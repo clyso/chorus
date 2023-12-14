@@ -1,0 +1,100 @@
+package config
+
+import (
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/stretchr/testify/require"
+	"testing"
+)
+
+func TestGet(t *testing.T) {
+	r := require.New(t)
+	var conf Common
+	err := Get(&conf)
+	r.NoError(err)
+
+	r.EqualValues(9090, conf.Metrics.Port)
+	r.EqualValues("info", conf.Log.Level)
+	r.EqualValues(false, conf.Log.Json)
+}
+
+func TestOverride(t *testing.T) {
+	r := require.New(t)
+	var conf Common
+	err := Get(&conf, Path("override_test.yaml"))
+	r.NoError(err)
+
+	r.EqualValues(69, conf.Metrics.Port)
+	r.EqualValues("info", conf.Log.Level)
+	r.EqualValues(true, conf.Log.Json)
+	r.Empty(conf.Redis.Password)
+	r.NotEmpty(conf.Redis.Address)
+
+}
+
+func TestOverride2(t *testing.T) {
+	r := require.New(t)
+	var conf Common
+	err := Get(&conf, Path("override_test.yaml"), Path("override_test2.yaml"))
+	r.NoError(err)
+	r.NoError(conf.Validate())
+
+	r.EqualValues(420, conf.Metrics.Port)
+	r.EqualValues("info", conf.Log.Level)
+	r.EqualValues(true, conf.Log.Json)
+	r.Empty(conf.Redis.Password)
+	r.NotEmpty(conf.Redis.Address)
+}
+
+func TestOverrideEnv(t *testing.T) {
+	t.Setenv("CFG_METRICS_PORT", "55")
+	t.Setenv("CFG_REDIS_PASSWORD", "secret")
+
+	r := require.New(t)
+	var conf Common
+	err := Get(&conf, Path("override_test.yaml"), Path("override_test2.yaml"))
+	r.NoError(err)
+	r.NoError(conf.Validate())
+	r.EqualValues(55, conf.Metrics.Port)
+	r.EqualValues("info", conf.Log.Level)
+	r.EqualValues(true, conf.Log.Json)
+	r.EqualValues("secret", conf.Redis.Password)
+	r.NotEmpty(conf.Redis.Address)
+}
+
+func TestStorageConfig_RateLimitConf(t *testing.T) {
+	r := require.New(t)
+	conf := s3.StorageConfig{Storages: map[string]s3.Storage{
+		"main": {RateLimit: s3.RateLimit{
+			Enabled: false,
+			RPM:     1,
+		}},
+		"f1": {RateLimit: s3.RateLimit{
+			Enabled: true,
+			RPM:     2,
+		}},
+		"f2": {RateLimit: s3.RateLimit{
+			Enabled: false,
+			RPM:     3,
+		}},
+	}}
+	res := conf.RateLimitConf()
+	r.EqualValues(s3.RateLimit{
+		Enabled: false,
+		RPM:     1,
+	}, res["main"])
+	r.EqualValues(s3.RateLimit{
+		Enabled: true,
+		RPM:     2,
+	}, res["f1"])
+	r.EqualValues(s3.RateLimit{
+		Enabled: false,
+		RPM:     3,
+	}, res["f2"])
+	r.EqualValues(s3.RateLimit{
+		Enabled: false,
+		RPM:     1,
+	}, res["main"])
+	r.EqualValues(conf.Storages["main"].RateLimit, res["main"])
+	r.EqualValues(conf.Storages["f1"].RateLimit, res["f1"])
+	r.EqualValues(conf.Storages["f2"].RateLimit, res["f2"])
+}

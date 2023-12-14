@@ -1,0 +1,17 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chorus.fullname" . }}-proxy-service
+  labels:
+    app: proxy
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: proxy
+  {{- include "chorus.selectorLabels" . | nindent 4 }}
+  type: {{ .Values.proxy.proxyService.type }}
+  ports:
+  - name: http
+	{{- .Values.proxy.proxyService.portHttp | toYaml | nindent 4 -}}
+{{- end }}

@@ -1,0 +1,75 @@
+package ratelimit
+
+import (
+	"context"
+	"fmt"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/go-redis/redis_rate/v10"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
+)
+
+// RPM storage rate limit based on requests per minute
+type RPM interface {
+	// StorReq acquires storage api request rate limit based on RPM config.
+	StorReq(ctx context.Context, storage string) error
+	// StorReqN acquires n storage api requests rate limit based on RPM config.
+	StorReqN(ctx context.Context, storage string, n int) error
+}
+
+func New(rc *redis.Client, conf map[string]s3.RateLimit) *Svc {
+	limiter := redis_rate.NewLimiter(rc)
+
+	return &Svc{
+		limiter: limiter,
+		conf:    conf,
+	}
+}
+
+var _ RPM = &Svc{}
+
+type Svc struct {
+	limiter *redis_rate.Limiter
+	conf    map[string]s3.RateLimit
+}
+
+func (s *Svc) StorReqN(ctx context.Context, storage string, n int) error {
+	conf, ok := s.conf[storage]
+	if !ok || !conf.Enabled {
+		zerolog.Ctx(ctx).Debug().Str(log.Storage, storage).Msg("rate limit disabled")
+		return nil
+	}
+
+	res, err := s.limiter.AllowN(ctx, fmt.Sprintf("lim:%s", storage), redis_rate.PerMinute(conf.RPM), n)
+	if err != nil {
+		// rate limiter failure should not affect business logic.
+		// log and return error here:
+		zerolog.Ctx(ctx).Err(err).Str(log.Storage, storage).Msg("rate limit error")
+		return nil
+	}
+	if res.Allowed == 0 {
+		return &dom.ErrRateLimitExceeded{RetryIn: res.RetryAfter}
+	}
+	return nil
+}
+
+func (s *Svc) StorReq(ctx context.Context, storage string) error {
+	conf, ok := s.conf[storage]
+	if !ok || !conf.Enabled {
+		zerolog.Ctx(ctx).Debug().Str(log.Storage, storage).Msg("rate limit disabled")
+		return nil
+	}
+	res, err := s.limiter.Allow(ctx, fmt.Sprintf("lim:%s", storage), redis_rate.PerMinute(conf.RPM))
+	if err != nil {
+		// rate limiter failure should not affect business logic.
+		// log and return error here:
+		zerolog.Ctx(ctx).Err(err).Str(log.Storage, storage).Msg("rate limit error")
+		return nil
+	}
+	if res.Allowed == 0 {
+		return &dom.ErrRateLimitExceeded{RetryIn: res.RetryAfter}
+	}
+	return nil
+}

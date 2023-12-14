@@ -1,0 +1,112 @@
+package agent
+
+import (
+	"encoding/json"
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/notifications"
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/rs/zerolog"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+)
+
+func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		bytes, err := io.ReadAll(req.Body)
+		if err != nil {
+			zerolog.Ctx(ctx).Err(err).Msg("unable to read event body")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var body s3EventBody
+		err = json.Unmarshal(bytes, &body)
+		if err != nil {
+			zerolog.Ctx(ctx).Err(err).Msg("unable to unmarshal event body")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, record := range body.Records {
+			user, err := notifications.UserIDFromNotificationID(record.S3.ConfigurationId)
+			if err != nil {
+				zerolog.Ctx(ctx).Err(err).Msg("skip notification with invalid id")
+				continue
+			}
+			reqCtx := xctx.SetUser(ctx, user)
+			reqCtx = xctx.SetBucket(reqCtx, record.S3.Bucket.Name)
+			reqCtx = xctx.SetObject(reqCtx, record.S3.Object.Key)
+			methodArr := strings.Split(record.EventName, ":")
+			switch methodArr[len(methodArr)-1] {
+			case "Put", "Post":
+				reqCtx = xctx.SetMethod(reqCtx, s3.PutObject)
+			case "Copy":
+				reqCtx = xctx.SetMethod(reqCtx, s3.CopyObject)
+			case "CompleteMultipartUpload":
+				reqCtx = xctx.SetMethod(reqCtx, s3.CompleteMultipartUpload)
+			case "Delete":
+				reqCtx = xctx.SetMethod(reqCtx, s3.DeleteObject)
+			}
+
+			if strings.Contains(record.EventName, "ObjectCreated") {
+				err = handler.PutObject(reqCtx, notifications.ObjCreated{
+					Bucket:  record.S3.Bucket.Name,
+					ObjKey:  record.S3.Object.Key,
+					ObjETag: record.S3.Object.ETag,
+					ObjSize: int64(record.S3.Object.Size),
+				})
+				if err != nil {
+					zerolog.Ctx(reqCtx).Err(err).Msg("unable to replicate ObjectCreated")
+				}
+			} else if strings.Contains(record.EventName, "ObjectRemoved") {
+				err = handler.DeleteObject(reqCtx, notifications.ObjDeleted{
+					Bucket: record.S3.Bucket.Name,
+					ObjKey: record.S3.Object.Key,
+				})
+				if err != nil {
+					zerolog.Ctx(reqCtx).Err(err).Msg("unable to replicate ObjectRemoved")
+				}
+			} else {
+				zerolog.Ctx(reqCtx).Warn().Msgf("unknown s3 notification event %s", record.EventName)
+			}
+		}
+	}
+}
+
+type s3EventBody struct {
+	Records []struct {
+		EventVersion string    `json:"eventVersion"`
+		EventSource  string    `json:"eventSource"`
+		AwsRegion    string    `json:"awsRegion"`
+		EventTime    time.Time `json:"eventTime"`
+		EventName    string    `json:"eventName"`
+		UserIdentity struct {
+			PrincipalId string `json:"principalId"`
+		} `json:"userIdentity"`
+		RequestParameters struct {
+			SourceIPAddress string `json:"sourceIPAddress"`
+		} `json:"requestParameters"`
+		ResponseElements struct {
+			XAmzRequestId string `json:"x-amz-request-id"`
+			XAmzId2       string `json:"x-amz-id-2"`
+		} `json:"responseElements"`
+		S3 struct {
+			S3SchemaVersion string `json:"s3SchemaVersion"`
+			ConfigurationId string `json:"configurationId"`
+			Bucket          struct {
+				Name          string `json:"name"`
+				OwnerIdentity struct {
+					PrincipalId string `json:"principalId"`
+				} `json:"ownerIdentity"`
+				Arn string `json:"arn"`
+			} `json:"bucket"`
+			Object struct {
+				Key       string `json:"key"`
+				Size      int    `json:"size"`
+				ETag      string `json:"eTag"`
+				Sequencer string `json:"sequencer"`
+			} `json:"object"`
+		} `json:"s3"`
+	} `json:"Records"`
+}

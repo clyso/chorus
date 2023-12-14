@@ -1,0 +1,54 @@
+address: "http://localhost:9669" # Chorus proxy s3 api address
+port: 9669
+cors:
+  enabled: false
+  allowAll: false
+  whitelist:
+auth:
+  allowV2Signature: false
+  useStorage: # use credentials from one of configured storages <one|two>
+  custom: # use custom credentials for proxy s3 endpoint
+#    user1:
+#      accessKeyID: <user1 v4 accessKey credential>
+#      secretAccessKey: <user1 v4 secretKey credential>
+#    user2:
+#      accessKeyID: <user2 v4 accessKey credential>
+#      secretAccessKey: <user2 v4 secretKey credential>
+storage:
+  createRouting: true # create roting rules to route proxy requests to main storage
+  createReplication: false  # create replication rules to replicate data from main to other storages
+  storages:
+#    one: # yaml key with some handy storage name
+#      address: <s3.chorus.com>
+#      credentials:
+#        user1:
+#          accessKeyID: <user1 v4 accessKey credential>
+#          secretAccessKey: <user1 v4 secretKey credential>
+#        user2:
+#          accessKeyID: <user2 v4 accessKey credential>
+#          secretAccessKey: <user2 v4 secretKey credential>
+#      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
+#      isMain: true # <true|false> one of the storages in should be main
+#      healthCheckInterval: 10s
+#      httpTimeout: 1m
+#      isSecure: true #set false for http address
+#      rateLimit:
+#        enable: true
+#        rpm: 60
+#    two: # yaml key with some handy storage name
+#      address: <news3.chorus.com>
+#      credentials:
+#        user1:
+#          accessKeyID: <user1 v4 accessKey credential>
+#          secretAccessKey: <user1 v4 secretKey credential>
+#        user2:
+#          accessKeyID: <user2 v4 accessKey credential>
+#          secretAccessKey: <user2 v4 secretKey credential>
+#      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
+#      isMain: false # <true|false> one of the storages in should be main
+#      healthCheckInterval: 10s
+#      httpTimeout: 1m
+#      isSecure: true #set false for http address
+#      rateLimit:
+#        enable: true
+#        rpm: 60

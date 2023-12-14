@@ -1,0 +1,151 @@
+proxy:
+  enabled: true
+  image:
+    repository: harbor.clyso.com/chorus/proxy
+    tag: latest
+    pullPolicy: Always
+  replicas: 2
+  resources:
+    limits:
+      cpu: 100m
+      memory: 300Mi
+    requests:
+      cpu: 50m
+      memory: 150Mi
+  proxyService:
+    portHttp:
+      port: 9669
+      targetPort: http
+    type: ClusterIP
+  config:
+    metrics:
+      enabled: true
+    log:
+      json: true
+      level: info
+    trace:
+      enabled: false
+      endpoint: # url to Jaeger or other open trace provider
+    address: "http://localhost:9669" # Chorus proxy s3 api address
+    port: 9669
+    cors:
+      enabled: false
+      allowAll: false
+      whitelist:
+    auth:
+      allowV2Signature: false
+      useStorage: # use credentials from one of configured storages <one|two>
+      custom: # use custom credentials for proxy s3 endpoint
+    #      - accessKeyID: <s3 v4 accessKey credential>
+    #        secretAccessKey: <s3 v4 secretKey credential>
+    #      - accessKeyID: <s3 v4 accessKey credential>
+    #        secretAccessKey: <s3 v4 secretKey credential>
+worker:
+  replicas: 2
+  image:
+    repository: harbor.clyso.com/chorus/worker
+    tag: latest
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 100m
+      memory: 300Mi
+    requests:
+      cpu: 50m
+      memory: 150Mi
+  restApiService:
+    portRest:
+      port: 9071
+      targetPort: rest
+    type: ClusterIP
+  grpcApiService:
+    portGRPC:
+      port: 9670
+      targetPort: grpc
+    type: ClusterIP
+  config:
+    metrics:
+      enabled: true
+    log:
+      json: true
+      level: info
+    trace:
+      enabled: false
+      endpoint: # url to Jaeger or other open trace provider
+    rclone:
+      memoryLimit:
+        enabled: true
+        limit: 300M # Max RAM memory for file copy. Possible values: 50M <= mem <= (total app RAM - 50M). More memory -> faster s3 replication. # For example: if worker container resources.memory.limit = 500M, then mem = 450M
+        retryMin: 2s
+        retryMax: 20s
+      memoryCalc:
+        mul: 1.5
+        const: 0M
+      localFileLimit:
+        enabled: false
+        limit: 3
+        retryMin: 2s
+        retryMax: 20s
+      globalFileLimit:
+        enabled: true
+        limit: 3
+        retryMin: 2s
+        retryMax: 20s
+    concurrency: 10
+    api:
+      enabled: true
+commonConfig:
+  features:
+    tagging: true
+    acl: true
+  storage:
+    createRouting: true # create roting rules to route proxy requests to main storage
+    createReplication: false  # create replication rules to replicate data from main to other storages
+    storages:
+      one:
+        address: s3.clyso.com
+        provider: Ceph
+        isMain: true
+        isSecure: true
+      two:
+        address: office.clyso.cloud
+        provider: Ceph
+        isSecure: true
+existingSecret: "" # set name of existing secret with storage credentials or
+secret: "" #  set storage credentials here to create secret:
+# Example
+# secret: |-
+#  storage:
+#    storages:
+#      one:
+#        address: s3.clyso.com
+#        provider: Ceph
+#        isMain: true
+#        isSecure: true
+#        credentials:
+#          accessKeyID: abc
+#          secretAccessKey: abc
+#      two:
+#        address: office.clyso.cloud
+#        provider: Ceph
+#        isMain: false
+#        isSecure: true
+#        credentials:
+#          accessKeyID: abc
+#          secretAccessKey: abc
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    existingSecret: redis-secret
+    existingSecretPasswordKey: password
+
+imagePullSecrets:
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: { }
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""

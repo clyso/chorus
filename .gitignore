@@ -1,0 +1,12 @@
+**/.DS_Store
+.idea
+.vscode
+.fleet
+volumes
+.env
+*.private.env.json
+**/*.lock
+**/override.yaml
+chorusui.tar.gz
+ui-version.txt
+service/standalone/static/

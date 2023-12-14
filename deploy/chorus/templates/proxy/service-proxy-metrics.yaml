@@ -1,0 +1,18 @@
+{{- if and .Values.proxy.enabled .Values.proxy.config.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chorus.fullname" . }}-proxy-metrics
+  labels:
+    app: proxy
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: proxy
+  {{- include "chorus.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+{{- end }}

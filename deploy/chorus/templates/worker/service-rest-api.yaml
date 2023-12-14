@@ -1,0 +1,17 @@
+{{- if .Values.worker.config.api.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chorus.fullname" . }}-rest
+  labels:
+    app: worker
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: worker
+  {{- include "chorus.selectorLabels" . | nindent 4 }}
+  type: {{ .Values.worker.restApiService.type }}
+  ports:
+  - name: rest
+	{{- .Values.worker.restApiService.portRest | toYaml | nindent 4 -}}
+{{- end }}

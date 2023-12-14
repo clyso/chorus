@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chorus.fullname" . }}-worker
+  labels:
+    app: worker
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app: worker
+    {{- include "chorus.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: worker
+      {{- include "chorus.selectorLabels" . | nindent 8 }}
+      {{- if .Values.worker.config.metrics.enabled }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "9090"
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "chorus.serviceAccountName" . }}
+      containers:
+      - env:
+        - name: CFG_REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: redis-secret
+        - name: CFG_REDIS_ADDRESS
+          value: {{ printf "%s-redis-master:6379" ( .Release.Name ) }}
+        image: {{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag
+          | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+        name: worker
+        {{- if .Values.worker.config.metrics.enabled }}
+        ports:
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        {{- end }}
+        {{- if .Values.worker.config.api.enabled }}
+        - containerPort: 9670
+          name: grpc
+          protocol: TCP
+        - containerPort: 9671
+          name: rest
+          protocol: TCP
+        {{- end }}
+        resources: {{- toYaml .Values.worker.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - mountPath: /bin/config/config.yaml
+          name: config
+          subPath: config
+        {{- if or .Values.existingSecret .Values.secret }}
+        - mountPath: /bin/config/override.yaml
+          name: secret
+          subPath: config
+        {{- end }}
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - configMap:
+          name: {{ include "chorus.fullname" . }}-worker
+        name: config
+      {{- if or .Values.existingSecret .Values.secret }}
+      - secret:
+          secretName: {{ .Values.existingSecret | default (printf "%s-secret" (include "chorus.fullname" . ) ) }}
+        name: secret
+      {{- end }}

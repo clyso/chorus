@@ -1,0 +1,19 @@
+version: v1
+plugins:
+  - plugin: go
+    out: gen/go
+    opt: paths=source_relative
+  - plugin: go-grpc
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+  - name: grpc-gateway
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - grpc_api_configuration=http.yaml
+  - name: openapiv2
+    out: gen/openapi
+    opt:
+      - grpc_api_configuration=http.yaml

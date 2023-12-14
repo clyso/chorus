@@ -1,0 +1,763 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "chorus/chorus.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Chorus"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/agents": {
+      "get": {
+        "operationId": "Chorus_GetAgents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetAgentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/proxy": {
+      "get": {
+        "summary": "Returns connection details for proxy s3 endpoint",
+        "operationId": "Chorus_GetProxyCredentials",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetProxyCredentialsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication": {
+      "get": {
+        "summary": "Lists configured replications with statuses",
+        "operationId": "Chorus_ListReplications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListReplicationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/add": {
+      "post": {
+        "summary": "Configures new replication for user or bucket(-s)",
+        "operationId": "Chorus_AddReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusAddReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/compare-bucket": {
+      "post": {
+        "summary": "Compares contents of given bucket in given storages",
+        "operationId": "Chorus_CompareBucket",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusCompareBucketResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusCompareBucketRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/delete": {
+      "put": {
+        "summary": "Deletes given replication",
+        "operationId": "Chorus_DeleteReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/list-buckets": {
+      "post": {
+        "summary": "Returns list of buckets to configure new replication.",
+        "operationId": "Chorus_ListBucketsForReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListBucketsForReplicationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusListBucketsForReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/pause": {
+      "put": {
+        "summary": "Pauses given replication",
+        "operationId": "Chorus_PauseReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/resume": {
+      "put": {
+        "summary": "Resumes given replication",
+        "operationId": "Chorus_ResumeReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/user": {
+      "get": {
+        "operationId": "Chorus_ListUserReplications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListUserReplicationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/user/delete": {
+      "put": {
+        "operationId": "Chorus_DeleteUserReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusDeleteUserReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/storage": {
+      "get": {
+        "summary": "Lists configured storages with users",
+        "operationId": "Chorus_GetStorages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetStoragesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "StorageProvider": {
+      "type": "string",
+      "enum": [
+        "Other",
+        "Ceph",
+        "Minio",
+        "AWS",
+        "GCS",
+        "Alibaba",
+        "Cloudflare",
+        "DigitalOcean"
+      ],
+      "default": "Other"
+    },
+    "chorusAddReplicationRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isForAllBuckets": {
+          "type": "boolean"
+        },
+        "agentUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusAgent": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusCompareBucketRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "showMatch": {
+          "type": "boolean",
+          "title": "set true to get list of matching files (match) in response"
+        }
+      }
+    },
+    "chorusCompareBucketResponse": {
+      "type": "object",
+      "properties": {
+        "isMatch": {
+          "type": "boolean",
+          "title": "true if storage's buckets have the same content"
+        },
+        "missFrom": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "list of missing files in 'from storage' bucket"
+        },
+        "missTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "list of missing files in 'to storage' bucket"
+        },
+        "differ": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "list of files with different content"
+        },
+        "error": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "list of errors occurred during comparison"
+        },
+        "match": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "list matched files in storages bucket.\nwill be empty if request parameter show_match set to false."
+        }
+      }
+    },
+    "chorusCredential": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "accessKey": {
+          "type": "string"
+        },
+        "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusDeleteUserReplicationRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "deleteBucketReplications": {
+          "type": "boolean"
+        }
+      }
+    },
+    "chorusGetAgentsResponse": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusAgent"
+          }
+        }
+      }
+    },
+    "chorusGetProxyCredentialsResponse": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusCredential"
+          }
+        }
+      }
+    },
+    "chorusGetStoragesResponse": {
+      "type": "object",
+      "properties": {
+        "storages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusStorage"
+          }
+        }
+      }
+    },
+    "chorusListBucketsForReplicationRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "showReplicated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "chorusListBucketsForReplicationResponse": {
+      "type": "object",
+      "properties": {
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "replicatedBuckets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "chorusListReplicationsResponse": {
+      "type": "object",
+      "properties": {
+        "replications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusReplication"
+          }
+        }
+      }
+    },
+    "chorusListUserReplicationsResponse": {
+      "type": "object",
+      "properties": {
+        "replications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusUserReplication"
+          }
+        }
+      }
+    },
+    "chorusReplication": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "isPaused": {
+          "type": "boolean"
+        },
+        "isInitDone": {
+          "type": "boolean"
+        },
+        "initObjListed": {
+          "type": "string",
+          "format": "int64"
+        },
+        "initObjDone": {
+          "type": "string",
+          "format": "int64"
+        },
+        "initBytesListed": {
+          "type": "string",
+          "format": "int64"
+        },
+        "initBytesDone": {
+          "type": "string",
+          "format": "int64"
+        },
+        "events": {
+          "type": "string",
+          "format": "int64"
+        },
+        "eventsDone": {
+          "type": "string",
+          "format": "int64"
+        },
+        "lastEmittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastProcessedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "agentUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusReplicationRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusStorage": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "some human-readable alias for storage config"
+        },
+        "isMain": {
+          "type": "boolean"
+        },
+        "address": {
+          "type": "string",
+          "title": "ex: s3.clyso.com"
+        },
+        "provider": {
+          "$ref": "#/definitions/StorageProvider",
+          "title": "s3 storage provider \u003cCeph|Minio|AWS|Other\u003e"
+        },
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusCredential"
+          },
+          "title": "credentials: access key (public, aka username)"
+        }
+      }
+    },
+    "chorusUserReplication": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}

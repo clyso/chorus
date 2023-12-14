@@ -1,0 +1,66 @@
+concurrency: 10 # max number of task that can be processed in parallel
+rclone:
+  memoryLimit:
+    enabled: true
+    limit: 300M # Max RAM memory for file copy. Possible values: 50M <= mem <= (total app RAM - 50M).
+    # More memory -> faster s3 replication. # For example: if worker container resources.memory.limit = 500M, then mem = 450M
+    retryMin: 2s # min task retry interval if limit reached. Used in retry sampler
+    retryMax: 20s # max task retry interval if limit reached. Used in retry sampler
+  memoryCalc:
+    mul: 1.5
+    const: 0M
+  localFileLimit:
+    enabled: false
+    limit: 3 # max number of objects copied in parallel by one instance
+    retryMin: 2s
+    retryMax: 20s
+  globalFileLimit:
+    enabled: true
+    limit: 3 # max number of objects copied in parallel across all instances - useful if worker replicas share the same network resource
+    retryMin: 2s
+    retryMax: 20s
+lock:
+  overlap: 2s
+api:
+  enabled: false # set true to enable management api
+  grpcPort: 9670
+  httpPort: 9671
+  secure: false
+storage:
+  createRouting: true # create roting rules to route proxy requests to main storage
+  createReplication: false  # create replication rules to replicate data from main to other storages
+  storages:
+#    one: # yaml key with some handy storage name
+#      address: <s3.chorus.com>
+#      credentials:
+#        user1:
+#          accessKeyID: <user1 v4 accessKey credential>
+#          secretAccessKey: <user1 v4 secretKey credential>
+#        user2:
+#          accessKeyID: <user2 v4 accessKey credential>
+#          secretAccessKey: <user2 v4 secretKey credential>
+#      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
+#      isMain: true # <true|false> one of the storages in should be main
+#      healthCheckInterval: 10s
+#      httpTimeout: 1m
+#      isSecure: true #set false for http address
+#      rateLimit:
+#        enable: true
+#        rpm: 60
+#    two: # yaml key with some handy storage name
+#      address: <news3.chorus.com>
+#      credentials:
+#        user1:
+#          accessKeyID: <user1 v4 accessKey credential>
+#          secretAccessKey: <user1 v4 secretKey credential>
+#        user2:
+#          accessKeyID: <user2 v4 accessKey credential>
+#          secretAccessKey: <user2 v4 secretKey credential>
+#      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
+#      isMain: false # <true|false> one of the storages in should be main
+#      healthCheckInterval: 10s
+#      httpTimeout: 1m
+#      isSecure: true #set false for http address
+#      rateLimit:
+#        enable: true
+#        rpm: 60

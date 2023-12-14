@@ -1,0 +1,30 @@
+FROM golang:1.21 as builder
+ARG GIT_COMMIT='not set'
+ARG GIT_TAG=development
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV GIT_TAG=$GIT_TAG
+
+WORKDIR /build
+
+COPY ./go.mod go.mod
+COPY ./go.sum go.sum
+
+RUN go mod download
+
+COPY . .
+
+ARG GO111MODULE=on
+ARG CGO_ENABLED=0
+ARG GOOS=linux
+ARG GOARCH=amd64
+
+RUN CGO_ENABLED=$CGO_ENABLED GO111MODULE=$GO111MODULE GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X 'main.version=$GIT_TAG' -X 'main.commit=$GIT_COMMIT'" ./cmd/proxy
+
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:nonroot
+USER nonroot:nonroot
+WORKDIR /bin
+
+COPY --chown=nonroot:nonroot --from=builder /build/proxy proxy
+
+CMD ["proxy"]

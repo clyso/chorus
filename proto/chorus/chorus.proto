@@ -1,0 +1,185 @@
+syntax = "proto3";
+
+option go_package = "github.com/clyso/chorus/proto/chorus;pb";
+
+package chorus;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+
+service Chorus {
+  // Lists configured storages with users
+  rpc GetStorages (google.protobuf.Empty) returns (GetStoragesResponse);
+  // Returns connection details for proxy s3 endpoint
+  rpc GetProxyCredentials(google.protobuf.Empty)returns (GetProxyCredentialsResponse);
+
+  // Returns list of buckets to configure new replication.
+  rpc ListBucketsForReplication(ListBucketsForReplicationRequest) returns (ListBucketsForReplicationResponse);
+  // Configures new replication for user or bucket(-s)
+  rpc AddReplication(AddReplicationRequest) returns (google.protobuf.Empty);
+  // Lists configured replications with statuses
+  rpc ListReplications(google.protobuf.Empty) returns (ListReplicationsResponse);
+  rpc ListUserReplications(google.protobuf.Empty) returns (ListUserReplicationsResponse);
+
+  rpc StreamBucketReplication(ReplicationRequest) returns  (stream Replication);
+
+  // Pauses given replication
+  rpc PauseReplication(ReplicationRequest) returns (google.protobuf.Empty);
+  // Resumes given replication
+  rpc ResumeReplication(ReplicationRequest) returns (google.protobuf.Empty);
+  // Deletes given replication
+  rpc DeleteReplication(ReplicationRequest) returns (google.protobuf.Empty);
+  rpc DeleteUserReplication(DeleteUserReplicationRequest) returns (google.protobuf.Empty);
+
+  // Compares contents of given bucket in given storages
+  rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse);
+
+  rpc GetAgents(google.protobuf.Empty)returns(GetAgentsResponse);
+}
+
+message GetStoragesResponse {
+  repeated Storage storages = 1;
+}
+
+message Storage {
+  enum Provider {
+    Other = 0;
+    Ceph = 1;
+    Minio = 2;
+    AWS = 3;
+    GCS = 4;
+    Alibaba = 5;
+    Cloudflare = 6;
+    DigitalOcean = 7;
+  }
+  // some human-readable alias for storage config
+  string name = 1;
+  bool is_main = 2;
+  // ex: s3.clyso.com
+  string address = 3;
+  // s3 storage provider <Ceph|Minio|AWS|Other>
+  Provider provider = 4;
+  // credentials: access key (public, aka username)
+  repeated Credential credentials = 5;
+}
+
+message Credential {
+  string alias = 1;
+  string access_key = 2;
+  string secret_key = 3;
+}
+
+message GetProxyCredentialsResponse{
+  string address = 1;
+  repeated Credential credentials = 2;
+}
+
+message AddReplicationRequest{
+  string user = 1;
+  string from = 3;
+  string  to = 4;
+  repeated string buckets = 5;
+  bool is_for_all_buckets = 6;
+  optional string agent_url = 7;
+}
+
+message ListBucketsForReplicationRequest{
+  string user = 1;
+  string from = 2;
+  string to = 3;
+  bool show_replicated = 4;
+}
+
+message ListBucketsForReplicationResponse{
+  repeated string buckets = 1;
+  repeated string replicated_buckets = 2;
+}
+
+message ListReplicationsResponse{
+  repeated Replication replications = 1;
+}
+
+message Replication{
+  string user = 1;
+  string bucket = 2;
+  string from = 3;
+  string  to = 4;
+
+  google.protobuf.Timestamp created_at = 5;
+  bool is_paused = 6;
+  bool is_init_done = 7;
+
+  int64 init_obj_listed = 8;
+  int64 init_obj_done = 9;
+
+  int64 init_bytes_listed = 10;
+  int64 init_bytes_done = 11;
+
+  int64 events = 12;
+  int64 events_done = 13;
+
+  google.protobuf.Timestamp last_emitted_at = 14;
+  google.protobuf.Timestamp last_processed_at = 15;
+
+  optional string agent_url = 16;
+}
+
+message ReplicationRequest{
+  string user = 1;
+  string bucket = 2;
+  string from = 3;
+  string to = 4;
+}
+
+message ListUserReplicationsResponse{
+  repeated UserReplication replications = 1;
+}
+
+message UserReplication{
+  string user = 1;
+  string from = 2;
+  string to = 3;
+}
+
+message DeleteUserReplicationRequest{
+  string user = 1;
+  string from = 2;
+  string to = 3;
+  bool delete_bucket_replications = 4;
+}
+
+message CompareBucketRequest{
+  string user = 1;
+  string bucket = 2;
+  string from = 3;
+  string to = 4;
+  // set true to get list of matching files (match) in response
+  bool show_match = 5;
+}
+
+message CompareBucketResponse{
+  // true if storage's buckets have the same content
+  bool is_match = 1;
+  // list of missing files in 'from storage' bucket
+  repeated string miss_from = 2;
+  // list of missing files in 'to storage' bucket
+  repeated string miss_to = 3;
+  // list of files with different content
+  repeated string differ = 4;
+  // list of errors occurred during comparison
+  repeated string error = 5;
+
+  // list matched files in storages bucket.
+  // will be empty if request parameter show_match set to false.
+  repeated string match = 6;
+}
+
+message GetAgentsResponse {
+  repeated Agent agents = 1;
+}
+
+message Agent {
+  string storage = 1;
+  string url = 2;
+}

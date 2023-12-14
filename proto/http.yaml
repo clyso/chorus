@@ -1,0 +1,40 @@
+type: google.api.Service
+config_version: 3
+
+http:
+  rules:
+    - selector: chorus.Chorus.GetStorages
+      get: /storage
+
+    - selector: chorus.Chorus.GetProxyCredentials
+      get: /proxy
+
+    - selector: chorus.Chorus.GetAgents
+      get: /agents
+
+    - selector: chorus.Chorus.ListBucketsForReplication
+      post: /replication/list-buckets
+      body: "*"
+    - selector: chorus.Chorus.ListReplications
+      get: /replication
+    - selector: chorus.Chorus.ListUserReplications
+      get: /replication/user
+    - selector: chorus.Chorus.AddReplication
+      post: /replication/add
+      body: "*"
+    - selector: chorus.Chorus.PauseReplication
+      put: /replication/pause
+      body: "*"
+    - selector: chorus.Chorus.ResumeReplication
+      put: /replication/resume
+      body: "*"
+    - selector: chorus.Chorus.DeleteReplication
+      put: /replication/delete
+      body: "*"
+    - selector: chorus.Chorus.DeleteUserReplication
+      put: /replication/user/delete
+      body: "*"
+    - selector: chorus.Chorus.CompareBucket
+      post: /replication/compare-bucket
+      body: "*"
+

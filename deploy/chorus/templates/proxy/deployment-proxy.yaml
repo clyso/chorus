@@ -1,0 +1,85 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chorus.fullname" . }}-proxy
+  labels:
+    app: proxy
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.proxy.replicas }}
+  selector:
+    matchLabels:
+      app: proxy
+    {{- include "chorus.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: proxy
+      {{- include "chorus.selectorLabels" . | nindent 8 }}
+      {{- if .Values.proxy.config.metrics.enabled }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "9090"
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "chorus.serviceAccountName" . }}
+      containers:
+      - env:
+        - name: CFG_REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: redis-secret
+        - name: CFG_REDIS_ADDRESS
+          value: {{ printf "%s-redis-master:6379" ( .Release.Name ) }}
+        image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
+        livenessProbe:
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          tcpSocket:
+            port: 9669
+        name: proxy
+        ports:
+        - containerPort: 9669
+          name: http
+          protocol: TCP
+        {{- if .Values.proxy.config.metrics.enabled }}
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        {{- end }}
+        readinessProbe:
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          tcpSocket:
+            port: 9669
+        resources: {{- toYaml .Values.proxy.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - mountPath: /bin/config/config.yaml
+          name: config
+          subPath: config
+        {{- if or .Values.existingSecret .Values.secret }}
+        - mountPath: /bin/config/override.yaml
+          name: secret
+          subPath: config
+        {{- end }}
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - configMap:
+          name: {{ include "chorus.fullname" . }}-proxy
+        name: config
+      {{- if or .Values.existingSecret .Values.secret }}
+      - secret:
+          secretName: {{ .Values.existingSecret | default (printf "%s-secret" (include "chorus.fullname" . ) ) }}
+        name: secret
+      {{- end }}
+{{- end }}

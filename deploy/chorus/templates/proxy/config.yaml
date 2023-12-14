@@ -1,0 +1,12 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "chorus.fullname" . }}-proxy
+  labels:
+  {{- include "chorus.labels" . | nindent 4 }}
+data:
+  config: |-     
+  {{- .Values.proxy.config | toYaml | nindent 4 }}
+  {{- .Values.commonConfig | toYaml | nindent 4 }}
+{{- end }}

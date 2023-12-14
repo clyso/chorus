@@ -1,0 +1,23 @@
+log:
+  json: false # false for dev console logger, true - json log for prod to export to Grafana&Loki.
+  level: info
+metrics:
+  enabled: false
+  port: 9090
+trace:
+  enabled: false
+  endpoint: # url to Jaeger or other open trace provider
+redis:
+  address: "127.0.0.1:6379"
+  password:
+  appDB: 0
+  queueDB: 1
+  lockDB: 2
+  configDB: 3
+features:
+  versioning: false #
+  autoMigrate: false # initiate migration from main to other storages on startup
+  tagging: true # sync object/bucket tags
+  acl: true # sync object/bucket ACLs
+  lifecycle: false # sync bucket Lifecycle
+  policy: false # sync bucket Policies

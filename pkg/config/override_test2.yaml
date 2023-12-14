@@ -1,0 +1,4 @@
+log:
+  json: true
+metrics:
+  port: 420

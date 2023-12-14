@@ -1,0 +1,32 @@
+proxy:
+  auth:
+    useStorage: one
+storage:
+  storages:
+    one: # yaml key with some handy storage name
+      address: ":9680" # will start fake s3 on port 9680
+      credentials:
+        user1:
+          accessKeyID: testKey1
+          secretAccessKey: testSecretKey1
+        user2:
+          accessKeyID: testKey2
+          secretAccessKey: testSecretKey2
+      provider: Other
+      isMain: true
+    two: # yaml key with some handy storage name
+      address: ":9681" # will start fake s3 on port 9681
+      credentials:
+        user1:
+          accessKeyID: testKey1
+          secretAccessKey: testSecretKey1
+        user2:
+          accessKeyID: testKey2
+          secretAccessKey: testSecretKey2
+      provider: Other
+      isMain: false
+api:
+  enabled: true # set true to enable management api
+log:
+  level: warn
+  json: false

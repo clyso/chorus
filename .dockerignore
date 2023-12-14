@@ -1,0 +1,32 @@
+# Ignore git folder
+.git/
+
+# Ignore doc files
+./docu
+**/*.png
+**/*.md
+
+# Ignore test files
+./test
+
+# Ignore files from root
+.gitignore
+.gitlab-ci.yml
+.golangci.yaml
+Dockerfile
+README.md
+
+# Ignore all files which are not go type
+!**/*.go
+!**/*.mod
+!**/*.sum
+
+# allow configs
+!/config/**
+
+# Ignore unnecessary files inside allowed directories
+# This should go after the allowed directories
+**/*~
+**/*.log
+**/.DS_Store
+**/Thumbs.db

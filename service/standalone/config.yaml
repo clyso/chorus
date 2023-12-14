@@ -1,0 +1,48 @@
+log:
+  level: warn
+  json: false
+concurrency: 10
+api:
+  enabled: true # set true to enable management api
+  grpcPort: 9670
+  httpPort: 9671
+  secure: false
+uiPort: 9672
+lock:
+  overlap: 2s
+proxy:
+  enabled: true
+  address: "http://localhost:9669" # Chorus proxy s3 api address
+  port: 9669
+  cors:
+    enabled: true
+    allowAll: false
+    whitelist:
+      - http://localhost:9672
+  auth:
+    allowV2Signature: true
+    useStorage: # use credentials from one of configured storages <one|two>
+    custom: # use custom credentials for proxy s3 endpoint
+  #      - accessKeyID: <s3 v4 accessKey credential>
+  #        secretAccessKey: <s3 v4 secretKey credential>
+  #      - accessKeyID: <s3 v4 accessKey credential>
+  #        secretAccessKey: <s3 v4 secretKey credential>
+rclone:
+  memoryLimit:
+    enabled: true
+    limit: 300M # Max RAM memory for file copy. Possible values: 50M <= mem <= (total app RAM - 50M). More memory -> faster s3 replication. # For example: if worker container resources.memory.limit = 500M, then mem = 450M
+    retryMin: 2s
+    retryMax: 20s
+  memoryCalc:
+    mul: 1.5
+    const: 0M
+  localFileLimit:
+    enabled: false
+    limit: 3
+    retryMin: 2s
+    retryMax: 20s
+  globalFileLimit:
+    enabled: false
+    limit: 3
+    retryMin: 2s
+    retryMax: 20s
