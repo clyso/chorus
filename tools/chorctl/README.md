@@ -7,6 +7,7 @@ CLI for chorus management api.
 ```shell
 go build .
 ```
+Or download binary from [docs page](https://docs.clyso.com/docs/products/chorus/installation#management-cli)
 
 ## Usage
 
@@ -47,3 +48,4 @@ Use "chorctl [command] --help" for more information about a command.
 Some useful commands:
 - `chorctl dash` - shows live dashboard with bucket replication statuses
 - `chorctl repl add -b <bucket name> -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config> `
+

@@ -20,9 +20,9 @@ Communication between Proxy/Agent and worker is done over work queue.
 
 For details, see:
 - [proxy](./service/proxy)
-- [worker](./service/proxy)
-- [agent](./service/proxy)
-- [standalone](./service/proxy)
+- [worker](./service/worker)
+- [agent](./service/agent)
+- [standalone](./service/standalone)
 - [management CLI](./tools/chorctl)
 
 ## Documentation

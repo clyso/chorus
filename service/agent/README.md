@@ -10,6 +10,9 @@ Can be used as alternative to [Chorus proxy](../proxy).
 Set proper `url` and `fromStorage` params to [config](./config.yaml) and deploy agent to be reachable by source s3
 storage.
 
+> [!NOTE]  
+> [Worker](../worker) is required to use CLI. Deploy worker and provide worker GRPC api address to CLI.
+
 With [CLI](../../tools/chorctl):
 - check that agent successfully registered itself and can be listed with CLI:
   ```shell

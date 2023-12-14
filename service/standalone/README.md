@@ -5,5 +5,5 @@ Standalone version does not have persistence, so it cannot be used for productio
 
 ## Installation and usage
 
-[See docs](https://docs.clyso.cloud/docs/products/chorus/installation#standalone)
+[See docs](https://docs.clyso.com/docs/products/chorus/installation#standalone)
 

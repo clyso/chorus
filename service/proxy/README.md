@@ -6,12 +6,12 @@ Serves s3 proxy on port `:9669`. Routes s3 requests to main s3 storage from [con
 
 Set s3 storage and redis credentials to [config](./config.yaml) and run.
 
-> [!NOTE]  
+> [!IMPORTANT]  
 > Both Proxy and [worker](../worker) should have the same Redis and s3 storages in config.
 
 Manage replication policies with [CLI](../../tools/chorctl)
 > [!NOTE]  
-> To use CLI [worker](../worker) is required. Deploy worker and provide worker GRPC api address to CLI.
+> [Worker](../worker) is required to use CLI. Deploy worker and provide worker GRPC api address to CLI.
 
 With [CLI](../../tools/chorctl):
 - check current replication state dashboard
@@ -23,9 +23,9 @@ With [CLI](../../tools/chorctl):
   chorctl repl buckets -f <from storage> -t <to storage> -u <user>
   ```
 - create replciation for bucket:
-```shell
-chorctl repl add -f <from storage> -t <to storage> -u <user> -b <bucket name>
-```
+  ```shell
+  chorctl repl add -f <from storage> -t <to storage> -u <user> -b <bucket name>
+  ```
 - go to dashboard to check created replication progress
   ```shell
   chorctl dash
@@ -53,5 +53,5 @@ Possible configurations:
           accessKeyID: <user2 v4 accessKey credential>
           secretAccessKey: <user2 v4 secretKey credential>
     ```
-> [!NOTE]  
+> [!IMPORTANT]  
 > Custom credentials user keys (`user1` and `user2` in example above) should match user keys in storage config.
