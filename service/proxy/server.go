@@ -123,6 +123,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	err = server.Add("proxy_request_reply", func(ctx context.Context) error {
 		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address, conf.Auth.Custom, conf.Storage.Storages[conf.Auth.UseStorage].Credentials))
 	}, func(ctx context.Context) error { return nil })
+	if err != nil {
+		return err
+	}
 
 	if conf.Metrics.Enabled {
 		start, stop := metrics.Server(ctx, conf.Metrics.Port, app)

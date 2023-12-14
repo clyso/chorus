@@ -9,4 +9,3 @@ volumes
 **/override.yaml
 chorusui.tar.gz
 ui-version.txt
-service/standalone/static/

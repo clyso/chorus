@@ -1,0 +1,1 @@
+# just some file to fix go:embed compile err. will be replaced with webUI static during build.

@@ -18,14 +18,12 @@ import (
 	"time"
 )
 
-// AWS Signature Version '4' constants.
 const (
 	signV4Algorithm = "AWS4-HMAC-SHA256"
 	iso8601Format   = "20060102T150405Z"
 	yyyymmdd        = "20060102"
 )
 
-// Verify if request has AWS Signature Version '4'.
 func isRequestSignatureV4(r *http.Request) bool {
 	return strings.HasPrefix(r.Header.Get(s3.Authorization), signV4Algorithm)
 }
@@ -35,19 +33,15 @@ func compareSignatureV4(sig1, sig2 string) bool {
 }
 
 func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request) (string, error) {
-	// Copy request.
 	req := *r
 
-	// Save authorization header.
 	v4Auth := req.Header.Get(s3.Authorization)
 
-	// Parse signature version '4' header.
 	signV4Values, err := s3.ParseSignV4(v4Auth)
 	if err != nil {
 		return "", err
 	}
 
-	// Extract all the signed headers along with its values.
 	extractedSignedHeaders, err := s3.ExtractSignedHeaders(signV4Values.SignedHeaders, r)
 	if err != nil {
 		return "", err
@@ -59,7 +53,6 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 	}
 	cred := credInfo.cred
 
-	// Extract date, if not present throw error.
 	var date string
 	if date = req.Header.Get(s3.AmzDate); date == "" {
 		if date = r.Header.Get(s3.Date); date == "" {
@@ -67,30 +60,17 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 		}
 	}
 
-	// Parse date header.
 	t, e := time.Parse(iso8601Format, date)
 	if e != nil {
 		return "", fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
 	}
-
-	// Query string.
-	//queryStr := req.Form.Encode()
 	queryStr := req.URL.Query().Encode()
-
-	// Get canonical request.
 	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
-
-	// Get string to sign from canonical request.
 	stringToSign := getV4StringToSign(canonicalRequest, t, signV4Values.Credential.GetScope())
-
-	// Get hmac signing key.
 	signingKey := getV4SigningKey(cred.SecretAccessKey, signV4Values.Credential.Scope.Date,
 		signV4Values.Credential.Scope.Region)
-
-	// Calculate signature.
 	newSignature := getV4Signature(signingKey, stringToSign)
 
-	// Verify if signature match.
 	if !compareSignatureV4(newSignature, signV4Values.Signature) {
 		return "", mclient.ErrorResponse{
 			XMLName:    xml.Name{},
@@ -146,7 +126,6 @@ func signV4TrimAll(input string) string {
 	return strings.Join(strings.Fields(input), " ")
 }
 
-// getSignedV4Headers generate a string i.e alphabetically sorted, semicolon-separated list of lowercase request header names
 func getSignedV4Headers(signedHeaders http.Header) string {
 	var headers []string
 	for k := range signedHeaders {
@@ -156,7 +135,6 @@ func getSignedV4Headers(signedHeaders http.Header) string {
 	return strings.Join(headers, ";")
 }
 
-// getV4StringToSign a string based on selected query values.
 func getV4StringToSign(canonicalRequest string, t time.Time, scope string) string {
 	stringToSign := signV4Algorithm + "\n" + t.Format(iso8601Format) + "\n"
 	stringToSign += scope + "\n"
@@ -165,7 +143,6 @@ func getV4StringToSign(canonicalRequest string, t time.Time, scope string) strin
 	return stringToSign
 }
 
-// getV4SigningKey hmac seed to calculate final signature.
 func getV4SigningKey(secretKey string, t time.Time, region string) []byte {
 	date := sumHMAC([]byte("AWS4"+secretKey), []byte(t.Format(yyyymmdd)))
 	regionBytes := sumHMAC(date, []byte(region))
@@ -174,7 +151,6 @@ func getV4SigningKey(secretKey string, t time.Time, region string) []byte {
 	return signingKey
 }
 
-// getV4Signature final signature in hexadecimal form.
 func getV4Signature(signingKey []byte, stringToSign string) string {
 	return hex.EncodeToString(sumHMAC(signingKey, []byte(stringToSign)))
 }

@@ -155,13 +155,7 @@ func signatureV2(cred s3.CredentialsV4, method string, encodedResource string, e
 	return signature
 }
 
-// compareSignatureV2 returns true if and only if both signatures
-// are equal. The signatures are expected to be base64 encoded strings
-// according to the AWS S3 signature V2 spec.
 func compareSignatureV2(sig1, sig2 string) bool {
-	// Decode signature string to binary byte-sequence representation is required
-	// as Base64 encoding of a value is not unique:
-	// For example "aGVsbG8=" and "aGVsbG8=\r" will result in the same byte slice.
 	signature1, err := base64.StdEncoding.DecodeString(sig1)
 	if err != nil {
 		return false
@@ -221,8 +215,6 @@ func canonicalizedResourceV2(encodedResource, encodedQuery string) string {
 		canonicalQueries = append(canonicalQueries, key+"="+val)
 	}
 
-	// The queries will be already sorted as resourceList is sorted, if canonicalQueries
-	// is empty strings.Join returns empty.
 	canonicalQuery := strings.Join(canonicalQueries, "&")
 	if canonicalQuery != "" {
 		return encodedResource + "?" + canonicalQuery
@@ -230,9 +222,6 @@ func canonicalizedResourceV2(encodedResource, encodedQuery string) string {
 	return encodedResource
 }
 
-// Return string to sign under two different conditions.
-// - if expires string is set then string to sign includes date instead of the Date header.
-// - if expires string is empty then string to sign includes date header instead.
 func getStringToSignV2(method string, encodedResource, encodedQuery string, headers http.Header, expires string) string {
 	canonicalHeaders := canonicalizedAmzHeadersV2(headers)
 	if len(canonicalHeaders) > 0 {
@@ -241,18 +230,9 @@ func getStringToSignV2(method string, encodedResource, encodedQuery string, head
 
 	date := expires // Date is set to expires date for presign operations.
 	if date == "" {
-		// If expires date is empty then request header Date is used.
 		date = headers.Get(s3.Date)
 	}
 
-	// From the Amazon docs:
-	//
-	// StringToSign = HTTP-Verb + "\n" +
-	// 	 Content-Md5 + "\n" +
-	//	 Content-Type + "\n" +
-	//	 Date/Expires + "\n" +
-	//	 CanonicalizedProtocolHeaders +
-	//	 CanonicalizedResource;
 	stringToSign := strings.Join([]string{
 		method,
 		headers.Get(s3.ContentMD5),
