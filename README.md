@@ -15,7 +15,7 @@ Listed features can be configured per s3 user and per bucket with [management CL
 Communication between Proxy/Agent and worker is done over work queue. 
 [Asynq](https://github.com/hibiken/asynq) with [Redis](https://github.com/redis/redis) is used as a work queue.
 
-![diagram.png](docs/media/diagram.png)
+![diagram.png](./docs/media/diagram.png)
 
 For details, see:
 - [proxy](./service/proxy)
