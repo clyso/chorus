@@ -9,6 +9,7 @@ Once configured it can:
 
 Listed features can be configured per s3 user and per bucket with [management CLI](./tools/chorctl) or webUI.
 
+## Components
 [Chorus S3 Proxy](./service/proxy) service responsible for routing s3 requests and capturing data change events. 
 [Chorus Agent](./service/agent) can be used as an alternative solution for capturing events instead of proxy.
 [Chorus Worker](./service/worker) service does actual data replication.
