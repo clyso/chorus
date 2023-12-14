@@ -18,7 +18,7 @@ Communication between Proxy/Agent and worker is done over work queue.
 
 ![diagram.png](./docs/media/diagram.png)
 
-For details, see:
+For more details, see:
 - [proxy](./service/proxy)
 - [worker](./service/worker)
 - [agent](./service/agent)
