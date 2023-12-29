@@ -11,7 +11,7 @@ Or download binary from [docs page](https://docs.clyso.com/docs/products/chorus/
 
 ## Usage
 
-`chorctl` sends requests GRPC api hosted by [Chorus worker](../../service/worker). 
+`chorctl` sends requests to GRPC api hosted by [Chorus worker](../../service/worker). 
 Deploy worker and provide GRPC api address to `chorctl` with `--address` flag or `CHORUS_ADDRESS` envar, for example:
 ```shell
 export CHORUS_ADDRESS=127.0.0.1:9670
