@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -202,7 +202,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	}
 	url := *req.URL
 	//todo: support virtual host
-	// see: /Users/atorubar/go/pkg/mod/github.com/minio/minio-go/v7@v7.0.52/api.go:890
+	// see: github.com/minio/minio-go/v7@v7.0.52/api.go:890
 	host := strings.TrimPrefix(c.conf.Address, "http://")
 	host = strings.TrimPrefix(host, "https://")
 	url.Host = host
@@ -214,7 +214,11 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	url.ForceQuery = false
 
 	_, copyReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.CopyReq", xctx.GetMethod(req.Context()).String()))
-	newReq, err = http.NewRequest(req.Method, url.String(), io.NopCloser(req.Body))
+	var body io.Reader = http.NoBody
+	if req.ContentLength != 0 {
+		body = io.NopCloser(req.Body)
+	}
+	newReq, err = http.NewRequest(req.Method, url.String(), body)
 	if err != nil {
 		copyReqSpan.End()
 		return nil, false, err

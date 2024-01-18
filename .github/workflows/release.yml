@@ -1,0 +1,36 @@
+name: Release Docker images
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  kaniko:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: build proxy
+        uses: aevea/action-kaniko@v0.10.0
+        with:
+          registry: harbor.clyso.com
+          username: "${{ secrets.DOCKER_USER }}"
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          image: chorus/proxy
+          build_file: Dockerfile.proxy
+          tag: ${{  github.ref_name }}
+          strip_tag_prefix: v
+          tag_with_latest: true
+          extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }}"
+      - name: build worker
+        uses: aevea/action-kaniko@v0.10.0
+        with:
+          registry: harbor.clyso.com
+          username: "${{ secrets.DOCKER_USER }}"
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          image: chorus/worker
+          build_file: Dockerfile.worker
+          tag: ${{  github.ref_name }}
+          strip_tag_prefix: v
+          tag_with_latest: true
+          extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }}"
