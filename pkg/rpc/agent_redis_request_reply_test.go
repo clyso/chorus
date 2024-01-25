@@ -41,7 +41,7 @@ func TestAgent(t *testing.T) {
 		_ = AgentServe(ctx, c, "agent3", "s3")
 	}()
 	tst := AgentClient{c}
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(50 * time.Millisecond)
 	res, err := tst.Ping(ctx)
 	r.NoError(err)
 	res, err = tst.Ping(ctx)
