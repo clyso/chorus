@@ -32,6 +32,8 @@ service Chorus {
   rpc DeleteReplication(ReplicationRequest) returns (google.protobuf.Empty);
   rpc DeleteUserReplication(DeleteUserReplicationRequest) returns (google.protobuf.Empty);
 
+  rpc SwitchMainBucket(SwitchMainBucketRequest) returns (google.protobuf.Empty);
+
   // Compares contents of given bucket in given storages
   rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse);
 
@@ -182,4 +184,10 @@ message GetAgentsResponse {
 message Agent {
   string storage = 1;
   string url = 2;
+}
+
+message SwitchMainBucketRequest{
+  string user = 1;
+  string bucket = 2;
+  string new_main = 3;
 }

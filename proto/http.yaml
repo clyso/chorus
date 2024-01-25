@@ -37,4 +37,7 @@ http:
     - selector: chorus.Chorus.CompareBucket
       post: /replication/compare-bucket
       body: "*"
+    - selector: chorus.Chorus.SwitchMainBucket
+      post: /replication/switch
+      body: "*"
 

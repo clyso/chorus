@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -471,4 +471,64 @@ func (h *handlers) GetAgents(ctx context.Context, _ *emptypb.Empty) (*pb.GetAgen
 		}
 	}
 	return &pb.GetAgentsResponse{Agents: res}, nil
+}
+
+func (h *handlers) SwitchMainBucket(ctx context.Context, req *pb.SwitchMainBucketRequest) (*emptypb.Empty, error) {
+	// validate req
+	if _, ok := h.storages.Storages[req.NewMain]; !ok {
+		return nil, fmt.Errorf("%w: invalid NewMain", dom.ErrInvalidArg)
+	}
+	ctx = log.WithUser(ctx, req.User)
+	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second), lock.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = lock.WithRefresh(ctx, func() error {
+		inProgress, err := h.policySvc.IsReplicationSwitchInProgress(ctx, req.User, req.Bucket)
+		if err != nil {
+			return err
+		}
+		if inProgress {
+			return fmt.Errorf("%w: switch aleady in progress", dom.ErrAlreadyExists)
+		}
+		prevMain, err := h.policySvc.GetRoutingPolicy(ctx, req.User, req.Bucket)
+		if err != nil {
+			return fmt.Errorf("%w: unable to get routing policy", err)
+		}
+		if prevMain == req.NewMain {
+			return fmt.Errorf("%w: storage %s is laready main for bucket %s", dom.ErrAlreadyExists, req.NewMain, req.Bucket)
+		}
+		replPolicies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.User, req.Bucket)
+		if err != nil {
+			return fmt.Errorf("%w: unable to get replication policy", err)
+		}
+		if _, ok := replPolicies.To[req.NewMain]; !ok {
+			return fmt.Errorf("%w: no previous replication policy to switch", dom.ErrInvalidArg)
+		}
+
+		prevReplication, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.User, req.Bucket, prevMain, req.NewMain)
+		if err != nil {
+			return err
+		}
+		if prevReplication.IsPaused {
+			return fmt.Errorf("%w: previous replication is paused", dom.ErrInvalidArg)
+		}
+		if !prevReplication.ListingStarted {
+			return fmt.Errorf("%w: previous replication is not started", dom.ErrInvalidArg)
+		}
+		if prevReplication.InitObjListed > prevReplication.InitObjDone {
+			return fmt.Errorf("%w: previous replication init phase is not done. %d objects remaining", dom.ErrInvalidArg, prevReplication.InitObjListed-prevReplication.InitObjDone)
+		}
+		if prevReplication.AgentURL != "" {
+			return fmt.Errorf("%w: switch is not supported for Chorus-agent setup. Use setup with Chorus-proxy", dom.ErrInvalidArg)
+		}
+		// todo: create replication switch
+
+		return nil
+	}, refresh, time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }

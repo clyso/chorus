@@ -286,6 +286,39 @@
         ]
       }
     },
+    "/replication/switch": {
+      "post": {
+        "operationId": "Chorus_SwitchMainBucket",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSwitchMainBucketRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/replication/user": {
       "get": {
         "operationId": "Chorus_ListUserReplications",
@@ -714,6 +747,20 @@
             "$ref": "#/definitions/chorusCredential"
           },
           "title": "credentials: access key (public, aka username)"
+        }
+      }
+    },
+    "chorusSwitchMainBucketRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "newMain": {
+          "type": "string"
         }
       }
     },

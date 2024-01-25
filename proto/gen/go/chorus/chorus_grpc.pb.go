@@ -31,6 +31,7 @@ const (
 	Chorus_ResumeReplication_FullMethodName         = "/chorus.Chorus/ResumeReplication"
 	Chorus_DeleteReplication_FullMethodName         = "/chorus.Chorus/DeleteReplication"
 	Chorus_DeleteUserReplication_FullMethodName     = "/chorus.Chorus/DeleteUserReplication"
+	Chorus_SwitchMainBucket_FullMethodName          = "/chorus.Chorus/SwitchMainBucket"
 	Chorus_CompareBucket_FullMethodName             = "/chorus.Chorus/CompareBucket"
 	Chorus_GetAgents_FullMethodName                 = "/chorus.Chorus/GetAgents"
 )
@@ -58,6 +59,7 @@ type ChorusClient interface {
 	// Deletes given replication
 	DeleteReplication(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeleteUserReplication(ctx context.Context, in *DeleteUserReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SwitchMainBucket(ctx context.Context, in *SwitchMainBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
 	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
@@ -193,6 +195,15 @@ func (c *chorusClient) DeleteUserReplication(ctx context.Context, in *DeleteUser
 	return out, nil
 }
 
+func (c *chorusClient) SwitchMainBucket(ctx context.Context, in *SwitchMainBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Chorus_SwitchMainBucket_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chorusClient) CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error) {
 	out := new(CompareBucketResponse)
 	err := c.cc.Invoke(ctx, Chorus_CompareBucket_FullMethodName, in, out, opts...)
@@ -234,6 +245,7 @@ type ChorusServer interface {
 	// Deletes given replication
 	DeleteReplication(context.Context, *ReplicationRequest) (*emptypb.Empty, error)
 	DeleteUserReplication(context.Context, *DeleteUserReplicationRequest) (*emptypb.Empty, error)
+	SwitchMainBucket(context.Context, *SwitchMainBucketRequest) (*emptypb.Empty, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)
 	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
@@ -275,6 +287,9 @@ func (UnimplementedChorusServer) DeleteReplication(context.Context, *Replication
 }
 func (UnimplementedChorusServer) DeleteUserReplication(context.Context, *DeleteUserReplicationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteUserReplication not implemented")
+}
+func (UnimplementedChorusServer) SwitchMainBucket(context.Context, *SwitchMainBucketRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SwitchMainBucket not implemented")
 }
 func (UnimplementedChorusServer) CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CompareBucket not implemented")
@@ -495,6 +510,24 @@ func _Chorus_DeleteUserReplication_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Chorus_SwitchMainBucket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchMainBucketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).SwitchMainBucket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_SwitchMainBucket_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).SwitchMainBucket(ctx, req.(*SwitchMainBucketRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Chorus_CompareBucket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CompareBucketRequest)
 	if err := dec(in); err != nil {
@@ -577,6 +610,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteUserReplication",
 			Handler:    _Chorus_DeleteUserReplication_Handler,
+		},
+		{
+			MethodName: "SwitchMainBucket",
+			Handler:    _Chorus_SwitchMainBucket_Handler,
 		},
 		{
 			MethodName: "CompareBucket",

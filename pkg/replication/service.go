@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -257,7 +257,7 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[str
 		return nil, fmt.Errorf("%w: no replication switch for replication task with invalid from storage", err)
 	}
 	if replSwitch.OldMain != task.GetFrom() {
-		return nil, fmt.Errorf("%w: replication swithc OldMain %s not match with task from storage %s", dom.ErrInternal, replSwitch.OldMain, task.GetFrom())
+		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, replSwitch.OldMain, task.GetFrom())
 	}
 
 	return replSwitch.GetOldFollowers(), nil
