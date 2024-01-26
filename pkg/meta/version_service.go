@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,17 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"strconv"
+)
+
+var (
+	// key = version key, args {1: user, 2: bucket 3: storage}
+	luaHIncVersion = redis.NewScript(`local max_ver = 0
+	for _, ver in ipairs(redis.call('HVALS', KEYS[1])) do
+		max_ver = math.max(max_ver, tonumber(ver))
+	end
+	max_ver = max_ver + 1
+	redis.call('HSET',KEYS[1], ARGV[1], max_ver )
+	return max_ver`)
 )
 
 type VersionService interface {
@@ -107,7 +118,22 @@ func (s *versionSvc) get(ctx context.Context, key string) (map[string]int64, err
 }
 
 func (s *versionSvc) IncrementObj(ctx context.Context, obj dom.Object, storage string) (int64, error) {
-	return s.client.HIncrBy(ctx, obj.Key(), storage, 1).Result()
+	return s.incVersion(ctx, obj.Key(), storage)
+}
+
+func (s *versionSvc) incVersion(ctx context.Context, key, storage string) (int64, error) {
+	result, err := luaHIncVersion.Run(ctx, s.client, []string{key}, storage).Result()
+	if err != nil {
+		return 0, err
+	}
+	inc, ok := result.(int64)
+	if !ok {
+		return 0, fmt.Errorf("%w: unable to cast luaHIncVersion result %T to int64", dom.ErrInternal, result)
+	}
+	if inc == 0 {
+		return 0, dom.ErrNotFound
+	}
+	return inc, nil
 }
 
 func (s *versionSvc) UpdateIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error {
@@ -191,7 +217,7 @@ func (s *versionSvc) GetACL(ctx context.Context, obj dom.Object) (map[string]int
 }
 
 func (s *versionSvc) IncrementACL(ctx context.Context, obj dom.Object, storage string) (int64, error) {
-	return s.client.HIncrBy(ctx, obj.ACLKey(), storage, 1).Result()
+	return s.incVersion(ctx, obj.ACLKey(), storage)
 }
 
 func (s *versionSvc) UpdateACLIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error {
@@ -203,7 +229,7 @@ func (s *versionSvc) GetTags(ctx context.Context, obj dom.Object) (map[string]in
 }
 
 func (s *versionSvc) IncrementTags(ctx context.Context, obj dom.Object, storage string) (int64, error) {
-	return s.client.HIncrBy(ctx, obj.TagKey(), storage, 1).Result()
+	return s.incVersion(ctx, obj.TagKey(), storage)
 }
 
 func (s *versionSvc) UpdateTagsIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error {
@@ -217,7 +243,7 @@ func (s *versionSvc) GetBucket(ctx context.Context, bucket string) (map[string]i
 
 func (s *versionSvc) IncrementBucket(ctx context.Context, bucket string, storage string) (int64, error) {
 	key := fmt.Sprintf("b:%s", bucket)
-	return s.client.HIncrBy(ctx, key, storage, 1).Result()
+	return s.incVersion(ctx, key, storage)
 }
 
 func (s *versionSvc) UpdateBucketIfGreater(ctx context.Context, bucket string, storage string, version int64) error {
@@ -239,7 +265,7 @@ func (s *versionSvc) GetBucketACL(ctx context.Context, bucket string) (map[strin
 
 func (s *versionSvc) IncrementBucketACL(ctx context.Context, bucket string, storage string) (int64, error) {
 	key := fmt.Sprintf("b:%s:a", bucket)
-	return s.client.HIncrBy(ctx, key, storage, 1).Result()
+	return s.incVersion(ctx, key, storage)
 }
 
 func (s *versionSvc) UpdateBucketACLIfGreater(ctx context.Context, bucket string, storage string, version int64) error {
@@ -254,7 +280,7 @@ func (s *versionSvc) GetBucketTags(ctx context.Context, bucket string) (map[stri
 
 func (s *versionSvc) IncrementBucketTags(ctx context.Context, bucket string, storage string) (int64, error) {
 	key := fmt.Sprintf("b:%s:t", bucket)
-	return s.client.HIncrBy(ctx, key, storage, 1).Result()
+	return s.incVersion(ctx, key, storage)
 }
 
 func (s *versionSvc) UpdateBucketTagsIfGreater(ctx context.Context, bucket string, storage string, version int64) error {
