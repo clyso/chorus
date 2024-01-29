@@ -1,3 +1,19 @@
+/*
+ * Copyright © 2024 Clyso GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package policy
 
 import (
@@ -772,4 +788,99 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.True(exists)
 	})
+
+	t.Run("replication switch", func(t *testing.T) {
+		r := require.New(t)
+		db.FlushAll()
+
+		_, err := svc.GetReplicationSwitch(ctx, u1, b1)
+		r.ErrorIs(err, dom.ErrNotFound)
+		_, err = svc.GetRoutingPolicy(ctx, u1, b1)
+		r.ErrorIs(err, dom.ErrNotFound)
+		_, err = svc.GetBucketReplicationPolicies(ctx, u1, b1)
+		r.ErrorIs(err, dom.ErrNotFound)
+
+		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s1)
+		r.NoError(err)
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, tasks.Priority3, nil)
+		r.NoError(err)
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s3, tasks.Priority4, nil)
+		r.NoError(err)
+
+		res, err := svc.GetBucketReplicationPolicies(ctx, u1, b1)
+		r.NoError(err)
+		r.EqualValues(s1, res.From)
+		r.Len(res.To, 2)
+		r.EqualValues(tasks.Priority3, res.To[s2])
+		r.EqualValues(tasks.Priority4, res.To[s3])
+
+		info, err := svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2)
+		r.NoError(err)
+		r.False(info.CreatedAt.IsZero())
+		r.False(info.IsPaused)
+		r.Zero(info.InitObjListed)
+		r.Zero(info.InitObjDone)
+		r.Zero(info.InitBytesListed)
+		r.Zero(info.InitBytesDone)
+		r.Zero(info.Events)
+		r.Zero(info.EventsDone)
+
+		exists, err := svc.IsReplicationPolicyExists(ctx, u1, b1, s1, s2)
+		r.NoError(err)
+		r.True(exists)
+
+		_, err = svc.GetReplicationSwitch(ctx, u1, b1)
+		r.ErrorIs(err, dom.ErrNotFound)
+
+		inProgress, err := svc.IsReplicationSwitchInProgress(ctx, u1, b1)
+		r.NoError(err)
+		r.False(inProgress)
+
+		err = svc.DoReplicationSwitch(ctx, u1, b1, s2)
+		r.Error(err)
+
+		r.NoError(svc.ObjListStarted(ctx, u1, b1, s1, s2))
+
+		err = svc.DoReplicationSwitch(ctx, u1, b1, s2)
+		r.Error(err)
+
+		r.NoError(svc.ObjListStarted(ctx, u1, b1, s1, s3))
+
+		err = svc.DoReplicationSwitch(ctx, u1, b1, s2)
+		r.NoError(err)
+
+		rs, err := svc.GetReplicationSwitch(ctx, u1, b1)
+		r.NoError(err)
+		r.EqualValues(res.To, rs.GetOldFollowers())
+		r.EqualValues(s1, rs.OldMain)
+
+		rp, err := svc.GetRoutingPolicy(ctx, u1, b1)
+		r.NoError(err)
+		r.EqualValues(s2, rp)
+		replP, err := svc.GetBucketReplicationPolicies(ctx, u1, b1)
+		r.NoError(err)
+		r.EqualValues(s2, replP.From)
+		r.Len(replP.To, 1)
+		_, ok := replP.To[s3]
+		r.True(ok)
+
+	})
+}
+
+func TestReplicationSwitch_GetOldFollowers(t *testing.T) {
+	r := require.New(t)
+	followers := map[string]tasks.Priority{
+		"f1": tasks.Priority3,
+		"f2": tasks.Priority2,
+		"f3": tasks.PriorityDefault1,
+	}
+
+	s := ReplicationSwitch{}
+	r.Empty(s.OldFollowers)
+	r.Empty(s.GetOldFollowers())
+
+	s.SetOldFollowers(followers)
+	r.NotEmpty(s.OldFollowers)
+	r.NotEmpty(s.GetOldFollowers())
+	r.EqualValues(followers, s.GetOldFollowers())
 }

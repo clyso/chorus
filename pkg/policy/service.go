@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,10 +73,10 @@ type ReplicationSwitch struct {
 	OldFollowers string        `redis:"OldFollowers"`
 	MultipartTTL time.Duration `redis:"MultipartTTL"`
 	StartedAt    time.Time     `redis:"StartedAt"`
-	DoneAt       time.Time     `redis:"DoneAt"`
+	DoneAt       *time.Time    `redis:"DoneAt,omitempty"`
 }
 
-func (r ReplicationSwitch) GetOldFollowers() map[string]tasks.Priority {
+func (r *ReplicationSwitch) GetOldFollowers() map[string]tasks.Priority {
 	res := map[string]tasks.Priority{}
 	arr := strings.Split(r.OldFollowers, ",")
 	for _, s := range arr {
@@ -89,6 +89,14 @@ func (r ReplicationSwitch) GetOldFollowers() map[string]tasks.Priority {
 		res[toStor] = tasks.Priority(toPriority)
 	}
 	return res
+}
+
+func (r *ReplicationSwitch) SetOldFollowers(f map[string]tasks.Priority) {
+	followers := make([]string, 0, len(f))
+	for k, v := range f {
+		followers = append(followers, k+":"+strconv.Itoa(int(v)))
+	}
+	r.OldFollowers = strings.Join(followers, ",")
 }
 
 type ReplicationPolicyStatus struct {
@@ -131,6 +139,7 @@ type Service interface {
 
 	IsReplicationSwitchInProgress(ctx context.Context, user, bucket string) (bool, error)
 	GetReplicationSwitch(ctx context.Context, user, bucket string) (ReplicationSwitch, error)
+	DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error
 
 	GetBucketReplicationPolicies(ctx context.Context, user, bucket string) (ReplicationPolicies, error)
 	GetUserReplicationPolicies(ctx context.Context, user string) (ReplicationPolicies, error)
@@ -886,5 +895,89 @@ func (s *policySvc) DeleteReplication(ctx context.Context, user, bucket, from st
 	if err != nil {
 		return err
 	}
+	return err
+}
+
+func (s *policySvc) DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error {
+	inProgress, err := s.IsReplicationSwitchInProgress(ctx, user, bucket)
+	if err != nil {
+		return err
+	}
+	if inProgress {
+		return fmt.Errorf("%w: switch aleady in progress", dom.ErrAlreadyExists)
+	}
+	prevMain, err := s.GetRoutingPolicy(ctx, user, bucket)
+	if err != nil {
+		return fmt.Errorf("%w: unable to get routing policy", err)
+	}
+	if prevMain == newMain {
+		return fmt.Errorf("%w: storage %s is laready main for bucket %s", dom.ErrAlreadyExists, newMain, bucket)
+	}
+	replPolicies, err := s.GetBucketReplicationPolicies(ctx, user, bucket)
+	if err != nil {
+		return fmt.Errorf("%w: unable to get replication policy", err)
+	}
+	if _, ok := replPolicies.To[newMain]; !ok {
+		return fmt.Errorf("%w: no previous replication policy to switch", dom.ErrInvalidArg)
+	}
+	for prevFollower, _ := range replPolicies.To {
+		prevReplication, err := s.GetReplicationPolicyInfo(ctx, user, bucket, prevMain, prevFollower)
+		if err != nil {
+			return err
+		}
+		if prevReplication.IsPaused {
+			return fmt.Errorf("%w: previous replication to %s is paused", dom.ErrInvalidArg, prevFollower)
+		}
+		if !prevReplication.ListingStarted {
+			return fmt.Errorf("%w: previous replication to %s is not started", dom.ErrInvalidArg, prevFollower)
+		}
+		if prevReplication.InitObjListed > prevReplication.InitObjDone {
+			return fmt.Errorf("%w: previous replication to %s init phase is not done. %d objects remaining", dom.ErrInvalidArg, prevFollower, prevReplication.InitObjListed-prevReplication.InitObjDone)
+		}
+		if prevReplication.AgentURL != "" {
+			return fmt.Errorf("%w: switch is not supported for Chorus-agent setup. Use setup with Chorus-proxy", dom.ErrInvalidArg)
+		}
+	}
+	oldFollowers := replPolicies.To
+	const multipartTTL = time.Hour //todo: move to config or api param
+	_, err = s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		// adjust route policy
+		routeKey := fmt.Sprintf("p:route:%s:%s", user, bucket)
+		_ = pipe.Set(ctx, routeKey, newMain, 0)
+		// create replication switch
+		switchKey := fmt.Sprintf("p:switch:%s:%s", user, bucket)
+		switchVal := ReplicationSwitch{
+			IsDone:       false,
+			OldMain:      prevMain,
+			OldFollowers: "",
+			MultipartTTL: multipartTTL,
+			StartedAt:    time.Now().UTC(),
+			DoneAt:       nil,
+		}
+		switchVal.SetOldFollowers(oldFollowers)
+		_ = pipe.HSet(ctx, switchKey, switchVal)
+
+		// adjust replication policies
+		replKey := fmt.Sprintf("p:repl:%s:%s", user, bucket)
+		pipe.Del(ctx, replKey)
+		delete(oldFollowers, newMain)
+		for follower, priority := range oldFollowers {
+			pipe.ZAdd(ctx, replKey, redis.Z{
+				Score:  float64(priority),
+				Member: fmt.Sprintf("%s:%s", newMain, follower),
+			})
+
+			statusKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, newMain, follower)
+			now := time.Now().UTC()
+			res := ReplicationPolicyStatus{
+				CreatedAt:      now,
+				IsPaused:       false,
+				InitDoneAt:     &now,
+				ListingStarted: true,
+			}
+			_ = pipe.HSet(ctx, statusKey, res)
+		}
+		return nil
+	})
 	return err
 }

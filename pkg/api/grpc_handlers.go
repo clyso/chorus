@@ -485,47 +485,7 @@ func (h *handlers) SwitchMainBucket(ctx context.Context, req *pb.SwitchMainBucke
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		inProgress, err := h.policySvc.IsReplicationSwitchInProgress(ctx, req.User, req.Bucket)
-		if err != nil {
-			return err
-		}
-		if inProgress {
-			return fmt.Errorf("%w: switch aleady in progress", dom.ErrAlreadyExists)
-		}
-		prevMain, err := h.policySvc.GetRoutingPolicy(ctx, req.User, req.Bucket)
-		if err != nil {
-			return fmt.Errorf("%w: unable to get routing policy", err)
-		}
-		if prevMain == req.NewMain {
-			return fmt.Errorf("%w: storage %s is laready main for bucket %s", dom.ErrAlreadyExists, req.NewMain, req.Bucket)
-		}
-		replPolicies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.User, req.Bucket)
-		if err != nil {
-			return fmt.Errorf("%w: unable to get replication policy", err)
-		}
-		if _, ok := replPolicies.To[req.NewMain]; !ok {
-			return fmt.Errorf("%w: no previous replication policy to switch", dom.ErrInvalidArg)
-		}
-
-		prevReplication, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.User, req.Bucket, prevMain, req.NewMain)
-		if err != nil {
-			return err
-		}
-		if prevReplication.IsPaused {
-			return fmt.Errorf("%w: previous replication is paused", dom.ErrInvalidArg)
-		}
-		if !prevReplication.ListingStarted {
-			return fmt.Errorf("%w: previous replication is not started", dom.ErrInvalidArg)
-		}
-		if prevReplication.InitObjListed > prevReplication.InitObjDone {
-			return fmt.Errorf("%w: previous replication init phase is not done. %d objects remaining", dom.ErrInvalidArg, prevReplication.InitObjListed-prevReplication.InitObjDone)
-		}
-		if prevReplication.AgentURL != "" {
-			return fmt.Errorf("%w: switch is not supported for Chorus-agent setup. Use setup with Chorus-proxy", dom.ErrInvalidArg)
-		}
-		// todo: create replication switch
-
-		return nil
+		return h.policySvc.DoReplicationSwitch(ctx, req.User, req.Bucket, req.NewMain)
 	}, refresh, time.Second)
 	if err != nil {
 		return nil, err
