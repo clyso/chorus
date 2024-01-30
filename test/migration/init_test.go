@@ -1,9 +1,26 @@
+/*
+ * Copyright © 2024 Clyso GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package migration
 
 import (
 	"context"
 	"fmt"
 	"github.com/alicebob/miniredis/v2"
+	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -29,16 +46,17 @@ import (
 )
 
 var (
-	mainClient    *mclient.Client
-	f1Client      *mclient.Client
-	f2Client      *mclient.Client
-	proxyClient   *mclient.Client
-	mpMainClient  *mclient.Core
-	mpF1Client    *mclient.Core
-	mpF2Client    *mclient.Core
-	mpProxyClient *mclient.Core
-	tstCtx        context.Context
-	apiClient     pb.ChorusClient
+	mainClient     *mclient.Client
+	f1Client       *mclient.Client
+	f2Client       *mclient.Client
+	proxyClient    *mclient.Client
+	proxyAwsClient *aws_s3.S3
+	mpMainClient   *mclient.Core
+	mpF1Client     *mclient.Core
+	mpF2Client     *mclient.Core
+	mpProxyClient  *mclient.Core
+	tstCtx         context.Context
+	apiClient      pb.ChorusClient
 
 	workerConf *worker.Config
 	proxyConf  *proxy.Config
@@ -198,6 +216,11 @@ func TestMain(m *testing.M) {
 		IsSecure:    false,
 	})
 	fmt.Println("proxy s3", addr)
+	proxyAwsClient = newAWSClient(s3.Storage{
+		Address:     addr,
+		Credentials: proxyConf.Storage.Storages["main"].Credentials,
+		IsSecure:    false,
+	})
 
 	grpcConn, err := grpc.DialContext(ctx, grpcAddr,
 		grpc.WithInsecure(),

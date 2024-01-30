@@ -427,15 +427,16 @@ func (s *policySvc) ListReplicationPolicyInfo(ctx context.Context) ([]Replicatio
 			select {
 			case <-gCtx.Done():
 				return gCtx.Err()
-			case resCh <- ReplicationPolicyStatusExtended{
+			default:
+			}
+			resCh <- ReplicationPolicyStatusExtended{
 				ReplicationPolicyStatus: policy,
 				User:                    user,
 				Bucket:                  bucket,
 				From:                    from,
 				To:                      to,
-			}:
-				return nil
 			}
+			return nil
 		})
 	}
 	if err := iter.Err(); err != nil && !errors.Is(err, context.Canceled) {
@@ -972,10 +973,10 @@ func (s *policySvc) DoReplicationSwitch(ctx context.Context, user, bucket, newMa
 			res := ReplicationPolicyStatus{
 				CreatedAt:      now,
 				IsPaused:       false,
-				InitDoneAt:     &now,
 				ListingStarted: true,
 			}
 			_ = pipe.HSet(ctx, statusKey, res)
+			_ = pipe.HSet(ctx, statusKey, "init_done_at", now)
 		}
 		return nil
 	})

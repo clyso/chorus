@@ -1,7 +1,22 @@
+/*
+ * Copyright © 2024 Clyso GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package migration
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"github.com/clyso/chorus/pkg/s3"
@@ -16,12 +31,17 @@ type testObj struct {
 	bucket string
 }
 
+const tstObjSize = 4096
+
 func getTestObj(name, bucket string) testObj {
-	return testObj{
+	rndLen := rand.Intn(100) - 100
+	to := testObj{
 		name:   name,
-		data:   bytes.Repeat([]byte(name[len(name)-1:]), rand.Intn(1<<20)+32*1024),
+		data:   make([]byte, tstObjSize+rndLen),
 		bucket: bucket,
 	}
+	_, _ = rand.Read(to.data)
+	return to
 }
 
 func listObjects(c *mclient.Client, bucket string, prefix string) ([]string, error) {
