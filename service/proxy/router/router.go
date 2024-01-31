@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,7 +137,7 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 		//todo: proxy unknown requests anyway???
 		err = dom.ErrNotImplemented
 	}
-	if task != nil {
+	if err == nil && task != nil {
 		task.SetFrom(storage)
 		if taskList == nil {
 			taskList = []tasks.SyncTask{task}
