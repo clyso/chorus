@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,7 +137,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	locker := lock.New(lockRedis)
 
-	workerSvc := handler.New(s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, locker)
+	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, locker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -212,6 +212,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
 	mux.HandleFunc(tasks.TypeApiCostEstimation, workerSvc.CostsEstimation)
 	mux.HandleFunc(tasks.TypeApiCostEstimationList, workerSvc.CostsEstimationList)
+	mux.HandleFunc(tasks.TypeApiReplicationSwitch, workerSvc.FinishReplicationSwitch)
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(_ context.Context) error {

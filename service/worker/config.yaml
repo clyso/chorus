@@ -1,4 +1,7 @@
 concurrency: 10 # max number of task that can be processed in parallel
+worker:
+  pauseRetryInterval: 30s
+  switchRetryInterval: 30s
 rclone:
   memoryLimit:
     enabled: true

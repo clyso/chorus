@@ -201,6 +201,17 @@ func TestApi_switch_e2e(t *testing.T) {
 		return diff.IsMatch
 	}, waitInterval, retryInterval)
 
+	var repl *pb.Replication
+	repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	for i, rr := range repls.Replications {
+		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
+			repl = repls.Replications[i]
+			break
+		}
+	}
+	r.NotNil(repl)
+	r.EqualValues(pb.Replication_NotStarted, repl.SwitchStatus)
+
 	writeCtx, cancel := context.WithCancel(tstCtx)
 	defer cancel()
 	go func() {
@@ -290,6 +301,16 @@ func TestApi_switch_e2e(t *testing.T) {
 	})
 	r.NoError(err)
 	t.Log("switch done")
+	repl = nil
+	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	for i, rr := range repls.Replications {
+		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
+			repl = repls.Replications[i]
+			break
+		}
+	}
+	r.NotNil(repl)
+	r.EqualValues(pb.Replication_InProgress, repl.SwitchStatus)
 	<-writeCtx.Done()
 
 	r.Eventually(func() bool {
@@ -306,6 +327,31 @@ func TestApi_switch_e2e(t *testing.T) {
 		return diff.IsMatch
 	}, waitInterval, retryInterval)
 
+	//r.Eventually(func() bool {
+	//	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	//	if err != nil {
+	//		return false
+	//	}
+	//	for _, rr := range repls.Replications {
+	//		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
+	//			if rr.SwitchStatus != pb.Replication_Done {
+	//				return false
+	//			}
+	//		}
+	//		if rr.Bucket == bucket && rr.From == "f1" && rr.To == "f2" {
+	//			if rr.SwitchStatus != pb.Replication_Done {
+	//				return false
+	//			}
+	//		}
+	//		if rr.Bucket == bucket && rr.From == "f1" && rr.To == "main" {
+	//			if rr.SwitchStatus != pb.Replication_Done {
+	//				return false
+	//			}
+	//		}
+	//	}
+	//	return true
+	//}, waitInterval, retryInterval)
+
 	for _, object := range objects {
 		if object.data == nil {
 			_, err = proxyClient.StatObject(tstCtx, bucket, object.name, mclient.StatObjectOptions{})
@@ -317,12 +363,12 @@ func TestApi_switch_e2e(t *testing.T) {
 		objData, err := proxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
 		r.NoError(err, object.name)
 		objBytes, err := io.ReadAll(objData)
-		r.NoError(err)
+		r.NoError(err, object.name)
 		r.True(bytes.Equal(object.data, objBytes), object.name)
 		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
 		r.NoError(err, object.name)
 		objBytes, err = io.ReadAll(objData)
-		r.NoError(err)
+		r.NoError(err, object.name)
 		r.True(bytes.Equal(object.data, objBytes), object.name)
 	}
 }

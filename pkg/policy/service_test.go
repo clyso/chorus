@@ -799,6 +799,8 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.ErrorIs(err, dom.ErrNotFound)
 		_, err = svc.GetBucketReplicationPolicies(ctx, u1, b1)
 		r.ErrorIs(err, dom.ErrNotFound)
+		_, err = svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2)
+		r.ErrorIs(err, dom.ErrNotFound)
 
 		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s1)
 		r.NoError(err)
@@ -824,6 +826,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.Zero(info.InitBytesDone)
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
+		r.EqualValues(NotStarted, info.SwitchStatus)
 
 		exists, err := svc.IsReplicationPolicyExists(ctx, u1, b1, s1, s2)
 		r.NoError(err)
@@ -853,6 +856,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(res.To, rs.GetOldFollowers())
 		r.EqualValues(s1, rs.OldMain)
+		r.False(rs.IsDone)
 
 		rp, err := svc.GetRoutingPolicy(ctx, u1, b1)
 		r.NoError(err)
@@ -864,6 +868,19 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		_, ok := replP.To[s3]
 		r.True(ok)
 
+		info, err = svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2)
+		r.NoError(err)
+		r.EqualValues(InProgress, info.SwitchStatus)
+
+		err = svc.ReplicationSwitchDone(ctx, u1, b1)
+		r.NoError(err)
+		rs, err = svc.GetReplicationSwitch(ctx, u1, b1)
+		r.NoError(err)
+		r.True(rs.IsDone)
+
+		info, err = svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2)
+		r.NoError(err)
+		r.EqualValues(Done, info.SwitchStatus)
 	})
 }
 

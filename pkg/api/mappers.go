@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,18 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		LastEmittedAt:   tsToPb(in.LastEmittedAt),
 		LastProcessedAt: tsToPb(in.LastProcessedAt),
 		AgentUrl:        strPtr(in.AgentURL),
+		SwitchStatus:    switchStatusToPb(in.SwitchStatus),
+	}
+}
+
+func switchStatusToPb(status policy.SwitchStatus) pb.Replication_SwitchEnum {
+	switch status {
+	case policy.InProgress:
+		return pb.Replication_InProgress
+	case policy.Done:
+		return pb.Replication_Done
+	default:
+		return pb.Replication_NotStarted
 	}
 }
 

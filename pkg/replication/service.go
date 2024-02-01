@@ -238,7 +238,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 }
 
 func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[string]tasks.Priority, error) {
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	policy, err := s.getReplicationPolicy(ctx, task)
 	if err != nil {
 		return nil, err
@@ -252,6 +251,7 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[str
 		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", policy.From, task.GetFrom())
 	}
 
+	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	replSwitch, err := s.policySvc.GetReplicationSwitch(ctx, user, bucket)
 	if err != nil {
 		return nil, fmt.Errorf("%w: no replication switch for replication task with invalid from storage", err)

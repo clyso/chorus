@@ -485,7 +485,22 @@ func (h *handlers) SwitchMainBucket(ctx context.Context, req *pb.SwitchMainBucke
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		return h.policySvc.DoReplicationSwitch(ctx, req.User, req.Bucket, req.NewMain)
+		err := h.policySvc.DoReplicationSwitch(ctx, req.User, req.Bucket, req.NewMain)
+		if err != nil {
+			return err
+		}
+		task, err := tasks.NewTask(ctx, tasks.FinishReplicationSwitchPayload{
+			User:   req.User,
+			Bucket: req.Bucket,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = h.taskClient.EnqueueContext(ctx, task)
+		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+			return err
+		}
+		return nil
 	}, refresh, time.Second)
 	if err != nil {
 		return nil, err

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/service/worker/handler"
 	"io/fs"
 	"time"
 )
@@ -44,9 +45,10 @@ type Config struct {
 
 	Concurrency int `yaml:"concurrency"`
 
-	Api    *api.Config    `yaml:"api,omitempty"`
-	RClone *rclone.Config `yaml:"rclone,omitempty"`
-	Lock   *Lock          `yaml:"lock,omitempty"`
+	Api    *api.Config     `yaml:"api,omitempty"`
+	RClone *rclone.Config  `yaml:"rclone,omitempty"`
+	Lock   *Lock           `yaml:"lock,omitempty"`
+	Worker *handler.Config `yaml:"worker,omitempty"`
 }
 
 type Lock struct {

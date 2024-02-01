@@ -399,6 +399,15 @@
     }
   },
   "definitions": {
+    "ReplicationSwitchEnum": {
+      "type": "string",
+      "enum": [
+        "NotStarted",
+        "InProgress",
+        "Done"
+      ],
+      "default": "NotStarted"
+    },
     "StorageProvider": {
       "type": "string",
       "enum": [
@@ -702,6 +711,9 @@
         },
         "agentUrl": {
           "type": "string"
+        },
+        "switchStatus": {
+          "$ref": "#/definitions/ReplicationSwitchEnum"
         }
       }
     },

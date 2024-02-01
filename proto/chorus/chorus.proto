@@ -103,6 +103,11 @@ message ListReplicationsResponse{
 }
 
 message Replication{
+  enum SwitchEnum {
+    NotStarted = 0;
+    InProgress = 1;
+    Done = 2;
+  }
   string user = 1;
   string bucket = 2;
   string from = 3;
@@ -125,6 +130,7 @@ message Replication{
   google.protobuf.Timestamp last_processed_at = 15;
 
   optional string agent_url = 16;
+  SwitchEnum switch_status = 17;
 }
 
 message ReplicationRequest{

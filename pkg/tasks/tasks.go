@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ const (
 
 	TypeApiCostEstimation     = "api:cost_estimation"
 	TypeApiCostEstimationList = "api:cost_estimation:list"
+	TypeApiReplicationSwitch  = "api:replication_switch"
 )
 
 type Priority uint8
@@ -147,6 +148,11 @@ type CostEstimationPayload struct {
 	Sync
 }
 
+type FinishReplicationSwitchPayload struct {
+	User   string
+	Bucket string
+}
+
 type CostEstimationListPayload struct {
 	FromStorage string
 	ToStorage   string
@@ -229,7 +235,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjectDeletePayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
-	CostEstimationPayload | CostEstimationListPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
+	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -247,6 +253,9 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	taskType := ""
 	var optionList []asynq.Option
 	switch p := any(payload).(type) {
+	case FinishReplicationSwitchPayload:
+		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(fmt.Sprintf("api:rs:%s:%s", p.User, p.Bucket))}
+		taskType = TypeApiReplicationSwitch
 	case CostEstimationPayload:
 		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.Retention(costEstimationTaskRetention), asynq.TaskID(fmt.Sprintf("api:ce:%s:%s", p.FromStorage, p.ToStorage))}
 		taskType = TypeApiCostEstimation
