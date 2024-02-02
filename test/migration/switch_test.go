@@ -594,6 +594,9 @@ func TestApi_switch_multipart(t *testing.T) {
 		}
 
 		n, _ = objReader.Read(partBuf)
+		if n == 0 {
+			break
+		}
 		partReader := bytes.NewReader(partBuf[:n])
 		part, err := proxyAwsClient.UploadPart(&aws_s3.UploadPartInput{
 			Body:          partReader,
