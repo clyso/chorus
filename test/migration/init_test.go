@@ -78,6 +78,7 @@ func TestMain(m *testing.M) {
 	workerConf.RClone.LocalFileLimit.Enabled = false
 	workerConf.RClone.GlobalFileLimit.Enabled = false
 	workerConf.Features.ACL = false
+	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"
 	workerConf.Worker.SwitchRetryInterval = 500 * time.Millisecond
 
@@ -86,6 +87,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	proxyConf.Features.ACL = false
+	proxyConf.Features.Tagging = false
 	proxyConf.Log.Level = "warn"
 
 	if os.Getenv("EXT_REDIS") != "true" {

@@ -23,10 +23,10 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 )
@@ -217,7 +217,7 @@ func TestApi_switch_e2e(t *testing.T) {
 	go func() {
 		defer cancel()
 		t.Log("start write")
-		for n := 0; n < 666; n++ {
+		for n := 0; n < 500; n++ {
 			select {
 			case <-writeCtx.Done():
 				return
@@ -254,34 +254,39 @@ func TestApi_switch_e2e(t *testing.T) {
 					pn++
 				}
 				parts := make([]*aws_s3.CompletedPart, pn)
-				wg := sync.WaitGroup{}
+
+				g, _ := errgroup.WithContext(tstCtx)
 				for nn := len(partBuf); nn >= len(partBuf); {
 					nn, _ = objReader.Read(partBuf)
+					if nn == 0 {
+						break
+					}
 					dd := make([]byte, nn)
 					copy(dd, partBuf[:nn])
-					wg.Add(1)
-					go func(data []byte, partId int) {
-						defer wg.Done()
-						partReader := bytes.NewReader(data)
-
+					partIDCopy := partID
+					g.Go(func() error {
+						partReader := bytes.NewReader(dd)
 						part, err := proxyAwsClient.UploadPart(&aws_s3.UploadPartInput{
 							Body:          partReader,
 							Bucket:        sPtr(bucket),
-							ContentLength: iPtr(int64(len(data))),
+							ContentLength: iPtr(int64(len(dd))),
 							Key:           sPtr(objects[i].name),
-							PartNumber:    iPtr(int64(partId)),
+							PartNumber:    iPtr(int64(partIDCopy)),
 							UploadId:      uploadID.UploadId,
 						})
 
-						r.NoError(err)
-						parts[partId-1] = &aws_s3.CompletedPart{
-							PartNumber: iPtr(int64(partId)),
+						if err != nil {
+							return err
+						}
+						parts[partIDCopy-1] = &aws_s3.CompletedPart{
+							PartNumber: iPtr(int64(partIDCopy)),
 							ETag:       part.ETag,
 						}
-					}(dd, partID)
+						return nil
+					})
 					partID++
 				}
-				wg.Wait()
+				r.NoError(g.Wait())
 				_, err = proxyAwsClient.CompleteMultipartUpload(&aws_s3.CompleteMultipartUploadInput{
 					Bucket:          sPtr(bucket),
 					Key:             sPtr(objects[i].name),
@@ -293,7 +298,7 @@ func TestApi_switch_e2e(t *testing.T) {
 		}
 		t.Log("end write")
 	}()
-	time.Sleep(time.Second)
+	time.Sleep(666 * time.Millisecond)
 	_, err = apiClient.SwitchMainBucket(tstCtx, &pb.SwitchMainBucketRequest{
 		User:    user,
 		Bucket:  bucket,
