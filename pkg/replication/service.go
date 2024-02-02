@@ -152,27 +152,11 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.ObjectSyncPayload:
-		_, err = s.versionSvc.IncrementObj(ctx, t.Object, t.FromStorage)
-		if err != nil {
-			return err
+		if t.Deleted {
+			err = s.versionSvc.DeleteObjAll(ctx, t.Object)
+		} else {
+			_, err = s.versionSvc.IncrementObj(ctx, t.Object, t.FromStorage)
 		}
-		for to, priority := range replTo {
-			t.SetTo(to)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetTo(), t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
-			}
-		}
-	case *tasks.ObjectDeletePayload:
-		err = s.versionSvc.DeleteObjAll(ctx, t.Object)
 		if err != nil {
 			return err
 		}

@@ -35,7 +35,6 @@ const (
 	TypeBucketSyncACL  = "bucket:sync:acl"
 
 	TypeObjectSync     = "object:sync"
-	TypeObjectDelete   = "object:del"
 	TypeObjectSyncTags = "object:sync:tags"
 	TypeObjectSyncACL  = "object:sync:acl"
 
@@ -193,11 +192,7 @@ type ObjectSyncPayload struct {
 
 	//FromVersion int64
 	ObjSize int64
-}
-
-type ObjectDeletePayload struct {
-	Object dom.Object
-	Sync
+	Deleted bool
 }
 
 type BucketDeletePayload struct {
@@ -233,7 +228,7 @@ type ObjPayload struct {
 
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
-	ObjectSyncPayload | ObjectDeletePayload | ObjSyncTagsPayload | ObjSyncACLPayload |
+	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
@@ -276,9 +271,6 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	case ObjectSyncPayload:
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeObjectSync
-	case ObjectDeletePayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
-		taskType = TypeObjectDelete
 	case BucketSyncTagsPayload:
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeBucketSyncTags

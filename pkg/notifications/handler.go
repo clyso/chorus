@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ type ObjDeleted struct {
 }
 
 func (h *Handler) DeleteObject(ctx context.Context, n ObjDeleted) error {
-	task := tasks.ObjectDeletePayload{
+	task := tasks.ObjectSyncPayload{
 		Object: dom.Object{
 			Bucket: n.Bucket,
 			Name:   n.ObjKey,
@@ -69,6 +69,7 @@ func (h *Handler) DeleteObject(ctx context.Context, n ObjDeleted) error {
 		Sync: tasks.Sync{
 			FromStorage: h.fromStorage,
 		},
+		Deleted: true,
 	}
 	return h.replSvc.Replicate(ctx, &task)
 }

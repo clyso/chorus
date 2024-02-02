@@ -81,8 +81,12 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	if err != nil {
 		return err
 	}
+	isObjDeleted := len(meta) == 0
+	if isObjDeleted {
+		return s.objectDelete(ctx, p)
+	}
 	fromVer, toVer := meta[p.FromStorage], meta[p.ToStorage]
-	if fromVer != 0 && fromVer <= toVer {
+	if fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("object sync: identical from/to obj version: skip copy")
 		return nil
 	}
@@ -114,40 +118,11 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	return nil
 }
 
-func (s *svc) HandleObjectDelete(ctx context.Context, t *asynq.Task) (err error) {
-	var p tasks.ObjectDeletePayload
-	if err = json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("ObjectDeletePayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
-	}
-	ctx = log.WithBucket(ctx, p.Object.Bucket)
-	ctx = log.WithObjName(ctx, p.Object.Name)
-
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
-
+func (s *svc) objectDelete(ctx context.Context, p tasks.ObjectSyncPayload) (err error) {
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			return
-		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.CreatedAt)
-		if verErr != nil {
-			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
-		}
-	}()
-
 	_, err = fromClient.S3().StatObject(ctx, p.Object.Bucket, p.Object.Name, mclient.StatObjectOptions{})
 	if err == nil {
 		zerolog.Ctx(ctx).Warn().Msg("skip obj delete: obj still exists in source storage")

@@ -205,7 +205,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
 	mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
 	mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
-	mux.HandleFunc(tasks.TypeObjectDelete, workerSvc.HandleObjectDelete)
 	mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
 	mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
 	mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)

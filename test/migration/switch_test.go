@@ -496,10 +496,35 @@ func TestApi_switch_multipart(t *testing.T) {
 		return f1e && f2e
 	}, waitInterval, retryInterval)
 
+	f1Stream, err := apiClient.StreamBucketReplication(tstCtx, &pb.ReplicationRequest{
+		User:   user,
+		Bucket: bucket,
+		From:   "main",
+		To:     "f1",
+	})
+	r.NoError(err)
+	defer f1Stream.CloseSend()
 	r.Eventually(func() bool {
-		obsf1, _ := listObjects(f1Client, bucket, "")
-		obsf2, _ := listObjects(f2Client, bucket, "")
-		return len(obsf1) == len(obsf2) && len(objects) == len(obsf2)
+		m, err := f1Stream.Recv()
+		if err != nil {
+			return false
+		}
+		return m.IsInitDone
+	}, waitInterval, retryInterval)
+	f2Stream, err := apiClient.StreamBucketReplication(tstCtx, &pb.ReplicationRequest{
+		User:   user,
+		Bucket: bucket,
+		From:   "main",
+		To:     "f2",
+	})
+	r.NoError(err)
+	defer f2Stream.CloseSend()
+	r.Eventually(func() bool {
+		m, err := f2Stream.Recv()
+		if err != nil {
+			return false
+		}
+		return m.IsInitDone
 	}, waitInterval, retryInterval)
 
 	r.Eventually(func() bool {

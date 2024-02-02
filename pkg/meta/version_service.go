@@ -18,7 +18,6 @@ package meta
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
@@ -36,6 +35,15 @@ var (
 	max_ver = max_ver + 1
 	redis.call('HSET',KEYS[1], ARGV[1], max_ver )
 	return max_ver`)
+
+	luaHSetIfExAndGreater = redis.NewScript(`
+if redis.call('exists',KEYS[1]) ~= 1 then return -1 end
+local prev = redis.call('hget', KEYS[1], ARGV[1]);
+if prev and (tonumber(prev) >= tonumber(ARGV[2])) then return 0
+else 
+	redis.call("hset", KEYS[1], ARGV[1], ARGV[2]);
+	return 1
+end`)
 )
 
 type VersionService interface {
@@ -167,49 +175,21 @@ func (s *versionSvc) setIfGreater(ctx context.Context, key, field string, setTo 
 		zerolog.Ctx(ctx).Warn().Str("key", key).Str("field", field).Msgf("discarded attempt to set invalid version %d", setTo)
 		return fmt.Errorf("%w: version value must be positive", dom.ErrInvalidArg)
 	}
-	const maxRetries = 1000
-	// Transactional function.
-	txf := func(tx *redis.Tx) error {
-		// Get the current value or zero.
-		currStr, err := s.client.HGet(ctx, key, field).Result()
-		if err != nil && err != redis.Nil {
-			return err
-		}
-		var currVer int
-		if currStr != "" {
-			currVer, err = strconv.Atoi(currStr)
-			if err != nil {
-				return err
-			}
-		}
-
-		if setTo <= currVer {
-			return nil
-		}
-		// Operation is commited only if the watched keys remain unchanged.
-		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-			pipe.HSet(ctx, key, field, setTo)
-			return nil
-		})
+	result, err := luaHSetIfExAndGreater.Run(ctx, s.client, []string{key}, field, setTo).Result()
+	if err != nil {
 		return err
 	}
-
-	// Retry if the key has been changed.
-	for i := 0; i < maxRetries; i++ {
-		err := s.client.Watch(ctx, txf, key)
-		if err == nil {
-			// Success.
-			return nil
-		}
-		if err == redis.TxFailedErr {
-			// Optimistic lock lost. Retry.
-			continue
-		}
-		// Return any other error.
-		return err
+	inc, ok := result.(int64)
+	if !ok {
+		return fmt.Errorf("%w: unable to cast luaHSetIfExAndGreater result %T to int64", dom.ErrInternal, result)
 	}
-
-	return errors.New("increment reached maximum number of retries")
+	if inc == -1 {
+		return fmt.Errorf("%w: unable to update replicated version for key %s", dom.ErrNotFound, key)
+	}
+	if inc == 0 {
+		return fmt.Errorf("%w: unable to update replicated version for key %s", dom.ErrAlreadyExists, key)
+	}
+	return nil
 }
 
 func (s *versionSvc) GetACL(ctx context.Context, obj dom.Object) (map[string]int64, error) {
