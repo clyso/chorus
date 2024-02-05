@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -471,4 +471,39 @@ func (h *handlers) GetAgents(ctx context.Context, _ *emptypb.Empty) (*pb.GetAgen
 		}
 	}
 	return &pb.GetAgentsResponse{Agents: res}, nil
+}
+
+func (h *handlers) SwitchMainBucket(ctx context.Context, req *pb.SwitchMainBucketRequest) (*emptypb.Empty, error) {
+	// validate req
+	if _, ok := h.storages.Storages[req.NewMain]; !ok {
+		return nil, fmt.Errorf("%w: invalid NewMain", dom.ErrInvalidArg)
+	}
+	ctx = log.WithUser(ctx, req.User)
+	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second), lock.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = lock.WithRefresh(ctx, func() error {
+		err := h.policySvc.DoReplicationSwitch(ctx, req.User, req.Bucket, req.NewMain)
+		if err != nil {
+			return err
+		}
+		task, err := tasks.NewTask(ctx, tasks.FinishReplicationSwitchPayload{
+			User:   req.User,
+			Bucket: req.Bucket,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = h.taskClient.EnqueueContext(ctx, task)
+		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+			return err
+		}
+		return nil
+	}, refresh, time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }

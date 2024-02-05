@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ type Service interface {
 	DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error
 
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
+	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
 	ExistsUploadID(ctx context.Context, user, bucket, object, uploadID string) (bool, error)
 	ExistsUploads(ctx context.Context, user, bucket string) (bool, error)
 }
@@ -123,4 +124,19 @@ func (s *svc) ExistsUploads(ctx context.Context, user, bucket string) (bool, err
 		return false, err
 	}
 	return num > 0, nil
+}
+
+func (s *svc) DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error {
+	if user == "" {
+		return fmt.Errorf("%w: user is requred to set uploadID", dom.ErrInvalidArg)
+	}
+	if bucket == "" {
+		return fmt.Errorf("%w: bucket is requred to set uploadID", dom.ErrInvalidArg)
+	}
+	if uploadID == "" {
+		return fmt.Errorf("%w: uploadID is requred", dom.ErrInvalidArg)
+	}
+	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
+	val := fmt.Sprintf("%s:%s", object, uploadID)
+	return s.client.SRem(ctx, key, val).Err()
 }

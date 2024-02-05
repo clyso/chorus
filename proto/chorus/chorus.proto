@@ -32,6 +32,8 @@ service Chorus {
   rpc DeleteReplication(ReplicationRequest) returns (google.protobuf.Empty);
   rpc DeleteUserReplication(DeleteUserReplicationRequest) returns (google.protobuf.Empty);
 
+  rpc SwitchMainBucket(SwitchMainBucketRequest) returns (google.protobuf.Empty);
+
   // Compares contents of given bucket in given storages
   rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse);
 
@@ -101,6 +103,11 @@ message ListReplicationsResponse{
 }
 
 message Replication{
+  enum SwitchEnum {
+    NotStarted = 0;
+    InProgress = 1;
+    Done = 2;
+  }
   string user = 1;
   string bucket = 2;
   string from = 3;
@@ -123,6 +130,7 @@ message Replication{
   google.protobuf.Timestamp last_processed_at = 15;
 
   optional string agent_url = 16;
+  SwitchEnum switch_status = 17;
 }
 
 message ReplicationRequest{
@@ -182,4 +190,10 @@ message GetAgentsResponse {
 message Agent {
   string storage = 1;
   string url = 2;
+}
+
+message SwitchMainBucketRequest{
+  string user = 1;
+  string bucket = 2;
+  string new_main = 3;
 }

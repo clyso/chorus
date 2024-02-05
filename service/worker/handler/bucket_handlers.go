@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		return err
 	}
 	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: replicationPauseRetryInterval}
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
@@ -225,7 +225,7 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 		return err
 	}
 	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: replicationPauseRetryInterval}
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)

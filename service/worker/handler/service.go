@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,10 @@ import (
 	"time"
 )
 
-const (
-	replicationPauseRetryInterval = 30 * time.Second
-)
+type Config struct {
+	PauseRetryInterval  time.Duration `yaml:"pauseRetryInterval"`
+	SwitchRetryInterval time.Duration `yaml:"switchRetryInterval"`
+}
 
 type svc struct {
 	clients    s3client.Service
@@ -43,10 +44,11 @@ type svc struct {
 	taskClient *asynq.Client
 	limit      ratelimit.RPM
 	locker     lock.Service
+	conf       *Config
 }
 
-func New(clients s3client.Service, versionSvc meta.VersionService, policySvc policy.Service, storageSvc storage.Service, rc rclone.Service, taskClient *asynq.Client, limit ratelimit.RPM, locker lock.Service) *svc {
-	return &svc{clients: clients, versionSvc: versionSvc, policySvc: policySvc, storageSvc: storageSvc, rc: rc, taskClient: taskClient, limit: limit, locker: locker}
+func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService, policySvc policy.Service, storageSvc storage.Service, rc rclone.Service, taskClient *asynq.Client, limit ratelimit.RPM, locker lock.Service) *svc {
+	return &svc{conf: conf, clients: clients, versionSvc: versionSvc, policySvc: policySvc, storageSvc: storageSvc, rc: rc, taskClient: taskClient, limit: limit, locker: locker}
 }
 
 func (s *svc) getClients(ctx context.Context, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {

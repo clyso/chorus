@@ -120,7 +120,11 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 		resp, taskList, storage, isApiErr, err = r.putObject(req)
 	case s3.DeleteObject:
 		resp, storage, isApiErr, err = r.commonWrite(req)
-		task = &tasks.ObjectDeletePayload{Object: dom.Object{Bucket: bucket, Name: object}}
+		task = &tasks.ObjectSyncPayload{
+			Object:  dom.Object{Bucket: bucket, Name: object},
+			Sync:    tasks.Sync{FromStorage: storage},
+			Deleted: true,
+		}
 	case s3.DeleteObjects:
 		resp, taskList, storage, isApiErr, err = r.deleteObjects(req)
 	case s3.CreateMultipartUpload:

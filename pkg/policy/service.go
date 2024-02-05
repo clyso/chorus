@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,10 +73,10 @@ type ReplicationSwitch struct {
 	OldFollowers string        `redis:"OldFollowers"`
 	MultipartTTL time.Duration `redis:"MultipartTTL"`
 	StartedAt    time.Time     `redis:"StartedAt"`
-	DoneAt       time.Time     `redis:"DoneAt"`
+	DoneAt       *time.Time    `redis:"DoneAt,omitempty"`
 }
 
-func (r ReplicationSwitch) GetOldFollowers() map[string]tasks.Priority {
+func (r *ReplicationSwitch) GetOldFollowers() map[string]tasks.Priority {
 	res := map[string]tasks.Priority{}
 	arr := strings.Split(r.OldFollowers, ",")
 	for _, s := range arr {
@@ -89,6 +89,14 @@ func (r ReplicationSwitch) GetOldFollowers() map[string]tasks.Priority {
 		res[toStor] = tasks.Priority(toPriority)
 	}
 	return res
+}
+
+func (r *ReplicationSwitch) SetOldFollowers(f map[string]tasks.Priority) {
+	followers := make([]string, 0, len(f))
+	for k, v := range f {
+		followers = append(followers, k+":"+strconv.Itoa(int(v)))
+	}
+	r.OldFollowers = strings.Join(followers, ",")
 }
 
 type ReplicationPolicyStatus struct {
@@ -107,7 +115,17 @@ type ReplicationPolicyStatus struct {
 	LastProcessedAt *time.Time `redis:"last_processed_at,omitempty"`
 
 	ListingStarted bool `redis:"listing_started"`
+
+	SwitchStatus SwitchStatus `redis:"-"`
 }
+
+type SwitchStatus int
+
+const (
+	NotStarted SwitchStatus = iota
+	InProgress
+	Done
+)
 
 type ReplicationPolicyStatusExtended struct {
 	ReplicationPolicyStatus
@@ -131,6 +149,8 @@ type Service interface {
 
 	IsReplicationSwitchInProgress(ctx context.Context, user, bucket string) (bool, error)
 	GetReplicationSwitch(ctx context.Context, user, bucket string) (ReplicationSwitch, error)
+	DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error
+	ReplicationSwitchDone(ctx context.Context, user, bucket string) error
 
 	GetBucketReplicationPolicies(ctx context.Context, user, bucket string) (ReplicationPolicies, error)
 	GetUserReplicationPolicies(ctx context.Context, user string) (ReplicationPolicies, error)
@@ -372,24 +392,44 @@ func (s *policySvc) GetReplicationPolicyInfo(ctx context.Context, user, bucket, 
 	}
 
 	fKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, from, to)
+	switchKey := fmt.Sprintf("p:switch:%s:%s", user, bucket)
+
 	res := ReplicationPolicyStatus{}
-	err := s.client.HGetAll(ctx, fKey).Scan(&res)
+	var getRes *redis.MapStringStringCmd
+	var switchDone *redis.StringCmd
+	_, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		getRes = pipe.HGetAll(ctx, fKey)
+		switchDone = s.client.HGet(ctx, switchKey, "IsDone")
+		return nil
+	})
 	if err != nil {
 		return ReplicationPolicyStatus{}, err
+	}
+	err = getRes.Scan(&res)
+	if err != nil {
+		return ReplicationPolicyStatus{}, err
+	}
+	if res.CreatedAt.IsZero() {
+		return ReplicationPolicyStatus{}, fmt.Errorf("%w: no replication policy status for user %q, bucket %q, from %q, to %q", dom.ErrNotFound, user, bucket, from, to)
+	}
+	if switchDone.Err() != nil {
+		if switchDone.Err() != redis.Nil {
+			return ReplicationPolicyStatus{}, err
+		}
+		res.SwitchStatus = NotStarted
+	} else {
+		// switch exists
+		isDone, err := switchDone.Bool()
+		if err != nil {
+			return ReplicationPolicyStatus{}, fmt.Errorf("%w: unable to parse replication switch isDone", err)
+		}
+		if isDone {
+			res.SwitchStatus = Done
+		} else {
+			res.SwitchStatus = InProgress
+		}
 	}
 
-	ruleKey := fmt.Sprintf("p:repl:%s:%s", user, bucket)
-	ruleVal := fmt.Sprintf("%s:%s", from, to)
-	err = s.client.ZRank(ctx, ruleKey, ruleVal).Err()
-	if err != nil {
-		if err == redis.Nil {
-			if res.CreatedAt.IsZero() {
-				return ReplicationPolicyStatus{}, fmt.Errorf("%w: no replication policy status for user %q, bucket %q, from %q, to %q", dom.ErrNotFound, user, bucket, from, to)
-			}
-			return ReplicationPolicyStatus{}, fmt.Errorf("%w: replication ploicy for given status not found, key: %s val: %s", dom.ErrInternal, ruleKey, ruleVal)
-		}
-		return ReplicationPolicyStatus{}, err
-	}
 	return res, nil
 }
 
@@ -418,15 +458,16 @@ func (s *policySvc) ListReplicationPolicyInfo(ctx context.Context) ([]Replicatio
 			select {
 			case <-gCtx.Done():
 				return gCtx.Err()
-			case resCh <- ReplicationPolicyStatusExtended{
+			default:
+			}
+			resCh <- ReplicationPolicyStatusExtended{
 				ReplicationPolicyStatus: policy,
 				User:                    user,
 				Bucket:                  bucket,
 				From:                    from,
 				To:                      to,
-			}:
-				return nil
 			}
+			return nil
 		})
 	}
 	if err := iter.Err(); err != nil && !errors.Is(err, context.Canceled) {
@@ -472,21 +513,10 @@ func (s *policySvc) IsReplicationPolicyPaused(ctx context.Context, user, bucket,
 	}
 
 	fKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, from, to)
-	pausedStr, err := s.client.HGet(ctx, fKey, "paused").Result()
+	paused, err := s.client.HGet(ctx, fKey, "paused").Bool()
 	if err != nil {
 		if err == redis.Nil {
 			return false, fmt.Errorf("%w: no replication policy status for user %q, bucket %q, from %q, to %q", dom.ErrNotFound, user, bucket, from, to)
-		}
-		return false, err
-	}
-	paused, _ := strconv.ParseBool(pausedStr)
-
-	ruleKey := fmt.Sprintf("p:repl:%s:%s", user, bucket)
-	ruleVal := fmt.Sprintf("%s:%s", from, to)
-	err = s.client.ZRank(ctx, ruleKey, ruleVal).Err()
-	if err != nil {
-		if err == redis.Nil {
-			return false, fmt.Errorf("%w: replication ploicy for given status not found, key: %s val: %s", dom.ErrInternal, ruleKey, ruleVal)
 		}
 		return false, err
 	}
@@ -877,14 +907,113 @@ func (s *policySvc) DeleteReplication(ctx context.Context, user, bucket, from st
 	key := fmt.Sprintf("p:repl:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", from, to)
 	statusKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, from, to)
+	switchKey := fmt.Sprintf("p:switch:%s:%s", user, bucket)
 
 	_, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.ZRem(ctx, key, val)
 		pipe.Del(ctx, statusKey)
+		pipe.Del(ctx, switchKey)
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 	return err
+}
+
+func (s *policySvc) DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error {
+	_, err := s.GetReplicationSwitch(ctx, user, bucket)
+	if !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("%w: switch aleady exists", dom.ErrAlreadyExists)
+	}
+
+	prevMain, err := s.GetRoutingPolicy(ctx, user, bucket)
+	if err != nil {
+		return fmt.Errorf("%w: unable to get routing policy", err)
+	}
+	if prevMain == newMain {
+		return fmt.Errorf("%w: storage %s is laready main for bucket %s", dom.ErrAlreadyExists, newMain, bucket)
+	}
+	replPolicies, err := s.GetBucketReplicationPolicies(ctx, user, bucket)
+	if err != nil {
+		return fmt.Errorf("%w: unable to get replication policy", err)
+	}
+	if _, ok := replPolicies.To[newMain]; !ok {
+		return fmt.Errorf("%w: no previous replication policy to switch", dom.ErrInvalidArg)
+	}
+	for prevFollower, _ := range replPolicies.To {
+		prevReplication, err := s.GetReplicationPolicyInfo(ctx, user, bucket, prevMain, prevFollower)
+		if err != nil {
+			return err
+		}
+		if prevReplication.IsPaused {
+			return fmt.Errorf("%w: previous replication to %s is paused", dom.ErrInvalidArg, prevFollower)
+		}
+		if !prevReplication.ListingStarted {
+			return fmt.Errorf("%w: previous replication to %s is not started", dom.ErrInvalidArg, prevFollower)
+		}
+		if prevReplication.InitObjListed > prevReplication.InitObjDone {
+			return fmt.Errorf("%w: previous replication to %s init phase is not done. %d objects remaining", dom.ErrInvalidArg, prevFollower, prevReplication.InitObjListed-prevReplication.InitObjDone)
+		}
+		if prevReplication.AgentURL != "" {
+			return fmt.Errorf("%w: switch is not supported for Chorus-agent setup. Use setup with Chorus-proxy", dom.ErrInvalidArg)
+		}
+	}
+	oldFollowers := replPolicies.To
+	const multipartTTL = time.Hour //todo: move to config or api param
+	_, err = s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		// adjust route policy
+		routeKey := fmt.Sprintf("p:route:%s:%s", user, bucket)
+		_ = pipe.Set(ctx, routeKey, newMain, 0)
+		// create replication switch
+		switchKey := fmt.Sprintf("p:switch:%s:%s", user, bucket)
+		switchVal := ReplicationSwitch{
+			IsDone:       false,
+			OldMain:      prevMain,
+			OldFollowers: "",
+			MultipartTTL: multipartTTL,
+			StartedAt:    time.Now().UTC(),
+			DoneAt:       nil,
+		}
+		switchVal.SetOldFollowers(oldFollowers)
+		_ = pipe.HSet(ctx, switchKey, switchVal)
+
+		// adjust replication policies
+		replKey := fmt.Sprintf("p:repl:%s:%s", user, bucket)
+		pipe.Del(ctx, replKey)
+		delete(oldFollowers, newMain)
+		for follower, priority := range oldFollowers {
+			pipe.ZAdd(ctx, replKey, redis.Z{
+				Score:  float64(priority),
+				Member: fmt.Sprintf("%s:%s", newMain, follower),
+			})
+
+			statusKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, newMain, follower)
+			now := time.Now().UTC()
+			res := ReplicationPolicyStatus{
+				CreatedAt:      now,
+				IsPaused:       false,
+				ListingStarted: true,
+			}
+			_ = pipe.HSet(ctx, statusKey, res)
+			_ = pipe.HSet(ctx, statusKey, "init_done_at", now)
+		}
+		return nil
+	})
+	return err
+}
+
+func (s *policySvc) ReplicationSwitchDone(ctx context.Context, user, bucket string) error {
+	if user == "" {
+		return fmt.Errorf("%w: user is requred to get replication Switch", dom.ErrInvalidArg)
+	}
+	if bucket == "" {
+		return fmt.Errorf("%w: bucket is requred to get replication Switch", dom.ErrInvalidArg)
+	}
+	key := fmt.Sprintf("p:switch:%s:%s", user, bucket)
+	err := s.hSetKeyExists(ctx, key, "IsDone", true)
+	if err != nil {
+		return err
+	}
+	return s.hSetKeyExists(ctx, key, "DoneAt", time.Now().UTC())
 }

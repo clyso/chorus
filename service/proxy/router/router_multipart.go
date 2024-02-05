@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,8 +64,9 @@ func (r *router) createMultipartUpload(req *http.Request) (resp *http.Response, 
 
 func (r *router) completeMultipartUpload(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	bucket, object := xctx.GetBucket(ctx), xctx.GetObject(ctx)
-	storage, err = r.routeMultipart(req)
+	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
+	var switchInProgress bool
+	storage, switchInProgress, err = r.routeMultipart(req)
 	if err != nil {
 		return
 	}
@@ -77,6 +78,9 @@ func (r *router) completeMultipartUpload(req *http.Request) (resp *http.Response
 	resp, isApiErr, err = client.Do(req)
 	if err != nil || isApiErr {
 		return
+	}
+	if switchInProgress {
+		_ = r.storageSvc.DeleteUploadID(ctx, user, bucket, object, req.URL.Query().Get("uploadId"))
 	}
 
 	var res completeMultipartUploadResult
@@ -117,7 +121,9 @@ func (r *router) completeMultipartUpload(req *http.Request) (resp *http.Response
 
 func (r *router) abortMultipartUpload(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	storage, err = r.routeMultipart(req)
+	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
+	var switchInProgress bool
+	storage, switchInProgress, err = r.routeMultipart(req)
 	if err != nil {
 		return
 	}
@@ -127,6 +133,12 @@ func (r *router) abortMultipartUpload(req *http.Request) (resp *http.Response, s
 		return nil, "", false, err
 	}
 	resp, isApiErr, err = client.Do(req)
+	if err != nil || isApiErr {
+		return
+	}
+	if switchInProgress {
+		_ = r.storageSvc.DeleteUploadID(ctx, user, bucket, object, req.URL.Query().Get("uploadId"))
+	}
 	return
 }
 
@@ -146,7 +158,7 @@ func (r *router) listMultipartUploads(req *http.Request) (resp *http.Response, s
 
 func (r *router) uploadPart(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	storage, err = r.routeMultipart(req)
+	storage, _, err = r.routeMultipart(req)
 	if err != nil {
 		return
 	}
@@ -159,15 +171,15 @@ func (r *router) uploadPart(req *http.Request) (resp *http.Response, storage str
 	return
 }
 
-func (r *router) routeMultipart(req *http.Request) (storage string, err error) {
+func (r *router) routeMultipart(req *http.Request) (storage string, switchInProgress bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return "", fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return "", false, fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
 		}
-		return "", err
+		return "", false, err
 	}
 
 	replSwitch, getSwitchErr := r.policySvc.GetReplicationSwitch(ctx, user, bucket)
@@ -179,6 +191,7 @@ func (r *router) routeMultipart(req *http.Request) (storage string, err error) {
 		err = getSwitchErr
 		return
 	}
+	switchInProgress = replSwitch.IsDone
 	if replSwitch.IsDone {
 		return
 	}
@@ -189,9 +202,9 @@ func (r *router) routeMultipart(req *http.Request) (storage string, err error) {
 		return
 	}
 	if exists {
-		return storage, nil
+		return storage, switchInProgress, nil
 	}
-	return replSwitch.OldMain, nil
+	return replSwitch.OldMain, switchInProgress, nil
 }
 
 func (r *router) routeListMultipart(req *http.Request) (storage string, err error) {

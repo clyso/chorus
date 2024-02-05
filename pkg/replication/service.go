@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,27 +152,11 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.ObjectSyncPayload:
-		_, err = s.versionSvc.IncrementObj(ctx, t.Object, t.FromStorage)
-		if err != nil {
-			return err
+		if t.Deleted {
+			err = s.versionSvc.DeleteObjAll(ctx, t.Object)
+		} else {
+			_, err = s.versionSvc.IncrementObj(ctx, t.Object, t.FromStorage)
 		}
-		for to, priority := range replTo {
-			t.SetTo(to)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetTo(), t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
-			}
-		}
-	case *tasks.ObjectDeletePayload:
-		err = s.versionSvc.DeleteObjAll(ctx, t.Object)
 		if err != nil {
 			return err
 		}
@@ -238,7 +222,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 }
 
 func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[string]tasks.Priority, error) {
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	policy, err := s.getReplicationPolicy(ctx, task)
 	if err != nil {
 		return nil, err
@@ -252,12 +235,13 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[str
 		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", policy.From, task.GetFrom())
 	}
 
+	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	replSwitch, err := s.policySvc.GetReplicationSwitch(ctx, user, bucket)
 	if err != nil {
 		return nil, fmt.Errorf("%w: no replication switch for replication task with invalid from storage", err)
 	}
 	if replSwitch.OldMain != task.GetFrom() {
-		return nil, fmt.Errorf("%w: replication swithc OldMain %s not match with task from storage %s", dom.ErrInternal, replSwitch.OldMain, task.GetFrom())
+		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, replSwitch.OldMain, task.GetFrom())
 	}
 
 	return replSwitch.GetOldFollowers(), nil

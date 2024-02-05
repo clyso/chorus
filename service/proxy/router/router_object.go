@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,18 +128,20 @@ func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList
 			if _, ok := errSet[object.Key]; ok {
 				continue
 			}
-			taskList = append(taskList, &tasks.ObjectDeletePayload{
-				Object: object.toDom(bucket),
-				Sync:   tasks.Sync{FromStorage: storage},
+			taskList = append(taskList, &tasks.ObjectSyncPayload{
+				Object:  object.toDom(bucket),
+				Sync:    tasks.Sync{FromStorage: storage},
+				Deleted: true,
 			})
 		}
 	} else {
 		// normal mode: use deleted obj list from response
 		taskList = make([]tasks.SyncTask, len(respBody.Deleted))
 		for i, object := range respBody.Deleted {
-			taskList[i] = &tasks.ObjectDeletePayload{
-				Object: object.toDom(bucket),
-				Sync:   tasks.Sync{FromStorage: storage},
+			taskList[i] = &tasks.ObjectSyncPayload{
+				Object:  object.toDom(bucket),
+				Sync:    tasks.Sync{FromStorage: storage},
+				Deleted: true,
 			}
 		}
 	}
