@@ -907,10 +907,12 @@ func (s *policySvc) DeleteReplication(ctx context.Context, user, bucket, from st
 	key := fmt.Sprintf("p:repl:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", from, to)
 	statusKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, from, to)
+	switchKey := fmt.Sprintf("p:switch:%s:%s", user, bucket)
 
 	_, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.ZRem(ctx, key, val)
 		pipe.Del(ctx, statusKey)
+		pipe.Del(ctx, switchKey)
 		return nil
 	})
 	if err != nil {
