@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/proxy/auth"
+	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/worker"
 	"io/fs"
 )
@@ -59,7 +59,7 @@ type Config struct {
 		Auth    *auth.Config `yaml:"auth,omitempty"`
 		Port    int          `yaml:"port"`
 		Address string       `yaml:"address"`
-		Cors    *proxy.Cors  `yaml:"cors"`
+		Cors    *cors.Config `yaml:"cors"`
 	} `yaml:"proxy"`
 }
 
