@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,11 +35,11 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/proxy/auth"
+	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/proxy/router"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/cors"
 	"net/http"
 	"slices"
 	"strings"
@@ -113,17 +113,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	} else {
 		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, router.Middleware(trace.HttpMiddleware(tp, authCheck.Wrap(proxyMux))))
 	}
-	if conf.Cors.Enabled {
-		if conf.Cors.AllowAll {
-			handler = cors.AllowAll().Handler(handler)
-		} else {
-			handler = cors.New(cors.Options{
-				AllowedOrigins: conf.Cors.Whitelist,
-				AllowedMethods: []string{"*"},
-				AllowedHeaders: []string{"*"},
-			}).Handler(handler)
-		}
-	}
+	handler = cors.HttpMiddleware(conf.Cors, handler)
 
 	proxyServer := http.Server{Addr: fmt.Sprintf(":%d", conf.Port), Handler: handler}
 
