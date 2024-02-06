@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy/auth"
+	"github.com/clyso/chorus/service/proxy/cors"
 	"io/fs"
 )
 
@@ -43,13 +44,7 @@ type Config struct {
 	Auth    *auth.Config      `yaml:"auth,omitempty"`
 	Port    int               `yaml:"port"`
 	Address string            `yaml:"address"`
-	Cors    *Cors             `yaml:"cors"`
-}
-
-type Cors struct {
-	Enabled   bool     `yaml:"enabled"`
-	AllowAll  bool     `yaml:"allowAll"`
-	Whitelist []string `yaml:"whitelist"`
+	Cors    *cors.Config      `yaml:"cors"`
 }
 
 func (c *Config) Validate() error {
