@@ -87,14 +87,24 @@ and reduce needs in metadata storage.
 
 Caveats:
 
-- what if `bucket-name + obj name` is too long for shard bucket name?
-  The bucket name can be between 3 and 63 characters and Object key names may be up to 1024 characters long.
+#### What if `bucket-name + obj name` is too long for shard bucket name?
+The bucket name can be between 3 and 63 characters and Object key names may be up to 1024 characters long.
 
 Solutions:
-
 - Trim bucket name and store `StartFromObjName` in metadata storage?
 - Hash bucket name and store `StartFromObjName` in metadata storage?
 - Just use numbers for bucket shard suffix and store `StartFromObjName` in metadata storage?
+
+
+#### What if user calls bucket shard directly? In this cas User can delete shard or place obj in the wrong shard.
+
+Solutions:
+
+- Restrict user from calling shard buckets directly. For each request proxy does:
+  - get bucket name from request
+  - check if bucket name is prefix of other bucket with enabled sharding and return error.
+
+
 
 ### Sequence diagram
 
