@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2024 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tas
 	reqBody := createBucketConfiguration{}
 	err = s3client.ExtractReqBody(req, &reqBody)
 	if err != nil && !errors.Is(err, io.EOF) {
-		zerolog.Ctx(ctx).Err(err).Msg("unable to unmarshal createBucketConfiguration request body")
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("unable to unmarshal createBucketConfiguration request body")
 	}
 
 	resp, isApiErr, err = client.Do(req)
