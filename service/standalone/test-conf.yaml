@@ -1,7 +1,12 @@
 proxy:
   auth:
     useStorage: one
+features:
+  tagging: false # sync object/bucket tags
+  acl: false # sync object/bucket ACLs
 storage:
+  createRouting: true # create roting rules to route proxy requests to main storage
+  createReplication: false  # create replication rules to replicate data from main to other storages
   storages:
     one: # yaml key with some handy storage name
       address: ":9680" # will start fake s3 on port 9680
