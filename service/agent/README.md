@@ -7,8 +7,11 @@ Can be used as alternative to [Chorus proxy](../proxy).
 
 ## Usage
 
-Set proper `url` and `fromStorage` params to [config](./config.yaml) and deploy agent to be reachable by source s3
-storage.
+Set proper `url`, `fromStorage`, and `redis` credentials to [config](./config.yaml) and deploy agent to be reachable by source s3
+storage. 
+
+> [!IMPORTANT]  
+> Make sure that `chorus-worker` and `chorus-agent` using the same Redis instance.
 
 > [!NOTE]  
 > [Worker](../worker) is required to use CLI. Deploy worker and provide worker GRPC api address to CLI.
