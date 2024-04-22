@@ -7,11 +7,11 @@ Can be used as alternative to [Chorus proxy](../proxy).
 
 ## Usage
 
-Set proper `url`, `fromStorage`, and `redis` credentials to [config](./config.yaml) and deploy agent to be reachable by source s3
+Set proper `url`, `fromStorage`, and `redis` credentials to [config](./config.yaml) and deploy agent to be reachable by source S3
 storage. 
 
 > [!IMPORTANT]  
-> Make sure that `chorus-worker` and `chorus-agent` using the same Redis instance.
+> Make sure that `chorus-worker` and `chorus-agent` are using the same Redis instance.
 
 > [!NOTE]  
 > [Worker](../worker) is required to use CLI. Deploy worker and provide worker GRPC api address to CLI.
@@ -30,6 +30,6 @@ chorctl repl add --from="<src_storage_name>" --to="<dest_storage_name>" --user="
 
 ## See also
 
-- Amazon s3 bucket
+- Amazon S3 bucket
   notifications [documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html)
-- Ceph RGW s3 bucket notifications [documentation](https://docs.ceph.com/en/latest/radosgw/notifications/)
+- Ceph RGW S3 bucket notifications [documentation](https://docs.ceph.com/en/latest/radosgw/notifications/)
