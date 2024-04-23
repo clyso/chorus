@@ -19,7 +19,7 @@ proxy:
     type: ClusterIP
   config:
     metrics:
-      enabled: true
+      enabled: false
     log:
       json: true
       level: info
@@ -65,7 +65,7 @@ worker:
     type: ClusterIP
   config:
     metrics:
-      enabled: true
+      enabled: false
     log:
       json: true
       level: info
@@ -123,16 +123,24 @@ secret: "" #  set storage credentials here to create secret:
 #        isMain: true
 #        isSecure: true
 #        credentials:
-#          accessKeyID: abc
-#          secretAccessKey: abc
+#          user1:
+#            accessKeyID: abc
+#            secretAccessKey: abc
+#          user2:
+#            accessKeyID: def
+#            secretAccessKey: jhi
 #      two:
 #        address: office.clyso.cloud
 #        provider: Ceph
 #        isMain: false
 #        isSecure: true
 #        credentials:
-#          accessKeyID: abc
-#          secretAccessKey: abc
+#          user1:
+#            accessKeyID: jkl
+#            secretAccessKey: mno
+#          user2:
+#            accessKeyID: pqr
+#            secretAccessKey: stw
 redis:
   enabled: true
   architecture: standalone
