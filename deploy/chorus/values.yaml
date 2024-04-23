@@ -19,7 +19,7 @@ proxy:
     type: ClusterIP
   config:
     metrics:
-      enabled: true
+      enabled: false
     log:
       json: true
       level: info
@@ -65,7 +65,7 @@ worker:
     type: ClusterIP
   config:
     metrics:
-      enabled: true
+      enabled: false
     log:
       json: true
       level: info
