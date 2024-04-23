@@ -18,9 +18,12 @@ package s3
 
 import (
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 const (
@@ -147,6 +150,22 @@ func (s *StorageConfig) Init() error {
 		}
 		if storage.Address == "" {
 			return fmt.Errorf("app config: storage address required")
+		}
+		if !strings.HasPrefix(storage.Address, "http") {
+			if storage.IsSecure {
+				storage.Address = "https://" + storage.Address
+			} else {
+				storage.Address = "http://" + storage.Address
+			}
+		}
+		if storage.IsSecure && !strings.HasPrefix(storage.Address, "https://") {
+			return fmt.Errorf("%w: invalid storage address schema for secure connection", dom.ErrInvalidStorageConfig)
+		}
+		if !storage.IsSecure && !strings.HasPrefix(storage.Address, "http://") {
+			return fmt.Errorf("%w: invalid storage address schema for insecure connection", dom.ErrInvalidStorageConfig)
+		}
+		if _, err := url.ParseRequestURI(storage.Address); err != nil {
+			return fmt.Errorf("%w: invalid storage address", err)
 		}
 		s.Storages[name] = storage
 		storList = append(storList, name)

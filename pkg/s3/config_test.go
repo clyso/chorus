@@ -1,8 +1,9 @@
 package s3
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestStorageConfig_Validate(t *testing.T) {
@@ -46,4 +47,83 @@ func TestStorageConfig_Validate(t *testing.T) {
 	r.EqualValues(fol[4], "f")
 	r.EqualValues(fol[5], "g")
 	r.EqualValues(len(fol), len(res1)-1)
+}
+
+func TestStorageConfig_ValidateAddress(t *testing.T) {
+	t.Run("Add http", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.NoError(s.Init())
+		r.EqualValues("http://clyso.com", s.Storages["a"].Address)
+	})
+	t.Run("Add https", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, IsSecure: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.NoError(s.Init())
+		r.EqualValues("https://clyso.com", s.Storages["a"].Address)
+	})
+
+	t.Run("Already http", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.NoError(s.Init())
+		r.EqualValues("http://clyso.com", s.Storages["a"].Address)
+	})
+	t.Run("Already https", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, IsSecure: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.NoError(s.Init())
+		r.EqualValues("https://clyso.com", s.Storages["a"].Address)
+	})
+
+	t.Run("Invalid http", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.Error(s.Init())
+	})
+	t.Run("Invalid https", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, IsSecure: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.Error(s.Init())
+	})
+	t.Run("Invalid url", func(t *testing.T) {
+		r := require.New(t)
+
+		s := StorageConfig{
+			Storages: map[string]Storage{
+				"a": {IsMain: true, IsSecure: true, Address: "http:/clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			},
+		}
+		r.Error(s.Init())
+	})
 }
