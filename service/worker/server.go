@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/clyso/chorus/pkg/api"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -46,7 +48,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
-	"time"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -166,8 +167,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 					taskLogger.Debug().Err(err).Msg("process task failed due to the rate limit")
 					return
 				}
-				taskLogger.Warn().Err(err).Msg("process task failed. task will be retired")
-
+				taskLogger.Warn().Err(err).Msg("process task failed. task will be retried")
 			}),
 			Logger:   stdLogger,
 			LogLevel: asynq.LogLevel(zerolog.GlobalLevel() + 1),
