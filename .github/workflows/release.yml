@@ -38,7 +38,7 @@ jobs:
           # context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: chorus/${{ matrix.service }}:test2
+          tags: harbor.clyso.com/chorus/${{ matrix.service }}:test2
           build-args: |
             GIT_TAG=${{  github.ref_name }}
             GIT_COMMIT=${{ github.sha }} 
