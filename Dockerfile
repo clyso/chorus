@@ -23,10 +23,9 @@ ARG SERVICE=worker
 RUN CGO_ENABLED=0 GO111MODULE=on GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X 'main.version=$GIT_TAG' -X 'main.commit=$GIT_COMMIT'" -o chorus ./cmd/${SERVICE}
 
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM --platform=$TARGETPLATFORM gcr.io/distroless/static:nonroot
-USER nonroot:nonroot
+FROM --platform=$TARGETPLATFORM scratch
 WORKDIR /bin
 
-COPY --chown=nonroot:nonroot --from=builder /build/chorus chorus
+COPY --from=builder /build/chorus chorus
 
 CMD ["chorus"]
