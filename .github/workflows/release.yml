@@ -29,7 +29,7 @@ jobs:
           # tag: ${{  github.ref_name }}
           strip_tag_prefix: v
           tag_with_latest: false
-          extra_args: "--custom-platform=linux/{{ matrix.arch }} --build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
+          extra_args: "--custom-platform=linux/${{ matrix.arch }} --build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
   # upload docker manifest to support multi-arch images
   manifest:
     needs: kaniko
