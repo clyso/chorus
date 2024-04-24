@@ -12,40 +12,67 @@ jobs:
   kaniko:
     strategy:
       matrix:
-        arch: [amd64, arm64]
-        service: [worker, proxy, agent]
+    #     arch: [amd64, arm64]
+        # service: [worker, proxy, agent]
+        service: [ proxy]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: docker build and push
-        uses: aevea/action-kaniko@v0.13.0
+    steps:
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
           registry: harbor.clyso.com
-          username: "${{ secrets.DOCKER_USER }}"
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          image: chorus/${{ matrix.service }}-${{ matrix.arch }}
-          build_file: Dockerfile
-          tag: test2
-          # tag: ${{  github.ref_name }}
-          strip_tag_prefix: v
-          tag_with_latest: false
-          extra_args: "--custom-platform=linux/${{ matrix.arch }} --build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: chorus/${{ matrix.service }}:test2
+          build-args:
+          - GIT_TAG=${{  github.ref_name }}
+          - GIT_COMMIT=${{ github.sha }} 
+          - SERVICE=${{ matrix.service }} 
+      # - uses: actions/checkout@v3
+      # - name: docker build and push
+      #   uses: aevea/action-kaniko@v0.13.0
+      #   with:
+      #     registry: harbor.clyso.com
+      #     username: "${{ secrets.DOCKER_USER }}"
+      #     password: ${{ secrets.DOCKER_PASSWORD }}
+      #     image: chorus/${{ matrix.service }}-${{ matrix.arch }}
+      #     build_file: Dockerfile
+      #     tag: test2
+      #     # tag: ${{  github.ref_name }}
+      #     strip_tag_prefix: v
+      #     tag_with_latest: false
+      #     extra_args: "--custom-platform=linux/${{ matrix.arch }} --build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
   # upload docker manifest to support multi-arch images
-  manifest:
-    needs: kaniko
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [worker, proxy, agent]
-    steps:
-    - name: Push manifest
-      uses: pixelfederation/gh-action-manifest-tool@v0.1.0 #check for latest tag
-      with:
-        username: "${{ secrets.DOCKER_USER }}"
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        platforms: linux/amd64,linux/arm64
-        template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:test2
-        target: harbor.clyso.com/chorus/${{ matrix.service }}:test2
+  # manifest:
+  #   needs: kaniko
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       service: [worker, proxy, agent]
+  #   steps:
+  #   - name: Push manifest
+  #     uses: pixelfederation/gh-action-manifest-tool@v0.1.0 #check for latest tag
+  #     with:
+  #       username: "${{ secrets.DOCKER_USER }}"
+  #       password: ${{ secrets.DOCKER_PASSWORD }}
+  #       platforms: linux/amd64,linux/arm64
+  #       template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:test2
+  #       target: harbor.clyso.com/chorus/${{ matrix.service }}:test2
         # template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:${{  github.ref_name }}
         # target: harbor.clyso.com/chorus/${{ matrix.service }}:${{  github.ref_name }}
     # - name: Tag latest
