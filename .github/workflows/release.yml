@@ -25,11 +25,11 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           image: chorus/${{ matrix.service }}-${{ matrix.arch }}
           build_file: Dockerfile
-          tag: test 
+          tag: test2
           # tag: ${{  github.ref_name }}
           strip_tag_prefix: v
           tag_with_latest: false
-          extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
+          extra_args: "--custom-platform=linux/{{ matrix.arch }} --build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
   # upload docker manifest to support multi-arch images
   manifest:
     needs: kaniko
@@ -44,8 +44,8 @@ jobs:
         username: "${{ secrets.DOCKER_USER }}"
         password: ${{ secrets.DOCKER_PASSWORD }}
         platforms: linux/amd64,linux/arm64
-        template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:test
-        target: harbor.clyso.com/chorus/${{ matrix.service }}:test
+        template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:test2
+        target: harbor.clyso.com/chorus/${{ matrix.service }}:test2
         # template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:${{  github.ref_name }}
         # target: harbor.clyso.com/chorus/${{ matrix.service }}:${{  github.ref_name }}
     # - name: Tag latest
