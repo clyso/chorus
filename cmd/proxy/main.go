@@ -19,8 +19,10 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/clyso/chorus/pkg/config"
@@ -48,6 +50,8 @@ func main() {
 	if configOverridePath != nil && *configOverridePath != "" {
 		configs = append(configs, config.Path(*configOverridePath))
 	}
+	fmt.Println(runtime.GOARCH)
+	fmt.Println(runtime.GOOS)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signals := make(chan os.Signal, 1)
