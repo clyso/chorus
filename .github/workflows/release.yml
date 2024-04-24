@@ -17,7 +17,6 @@ jobs:
         service: [ proxy]
     runs-on: ubuntu-latest
     steps:
-    steps:
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -39,10 +38,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: chorus/${{ matrix.service }}:test2
-          build-args:
-          - GIT_TAG=${{  github.ref_name }}
-          - GIT_COMMIT=${{ github.sha }} 
-          - SERVICE=${{ matrix.service }} 
+          build-args: |
+            GIT_TAG=${{  github.ref_name }}
+            GIT_COMMIT=${{ github.sha }} 
+            SERVICE=${{ matrix.service }} 
       # - uses: actions/checkout@v3
       # - name: docker build and push
       #   uses: aevea/action-kaniko@v0.13.0
