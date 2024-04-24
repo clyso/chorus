@@ -17,6 +17,7 @@ jobs:
         service: [ proxy]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -24,7 +25,7 @@ jobs:
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       -
-        name: Login to Docker Hub
+        name: Login to Docker Registry
         uses: docker/login-action@v3
         with:
           registry: harbor.clyso.com
@@ -34,7 +35,7 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: .
+          # context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: chorus/${{ matrix.service }}:test2
