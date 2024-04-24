@@ -1,36 +1,56 @@
 name: Release Docker images
 
 on:
-  push:
-    tags:
-      - '*'
+  # push:
+  #   tags:
+  #     - '*'
+  pull_request:
+    branches: [ main ]
 
 jobs:
+  # build and publish docker images
   kaniko:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        service: [worker, proxy, agent]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: build proxy
+      - name: docker build and push
         uses: aevea/action-kaniko@v0.10.0
         with:
           registry: harbor.clyso.com
           username: "${{ secrets.DOCKER_USER }}"
           password: ${{ secrets.DOCKER_PASSWORD }}
-          image: chorus/proxy
-          build_file: Dockerfile.proxy
+          image: chorus/${{ matrix.service }}-${{ matrix.arch }}
+          build_file: Dockerfile
           tag: ${{  github.ref_name }}
           strip_tag_prefix: v
-          tag_with_latest: true
-          extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }}"
-      - name: build worker
-        uses: aevea/action-kaniko@v0.10.0
-        with:
-          registry: harbor.clyso.com
-          username: "${{ secrets.DOCKER_USER }}"
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          image: chorus/worker
-          build_file: Dockerfile.worker
-          tag: ${{  github.ref_name }}
-          strip_tag_prefix: v
-          tag_with_latest: true
-          extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }}"
+          tag_with_latest: false
+          extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
+  # upload docker manifest to support multi-arch images
+  manifest:
+    needs: kaniko
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [worker, proxy, agent]
+    steps:
+    - name: Push manifest
+      uses: pixelfederation/gh-action-manifest-tool@v0.1.0 #check for latest tag
+      with:
+        username: "${{ secrets.DOCKER_USER }}"
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        platforms: linux/amd64,linux/arm64
+        template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:${{  github.ref_name }}
+        target: harbor.clyso.com/chorus/${{ matrix.service }}:${{  github.ref_name }}
+    # - name: Tag latest
+    #   uses: pixelfederation/gh-action-manifest-tool@v0.1.0 #check for latest tag
+    #   with:
+    #     username: "${{ secrets.DOCKER_USER }}"
+    #     password: ${{ secrets.DOCKER_PASSWORD }}
+    #     platforms: linux/amd64,linux/arm64
+    #     template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:${{  github.ref_name }}
+    #     target: harbor.clyso.com/chorus/${{ matrix.service }}:latest
+

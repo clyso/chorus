@@ -13,18 +13,19 @@ RUN go mod download
 
 COPY . .
 
-ARG GO111MODULE=on
-ARG CGO_ENABLED=0
 ARG GOOS=linux
-ARG GOARCH=amd64
+# amd64| arm64
+ARG GOARCH=amd64 
+# worker|proxy|agent
+ARG SERVICE=worker
 
-RUN CGO_ENABLED=$CGO_ENABLED GO111MODULE=$GO111MODULE GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X 'main.version=$GIT_TAG' -X 'main.commit=$GIT_COMMIT'" ./cmd/worker
+RUN CGO_ENABLED=0 GO111MODULE=on GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X 'main.version=$GIT_TAG' -X 'main.commit=$GIT_COMMIT'" -o chorus ./cmd/${SERVICE}
 
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 USER nonroot:nonroot
 WORKDIR /bin
 
-COPY --chown=nonroot:nonroot --from=builder /build/worker worker
+COPY --chown=nonroot:nonroot --from=builder /build/chorus chorus
 
-CMD ["worker"]
+CMD ["chorus"]
