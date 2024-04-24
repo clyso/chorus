@@ -25,7 +25,8 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           image: chorus/${{ matrix.service }}-${{ matrix.arch }}
           build_file: Dockerfile
-          tag: ${{  github.ref_name }}
+          tag: test 
+          # tag: ${{  github.ref_name }}
           strip_tag_prefix: v
           tag_with_latest: false
           extra_args: "--build-arg GIT_TAG=${{  github.ref_name }} --build-arg GIT_COMMIT=${{ github.sha }} --build-arg SERVICE=${{ matrix.service }} --build-arg GOARCH=${{ matrix.arch }}"
@@ -43,8 +44,10 @@ jobs:
         username: "${{ secrets.DOCKER_USER }}"
         password: ${{ secrets.DOCKER_PASSWORD }}
         platforms: linux/amd64,linux/arm64
-        template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:${{  github.ref_name }}
-        target: harbor.clyso.com/chorus/${{ matrix.service }}:${{  github.ref_name }}
+        template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:test
+        target: harbor.clyso.com/chorus/${{ matrix.service }}:test
+        # template: harbor.clyso.com/chorus/${{ matrix.service }}-ARCH:${{  github.ref_name }}
+        # target: harbor.clyso.com/chorus/${{ matrix.service }}:${{  github.ref_name }}
     # - name: Tag latest
     #   uses: pixelfederation/gh-action-manifest-tool@v0.1.0 #check for latest tag
     #   with:
