@@ -1,5 +1,4 @@
 FROM golang:1.21 as builder
-# FROM --platform=$BUILDPLATFORM golang:1.21 as builder
 ARG GIT_COMMIT='not set'
 ARG GIT_TAG=development
 ENV GIT_COMMIT=$GIT_COMMIT
@@ -24,7 +23,6 @@ RUN CGO_ENABLED=0 GO111MODULE=on GOOS=$GOOS GOARCH=${TARGETARCH} go build -ldfla
 
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
-# FROM --platform=$TARGETPLATFORM gcr.io/distroless/static:nonroot
 USER nonroot:nonroot
 WORKDIR /bin
 
