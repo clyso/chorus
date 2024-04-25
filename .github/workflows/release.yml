@@ -1,8 +1,11 @@
 name: Release Artifacts
 on:
-  push:
-    tags:
-      - '*'
+  # push:
+  #   tags:
+  #     - '*'
+  pull_request:
+    branches:
+      - main
 env:
   REGISTRY: harbor.clyso.com
 jobs:
@@ -10,52 +13,50 @@ jobs:
   docker:
     strategy:
       matrix:
-        service: [worker, proxy, agent]
+        service:
+          - worker
+          - proxy
+          - agent
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      -
-        name: Set up QEMU
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      -
-        name: Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      -
-        name: Login to Docker Registry
+      - name: Login to Docker Registry
         uses: docker/login-action@v3
         with:
           registry: $REGISTRY
-          username: "${{ secrets.DOCKER_USER }}"
+          username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      -
-        name: Build and push
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/arm64
           push: true
+          # tags: |
+          #   $REGISTRY/chorus/${{ matrix.service }}:${{  github.ref_name }}
+          #   $REGISTRY/chorus/${{ matrix.service }}:latest
           tags: |
-            $REGISTRY/chorus/${{ matrix.service }}:${{  github.ref_name }}
-            $REGISTRY/chorus/${{ matrix.service }}:latest
-          build-args: |
-            GIT_TAG=${{  github.ref_name }}
-            GIT_COMMIT=${{ github.sha }} 
-            SERVICE=${{ matrix.service }} 
+            $REGISTRY/chorus/${{ matrix.service }}:tst
+          build-args: "GIT_TAG=${{  github.ref_name }}\nGIT_COMMIT=${{ github.sha }} \nSERVICE=${{ matrix.service }} \n"
   # publish helm chart
-  helm:
-    needs: docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: read chart version
-        id: chartVer
-        uses: mikefarah/yq@v4.43.1
-        with:
-          cmd: yq '.version' deploy/chorus/Chart.yaml
-      - name: Install helm
-        uses: azure/setup-helm@v4.2.0
-      - name: Publish chart
-        run: |
-          echo "${{ steps.chartVer.outputs.result }}"
-          helm registry login -u '${{ secrets.DOCKER_USER }}' -p ${{ secrets.DOCKER_PASSWORD }} $REGISTRY
-          helm package ./deploy/chorus --app-version=${{  github.ref_name }}
-          helm push ./chorus-${{ steps.chartVer.outputs.result }}.tgz oci://$REGISTRY/chorus
+  # helm:
+  #   needs: docker
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: read chart version
+  #       id: chartVer
+  #       uses: mikefarah/yq@v4.43.1
+  #       with:
+  #         cmd: yq '.version' deploy/chorus/Chart.yaml
+  #     - name: Install helm
+  #       uses: azure/setup-helm@v4.2.0
+  #     - name: Publish chart
+  #       run: |
+  #         echo "${{ steps.chartVer.outputs.result }}"
+  #         helm registry login -u '${{ secrets.DOCKER_USER }}' -p ${{ secrets.DOCKER_PASSWORD }} $REGISTRY
+  #         helm package ./deploy/chorus --app-version=${{  github.ref_name }}
+  #         helm push ./chorus-${{ steps.chartVer.outputs.result }}.tgz oci://$REGISTRY/chorus
