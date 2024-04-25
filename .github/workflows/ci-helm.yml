@@ -1,0 +1,25 @@
+name: CI helm
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - deploy/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - deploy/**
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install helm
+        uses: azure/setup-helm@v4.2.0
+      - name: Lint default
+        run: |
+          helm lint ./deploy/chorus --strict
+      - name: Lint all enabled
+        run: |
+          helm lint ./deploy/chorus --strict --set agent.enabled=true,worker.config.metrics.enabled=true,proxy.config.metrics.enabled=true,agent.config.metrics.enabled=true
