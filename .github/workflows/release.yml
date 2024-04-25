@@ -59,4 +59,4 @@ jobs:
           echo "${{ steps.chartVer.outputs.result }}"
           helm registry login -u '${{ secrets.DOCKER_USER }}' -p ${{ secrets.DOCKER_PASSWORD }} harbor.clyso.com
           helm package ./deploy/chorus --app-version=${{  github.ref_name }}
-          helm push ./chorus-${{ steps.chartVer.outputs.result }} oci://harbor.clyso.com/chorus
+          helm push ./chorus-${{ steps.chartVer.outputs.result }}.tgz oci://harbor.clyso.com/chorus
