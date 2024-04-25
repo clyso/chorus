@@ -2,7 +2,7 @@ proxy:
   enabled: true
   image:
     repository: harbor.clyso.com/chorus/proxy
-    tag: latest
+    tag: "" # Chart appVersion will be used if empty
     pullPolicy: Always
   replicas: 2
   resources:
@@ -26,7 +26,7 @@ proxy:
     trace:
       enabled: false
       endpoint: # url to Jaeger or other open trace provider
-    address: "http://localhost:9669" # Chorus proxy s3 api address
+    address: http://localhost:9669 # Chorus proxy s3 api address
     port: 9669
     cors:
       enabled: false
@@ -36,15 +36,15 @@ proxy:
       allowV2Signature: false
       useStorage: # use credentials from one of configured storages <one|two>
       custom: # use custom credentials for proxy s3 endpoint
-    #      - accessKeyID: <s3 v4 accessKey credential>
-    #        secretAccessKey: <s3 v4 secretKey credential>
-    #      - accessKeyID: <s3 v4 accessKey credential>
-    #        secretAccessKey: <s3 v4 secretKey credential>
+      #      - accessKeyID: <s3 v4 accessKey credential>
+      #        secretAccessKey: <s3 v4 secretKey credential>
+      #      - accessKeyID: <s3 v4 accessKey credential>
+      #        secretAccessKey: <s3 v4 secretKey credential>
 worker:
   replicas: 2
   image:
     repository: harbor.clyso.com/chorus/worker
-    tag: latest
+    tag: "" # Chart appVersion will be used if empty
     pullPolicy: Always
   resources:
     limits:
@@ -100,7 +100,7 @@ commonConfig:
     acl: true
   storage:
     createRouting: true # create roting rules to route proxy requests to main storage
-    createReplication: false  # create replication rules to replicate data from main to other storages
+    createReplication: false # create replication rules to replicate data from main to other storages
     storages:
       one:
         address: s3.clyso.com
@@ -111,6 +111,37 @@ commonConfig:
         address: office.clyso.cloud
         provider: Ceph
         isSecure: true
+agent:
+  enabled: false
+  image:
+    repository: harbor.clyso.com/chorus/agent
+    tag: "" # Chart appVersion will be used if empty
+    pullPolicy: Always
+  replicas: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  agentService:
+    portHttp:
+      port: 9673
+      targetPort: http
+    type: ClusterIP
+  config:
+    metrics:
+      enabled: false
+    log:
+      json: true
+      level: info
+    trace:
+      enabled: false
+      endpoint: # url to Jaeger or other open trace provider
+    port: 9673 # agent port to listen incoming notifications
+    url: http://localhost:9673 # REQUIRED: url to be used by s3 storage to send notifications. The URL should be reachable for s3 storage.
+    fromStorage: "" # REQUIRED: notifications source storage name from Chorus config. Normally name of the main storage from storage config.
 existingSecret: "" # set name of existing secret with storage credentials or
 secret: "" #  set storage credentials here to create secret:
 # Example
@@ -147,13 +178,12 @@ redis:
   auth:
     existingSecret: redis-secret
     existingSecretPasswordKey: password
-
 imagePullSecrets:
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
   # Annotations to add to the service account
-  annotations: { }
+  annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""

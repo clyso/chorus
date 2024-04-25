@@ -1,22 +1,23 @@
+{{- if .Values.agent.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "chorus.fullname" . }}-worker
+  name: {{ include "chorus.fullname" . }}-agent
   labels:
-    app: worker
+    app: agent
   {{- include "chorus.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.worker.replicas }}
+  replicas: {{ .Values.agent.replicas }}
   selector:
     matchLabels:
-      app: worker
+      app: agent
     {{- include "chorus.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: worker
+        app: agent
       {{- include "chorus.selectorLabels" . | nindent 8 }}
-      {{- if .Values.worker.config.metrics.enabled }}
+      {{- if .Values.agent.config.metrics.enabled }}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
@@ -37,42 +38,38 @@ spec:
               name: redis-secret
         - name: CFG_REDIS_ADDRESS
           value: {{ printf "%s-redis-master:6379" ( .Release.Name ) }}
-        image: {{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
-        name: worker
+        image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+        name: agent
         ports:
-        {{- if .Values.worker.config.metrics.enabled }}
+        - containerPort: {{ .Values.agent.config.port | default 9673 }}
+          name: http
+          protocol: TCP
+        {{- if .Values.agent.config.metrics.enabled }}
         - containerPort: 9090
           name: metrics
           protocol: TCP
         {{- end }}
-        {{- if .Values.worker.config.api.enabled }}
-        - containerPort: 9670
-          name: grpc
-          protocol: TCP
-        - containerPort: 9671
-          name: rest
-          protocol: TCP
-        {{- end }}
-        resources: {{- toYaml .Values.worker.resources | nindent 10 }}
+        readinessProbe:
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          tcpSocket:
+            port: {{ .Values.agent.config.port | default 9673 }}
+        livenessProbe:
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          tcpSocket:
+            port: {{ .Values.agent.config.port | default 9673 }}
+        resources: {{- toYaml .Values.agent.resources | nindent 10 }}
         securityContext:
           allowPrivilegeEscalation: false
         volumeMounts:
         - mountPath: /bin/config/config.yaml
           name: config
           subPath: config
-        {{- if or .Values.existingSecret .Values.secret }}
-        - mountPath: /bin/config/override.yaml
-          name: secret
-          subPath: config
-        {{- end }}
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
-          name: {{ include "chorus.fullname" . }}-worker
+          name: {{ include "chorus.fullname" . }}-agent
         name: config
-      {{- if or .Values.existingSecret .Values.secret }}
-      - secret:
-          secretName: {{ .Values.existingSecret | default (printf "%s-secret" (include "chorus.fullname" . ) ) }}
-        name: secret
-      {{- end }}
+{{- end }}
