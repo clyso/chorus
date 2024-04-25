@@ -51,11 +51,10 @@ jobs:
         id: chartVer
         uses: mikefarah/yq@v4.9.8
         with:
-          cmd: yq '.version' 'deploy/chorus/Chart.yaml'
+          cmd: yq '.version' deploy/chorus/Chart.yaml
       - name: Install helm
         uses: azure/setup-helm@v4.2.0
       - name: Publish chart
-        shell: bash
         run: |
           echo "${{ steps.chartVer.outputs.result }}"
           helm registry login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }} harbor.clyso.com
