@@ -54,9 +54,9 @@ jobs:
           cmd: yq '.version' deploy/chorus/Chart.yaml
       - name: Install helm
         uses: azure/setup-helm@v4.2.0
-      # - name: Publish chart
-      #   run: |
-      - run: echo "${{ steps.chartVer.outputs.result }}"
-      - run: helm registry login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }} harbor.clyso.com
-      - run: helm package ./deploy/chorus --app-version=${{  github.ref_name }}
-      - run: helm push ./chorus-${{ steps.chartVer.outputs.result }} oci://harbor.clyso.com/chorus
+      - name: Publish chart
+        run: |
+          echo "${{ steps.chartVer.outputs.result }}"
+          helm registry login -u "${{ secrets.DOCKER_USER }}" -p ${{ secrets.DOCKER_PASSWORD }} harbor.clyso.com
+          helm package ./deploy/chorus --app-version=${{  github.ref_name }}
+          helm push ./chorus-${{ steps.chartVer.outputs.result }} oci://harbor.clyso.com/chorus
