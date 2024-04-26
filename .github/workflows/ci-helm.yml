@@ -14,12 +14,12 @@ jobs:
   helm-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install helm
         uses: azure/setup-helm@v4.2.0
-      - name: Lint default
+      - name: Lint default chart
         run: |
           helm lint ./deploy/chorus --strict
-      - name: Lint all enabled
+      - name: Lint chart with all components enabled
         run: |
           helm lint ./deploy/chorus --strict --set agent.enabled=true,worker.config.metrics.enabled=true,proxy.config.metrics.enabled=true,agent.config.metrics.enabled=true

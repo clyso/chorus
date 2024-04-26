@@ -16,7 +16,7 @@ jobs:
           - agent
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -33,10 +33,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:${{  github.ref_name }}
+            ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:${{ github.ref_name }}
             ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:latest
           build-args: |
-            GIT_TAG=${{  github.ref_name }}
+            GIT_TAG=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             SERVICE=${{ matrix.service }}
   # publish helm chart
@@ -44,7 +44,7 @@ jobs:
     needs: docker
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: read chart version
         id: chartVer
         uses: mikefarah/yq@v4.43.1
@@ -56,5 +56,5 @@ jobs:
         run: |
           echo "${{ steps.chartVer.outputs.result }}"
           helm registry login -u '${{ secrets.DOCKER_USER }}' -p ${{ secrets.DOCKER_PASSWORD }} ${{ env.REGISTRY }}
-          helm package ./deploy/chorus --app-version=${{  github.ref_name }}
+          helm package ./deploy/chorus --app-version=${{ github.ref_name }}
           helm push ./chorus-${{ steps.chartVer.outputs.result }}.tgz oci://${{ env.REGISTRY }}/chorus

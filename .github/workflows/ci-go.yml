@@ -10,8 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        # GO tests
+      - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
@@ -22,7 +21,3 @@ jobs:
         run: go vet ./...
       - name: Test
         run: go test ./...
-#    - name: golangci-lint
-#      uses: golangci/golangci-lint-action@v3
-#      with:
-#        version: v1.55.2
