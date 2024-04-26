@@ -13,5 +13,5 @@ spec:
   type: {{ .Values.agent.agentService.type }}
   ports:
   - name: http
-	{{- .Values.agent.agentService.portHttp | toYaml | nindent 4 -}}
+    {{- .Values.agent.agentService.portHttp | toYaml | nindent 4 -}}
 {{- end }}
