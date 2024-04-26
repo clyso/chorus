@@ -1,0 +1,18 @@
+{{- if and .Values.agent.enabled .Values.agent.config.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chorus.fullname" . }}-agent-metrics
+  labels:
+    app: agent
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: agent
+  {{- include "chorus.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+{{- end }}

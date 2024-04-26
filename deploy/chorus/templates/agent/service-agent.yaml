@@ -1,0 +1,17 @@
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chorus.fullname" . }}-agent-service
+  labels:
+    app: agent
+  {{- include "chorus.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: agent
+  {{- include "chorus.selectorLabels" . | nindent 4 }}
+  type: {{ .Values.agent.agentService.type }}
+  ports:
+  - name: http
+    {{- .Values.agent.agentService.portHttp | toYaml | nindent 4 -}}
+{{- end }}
