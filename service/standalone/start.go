@@ -113,7 +113,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	for _, fakePort := range fake {
 		port := fakePort
 		g.Go(func() error {
-			defer fmt.Println("fake done")
 			return serveFakeS3(ctx, port)
 		})
 	}
@@ -137,7 +136,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	// start worker
 	g.Go(func() error {
-		defer fmt.Println("worker done")
 		return worker.Start(ctx, app, &workerConf)
 	})
 
@@ -163,7 +161,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		}
 		// start proxy
 		g.Go(func() error {
-			defer fmt.Println("proxy done")
 			return proxy.Start(ctx, app, &proxyConf)
 		})
 	}
@@ -173,7 +170,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err == nil {
 		// start UI
 		g.Go(func() error {
-			defer fmt.Println("ui done")
 			return uiServer()
 		})
 		uiURL = fmt.Sprintf("Mgmt UI URL:	%s", httpLocalhost(conf.UIPort))
