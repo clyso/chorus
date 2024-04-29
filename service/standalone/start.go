@@ -18,7 +18,12 @@ package standalone
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -28,9 +33,6 @@ import (
 	"github.com/clyso/chorus/service/worker"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
-	"net"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -42,7 +44,7 @@ const (
         \/     \/                        \/[0m
 
 
-Mgmt UI URL:	%s
+%s
 
 S3 Proxy URL: 	%s
 S3 Proxy Credentials (AccessKey|SecretKey): 		
@@ -58,25 +60,10 @@ Storage list:
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
-	if err := conf.Validate(); err != nil {
-		return err
-	}
-	features.Set(conf.Features)
-	logger := log.GetLogger(conf.Log, "", "")
-	logger.Info().
-		Str("version", app.Version).
-		Str("commit", app.Commit).
-		Msg("app starting...")
-
-	// start embedded redis:
-	redisSvc, err := miniredis.Run()
-	if err != nil {
-		return fmt.Errorf("%w: unable to start redis", err)
-	}
-
-	fake := map[string]bool{}
-	g, ctx := errgroup.WithContext(ctx)
+	// detect fake s3 storages in config
+	fake := map[string]int{}
 	for name, storage := range conf.Storage.Storages {
+		var err error
 		isFake := false
 		fakePort := 0
 		if storage.Address == "" {
@@ -93,36 +80,53 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			isFake = true
 		}
 		if isFake {
-			fake[name] = true
-			g.Go(func() error {
-				return serveFakeS3(ctx, fakePort)
-			})
-			//conf.Storage.Storages[name].Address=httpLocalhost(fakePort)
-			//conf.Storage.Storages[name].IsSecure=false
+			fake[name] = fakePort
 			storage.Address = httpLocalhost(fakePort)
 			storage.IsSecure = false
 			conf.Storage.Storages[name] = storage
 		}
 	}
 
+	// validate config
+	if err := conf.Validate(); err != nil {
+		return err
+	}
+	features.Set(conf.Features)
+	logger := log.GetLogger(conf.Log, "", "")
+	logger.Info().
+		Str("version", app.Version).
+		Str("commit", app.Commit).
+		Msg("app starting...")
+
+	// start embedded redis:
+	redisSvc, err := miniredis.Run()
+	if err != nil {
+		return fmt.Errorf("%w: unable to start redis", err)
+	}
+	go func() {
+		<-ctx.Done()
+		redisSvc.Close()
+	}()
+
+	// start fake s3 storages
+	g, ctx := errgroup.WithContext(ctx)
+	for _, fakePort := range fake {
+		port := fakePort
+		g.Go(func() error {
+			defer fmt.Println("fake done")
+			return serveFakeS3(ctx, port)
+		})
+	}
+
 	proxyURL := "\u001B[91m<disabled in config>\u001B[0m"
 	if conf.Proxy.Enabled {
 		proxyURL = httpLocalhost(conf.Proxy.Port)
 	}
-	fmt.Printf(connectInfo,
-		httpLocalhost(conf.UIPort),
-		proxyURL,
-		printCreds(conf),
-		localhost(conf.Api.GrpcPort),
-		httpLocalhost(conf.Api.HttpPort),
-		redisSvc.Addr(),
-		printStorages(fake, conf.Storage),
-	)
 
 	workerConf := conf.Config
 	workerConf.Redis.Address = redisSvc.Addr()
 
-	//deep copy worker config
+	// deep copy worker config
 	wcBytes, err := yaml.Marshal(&workerConf)
 	if err != nil {
 		return err
@@ -131,8 +135,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	//start worker
+	// start worker
 	g.Go(func() error {
+		defer fmt.Println("worker done")
 		return worker.Start(ctx, app, &workerConf)
 	})
 
@@ -147,7 +152,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		}
 		proxyConf.Redis.Address = redisSvc.Addr()
 
-		//deep copy proxy config
+		// deep copy proxy config
 		pcBytes, err := yaml.Marshal(&proxyConf)
 		if err != nil {
 			return err
@@ -156,16 +161,35 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		if err != nil {
 			return err
 		}
-		//start proxy
+		// start proxy
 		g.Go(func() error {
+			defer fmt.Println("proxy done")
 			return proxy.Start(ctx, app, &proxyConf)
 		})
 	}
 
-	// start UI
-	g.Go(func() error {
-		return serveUI(ctx, conf.UIPort)
-	})
+	uiURL := ""
+	uiServer, err := serveUI(ctx, conf.UIPort)
+	if err == nil {
+		// start UI
+		g.Go(func() error {
+			defer fmt.Println("ui done")
+			return uiServer()
+		})
+		uiURL = fmt.Sprintf("Mgmt UI URL:	%s", httpLocalhost(conf.UIPort))
+	} else if !errors.Is(err, dom.ErrNotFound) {
+		return err
+	}
+
+	fmt.Printf(connectInfo,
+		uiURL,
+		proxyURL,
+		printCreds(conf),
+		localhost(conf.Api.GrpcPort),
+		httpLocalhost(conf.Api.HttpPort),
+		redisSvc.Addr(),
+		printStorages(fake, conf.Storage),
+	)
 
 	return g.Wait()
 }
@@ -198,14 +222,14 @@ func printCreds(conf *Config) string {
 	return strings.Join(res, "\n")
 }
 
-func printStorages(fake map[string]bool, conf *s3.StorageConfig) string {
+func printStorages(fake map[string]int, conf *s3.StorageConfig) string {
 	if len(conf.Storages) == 0 {
 		return "<no storages provided in config>"
 	}
 	res := make([]string, 0, len(conf.Storages))
 	for name, stor := range conf.Storages {
 		f := ""
-		if fake[name] {
+		if _, ok := fake[name]; ok {
 			f = "[\u001B[33mFAKE\u001B[0m] "
 		}
 		m := ""

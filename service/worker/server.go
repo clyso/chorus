@@ -146,7 +146,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	srv := asynq.NewServer(
 		queueRedis,
 		asynq.Config{
-			Concurrency: conf.Concurrency,
+			ShutdownTimeout: conf.ShutdownTimeout,
+			Concurrency:     conf.Concurrency,
 			IsFailure: func(err error) bool {
 				var rlErr *dom.ErrRateLimitExceeded
 				return !errors.As(err, &rlErr)
@@ -214,8 +215,13 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeApiReplicationSwitch, workerSvc.FinishReplicationSwitch)
 
 	server := util.NewServer()
-	err = server.Add("queue_workers", func(_ context.Context) error {
-		return srv.Run(mux)
+	err = server.Add("queue_workers", func(ctx context.Context) error {
+		err := srv.Start(mux)
+		if err != nil {
+			return err
+		}
+		<-ctx.Done()
+		return nil
 	}, func(_ context.Context) error {
 		srv.Stop()
 		srv.Shutdown()
