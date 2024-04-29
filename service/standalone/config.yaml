@@ -2,6 +2,7 @@ log:
   level: warn
   json: false
 concurrency: 10
+shutdownTimeout: 5s
 api:
   enabled: true # set true to enable management api
   grpcPort: 9670
@@ -12,7 +13,7 @@ lock:
   overlap: 2s
 proxy:
   enabled: true
-  address: "http://localhost:9669" # Chorus proxy s3 api address
+  address: http://localhost:9669 # Chorus proxy s3 api address
   port: 9669
   cors:
     enabled: true
@@ -23,10 +24,10 @@ proxy:
     allowV2Signature: true
     useStorage: # use credentials from one of configured storages <one|two>
     custom: # use custom credentials for proxy s3 endpoint
-  #      - accessKeyID: <s3 v4 accessKey credential>
-  #        secretAccessKey: <s3 v4 secretKey credential>
-  #      - accessKeyID: <s3 v4 accessKey credential>
-  #        secretAccessKey: <s3 v4 secretKey credential>
+    #      - accessKeyID: <s3 v4 accessKey credential>
+    #        secretAccessKey: <s3 v4 secretKey credential>
+    #      - accessKeyID: <s3 v4 accessKey credential>
+    #        secretAccessKey: <s3 v4 secretKey credential>
 rclone:
   memoryLimit:
     enabled: true
@@ -46,3 +47,4 @@ rclone:
     limit: 3
     retryMin: 2s
     retryMax: 20s
+

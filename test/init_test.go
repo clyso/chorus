@@ -19,6 +19,14 @@ package test
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http/httptest"
+	"os"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
@@ -32,13 +40,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/xid"
-	"net"
-	"net/http/httptest"
-	"os"
-	"strconv"
-	"strings"
-	"testing"
-	"time"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -143,7 +145,17 @@ func TestMain(m *testing.M) {
 	}
 	proxyConf.Storage.CreateRouting = true
 	proxyConf.Storage.CreateReplication = true
+
 	workerConf.Storage = proxyConf.Storage
+	// deep copy proxy config
+	pcBytes, err := yaml.Marshal(&workerConf.Storage)
+	if err != nil {
+		panic(err)
+	}
+	err = yaml.Unmarshal(pcBytes, &workerConf.Storage)
+	if err != nil {
+		panic(err)
+	}
 
 	proxyConf.Auth.UseStorage = "main"
 
@@ -199,7 +211,6 @@ func TestMain(m *testing.M) {
 	cancel()
 	// exit
 	os.Exit(exitCode)
-
 }
 
 func getRandomPort() (int, string) {

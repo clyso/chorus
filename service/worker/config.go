@@ -19,13 +19,14 @@ package worker
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+	"time"
+
 	"github.com/clyso/chorus/pkg/api"
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/worker/handler"
-	"io/fs"
-	"time"
 )
 
 //go:embed config.yaml
@@ -43,7 +44,8 @@ type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
 	Storage       *s3.StorageConfig `yaml:"storage,omitempty"`
 
-	Concurrency int `yaml:"concurrency"`
+	Concurrency     int           `yaml:"concurrency"`
+	ShutdownTimeout time.Duration `yaml:"shutdownTimeout"`
 
 	Api    *api.Config     `yaml:"api,omitempty"`
 	RClone *rclone.Config  `yaml:"rclone,omitempty"`

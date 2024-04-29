@@ -20,6 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"runtime/debug"
+	"time"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
@@ -38,9 +42,6 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"net"
-	"runtime/debug"
-	"time"
 )
 
 func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerProvider, logConf *log.Config, version dom.AppInfo) (start func(context.Context) error, stop func(context.Context) error, err error) {
@@ -84,6 +85,7 @@ func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerP
 			return srv.Serve(lis)
 		}, func(ctx context.Context) error {
 			srv.Stop()
+			lis.Close()
 			return nil
 		}, nil
 }

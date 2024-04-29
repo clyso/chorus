@@ -20,14 +20,15 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/rs/cors"
 	"github.com/tmc/grpc-websocket-proxy/wsproxy"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"net/http"
-	"strconv"
 )
 
 type RegisterHandlersFunc func(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) error
@@ -62,11 +63,11 @@ func GRPCGateway(ctx context.Context, conf *Config, register RegisterHandlersFun
 	srv := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", conf.HttpPort)}
 	srv.Handler = handler
 
-	start = func(ctx context.Context) error {
+	start = func(_ context.Context) error {
 		return srv.ListenAndServe()
 	}
-	stop = func(ctx context.Context) error {
-		return srv.Shutdown(ctx)
+	stop = func(_ context.Context) error {
+		return srv.Shutdown(context.Background())
 	}
 	return
 }

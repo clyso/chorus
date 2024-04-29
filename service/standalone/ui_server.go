@@ -19,30 +19,35 @@ package standalone
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 //go:embed all:static
 var staticAssets embed.FS
 
-func serveUI(ctx context.Context, port int) error {
+var errDisabled = errors.New("disabled")
+
+func serveUI(ctx context.Context, port int) (func() error, error) {
+	f, err := staticAssets.Open("static/index.html")
+	if err != nil {
+		return nil, dom.ErrNotFound
+	}
+	_ = f.Close()
 	mux := http.NewServeMux()
-	//static, err := fs.Sub(staticAssets, "static")
-	//if err != nil {
-	//	return err
-	//}
-	//h := http.FileServer(http.FS(static))
 	mux.HandleFunc("/", handleSPA)
 	server := http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
 	go func() {
 		<-ctx.Done()
 		_ = server.Shutdown(context.Background())
 	}()
-	return server.ListenAndServe()
+	return server.ListenAndServe, nil
 }
 
 func handleSPA(w http.ResponseWriter, r *http.Request) {
