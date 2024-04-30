@@ -17,11 +17,13 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
-	"strings"
 )
 
 var cfgFile string
@@ -49,6 +51,10 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func SetVersionInfo(version, commit, date string) {
+	rootCmd.Version = fmt.Sprintf("%q (Built on %q from Git SHA %q)", version, date, commit)
 }
 
 func init() {

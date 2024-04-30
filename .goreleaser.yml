@@ -1,0 +1,56 @@
+project_name: chorus
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - binary: chorctl
+    dir: tools/chorctl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+archives:
+  - name_template: chorctl_{{ .Tag }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - none*
+checksum:
+  name_template: checksums.txt
+brews:
+  - name: chorctl
+    app: chorctl
+    tap:
+      owner: clyso
+      name: homebrew-tap
+    commit_author:
+      name: clyso_bot
+      email: release-bot@clyso.com
+    commit_msg_template: Brew formula update for chorctl version {{ .Tag }}
+    folder: Formula
+    homepage: https://github.com/clyso/chorus
+    description: Management CLI for chorus service
+    license: Apache-2.0
+    test: |
+      system "#{bin}/chorctl --version"
+    install: |
+      bin.install "chorctl"
+    token: '{{ .Env.BREW_RELEASE_TOKEN }}'
+release:
+  github:
+    owner: clyso
+    name: chorus
+  extra_files:
+    - glob: ./standalone/*
