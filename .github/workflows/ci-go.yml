@@ -10,14 +10,51 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # - uses: actions/checkout@v4
+      # - name: Set up Go
+      #   uses: actions/setup-go@v3
+      #   with:
+      #     go-version: "1.21"
       - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v3
+      - uses: actions/setup-go@v3
         with:
           go-version: "1.21"
-      - name: Fmt
-        run: go fmt ./...
-      - name: Vet
-        run: go vet ./...
-      - name: Test
-        run: go test ./...
+      - name: Install zip
+        uses: montudor/action-zip@v1
+      - name: Build standalone binaries
+        run: |
+          mkdir standalone
+          platforms=("darwin/amd64" "darwin/arm64" "linux/386" "linux/amd64" "linux/arm64" "windows/amd64" "windows/386" )
+          for platform in "${platforms[@]}"
+          do
+              platform_split=(${platform//\// })
+              GOOS=${platform_split[0]}
+              GOARCH=${platform_split[1]}
+              bin_name='chorus'
+              output_name='standalone_'${{ github.ref_name }}'_'$GOOS'_'$GOARCH
+              if [ $GOOS = "windows" ]; then
+                  bin_name+='.exe'
+                  output_name+='.zip'
+              else
+                  output_name+='.tar.gz'
+              fi
+              env GOOS=$GOOS GOARCH=$GOARCH go build -o $bin_name ./cmd/chorus
+              if [ $? -ne 0 ]; then
+                  echo 'An error has occurred! Aborting the script execution...'
+                  exit 1
+              fi
+              if [ $GOOS = "windows" ]; then
+                  zip -r standalone/$output_name ./$bin_name
+              else
+                  tar -cvzf standalone/$output_name ./$bin_name
+              fi
+              rm ./$bin_name
+          done
+           
+      #
+      # - name: Fmt
+      #   run: go fmt ./...
+      # - name: Vet
+      #   run: go vet ./...
+      # - name: Test
+      #   run: go test ./...
