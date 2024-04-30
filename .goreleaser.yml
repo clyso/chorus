@@ -31,10 +31,10 @@ checksum:
   name_template: checksums.txt
 brews:
   - name: chorctl
-    app: chorctl
-    tap:
+    repository:
       owner: clyso
       name: homebrew-tap
+      token: '{{ .Env.BREW_RELEASE_TOKEN }}'
     commit_author:
       name: clyso_bot
       email: release-bot@clyso.com
@@ -47,7 +47,6 @@ brews:
       system "#{bin}/chorctl --version"
     install: |
       bin.install "chorctl"
-    token: '{{ .Env.BREW_RELEASE_TOKEN }}'
 release:
   github:
     owner: clyso

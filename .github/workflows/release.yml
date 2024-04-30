@@ -100,10 +100,12 @@ jobs:
           done
            
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v5
         with:
-          version: latest
-          args: release --rm-dist
+          # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser
+          version: v5.0.0
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BREW_RELEASE_TOKEN: ${{ secrets.BREW_RELEASE_TOKEN }}
