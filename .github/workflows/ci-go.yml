@@ -31,7 +31,8 @@ jobs:
               GOOS=${platform_split[0]}
               GOARCH=${platform_split[1]}
               bin_name='chorus'
-              output_name='standalone_'${{ github.ref_name }}'_'$GOOS'_'$GOARCH
+              output_name='standalone_''v0.1.0''_'$GOOS'_'$GOARCH
+              # output_name='standalone_'${{ github.ref_name }}'_'$GOOS'_'$GOARCH
               if [ $GOOS = "windows" ]; then
                   bin_name+='.exe'
                   output_name+='.zip'
