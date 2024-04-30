@@ -9,3 +9,7 @@ volumes
 **/override.yaml
 chorusui.tar.gz
 ui-version.txt
+standalone
+standalone/
+**/*.tar.gz
+**/*.zip
