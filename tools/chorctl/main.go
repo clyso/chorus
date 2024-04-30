@@ -18,6 +18,13 @@ package main
 
 import "github.com/clyso/chorus/tools/chorctl/cmd"
 
+var (
+	version = "development"
+	commit  = "not set"
+	date    = "not set"
+)
+
 func main() {
+	cmd.SetVersionInfo(version, commit, date)
 	cmd.Execute()
 }
