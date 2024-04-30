@@ -19,7 +19,6 @@ package standalone
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -31,8 +30,6 @@ import (
 
 //go:embed all:static
 var staticAssets embed.FS
-
-var errDisabled = errors.New("disabled")
 
 func serveUI(ctx context.Context, port int) (func() error, error) {
 	f, err := staticAssets.Open("static/index.html")
