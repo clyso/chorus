@@ -6,6 +6,10 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - ".github/**"
+      -  "**.go"
+      - "**/config.yaml"
 jobs:
   test:
     runs-on: ubuntu-latest

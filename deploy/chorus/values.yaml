@@ -17,7 +17,7 @@ proxy:
       port: 9669
       targetPort: http
     type: ClusterIP
-  config:
+  config: # for full spec and default values see proxy config: https://github.com/clyso/chorus/blob/main/service/proxy/config.yaml and common config https://github.com/clyso/chorus/blob/main/pkg/config/config.yaml
     metrics:
       enabled: false
     log:
@@ -35,11 +35,13 @@ proxy:
     auth:
       allowV2Signature: false
       useStorage: # use credentials from one of configured storages <one|two>
-      custom: # use custom credentials for proxy s3 endpoint
-      #      - accessKeyID: <s3 v4 accessKey credential>
-      #        secretAccessKey: <s3 v4 secretKey credential>
-      #      - accessKeyID: <s3 v4 accessKey credential>
-      #        secretAccessKey: <s3 v4 secretKey credential>
+      custom: # or use custom credentials for proxy s3 endpoint
+    #    user1:
+    #      accessKeyID: <user1 v4 accessKey credential>
+    #      secretAccessKey: <user1 v4 secretKey credential>
+    #    user2:
+    #      accessKeyID: <user2 v4 accessKey credential>
+    #      secretAccessKey: <user2 v4 secretKey credential>
 worker:
   replicas: 2
   image:
@@ -63,7 +65,7 @@ worker:
       port: 9670
       targetPort: grpc
     type: ClusterIP
-  config:
+  config: # for full spec and default values see worker config: https://github.com/clyso/chorus/blob/main/service/worker/config.yaml and common config https://github.com/clyso/chorus/blob/main/pkg/config/config.yaml
     metrics:
       enabled: false
     log:
@@ -130,7 +132,7 @@ agent:
       port: 9673
       targetPort: http
     type: ClusterIP
-  config:
+  config: # for full spec and default values see agent config: https://github.com/clyso/chorus/blob/main/service/agent/config.yaml and common config https://github.com/clyso/chorus/blob/main/pkg/config/config.yaml
     metrics:
       enabled: false
     log:
