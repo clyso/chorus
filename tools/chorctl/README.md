@@ -7,7 +7,12 @@ CLI for chorus management api.
 ```shell
 go build .
 ```
-Or download binary from [docs page](https://docs.clyso.com/docs/products/chorus/installation#management-cli)
+Or download binary from [the latest release](https://github.com/clyso/chorus/releases).
+
+Or with homebrew (MacOS and Linux only):
+```shell
+brew install clyso/tap/chorctl
+```
 
 ## Usage
 

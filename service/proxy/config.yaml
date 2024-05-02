@@ -7,7 +7,7 @@ cors:
 auth:
   allowV2Signature: false
   useStorage: # use credentials from one of configured storages <one|two>
-  custom: # use custom credentials for proxy s3 endpoint
+  custom: # OR use custom credentials for proxy s3 endpoint
 #    user1:
 #      accessKeyID: <user1 v4 accessKey credential>
 #      secretAccessKey: <user1 v4 secretKey credential>
