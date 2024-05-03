@@ -86,4 +86,23 @@ To tear down and wipe all replication metadata:
 docker-compose -f ./docker-compose/docker-compose.yml down -v
 
 ```
+Rebuild images with the latest source changes (`--build`):
+```shell
+docker-compose -f ./docker-compose/docker-compose.yml --profile fake --profile proxy --build up
+```
+Use chorus images from registry instead of building from source replace in [docker-compose.yml](./docker-compose.yml):
+```yaml
+  worker:
+    build:
+      context: ../
+      args:
+        SERVICE: worker
+``` 
+to:
+
+```yaml
+  worker:
+    image: "harbor.clyso.com/chorus/worker:latest" 
+```
+And similar for `agent` and `proxy`.
 
