@@ -5,7 +5,7 @@ CLI for chorus management api.
 
 ## Install
 ```shell
-go build .
+cd ./tools/chorctl && go build .
 ```
 Or download binary from [the latest release](https://github.com/clyso/chorus/releases).
 
@@ -50,7 +50,22 @@ Flags:
 Use "chorctl [command] --help" for more information about a command.
 ```
 
-Some useful commands:
-- `chorctl dash` - shows live dashboard with bucket replication statuses
-- `chorctl repl add -b <bucket name> -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config> `
+### Useful commands:
+Show live dashboard with bucket replication statuses:
+```shell
+chorctl dash
+```
+Manage replicatoins (run `chorclt repl -h` to see all commands).
 
+List buckets avaiable for replication for given S3 user:
+```shell
+chorctl repl buckets -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config>
+```
+Start replication for given S3 user/bucket:
+```shell
+chorctl repl add -b <bucket name> -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config>
+```
+Enable replication for all user buckets:
+```shell
+chorctl repl add-user -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config>
+```

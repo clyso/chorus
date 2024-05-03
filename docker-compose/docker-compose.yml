@@ -1,0 +1,90 @@
+volumes:
+  redis-data:
+services:
+  redis:
+    image: 'redis'
+    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_PORT_NUMBER=6379
+    expose:
+      - 6379
+    volumes:
+      - redis-data:/data
+  worker:
+    depends_on:
+      - redis
+    build:
+      context: ../
+      args:
+        SERVICE: worker
+    volumes:
+    - type: bind
+      source: ./worker-conf.yaml
+      target: /bin/config/config.yaml
+    - type: bind
+      source: ./s3-credentials.yaml
+      target: /bin/config/override.yaml
+    ports:
+      - "9670:9670" # expose grpc management API for CLI
+  proxy:
+    # To enable run with proxy profile: "docker-compose up --profile proxy up". See https://docs.docker.com/compose/profiles/
+    profiles:
+      - "proxy"
+    depends_on:
+      - redis
+    build:
+      context: ../
+      args:
+        SERVICE: proxy
+    volumes:
+    # proxy config
+    - type: bind
+      source: ./proxy-conf.yaml
+      target: /bin/config/config.yaml
+    # common config: s3 credentials
+    - type: bind
+      source: ./s3-credentials.yaml
+      target: /bin/config/override.yaml
+    ports:
+      - "9669:9669" # expose proxy s3 api
+  agent:
+    # To enable run with agent profile: "docker-compose up --profile agent up". See https://docs.docker.com/compose/profiles/
+    profiles:
+      - "agent"
+    depends_on:
+      - redis
+    build:
+      context: ../
+      args:
+        SERVICE: agent
+    volumes:
+    # agent config
+    - type: bind
+      source: ./agent-conf.yaml
+      target: /bin/config/config.yaml
+    ports:
+      - "9673:9673" # expose agent bucket notifications webhook 
+
+  # start fake in-memory s3 endpoint. To enable run with fake profile: "docker-compose up --profile fake up"
+  fake-s3-main:
+    profiles:
+      - "fake"
+    build:
+      context: .
+      dockerfile: ./FakeS3Dockerfile
+    expose:
+      - 9000
+    ports:
+      - "9001:9000" # expose main s3 to host
+  fake-s3-follower:
+    profiles:
+      - "fake"
+    build:
+      context: .
+      dockerfile: ./FakeS3Dockerfile
+    expose:
+      - 9000
+    ports:
+      - "9002:9000" # expose follower s3 to host
+
