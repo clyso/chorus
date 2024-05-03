@@ -75,6 +75,8 @@ Or try a setup with [chorus-agent](../service/agent) instead of proxy. Unlike `c
 ```shell
 docker-compose -f ./docker-compose/docker-compose.yml --profile agent up
 ```
+> [!NOTE]  
+> Chorus agent will not work with fake S3 backend because bucket notifications are not supported by fake S3 backend.
 
 ## How-to
 To tear-down:
@@ -98,7 +100,7 @@ Use chorus images from registry instead of building from source replace in [dock
       args:
         SERVICE: worker
 ``` 
-to:
+with:
 
 ```yaml
   worker:
