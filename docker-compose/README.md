@@ -92,7 +92,7 @@ Rebuild images with the latest source changes (`--build`):
 ```shell
 docker-compose -f ./docker-compose/docker-compose.yml --profile fake --profile proxy --build up
 ```
-Use chorus images from registry instead of building from source replace in [docker-compose.yml](./docker-compose.yml):
+To use chorus images from registry instead of building from source replace in [docker-compose.yml](./docker-compose.yml):
 ```yaml
   worker:
     build:
