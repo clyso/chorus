@@ -34,13 +34,7 @@ To run chorus with docker compose:
     ```shell
     s3cmd ls s3://test -c ./docker-compose/s3cmd-main.conf
     ```
-5. See `test` bucket avaiable for replication:
-    ```shell
-    % chorctl repl buckets -u user1 -f main -t follower
-    BUCKET
-    test
-    ```
-6. Upload contents of this directory into `main`:
+5. Upload contents of this directory into `main`:
     ```shell
     s3cmd sync ./docker-compose/  s3://test -c ./docker-compose/s3cmd-main.conf
     ```
@@ -50,20 +44,29 @@ To run chorus with docker compose:
     ERROR: Bucket 'test' does not exist
     ERROR: S3 error: 404 (NoSuchBucket): The specified bucket does not exist
     ```
-7. Enable replication for bucket:
+6. See `test` bucket avaiable for replication:
+    ```shell
+    % chorctl repl buckets -u user1 -f main -t follower
+    BUCKET
+    test
+    ```
+7. Enable replication for the bucket:
     ```shell
     chorctl repl add -u user1 -b test -f main -t follower
     ```
-    Check replication progress with `chorctl dash`
-8. Check that data is synced to the follower:
+8. Check replication progress with:
+    ```shell
+    chorctl dash
+    ```
+9. Check that data is actually replicated to the follower:
     ```shell
     s3cmd ls s3://test -c ./docker-compose/s3cmd-follower.conf
     ```
-9. Now do some live changes to bucket using proxy:
+10. Now do some live changes to bucket using proxy:
     ```shell
     s3cmd del s3://test/agent-conf.yaml -c ./docker-compose/s3cmd-proxy.conf
     ```
-10. List main and follower contents again to see that the file was removed from both. Feel free to play around with storages using `s3cmd` and preconfigured configs [s3cmd-main.conf](./s3cmd-main.conf) [s3cmd-follower.conf](./s3cmd-follower.conf) [s3cmd-proxy.conf](./s3cmd-proxy.conf).
+11. List main and follower contents again to see that the file was removed from both. Feel free to play around with storages using `s3cmd` and preconfigured configs [s3cmd-main.conf](./s3cmd-main.conf) [s3cmd-follower.conf](./s3cmd-follower.conf) [s3cmd-proxy.conf](./s3cmd-proxy.conf).
 
 ## Where to go next
 Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) with your own s3 storages and start docker-compose without fake backends:
@@ -71,7 +74,7 @@ Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) with yo
 docker-compose -f ./docker-compose/docker-compose.yml --profile proxy up
 ```
 
-Or try a setup with [chorus-agent](../service/agent) instead of proxy. Unlike `chorus-proxy`, `chorus-agent` dont't need to intercept s3 requests to propagate new cahges. Instead, it is capturing changes from [S3 bucket notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html)
+Or try a setup with [chorus-agent](../service/agent) instead of proxy. Unlike `chorus-proxy`, `chorus-agent` dont't need to intercept s3 requests to propagate a new cahges. Instead, it is capturing changes from [S3 bucket notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html)
 ```shell
 docker-compose -f ./docker-compose/docker-compose.yml --profile agent up
 ```
@@ -100,7 +103,7 @@ To use chorus images from registry instead of building from source replace in [d
       args:
         SERVICE: worker
 ``` 
-with:
+to:
 
 ```yaml
   worker:
