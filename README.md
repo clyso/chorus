@@ -12,7 +12,7 @@ Listed features can be configured per s3 user and per bucket with [management CL
 ## Components
 [Chorus S3 Proxy](./service/proxy) service responsible for routing s3 requests and capturing data change events. 
 [Chorus Agent](./service/agent) can be used as an alternative solution for capturing events instead of proxy.
-[Chorus Worker](./service/worker) service does actual data replication.
+[Chorus Worker](./service/worker) service does actual data replication with the help of [RClone](https://github.com/rclone/rclone).
 Communication between Proxy/Agent and worker is done over work queue. 
 [Asynq](https://github.com/hibiken/asynq) with [Redis](https://github.com/redis/redis) is used as a work queue.
 
@@ -28,6 +28,56 @@ For more details, see:
 ## Documentation
 
 Documentation available at [docs.clyso.com](https://docs.clyso.com/docs/products/chorus/overview).
+
+## Run
+### From source
+**REQUIREMENTS:**
+- Go <https://go.dev/doc/install>
+
+Run all-in-one [standalone binry](./service/standalone) from Go:
+```shell
+go run ./cmd/chorus
+```
+
+Or run each service separately:
+
+**REQUIREMENTS:**
+- Go <https://go.dev/doc/install>
+- Redis <https://github.com/redis/redis>
+
+```shell
+# run chorus worker
+go run ./cmd/worker
+
+# run chorus worker with a custom yaml config file
+go run ./cmd/worker -config <path to worker yaml config>
+
+# run chorus proxy with a custom yaml config file
+go run ./cmd/proxy -config <path to proxy yaml config>
+
+# run chorus agent with a custom yaml config file
+go run ./cmd/agent -config <path to agent yaml config>
+```
+
+### Standalone binary
+See: [service/standalone](./service/standalone)
+
+### Docker-compose
+**REQUIREMENTS:**
+- Docker
+
+See: [docker-compose](./docker-compose)
+
+### With Helm
+**REQUIREMENTS:**
+- K8s
+- Helm
+
+Install chorus helm chart from OCI registry:
+```shell
+helm install <release name> oci://harbor.clyso.com/chorus/chorus
+```
+See: [deploy/chours](./deploy/chorus)
 
 ## Develop
 

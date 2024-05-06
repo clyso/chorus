@@ -1,0 +1,26 @@
+address: "http://localhost:9669" # Chorus proxy s3 api address
+port: 9669
+cors:
+  enabled: false
+  allowAll: false
+  whitelist:
+auth:
+  allowV2Signature: false
+  useStorage: main # use credentials from one of configured storages <one|two>
+log:
+  json: false # false for dev console logger, true - json log for prod to export to Grafana&Loki.
+  level: info
+metrics:
+  enabled: false
+  port: 9090
+trace:
+  enabled: false
+  endpoint: # url to Jaeger or other open trace provider
+redis:
+  address: "redis:6379"
+features:
+  tagging: false # sync object/bucket tags
+  acl: false # sync object/bucket ACLs
+  lifecycle: false # sync bucket Lifecycle
+  policy: false # sync bucket Policies
+
