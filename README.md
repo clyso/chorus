@@ -1,6 +1,5 @@
 [![CI](https://github.com/clyso/chorus/actions/workflows/ci-go.yml/badge.svg)](https://github.com/clyso/chorus/actions/workflows/ci-go.yml)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/clyso/chorus)
-![License](https://img.shields.io/github/license/clyso/chorus)
 [![GoDoc](https://godoc.org/github.com/clyso/chorus?status.svg)](https://pkg.go.dev/github.com/clyso/chorus?tab=doc)
 [![Go Report Card](https://goreportcard.com/badge/github.com/clyso/chorus)](https://goreportcard.com/report/github.com/clyso/chorus)
 
