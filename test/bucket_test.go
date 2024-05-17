@@ -331,7 +331,7 @@ func TestApi_Bucket_List(t *testing.T) {
 	r.Eventually(func() bool {
 		objCh = mainClient.ListObjects(tstCtx, b2, mclient.ListObjectsOptions{WithMetadata: true})
 		objNum = 0
-		for _ = range objCh {
+		for range objCh {
 			objNum++
 		}
 		if objNum != 3 {
@@ -340,7 +340,7 @@ func TestApi_Bucket_List(t *testing.T) {
 
 		objCh = f1Client.ListObjects(tstCtx, b2, mclient.ListObjectsOptions{WithMetadata: true})
 		objNum = 0
-		for _ = range objCh {
+		for range objCh {
 			objNum++
 		}
 		if objNum != 3 {
@@ -349,7 +349,7 @@ func TestApi_Bucket_List(t *testing.T) {
 
 		objCh = f2Client.ListObjects(tstCtx, b2, mclient.ListObjectsOptions{WithMetadata: true})
 		objNum = 0
-		for _ = range objCh {
+		for range objCh {
 			objNum++
 		}
 		if objNum != 3 {
@@ -382,7 +382,7 @@ func TestApi_Bucket_List(t *testing.T) {
 	r.Eventually(func() bool {
 		objCh = mainClient.ListObjects(tstCtx, b2, mclient.ListObjectsOptions{WithMetadata: true})
 		objNum = 0
-		for _ = range objCh {
+		for range objCh {
 			objNum++
 		}
 		if objNum != 0 {
@@ -391,7 +391,7 @@ func TestApi_Bucket_List(t *testing.T) {
 
 		objCh = f1Client.ListObjects(tstCtx, b2, mclient.ListObjectsOptions{WithMetadata: true})
 		objNum = 0
-		for _ = range objCh {
+		for range objCh {
 			objNum++
 		}
 		if objNum != 0 {
@@ -400,7 +400,7 @@ func TestApi_Bucket_List(t *testing.T) {
 
 		objCh = f2Client.ListObjects(tstCtx, b2, mclient.ListObjectsOptions{WithMetadata: true})
 		objNum = 0
-		for _ = range objCh {
+		for range objCh {
 			objNum++
 		}
 		if objNum != 0 {
