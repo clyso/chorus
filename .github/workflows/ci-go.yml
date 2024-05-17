@@ -1,4 +1,4 @@
-name: CI go code
+name: E2E tests
 on:
   push:
     branches:
