@@ -25,8 +25,8 @@ With [CLI](../../tools/chorctl):
 ```shell
 chorctl repl add --from="<src_storage_name>" --to="<dest_storage_name>" --user="<s3 user>" --bucket="<bucket name>" --agent-url="PUSH_URL"
 ```
-- Chorus will automatically configure bucket notifications in soruce storage for given bucket and url (tested with aws and ceph rgw).
-- now all changes from src storage will be propagated to dest
+- Chorus will automatically configure bucket notifications in source storage for given bucket and URL (tested with AWS S3 and Ceph RGW).
+- Now all changes from the source storage will be propagated to the destination.
 
 ## See also
 
