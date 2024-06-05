@@ -20,6 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	aws_credentials "github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -31,11 +37,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"io"
-	"net/http"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.S3Service, tp trace.TracerProvider) (Client, error) {
@@ -201,7 +202,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		object = parts[1]
 	}
 	url := *req.URL
-	//todo: support virtual host
+	// todo: support virtual host
 	// see: github.com/minio/minio-go/v7@v7.0.52/api.go:890
 	host := strings.TrimPrefix(c.conf.Address, "http://")
 	host = strings.TrimPrefix(host, "https://")
@@ -224,21 +225,18 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		return nil, false, err
 	}
 	newReq.ContentLength = req.ContentLength
+	toSign, notToSign := processHeaders(req.Header)
+	newReq.Header = toSign
 
-	for name, vals := range req.Header {
-		if name == "Authorization" || name == "X-Amz-Date" {
-			continue
-		}
-		for _, val := range vals {
-			newReq.Header.Add(name, val)
-		}
-	}
 	copyReqSpan.End()
 	_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
-	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") //todo: get location if needed ("us-east-1")
+	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") // todo: get location if needed ("us-east-1")
 	signReqSpan.End()
 	if err != nil {
 		return nil, false, err
+	}
+	for name, vals := range notToSign {
+		newReq.Header[name] = vals
 	}
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
 	resp, err = c.c.Do(newReq)
