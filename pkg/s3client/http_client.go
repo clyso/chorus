@@ -158,6 +158,16 @@ func (c *client) S3() *S3 {
 	return c.s3
 }
 
+var preserveHeaders = map[string]struct{}{
+	"x-forwarded-for":    {},
+	"x-forwarded-host":   {},
+	"x-forwarded-port":   {},
+	"x-forwarded-proto":  {},
+	"x-forwarded-server": {},
+	"connection":         {},
+	"x-real-ip":          {},
+}
+
 func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err error) {
 	ctx, span := otel.Tracer("").Start(req.Context(), fmt.Sprintf("clientDo.%s", xctx.GetMethod(req.Context()).String()))
 	span.SetAttributes(attribute.String("storage", c.name), attribute.String("user", c.user))
@@ -228,8 +238,13 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	}
 	newReq.ContentLength = req.ContentLength
 
+	preserve := http.Header{}
 	for name, vals := range req.Header {
 		if name == "Authorization" || name == "X-Amz-Date" {
+			continue
+		}
+		if _, ok := preserveHeaders[strings.ToLower(name)]; ok {
+			preserve[name] = vals
 			continue
 		}
 		for _, val := range vals {
@@ -242,6 +257,9 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	signReqSpan.End()
 	if err != nil {
 		return nil, false, err
+	}
+	for name, vals := range preserve {
+		newReq.Header[name] = vals
 	}
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
 	zerolog.Ctx(ctx).Debug().Msgf("forward request to %s-%s", c.name, c.user)
