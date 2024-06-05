@@ -20,12 +20,15 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/xml"
+	"net/http"
+	"net/http/httputil"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/util"
 	mclient "github.com/minio/minio-go/v7"
-	"net/http"
+	"github.com/rs/zerolog"
 )
 
 func Middleware(conf *Config, storages map[string]s3.Storage) *middleware {
@@ -73,6 +76,10 @@ func (m *middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := m.isReqAuthenticated(r)
 		if err != nil {
+			if zerolog.GlobalLevel() < zerolog.InfoLevel {
+				reqDump, _ := httputil.DumpRequest(r, false)
+				zerolog.Ctx(r.Context()).Debug().Str("http_req_dump", string(reqDump)).Msg("auth check failed for request")
+			}
 			util.WriteError(r.Context(), w, err)
 			return
 		}
