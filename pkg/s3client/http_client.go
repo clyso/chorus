@@ -20,6 +20,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httputil"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	aws_credentials "github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -28,14 +35,10 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"io"
-	"net/http"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.S3Service, tp trace.TracerProvider) (Client, error) {
@@ -201,7 +204,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		object = parts[1]
 	}
 	url := *req.URL
-	//todo: support virtual host
+	// todo: support virtual host
 	// see: github.com/minio/minio-go/v7@v7.0.52/api.go:890
 	host := strings.TrimPrefix(c.conf.Address, "http://")
 	host = strings.TrimPrefix(host, "https://")
@@ -235,14 +238,18 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	}
 	copyReqSpan.End()
 	_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
-	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") //todo: get location if needed ("us-east-1")
+	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") // todo: get location if needed ("us-east-1")
 	signReqSpan.End()
 	if err != nil {
 		return nil, false, err
 	}
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
+	zerolog.Ctx(ctx).Debug().Msgf("forward request to %s-%s", c.name, c.user)
 	resp, err = c.c.Do(newReq)
 	doReqSpan.End()
+	origReqDump, _ := httputil.DumpRequest(req, false)
+	newReqDump, _ := httputil.DumpRequest(newReq, false)
+	zerolog.Ctx(ctx).Debug().Str("orig_req_dump", string(origReqDump)).Str("new_req_dump", string(newReqDump)).Bool("req_ok", err == nil).Msg("dump proxy requests")
 	if resp != nil && !successStatus[resp.StatusCode] {
 		isApiErr = true
 		// Read the body to be saved later.
