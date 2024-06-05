@@ -6,6 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
+
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,10 +21,13 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/signer"
 	"io"
 	"net/http"
+	"strings"
+
+	"github.com/clyso/chorus/pkg/s3"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/signer"
 )
 
 // List of success status.
@@ -238,4 +242,56 @@ func signV4(req http.Request, accessKeyID, secretAccessKey, sessionToken, locati
 	}
 	res = signer.SignV4(req, accessKeyID, secretAccessKey, sessionToken, location)
 	return res, nil
+}
+
+var ignoreInSignature = map[string]struct{}{
+	"x-forwarded-for":    {},
+	"x-forwarded-host":   {},
+	"x-forwarded-port":   {},
+	"x-forwarded-proto":  {},
+	"x-forwarded-server": {},
+	"connection":         {},
+	"x-real-ip":          {},
+}
+
+// processHeaders decides which orginal headers should be copied to forwarded request.
+func processHeaders(origin http.Header) (toSign http.Header, notToSign http.Header) {
+	// get a set of headers from origin signature if it was V4
+	var origSigned map[string]struct{}
+	if len(origin[s3.Authorization]) == 1 {
+		res, err := s3.ParseSignV4(origin[s3.Authorization][0])
+		if err == nil {
+			origSigned = make(map[string]struct{}, len(res.SignedHeaders))
+			for _, v := range res.SignedHeaders {
+				origSigned[strings.ToLower(v)] = struct{}{}
+			}
+		}
+	}
+
+	// process headers
+	toSign, notToSign = http.Header{}, http.Header{}
+	for name, vals := range origin {
+		if name == "Authorization" || name == "X-Amz-Date" {
+			// remove from request
+			continue
+		}
+		if _, ok := ignoreInSignature[strings.ToLower(name)]; ok {
+			notToSign[name] = vals
+			continue
+		}
+
+		if origSigned == nil || len(origSigned) == 0 {
+			// sign all if there no signedHeaders in origin
+			toSign[name] = vals
+			continue
+		}
+
+		// sign only from origin signature
+		if _, ok := origSigned[strings.ToLower(name)]; ok {
+			toSign[name] = vals
+		} else {
+			notToSign[name] = vals
+		}
+	}
+	return
 }

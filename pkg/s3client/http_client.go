@@ -158,16 +158,6 @@ func (c *client) S3() *S3 {
 	return c.s3
 }
 
-var preserveHeaders = map[string]struct{}{
-	"x-forwarded-for":    {},
-	"x-forwarded-host":   {},
-	"x-forwarded-port":   {},
-	"x-forwarded-proto":  {},
-	"x-forwarded-server": {},
-	"connection":         {},
-	"x-real-ip":          {},
-}
-
 func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err error) {
 	ctx, span := otel.Tracer("").Start(req.Context(), fmt.Sprintf("clientDo.%s", xctx.GetMethod(req.Context()).String()))
 	span.SetAttributes(attribute.String("storage", c.name), attribute.String("user", c.user))
@@ -237,20 +227,9 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		return nil, false, err
 	}
 	newReq.ContentLength = req.ContentLength
+	toSign, notToSign := processHeaders(req.Header)
+	newReq.Header = toSign
 
-	preserve := http.Header{}
-	for name, vals := range req.Header {
-		if name == "Authorization" || name == "X-Amz-Date" {
-			continue
-		}
-		if _, ok := preserveHeaders[strings.ToLower(name)]; ok {
-			preserve[name] = vals
-			continue
-		}
-		for _, val := range vals {
-			newReq.Header.Add(name, val)
-		}
-	}
 	copyReqSpan.End()
 	_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
 	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") // todo: get location if needed ("us-east-1")
@@ -258,7 +237,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	if err != nil {
 		return nil, false, err
 	}
-	for name, vals := range preserve {
+	for name, vals := range notToSign {
 		newReq.Header[name] = vals
 	}
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
