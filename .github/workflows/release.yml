@@ -33,7 +33,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:${{ github.head_ref || github.ref_name }} 
           build-args: |
             GIT_TAG=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
