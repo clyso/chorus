@@ -75,11 +75,9 @@ type middleware struct {
 func (m *middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := m.isReqAuthenticated(r)
+		reqDump, _ := httputil.DumpRequest(r, false)
+		zerolog.Ctx(r.Context()).Debug().Str("http_req_dump", string(reqDump)).Bool("auth_ok", err == nil).Msg("auth check failed for request")
 		if err != nil {
-			if zerolog.GlobalLevel() < zerolog.InfoLevel {
-				reqDump, _ := httputil.DumpRequest(r, false)
-				zerolog.Ctx(r.Context()).Debug().Str("http_req_dump", string(reqDump)).Msg("auth check failed for request")
-			}
 			util.WriteError(r.Context(), w, err)
 			return
 		}
