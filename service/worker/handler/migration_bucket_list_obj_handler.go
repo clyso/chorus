@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
@@ -31,7 +32,7 @@ import (
 )
 
 func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) error {
-	//todo: aggregate task to not list multiple times
+	// todo: aggregate task to not list multiple times
 	var p tasks.MigrateBucketListObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("HandleMigrationBucketListObj Unmarshal failed: %v: %w", err, asynq.SkipRetry)
@@ -73,7 +74,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			return fmt.Errorf("migration bucket list obj: list objects error %w", object.Err)
 		}
 		objectsNum++
-		isDir := object.Size == 0 && object.ContentType == ""
+		isDir := object.Size == 0 && object.ContentType == "" && object.ETag == "" && object.LastModified.IsZero()
 		logger.Debug().Str(log.Object, object.Key).Str("obj_version_id", object.VersionID).Bool("is_dir", isDir).Msg("migration bucket list obj: start processing object from the list")
 		if isDir {
 			subP := p
