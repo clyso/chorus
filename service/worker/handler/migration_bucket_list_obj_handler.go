@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
@@ -74,7 +75,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			return fmt.Errorf("migration bucket list obj: list objects error %w", object.Err)
 		}
 		objectsNum++
-		isDir := object.Size == 0 && object.ETag == ""
+		isDir := object.Size == 0 && strings.HasSuffix(object.Key, "/")
 		logger.Debug().Str(log.Object, object.Key).Str("obj_version_id", object.VersionID).Bool("is_dir", isDir).Msg("migration bucket list obj: start processing object from the list")
 		if isDir {
 			subP := p
@@ -129,31 +130,31 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		}
 	}
 
-	// if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
-	// 	p.Sync.InitDate()
-	// 	// copy empty dir object
-	// 	task, err := tasks.NewTask(ctx, tasks.MigrateObjCopyPayload{
-	// 		Sync:   p.Sync,
-	// 		Bucket: p.Bucket,
-	// 		Obj: tasks.ObjPayload{
-	// 			Name: p.Prefix,
-	// 		},
-	// 	})
-	// 	if err != nil {
-	// 		return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
-	// 	}
-	// 	_, err = s.taskClient.EnqueueContext(ctx, task)
-	// 	if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-	// 		logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
-	// 	} else if err != nil {
-	// 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
-	// 	} else {
-	// 		err = s.policySvc.IncReplInitObjListed(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, 0, p.GetDate())
-	// 		if err != nil {
-	// 			return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)
-	// 		}
-	// 	}
-	// }
+	if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
+		p.Sync.InitDate()
+		// copy empty dir object
+		task, err := tasks.NewTask(ctx, tasks.MigrateObjCopyPayload{
+			Sync:   p.Sync,
+			Bucket: p.Bucket,
+			Obj: tasks.ObjPayload{
+				Name: p.Prefix,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
+		}
+		_, err = s.taskClient.EnqueueContext(ctx, task)
+		if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
+			logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+		} else if err != nil {
+			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
+		} else {
+			err = s.policySvc.IncReplInitObjListed(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, 0, p.GetDate())
+			if err != nil {
+				return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)
+			}
+		}
+	}
 	_ = s.storageSvc.DelLastListedObj(ctx, p)
 
 	if p.Prefix == "" {
