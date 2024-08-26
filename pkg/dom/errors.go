@@ -19,6 +19,7 @@ package dom
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -48,4 +49,16 @@ type ErrRateLimitExceeded struct {
 
 func (e *ErrRateLimitExceeded) Error() string {
 	return "RateLimitExceeded"
+}
+
+func ErrContains(err error, text ...string) bool {
+	if err == nil {
+		return false
+	}
+	for _, s := range text {
+		if strings.Contains(strings.ToLower(err.Error()), strings.ToLower(s)) {
+			return true
+		}
+	}
+	return false
 }
