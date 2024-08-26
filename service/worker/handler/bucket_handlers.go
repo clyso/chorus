@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/aws/aws-sdk-go/service/s3"
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -30,8 +32,9 @@ import (
 	"github.com/hibiken/asynq"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
-	"strings"
 )
+
+var defaultRegion = "us-east-1"
 
 func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error) {
 	var p tasks.BucketCreatePayload
@@ -68,14 +71,24 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 
 	// 1. create bucket
-	err = toClient.S3().MakeBucket(ctx, p.Bucket, mclient.MakeBucketOptions{Region: p.Location})
-	var mcErr mclient.ErrorResponse
-	if err != nil && errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "InvalidRegion") {
+
+	_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
+		Bucket: &p.Bucket,
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+			LocationConstraint: &p.Location,
+		},
+	})
+	if err != nil && (dom.ErrContains(err, "region", "location")) {
 		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region", p.Location)
-		err = toClient.S3().MakeBucket(ctx, p.Bucket, mclient.MakeBucketOptions{})
+		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
+			Bucket: &p.Bucket,
+			CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+				LocationConstraint: &defaultRegion,
+			},
+		})
 	}
 	if err != nil {
-		if !errors.As(err, &mcErr) || !strings.Contains(mcErr.Code, "BucketAlreadyExists") {
+		if !dom.ErrContains(err, "BucketAlreadyExists") {
 			return err
 		}
 		// else BucketAlreadyExists - ok
