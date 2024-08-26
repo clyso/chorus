@@ -34,8 +34,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var defaultRegion = "us-east-1"
-
 func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error) {
 	var p tasks.BucketCreatePayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
@@ -71,7 +69,6 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 
 	// 1. create bucket
-
 	_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
 		Bucket: &p.Bucket,
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
@@ -79,7 +76,11 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		},
 	})
 	if err != nil && (dom.ErrContains(err, "region", "location")) {
-		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region", p.Location)
+		defaultRegion := toClient.Config().DefaultRegion
+		if defaultRegion == "" {
+			defaultRegion = s.clients.DefaultRegion()
+		}
+		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
 		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
 			Bucket: &p.Bucket,
 			CreateBucketConfiguration: &s3.CreateBucketConfiguration{
