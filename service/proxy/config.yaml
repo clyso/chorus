@@ -17,6 +17,7 @@ auth:
 storage:
   createRouting: true # create roting rules to route proxy requests to main storage
   createReplication: false  # create replication rules to replicate data from main to other storages
+  defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
   storages:
 #    one: # yaml key with some handy storage name
 #      address: <s3.chorus.com>

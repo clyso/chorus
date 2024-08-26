@@ -32,6 +32,7 @@ import (
 
 type Service interface {
 	GetByName(ctx context.Context, storageName string) (Client, error)
+	DefaultRegion() string
 }
 
 type Client interface {
@@ -89,6 +90,10 @@ func (s *svc) getClient(ctx context.Context, storage string) (Client, error) {
 		zerolog.Ctx(ctx).Warn().Str(log.Storage, storage).Msg("storage is offline")
 	}
 	return c, nil
+}
+
+func (s *svc) DefaultRegion() string {
+	return s.conf.DefaultRegion
 }
 
 func (s *svc) GetByName(ctx context.Context, storageName string) (Client, error) {

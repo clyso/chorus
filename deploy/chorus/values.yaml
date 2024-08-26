@@ -103,16 +103,19 @@ commonConfig:
   storage:
     createRouting: true # create roting rules to route proxy requests to main storage
     createReplication: false # create replication rules to replicate data from main to other storages
+    defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
     storages:
       one:
         address: s3.clyso.com
         provider: Ceph
         isMain: true
         isSecure: true
+        defaultRegion: ""
       two:
         address: office.clyso.cloud
         provider: Ceph
         isSecure: true
+        defaultRegion: ""
 agent:
   enabled: false
   image:
