@@ -6,13 +6,13 @@
 # Chorus
 ![chorus.png](./docs/media/banner.png)
 
-Chorus is vendor-agnostic s3 backup, replication, and routing software. 
+Chorus is vendor-agnostic S3-compatible backup, replication, and routing software. 
 Once configured it can:
- - sync existing buckets and objects from source to destination s3 storage
- - capture live bucket/object changes from source s3
- - propagate the changes to destination s3
+ - sync existing buckets and objects from source to destination S3 storage
+ - capture live bucket/object changes from source S3
+ - propagate the changes to destination S3
 
-Listed features can be configured per s3 user and per bucket with [management CLI](./tools/chorctl) or webUI.
+Listed features can be configured per S3 user and per bucket with [management CLI](./tools/chorctl) or webUI.
 
 ## Components
 [Chorus S3 Proxy](./service/proxy) service responsible for routing s3 requests and capturing data change events. 
@@ -54,13 +54,13 @@ Or run each service separately:
 # run chorus worker
 go run ./cmd/worker
 
-# run chorus worker with a custom yaml config file
+# run chorus worker with a custom YAML config file
 go run ./cmd/worker -config <path to worker yaml config>
 
-# run chorus proxy with a custom yaml config file
+# run chorus proxy with a custom YAML config file
 go run ./cmd/proxy -config <path to proxy yaml config>
 
-# run chorus agent with a custom yaml config file
+# run chorus agent with a custom YAML config file
 go run ./cmd/agent -config <path to agent yaml config>
 ```
 
@@ -78,11 +78,11 @@ See: [docker-compose](./docker-compose)
 - K8s
 - Helm
 
-Install chorus helm chart from OCI registry:
+Install the Chorus Helm chart from the OCI registry:
 ```shell
 helm install <release name> oci://harbor.clyso.com/chorus/chorus
 ```
-See: [deploy/chours](./deploy/chorus)
+See: [deploy/chorus](./deploy/chorus)
 
 ## Develop
 
