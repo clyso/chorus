@@ -69,30 +69,9 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 
 	// 1. create bucket
-	_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
-		Bucket: &p.Bucket,
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: &p.Location,
-		},
-	})
-	if err != nil && (dom.ErrContains(err, "region", "location")) {
-		defaultRegion := toClient.Config().DefaultRegion
-		if defaultRegion == "" {
-			defaultRegion = s.clients.DefaultRegion()
-		}
-		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
-		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
-			Bucket: &p.Bucket,
-			CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-				LocationConstraint: &defaultRegion,
-			},
-		})
-	}
+	err = s.createBucketIfNotExists(ctx, toClient, p)
 	if err != nil {
-		if !dom.ErrContains(err, "BucketAlreadyExists") {
-			return err
-		}
-		// else BucketAlreadyExists - ok
+		return err
 	}
 
 	// 2. copy tags
@@ -142,6 +121,47 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 
 	logger.Info().Msg("create bucket: done")
 
+	return nil
+}
+
+func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Client, p tasks.BucketCreatePayload) error {
+	ctx = log.WithBucket(ctx, p.Bucket)
+	logger := zerolog.Ctx(ctx)
+	// check if bucket already exists:
+	_, err := toClient.AWS().HeadBucketWithContext(ctx, &s3.HeadBucketInput{
+		Bucket: &p.Bucket,
+	})
+	if err == nil {
+		// already exists
+		return nil
+	}
+
+	// create bucket
+	_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
+		Bucket: &p.Bucket,
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+			LocationConstraint: &p.Location,
+		},
+	})
+	if err != nil && (dom.ErrContains(err, "region", "location")) {
+		defaultRegion := toClient.Config().DefaultRegion
+		if defaultRegion == "" {
+			defaultRegion = s.clients.DefaultRegion()
+		}
+		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
+		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
+			Bucket: &p.Bucket,
+			CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+				LocationConstraint: &defaultRegion,
+			},
+		})
+	}
+	if err != nil {
+		if !dom.ErrContains(err, "BucketAlreadyExists") {
+			return err
+		}
+		// else BucketAlreadyExists - ok
+	}
 	return nil
 }
 
