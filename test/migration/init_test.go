@@ -203,7 +203,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		app := dom.AppInfo{
 			Version: "test",
-			App:     "proxy",
+			App:     "worker",
 			AppID:   xid.New().String(),
 		}
 		workerCtx, cancelFn := context.WithCancel(ctx)
