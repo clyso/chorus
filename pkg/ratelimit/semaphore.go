@@ -98,7 +98,7 @@ func (l *Local) TryAcquireN(ctx context.Context, n int64) (func(), error) {
 	return release, nil
 }
 
-func GlobalSemaphore(rc *redis.Client, c SemaphoreConfig, name string) *Global {
+func GlobalSemaphore(rc redis.UniversalClient, c SemaphoreConfig, name string) *Global {
 	return &Global{
 		c:    c,
 		rc:   rc,
@@ -110,7 +110,7 @@ var _ Semaphore = &Global{}
 
 type Global struct {
 	c    SemaphoreConfig
-	rc   *redis.Client
+	rc   redis.UniversalClient
 	name string
 }
 

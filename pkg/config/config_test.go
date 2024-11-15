@@ -1,9 +1,10 @@
 package config
 
 import (
+	"testing"
+
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestGet(t *testing.T) {
@@ -97,4 +98,82 @@ func TestStorageConfig_RateLimitConf(t *testing.T) {
 	r.EqualValues(conf.Storages["main"].RateLimit, res["main"])
 	r.EqualValues(conf.Storages["f1"].RateLimit, res["f1"])
 	r.EqualValues(conf.Storages["f2"].RateLimit, res["f2"])
+}
+
+func TestRedis_validate(t *testing.T) {
+	type fields struct {
+		Address   string
+		Addresses []string
+		Sentinel  RedisSentinel
+		User      string
+		Password  string
+		UseTLS    bool
+		MetaDB    int
+		QueueDB   int
+		LockDB    int
+		ConfigDB  int
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{
+			name: "invalid: no address set",
+			fields: fields{
+				Address:   "",
+				Addresses: []string{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid: both addresses set",
+			fields: fields{
+				Address:   "addr",
+				Addresses: []string{"addr"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid: only address set",
+			fields: fields{
+				Address:   "addr",
+				Addresses: []string{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid: only addresses set",
+			fields: fields{
+				Address:   "",
+				Addresses: []string{"addr"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid: addresses is nil",
+			fields: fields{
+				Address: "addr",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Redis{
+				Address:   tt.fields.Address,
+				Addresses: tt.fields.Addresses,
+				Sentinel:  tt.fields.Sentinel,
+				User:      tt.fields.User,
+				Password:  tt.fields.Password,
+				MetaDB:    tt.fields.MetaDB,
+				QueueDB:   tt.fields.QueueDB,
+				LockDB:    tt.fields.LockDB,
+				ConfigDB:  tt.fields.ConfigDB,
+			}
+			if err := r.validate(); (err != nil) != tt.wantErr {
+				t.Errorf("Redis.validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

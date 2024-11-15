@@ -142,7 +142,7 @@ func MigrationCostsKey(fromStorage, toStorage string) key {
 	}
 }
 
-func New(redisClient *redis.Client) Service {
+func New(redisClient redis.UniversalClient) Service {
 	return &svc{locker: redislock.New(redisClient)}
 }
 

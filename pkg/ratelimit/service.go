@@ -35,7 +35,7 @@ type RPM interface {
 	StorReqN(ctx context.Context, storage string, n int) error
 }
 
-func New(rc *redis.Client, conf map[string]s3.RateLimit) *Svc {
+func New(rc redis.UniversalClient, conf map[string]s3.RateLimit) *Svc {
 	limiter := redis_rate.NewLimiter(rc)
 
 	return &Svc{

@@ -67,7 +67,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	defer shutdown(context.Background())
 
-	appRedis := redis.NewClient(&redis.Options{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.MetaDB})
+	appRedis := util.NewRedis(conf.Redis, conf.Redis.MetaDB)
 	defer appRedis.Close()
 	err = appRedis.Ping(ctx).Err()
 	if err != nil {
@@ -82,7 +82,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	versionSvc := meta.NewVersionService(appRedis)
 	storageSvc := storage.New(appRedis)
 
-	confRedis := redis.NewClient(&redis.Options{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.ConfigDB})
+	confRedis := util.NewRedis(conf.Redis, conf.Redis.ConfigDB)
 	defer confRedis.Close()
 	err = redisotel.InstrumentTracing(confRedis, redisotel.WithTracerProvider(tp))
 	if err != nil {
@@ -121,7 +121,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	logger.Info().Msg("rclone connected")
 
-	queueRedis := asynq.RedisClientOpt{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.QueueDB}
+	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
 
@@ -131,7 +131,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
-	lockRedis := redis.NewClient(&redis.Options{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.LockDB})
+	lockRedis := util.NewRedis(conf.Redis, conf.Redis.LockDB)
 	defer lockRedis.Close()
 	if conf.Lock.Overlap > 0 {
 		lock.UpdateOverlap(conf.Lock.Overlap)
