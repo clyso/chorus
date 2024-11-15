@@ -31,10 +31,10 @@ const (
 )
 
 type AgentClient struct {
-	client *redis.Client
+	client redis.UniversalClient
 }
 
-func NewAgentClient(client *redis.Client) *AgentClient {
+func NewAgentClient(client redis.UniversalClient) *AgentClient {
 	return &AgentClient{client: client}
 }
 
@@ -95,7 +95,7 @@ func (a *AgentClient) Ping(ctx context.Context) ([]AgentInfo, error) {
 	}
 }
 
-func AgentServe(ctx context.Context, client *redis.Client, url, fromStorage string) error {
+func AgentServe(ctx context.Context, client redis.UniversalClient, url, fromStorage string) error {
 	ps := client.Subscribe(ctx, agentPing)
 	defer ps.Close()
 	defer ps.Unsubscribe(context.Background(), agentPing)

@@ -175,12 +175,12 @@ type Service interface {
 	DeleteBucketReplicationsByUser(ctx context.Context, user, from string, to string) ([]string, error)
 }
 
-func NewService(client *redis.Client) Service {
+func NewService(client redis.UniversalClient) Service {
 	return &policySvc{client: client}
 }
 
 type policySvc struct {
-	client *redis.Client
+	client redis.UniversalClient
 }
 
 func (s *policySvc) ObjListStarted(ctx context.Context, user, bucket, from, to string) error {

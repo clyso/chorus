@@ -19,15 +19,16 @@ package config
 import (
 	"embed"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/trace"
 	stdlog "github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
-	"io"
-	"os"
-	"strings"
 )
 
 //go:embed config.yaml
@@ -42,12 +43,38 @@ type Common struct {
 }
 
 type Redis struct {
-	Address  string `yaml:"address"`
-	Password string `yaml:"password"`
-	MetaDB   int    `yaml:"metaDB"`
-	QueueDB  int    `yaml:"queueDB"`
-	LockDB   int    `yaml:"lockDB"`
-	ConfigDB int    `yaml:"configDB"`
+	// Deprecated: Address is deprecated: use Addresses
+	Address   string        `yaml:"address"`
+	Addresses []string      `yaml:"addresses"`
+	Sentinel  RedisSentinel `yaml:"sentinel"`
+	User      string        `yaml:"user"`
+	Password  string        `yaml:"password"`
+	TLS       TLS           `yaml:"tls"`
+	MetaDB    int           `yaml:"metaDB"`
+	QueueDB   int           `yaml:"queueDB"`
+	LockDB    int           `yaml:"lockDB"`
+	ConfigDB  int           `yaml:"configDB"`
+}
+
+type RedisSentinel struct {
+	MasterName string `yaml:"masterName"`
+	Password   string `yaml:"password"`
+	User       string `yaml:"user"`
+}
+
+type TLS struct {
+	Enabled  bool `yaml:"enabled"`
+	Insecure bool `yaml:"insecure"`
+}
+
+func (r *Redis) validate() error {
+	if r.Address != "" && len(r.Addresses) != 0 {
+		return fmt.Errorf("invalid redis config: either address or addresses must be used, but not both")
+	}
+	if r.Address == "" && len(r.Addresses) == 0 {
+		return fmt.Errorf("invalid redis config: address is not set")
+	}
+	return nil
 }
 
 func Get(conf any, sources ...Src) error {
@@ -110,6 +137,9 @@ func (c *Common) Validate() error {
 	}
 	if c.Redis == nil {
 		return fmt.Errorf("app config: empty Redis config")
+	}
+	if err := c.Redis.validate(); err != nil {
+		return err
 	}
 	if c.Metrics == nil {
 		return fmt.Errorf("app config: empty Metrics config")

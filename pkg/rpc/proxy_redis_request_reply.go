@@ -51,10 +51,10 @@ func (f ProxyGetCredentials) GetCredentials(ctx context.Context) (*pb.GetProxyCr
 var _ Proxy = &ProxyClient{}
 
 type ProxyClient struct {
-	client *redis.Client
+	client redis.UniversalClient
 }
 
-func NewProxyClient(client *redis.Client) Proxy {
+func NewProxyClient(client redis.UniversalClient) Proxy {
 	return &ProxyClient{client: client}
 }
 
@@ -106,7 +106,7 @@ func (c *ProxyClient) GetCredentials(ctx context.Context) (*pb.GetProxyCredentia
 	}
 }
 
-func ProxyServe(ctx context.Context, client *redis.Client, proxy Proxy) error {
+func ProxyServe(ctx context.Context, client redis.UniversalClient, proxy Proxy) error {
 	ps := client.Subscribe(ctx, proxyCreds)
 	defer ps.Close()
 	defer ps.Unsubscribe(context.Background(), proxyCreds)

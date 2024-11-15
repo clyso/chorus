@@ -96,12 +96,12 @@ type VersionService interface {
 	UpdateBucketTagsIfGreater(ctx context.Context, bucket string, storage string, version int64) error
 }
 
-func NewVersionService(client *redis.Client) VersionService {
+func NewVersionService(client redis.UniversalClient) VersionService {
 	return &versionSvc{client: client}
 }
 
 type versionSvc struct {
-	client *redis.Client
+	client redis.UniversalClient
 }
 
 func (s *versionSvc) GetObj(ctx context.Context, obj dom.Object) (map[string]int64, error) {

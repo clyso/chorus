@@ -63,8 +63,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	defer shutdown(context.Background())
 
-	appRedis := redis.NewClient(&redis.Options{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.MetaDB})
-	logger.Info().Interface("redis_pool", appRedis.PoolStats()).Int("redis_pool_size", appRedis.Options().PoolSize).Msg("redis app pool stats")
+	appRedis := util.NewRedis(conf.Redis, conf.Redis.MetaDB)
 	defer appRedis.Close()
 	err = appRedis.Ping(ctx).Err()
 	if err != nil {
@@ -81,8 +80,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	storageSvc := storage.New(appRedis)
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 
-	confRedis := redis.NewClient(&redis.Options{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.ConfigDB})
-	logger.Info().Interface("redis_pool", appRedis.PoolStats()).Int("redis_pool_size", appRedis.Options().PoolSize).Msg("redis conf pool stats")
+	confRedis := util.NewRedis(conf.Redis, conf.Redis.ConfigDB)
 	defer confRedis.Close()
 	err = redisotel.InstrumentTracing(confRedis, redisotel.WithTracerProvider(tp))
 	if err != nil {
@@ -92,8 +90,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
-	queueRedis := asynq.RedisClientOpt{Addr: conf.Redis.Address, Password: conf.Redis.Password, DB: conf.Redis.QueueDB}
-	logger.Info().Int("redis_pool_size", queueRedis.PoolSize).Msg("redis queue pool stats")
+	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
 

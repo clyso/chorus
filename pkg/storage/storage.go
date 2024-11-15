@@ -40,12 +40,12 @@ type Service interface {
 	ExistsUploads(ctx context.Context, user, bucket string) (bool, error)
 }
 
-func New(client *redis.Client) Service {
+func New(client redis.UniversalClient) Service {
 	return &svc{client: client}
 }
 
 type svc struct {
-	client *redis.Client
+	client redis.UniversalClient
 }
 
 func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error {

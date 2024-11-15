@@ -11,8 +11,19 @@ trace:
   enabled: false
   endpoint: # url to Jaeger or other open trace provider
 redis:
-  address: "127.0.0.1:6379" # Chorus redis instance used by chorus worker
+  # redis master address for standalone installation
+  address: "127.0.0.1:6379"
+  # list of redis addresses for HA (cluster or sentinel) setup
+  addresses: []
+  user:
   password:
+  tls:
+    enabled: false
+    insecure: false
+  sentinel:
+    masterName: 
+    user:
+    password:
   appDB: 0
   queueDB: 1
   lockDB: 2
