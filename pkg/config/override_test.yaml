@@ -2,3 +2,14 @@ log:
   json: true
 metrics:
   port: 69
+redis:
+  user: user
+  password: pass
+  tls:
+    enabled: true
+    insecure: true
+  sentinel:
+    masterName: master
+    user: sentinel
+    password: sentinel-pass
+

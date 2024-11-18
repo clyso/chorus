@@ -44,6 +44,7 @@ type Common struct {
 
 type Redis struct {
 	// Deprecated: Address is deprecated: use Addresses
+	// If Addresses set, Address will be ignored
 	Address   string        `yaml:"address"`
 	Addresses []string      `yaml:"addresses"`
 	Sentinel  RedisSentinel `yaml:"sentinel"`
@@ -68,11 +69,18 @@ type TLS struct {
 }
 
 func (r *Redis) validate() error {
-	if r.Address != "" && len(r.Addresses) != 0 {
-		return fmt.Errorf("invalid redis config: either address or addresses must be used, but not both")
-	}
-	if r.Address == "" && len(r.Addresses) == 0 {
+	if len(r.GetAddresses()) == 0 {
 		return fmt.Errorf("invalid redis config: address is not set")
+	}
+	return nil
+}
+
+func (r *Redis) GetAddresses() []string {
+	if len(r.Addresses) != 0 {
+		return r.Addresses
+	}
+	if r.Address != "" {
+		return []string{r.Address}
 	}
 	return nil
 }

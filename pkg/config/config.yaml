@@ -9,8 +9,11 @@ trace:
   endpoint: # url to Jaeger or other open trace provider
 redis:
   # redis master address for standalone installation
+  # will be ignored if addresses is set.
+  # This fiel is deprecated. Use addresses instead.
   address: "127.0.0.1:6379"
-  # list of redis addresses for HA (cluster or sentinel) setup
+  # List of redis addresses for HA (cluster or sentinel) setup.
+  # For standalone redis setup add a single address to the list.
   addresses: []
   user:
   password:
