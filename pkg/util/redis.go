@@ -9,11 +9,8 @@ import (
 )
 
 func NewRedis(conf *config.Redis, db int) redis.UniversalClient {
-	if conf.Address != "" {
-		conf.Addresses = append(conf.Addresses, conf.Address)
-	}
 	opt := &redis.UniversalOptions{
-		Addrs:            conf.Addresses,
+		Addrs:            conf.GetAddresses(),
 		DB:               db,
 		Username:         conf.User,
 		Password:         conf.Password,
@@ -28,12 +25,10 @@ func NewRedis(conf *config.Redis, db int) redis.UniversalClient {
 }
 
 func NewRedisAsynq(conf *config.Redis, db int) asynq.RedisConnOpt {
-	if conf.Address != "" {
-		conf.Addresses = append(conf.Addresses, conf.Address)
-	}
-	if len(conf.Addresses) == 1 {
+	addresses := conf.GetAddresses()
+	if len(addresses) == 1 {
 		// Standalone
-		opt := asynq.RedisClientOpt{Addr: conf.Addresses[0], Username: conf.User, Password: conf.Password, DB: db}
+		opt := asynq.RedisClientOpt{Addr: addresses[0], Username: conf.User, Password: conf.Password, DB: db}
 		if conf.TLS.Enabled {
 			opt.TLSConfig = &tls.Config{InsecureSkipVerify: conf.TLS.Insecure}
 		}
@@ -44,7 +39,7 @@ func NewRedisAsynq(conf *config.Redis, db int) asynq.RedisConnOpt {
 		// Sentinel
 		opt := asynq.RedisFailoverClientOpt{
 			MasterName:       conf.Sentinel.MasterName,
-			SentinelAddrs:    conf.Addresses,
+			SentinelAddrs:    addresses,
 			SentinelPassword: conf.Sentinel.Password,
 			Username:         conf.User,
 			Password:         conf.Password,
@@ -57,7 +52,7 @@ func NewRedisAsynq(conf *config.Redis, db int) asynq.RedisConnOpt {
 	}
 	// Cluster
 	opt := asynq.RedisClusterClientOpt{
-		Addrs:    conf.Addresses,
+		Addrs:    addresses,
 		Username: conf.User,
 		Password: conf.Password,
 	}
