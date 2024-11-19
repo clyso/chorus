@@ -19,7 +19,10 @@ func NewRedis(conf *config.Redis, db int) redis.UniversalClient {
 		MasterName:       conf.Sentinel.MasterName,
 	}
 	if conf.TLS.Enabled {
-		opt.TLSConfig = &tls.Config{InsecureSkipVerify: conf.TLS.Insecure}
+		opt.TLSConfig = &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: conf.TLS.Insecure,
+		}
 	}
 	return redis.NewUniversalClient(opt)
 }
@@ -30,7 +33,10 @@ func NewRedisAsynq(conf *config.Redis, db int) asynq.RedisConnOpt {
 		// Standalone
 		opt := asynq.RedisClientOpt{Addr: addresses[0], Username: conf.User, Password: conf.Password, DB: db}
 		if conf.TLS.Enabled {
-			opt.TLSConfig = &tls.Config{InsecureSkipVerify: conf.TLS.Insecure}
+			opt.TLSConfig = &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: conf.TLS.Insecure,
+			}
 		}
 		return &opt
 	}
@@ -46,7 +52,10 @@ func NewRedisAsynq(conf *config.Redis, db int) asynq.RedisConnOpt {
 			DB:               db,
 		}
 		if conf.TLS.Enabled {
-			opt.TLSConfig = &tls.Config{InsecureSkipVerify: conf.TLS.Insecure}
+			opt.TLSConfig = &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: conf.TLS.Insecure,
+			}
 		}
 		return &opt
 	}
@@ -57,7 +66,10 @@ func NewRedisAsynq(conf *config.Redis, db int) asynq.RedisConnOpt {
 		Password: conf.Password,
 	}
 	if conf.TLS.Enabled {
-		opt.TLSConfig = &tls.Config{InsecureSkipVerify: conf.TLS.Insecure}
+		opt.TLSConfig = &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: conf.TLS.Insecure,
+		}
 	}
 	return &opt
 }
