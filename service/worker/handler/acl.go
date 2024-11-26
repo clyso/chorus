@@ -248,7 +248,7 @@ func mappedOwnersACL(srcOwner *aws_s3.Owner, srcGrants []*aws_s3.Grant, dstOwner
 	for i, grant := range srcGrants {
 		grants[i] = &aws_s3.Grant{
 			Grantee: &aws_s3.Grantee{
-				ID:           srcOwnerToDstOwner(grant.Grantee.ID, srcOwner.ID, dstOwner),
+				ID:           grant.Grantee.ID,
 				EmailAddress: grant.Grantee.EmailAddress,
 				Type:         grant.Grantee.Type,
 				URI:          grant.Grantee.URI,
