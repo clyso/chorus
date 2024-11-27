@@ -48,6 +48,7 @@ type Storage struct {
 	HealthCheckInterval time.Duration            `yaml:"healthCheckInterval"`
 	HttpTimeout         time.Duration            `yaml:"httpTimeout"`
 	IsSecure            bool                     `yaml:"isSecure"`
+	SyncACLGrants       bool                     `yaml:"syncACLGrants"`
 	DefaultRegion       string                   `yaml:"defaultRegion"`
 
 	RateLimit RateLimit `yaml:"rateLimit"`
