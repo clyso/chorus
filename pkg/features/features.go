@@ -19,11 +19,12 @@ package features
 import "context"
 
 type Config struct {
-	Versioning bool `yaml:"versioning"`
-	Tagging    bool `yaml:"tagging"`
-	ACL        bool `yaml:"acl"`
-	Lifecycle  bool `yaml:"lifecycle"`
-	Policy     bool `yaml:"policy"`
+	Versioning        bool `yaml:"versioning"`
+	Tagging           bool `yaml:"tagging"`
+	ACL               bool `yaml:"acl"`
+	Lifecycle         bool `yaml:"lifecycle"`
+	Policy            bool `yaml:"policy"`
+	PreserveACLGrants bool `yaml:"preserveACLGrants"`
 }
 
 var val *Config
@@ -50,4 +51,8 @@ func Lifecycle(_ context.Context) bool {
 
 func Policy(_ context.Context) bool {
 	return val.Policy
+}
+
+func PreserveACLGrants(_ context.Context) bool {
+	return val.PreserveACLGrants
 }

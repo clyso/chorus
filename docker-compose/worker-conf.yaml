@@ -19,4 +19,5 @@ features:
   acl: false # sync object/bucket ACLs
   lifecycle: false # sync bucket Lifecycle
   policy: false # sync bucket Policies
+  preserveACLGrants: false # preserve object/bucket ACL Grants from source
 
