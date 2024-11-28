@@ -47,7 +47,6 @@ storage:
   #          secretAccessKey: <user2 v4 secretKey credential>
   #      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
   #      isMain: true # <true|false> one of the storages in should be main
-  #      syncACLGrants: false #set true to synchronize ACL Grants from source
   #      healthCheckInterval: 10s
   #      httpTimeout: 1m
   #      isSecure: true #set false for http address
@@ -66,7 +65,6 @@ storage:
   #          secretAccessKey: <user2 v4 secretKey credential>
   #      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
   #      isMain: false # <true|false> one of the storages in should be main
-  #      syncACLGrants: false #set true to synchronize ACL Grants from source
   #      healthCheckInterval: 10s
   #      httpTimeout: 1m
   #      isSecure: true #set false for http address

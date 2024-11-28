@@ -156,10 +156,8 @@ func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.C
 		toOwnerID = toACL.Owner.ID
 	}
 
-	var syncACLGrants bool = toClient.Config().SyncACLGrants
-
 	_, err = toClient.AWS().PutBucketAclWithContext(ctx, &aws_s3.PutBucketAclInput{
-		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, syncACLGrants),
+		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
 		Bucket:              &bucket,
 	})
 	if err != nil {
@@ -220,10 +218,8 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 		toOwnerID = toACL.Owner.ID
 	}
 
-	var syncACLGrants bool = toClient.Config().SyncACLGrants
-
 	_, err = toClient.AWS().PutObjectAclWithContext(ctx, &aws_s3.PutObjectAclInput{
-		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, syncACLGrants),
+		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
 		Bucket:              &bucket,
 		Key:                 &object,
 		VersionId:           nil, //todo: versioning
@@ -248,11 +244,11 @@ func srcOwnerToDstOwner(owner, srcBucketOwner, dstBucketOwner *string) *string {
 	return dstBucketOwner
 }
 
-func mappedOwnersACL(srcOwner *aws_s3.Owner, srcGrants []*aws_s3.Grant, dstOwner *string, syncACLGrants bool) *aws_s3.AccessControlPolicy {
+func mappedOwnersACL(srcOwner *aws_s3.Owner, srcGrants []*aws_s3.Grant, dstOwner *string, preserveACLGrants bool) *aws_s3.AccessControlPolicy {
 	grants := make([]*aws_s3.Grant, len(srcGrants))
 	for i, grant := range srcGrants {
 		var dstID *string
-		if syncACLGrants {
+		if preserveACLGrants {
 			dstID = grant.Grantee.ID
 		} else {
 			dstID = srcOwnerToDstOwner(grant.Grantee.ID, srcOwner.ID, dstOwner)
