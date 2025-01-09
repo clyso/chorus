@@ -18,6 +18,7 @@ To run chorus with docker compose:
     ```shell
     docker-compose -f ./docker-compose/docker-compose.yml --profile fake --profile proxy up
     ```
+    Web UI will be avaiable on <http://localhost:8080/>
 3. Check chorus config with CLI:
     ```
     % chorctl storage
