@@ -10,9 +10,9 @@
     brew install clyso/tap/chorctl
     ```
 To run chorus with docker compose:
-1. Clone repo:
+1. Clone repo `test-ui` branch:
     ```shell 
-    git clone https://github.com/clyso/chorus.git && cd chorus
+    git clone -b test-ui --single-branch https://github.com/clyso/chorus.git && cd chorus
     ```
 2. Start chorus `worker`,`proxy` with fake main and follower S3 backends:
     ```shell
