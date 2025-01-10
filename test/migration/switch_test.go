@@ -49,32 +49,6 @@ func TestApi_switch_e2e(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	// cleanup
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "main",
-		To:                       "f1",
-		DeleteBucketReplications: true,
-	})
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "main",
-		To:                       "f2",
-		DeleteBucketReplications: true,
-	})
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "f1",
-		To:                       "f2",
-		DeleteBucketReplications: true,
-	})
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "f1",
-		To:                       "main",
-		DeleteBucketReplications: true,
-	})
-
 	// fill main bucket with init data
 	err = mainClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{})
 	r.NoError(err)
@@ -117,6 +91,14 @@ func TestApi_switch_e2e(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "main",
+			To:     "f1",
+		})
+	})
 
 	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		User:            user,
@@ -126,6 +108,14 @@ func TestApi_switch_e2e(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "main",
+			To:     "f2",
+		})
+	})
 
 	// wait until repl started
 	r.Eventually(func() bool {
@@ -396,32 +386,6 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	// cleanup
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "main",
-		To:                       "f1",
-		DeleteBucketReplications: true,
-	})
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "main",
-		To:                       "f2",
-		DeleteBucketReplications: true,
-	})
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "f1",
-		To:                       "f2",
-		DeleteBucketReplications: true,
-	})
-	_, _ = apiClient.DeleteUserReplication(tstCtx, &pb.DeleteUserReplicationRequest{
-		User:                     user,
-		From:                     "f1",
-		To:                       "main",
-		DeleteBucketReplications: true,
-	})
-
 	// fill main bucket with init data
 	err = mainClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{})
 	r.NoError(err)
@@ -458,6 +422,14 @@ func TestApi_switch_multipart(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "main",
+			To:     "f1",
+		})
+	})
 
 	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		User:            user,
@@ -467,6 +439,14 @@ func TestApi_switch_multipart(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "main",
+			To:     "f2",
+		})
+	})
 
 	// wait until repl started
 	r.Eventually(func() bool {

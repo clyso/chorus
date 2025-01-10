@@ -20,29 +20,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/notifications"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
+	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"slices"
-	"sort"
-	"strings"
-	"time"
 )
 
-func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service) pb.ChorusServer {
-	return &handlers{storages: storages, rclone: rclone, s3clients: s3clients, taskClient: taskClient, policySvc: policySvc, locker: locker, proxyClient: proxyClient, agentClient: agentClient, notificationSvc: notificationSvc}
+func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService, storageSvc storage.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service) pb.ChorusServer {
+	return &handlers{storages: storages, rclone: rclone, s3clients: s3clients, taskClient: taskClient, policySvc: policySvc, versionSvc: versionSvc, storageSvc: storageSvc, locker: locker, proxyClient: proxyClient, agentClient: agentClient, notificationSvc: notificationSvc}
 }
 
 type handlers struct {
@@ -51,6 +54,8 @@ type handlers struct {
 	taskClient      *asynq.Client
 	rclone          rclone.Service
 	policySvc       policy.Service
+	versionSvc      meta.VersionService
+	storageSvc      storage.Service
 	locker          lock.Service
 	proxyClient     rpc.Proxy
 	agentClient     *rpc.AgentClient
@@ -344,6 +349,14 @@ func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUser
 			return err
 		}
 		for _, bucket := range deleted {
+			err = h.versionSvc.DeleteBucketMeta(ctx, req.To, bucket)
+			if err != nil {
+				zerolog.Ctx(ctx).Err(err).Msg("unable to delete bucket version metadata")
+			}
+			err = h.storageSvc.CleanLastListedObj(ctx, req.From, req.To, bucket)
+			if err != nil {
+				zerolog.Ctx(ctx).Err(err).Msg("unable to delete bucket obj list metadata")
+			}
 			err = h.notificationSvc.DeleteBucketNotification(ctx, req.From, req.User, bucket)
 			if err != nil {
 				zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
@@ -383,7 +396,15 @@ func (h *handlers) DeleteReplication(ctx context.Context, req *pb.ReplicationReq
 	err = lock.WithRefresh(ctx, func() error {
 		err = h.policySvc.DeleteReplication(ctx, req.User, req.Bucket, req.From, req.To)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: unable to delete replication policy", err)
+		}
+		err = h.versionSvc.DeleteBucketMeta(ctx, req.To, req.Bucket)
+		if err != nil {
+			return fmt.Errorf("%w: unable to delete version metadata", err)
+		}
+		err = h.storageSvc.CleanLastListedObj(ctx, req.From, req.To, req.Bucket)
+		if err != nil {
+			return fmt.Errorf("%w: unable to delete list obj metadata", err)
 		}
 		err = h.notificationSvc.DeleteBucketNotification(ctx, req.From, req.User, req.Bucket)
 		if err != nil {

@@ -19,11 +19,12 @@ package meta
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
-	"strconv"
 )
 
 var (
@@ -44,6 +45,20 @@ else
 	redis.call("hset", KEYS[1], ARGV[1], ARGV[2]);
 	return 1
 end`)
+	luaDelKeysWithPrefix = redis.NewScript(`local cursor = tonumber(ARGV[1]) or 0
+local pattern = ARGV[2]
+local count = tonumber(ARGV[3]) or 1000
+local field = KEYS[1]
+
+local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', count)
+local new_cursor = tonumber(scan_result[1])
+local keys = scan_result[2]
+
+for _, key in ipairs(keys) do
+    redis.call('HDEL', key, field)
+end
+
+return new_cursor`)
 )
 
 type VersionService interface {
@@ -55,7 +70,7 @@ type VersionService interface {
 	UpdateIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error
 	// DeleteObjAll deletes all obj meta for all storages
 	DeleteObjAll(ctx context.Context, obj dom.Object) error
-	// DeleteBucketMeta deletes meta of bucket objects for given storage.
+	// DeleteBucketMeta deletes all versions info for bucket and version info for all bucket objects
 	DeleteBucketMeta(ctx context.Context, storage, bucket string) error
 
 	// GetACL returns object ACL versions in s3 storages
@@ -149,19 +164,31 @@ func (s *versionSvc) UpdateIfGreater(ctx context.Context, obj dom.Object, storag
 }
 
 func (s *versionSvc) DeleteBucketMeta(ctx context.Context, storage, bucket string) error {
-	if err := s3.ValidateBucketName(bucket); err != nil {
+	err := s3.ValidateBucketName(bucket)
+	if err != nil {
 		return err
 	}
-	iter := s.client.Scan(ctx, 0, bucket+":*", 0).Iterator()
-	for iter.Next(ctx) {
-		key := iter.Val()
-		err := s.client.HDel(ctx, key, storage).Err()
-		if err != nil && err != redis.Nil {
-			return fmt.Errorf("%w: unable to delete obj version", err)
-		}
+	key := fmt.Sprintf("b:%s", bucket)
+	if err = s.client.HDel(ctx, key, storage).Err(); err != nil {
+		return err
 	}
-	if err := iter.Err(); err != nil {
-		return fmt.Errorf("%w: iterate over obj meta error", err)
+	keyAcl := fmt.Sprintf("b:%s:a", bucket)
+	if err = s.client.HDel(ctx, keyAcl, storage).Err(); err != nil {
+		return err
+	}
+	keyTags := fmt.Sprintf("b:%s:t", bucket)
+	if err = s.client.HDel(ctx, keyTags, storage).Err(); err != nil {
+		return err
+	}
+	var cursor int64
+	for {
+		cursor, err = luaDelKeysWithPrefix.Run(ctx, s.client, []string{storage}, cursor, bucket+":*").Int64()
+		if err != nil {
+			return err
+		}
+		if cursor == 0 {
+			break
+		}
 	}
 	return nil
 }

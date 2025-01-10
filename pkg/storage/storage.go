@@ -29,10 +29,20 @@ const (
 	lastListedObjTTL = time.Hour * 8
 )
 
+var (
+	luaDeleteKeysByPrefix = redis.NewScript(`local keys = redis.call('keys', ARGV[1])
+if #keys >0 then
+	return redis.call('DEL', unpack(keys))
+else
+	return 0
+end`)
+)
+
 type Service interface {
 	GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error)
 	SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error
 	DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error
+	CleanLastListedObj(ctx context.Context, fromStor, toStor, bucket string) error
 
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
 	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
@@ -46,6 +56,15 @@ func New(client redis.UniversalClient) Service {
 
 type svc struct {
 	client redis.UniversalClient
+}
+
+func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, bucket string) error {
+	key := fmt.Sprintf("s:%s:%s:%s", fromStor, toStor, bucket)
+	if err := s.client.Del(ctx, key).Err(); err != nil {
+		return err
+	}
+	prefix := key + ":*"
+	return luaDeleteKeysByPrefix.Run(ctx, s.client, []string{}, prefix).Err()
 }
 
 func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error {

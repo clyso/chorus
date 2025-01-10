@@ -2,15 +2,16 @@ package migration
 
 import (
 	"bytes"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"testing"
 	"time"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestApi_Migrate_test(t *testing.T) {
@@ -140,29 +141,34 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Empty(repl.Replications)
 
 	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "f1",
-		To:              "main",
-		Buckets:         nil,
-		IsForAllBuckets: true,
+		User:    user,
+		From:    "f1",
+		To:      "main",
+		Buckets: []string{b1, b2},
 	})
 	r.Error(err)
 
 	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         nil,
-		IsForAllBuckets: true,
+		User:    user,
+		From:    "main",
+		To:      "f1",
+		Buckets: []string{b1, b2},
 	})
 	r.NoError(err)
-
-	ur, err = apiClient.ListUserReplications(tstCtx, &emptypb.Empty{})
-	r.NoError(err)
-	r.Len(ur.Replications, 1)
-	r.EqualValues(user, ur.Replications[0].User)
-	r.EqualValues("main", ur.Replications[0].From)
-	r.EqualValues("f1", ur.Replications[0].To)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: b1,
+			From:   "main",
+			To:     "f1",
+		})
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: b2,
+			From:   "main",
+			To:     "f1",
+		})
+	})
 
 	bfr, err = apiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
 		User:           user,
@@ -374,13 +380,14 @@ func TestApi_Migrate_test(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
-
-	ur, err = apiClient.ListUserReplications(tstCtx, &emptypb.Empty{})
-	r.NoError(err)
-	r.Len(ur.Replications, 1)
-	r.EqualValues(user, ur.Replications[0].User)
-	r.EqualValues("main", ur.Replications[0].From)
-	r.EqualValues("f1", ur.Replications[0].To)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: b1,
+			From:   "main",
+			To:     "f2",
+		})
+	})
 
 	bfr, err = apiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
 		User:           user,
@@ -406,6 +413,14 @@ func TestApi_Migrate_test(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: b2,
+			From:   "main",
+			To:     "f2",
+		})
+	})
 
 	bfr, err = apiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
 		User:           user,
@@ -570,7 +585,6 @@ func TestApi_Migrate_test(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestApi_Migrate_Http_api_test(t *testing.T) {

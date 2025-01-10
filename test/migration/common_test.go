@@ -19,10 +19,11 @@ package migration
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/clyso/chorus/pkg/s3"
-	mclient "github.com/minio/minio-go/v7"
 	"math/rand"
 	"strings"
+
+	"github.com/clyso/chorus/pkg/s3"
+	mclient "github.com/minio/minio-go/v7"
 )
 
 type testObj struct {
@@ -134,7 +135,6 @@ func generateCredentials() s3.CredentialsV4 {
 }
 
 func cleanup(buckets ...string) {
-
 	for _, bucket := range buckets {
 		objCh, _ := listObjects(mainClient, bucket, "")
 		for _, obj := range objCh {
@@ -154,5 +154,12 @@ func cleanup(buckets ...string) {
 		}
 		_ = f2Client.RemoveBucket(tstCtx, bucket)
 	}
+}
 
+func rmBucket(client *mclient.Client, bucket string) error {
+	objs, _ := listObjects(client, bucket, "")
+	for _, obj := range objs {
+		_ = client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
+	}
+	return client.RemoveBucket(tstCtx, bucket)
 }
