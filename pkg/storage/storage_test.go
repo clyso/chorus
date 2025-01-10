@@ -83,16 +83,34 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 		}
 	}
 
-	for i, stor := range stors {
-		for j, buck := range bucks {
-			for k, pref := range prefs {
+	for storIdx, stor := range stors {
+		for buckIdx, buck := range bucks {
+			for prefIdx, pref := range prefs {
 				res, err := storage.GetLastListedObj(ctx, tasks.MigrateBucketListObjectsPayload{
 					Sync:   stor,
 					Bucket: buck,
 					Prefix: pref,
 				})
 				r.NoError(err)
-				r.EqualValues(fmt.Sprintf("%d-%d-%d", i, j, k), res)
+				r.EqualValues(fmt.Sprintf("%d-%d-%d", storIdx, buckIdx, prefIdx), res)
+			}
+		}
+	}
+	r.NoError(storage.CleanLastListedObj(ctx, s1.FromStorage, s1.ToStorage, b1))
+	for storIdx, stor := range stors {
+		for buckIdx, buck := range bucks {
+			for prefIdx, pref := range prefs {
+				res, err := storage.GetLastListedObj(ctx, tasks.MigrateBucketListObjectsPayload{
+					Sync:   stor,
+					Bucket: buck,
+					Prefix: pref,
+				})
+				r.NoError(err)
+				if buck == b1 && stor.ToStorage == s1.ToStorage && stor.FromStorage == s1.FromStorage {
+					r.Empty(res)
+					break
+				}
+				r.EqualValues(fmt.Sprintf("%d-%d-%d", storIdx, buckIdx, prefIdx), res)
 			}
 		}
 	}

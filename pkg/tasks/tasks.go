@@ -105,8 +105,6 @@ const (
 
 const (
 	costEstimationTaskRetention = time.Second
-	migrateBucketTaskRetention  = time.Second * 30
-	migrateObjectTaskRetention  = time.Second * 30
 )
 
 type SyncTask interface {
@@ -263,7 +261,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		taskType = TypeApiCostEstimationList
 	case BucketCreatePayload:
 		id := fmt.Sprintf("cb:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue()), asynq.TaskID(id), asynq.Retention(time.Second * 5)}
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue()), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
 	case BucketDeletePayload:
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
@@ -288,14 +286,14 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		if p.Prefix != "" {
 			taskID = asynq.TaskID(fmt.Sprintf("mgr:lo:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix))
 		}
-		optionList = []asynq.Option{asynq.Queue(QueueMigrateBucketListObjects), asynq.Retention(migrateBucketTaskRetention), taskID}
+		optionList = []asynq.Option{asynq.Queue(QueueMigrateBucketListObjects), taskID}
 		taskType = TypeMigrateBucketListObjects
 	case MigrateObjCopyPayload:
 		taskID := asynq.TaskID(fmt.Sprintf("mgr:co:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Obj.Name))
 		if p.Obj.VersionID != "" {
 			taskID = asynq.TaskID(fmt.Sprintf("mgr:co:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Obj.Name, p.Obj.VersionID))
 		}
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.Retention(migrateObjectTaskRetention), taskID}
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), taskID}
 		taskType = TypeMigrateObjCopy
 	default:
 		return nil, fmt.Errorf("%w: unknown task type %+v", dom.ErrInvalidArg, payload)

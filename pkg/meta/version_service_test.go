@@ -317,3 +317,172 @@ func Test_inc_version_during_switch(t *testing.T) {
 	r.EqualValues(8, vers[stor2])
 	r.EqualValues(9, vers[stor3])
 }
+
+func Test_DeleteBucketMeta(t *testing.T) {
+	// setup
+	r := require.New(t)
+	red := miniredis.RunT(t)
+
+	c := redis.NewClient(&redis.Options{
+		Addr: red.Addr(),
+	})
+
+	s := NewVersionService(c)
+
+	s1, s2 := "stor1", "stor2"
+	b1, b2 := "buck1", "buck2"
+	o1, o2, o3, o4 := dom.Object{
+		Bucket: b1,
+		Name:   "obj1",
+	}, dom.Object{
+		Bucket: b1,
+		Name:   "obj2",
+	}, dom.Object{
+		Bucket: b2,
+		Name:   "obj1",
+	}, dom.Object{
+		Bucket: b2,
+		Name:   "obj2",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	// add version metadata for all storage/bucket/obj combinations
+	s.IncrementBucket(ctx, b1, s1)
+	s.IncrementBucket(ctx, b1, s2)
+	s.IncrementBucket(ctx, b2, s1)
+	s.IncrementBucket(ctx, b2, s2)
+
+	s.IncrementBucketACL(ctx, b1, s1)
+	s.IncrementBucketACL(ctx, b1, s2)
+	s.IncrementBucketACL(ctx, b2, s1)
+	s.IncrementBucketACL(ctx, b2, s2)
+
+	s.IncrementBucketTags(ctx, b1, s1)
+	s.IncrementBucketTags(ctx, b1, s2)
+	s.IncrementBucketTags(ctx, b2, s1)
+	s.IncrementBucketTags(ctx, b2, s2)
+
+	s.IncrementObj(ctx, o1, s1)
+	s.IncrementObj(ctx, o1, s2)
+	s.IncrementObj(ctx, o2, s1)
+	s.IncrementObj(ctx, o2, s2)
+	s.IncrementObj(ctx, o3, s1)
+	s.IncrementObj(ctx, o3, s2)
+	s.IncrementObj(ctx, o4, s1)
+	s.IncrementObj(ctx, o4, s2)
+
+	s.IncrementACL(ctx, o1, s1)
+	s.IncrementACL(ctx, o1, s2)
+	s.IncrementACL(ctx, o2, s1)
+	s.IncrementACL(ctx, o2, s2)
+	s.IncrementACL(ctx, o3, s1)
+	s.IncrementACL(ctx, o3, s2)
+	s.IncrementACL(ctx, o4, s1)
+	s.IncrementACL(ctx, o4, s2)
+
+	s.IncrementTags(ctx, o1, s1)
+	s.IncrementTags(ctx, o1, s2)
+	s.IncrementTags(ctx, o2, s1)
+	s.IncrementTags(ctx, o2, s2)
+	s.IncrementTags(ctx, o3, s1)
+	s.IncrementTags(ctx, o3, s2)
+	s.IncrementTags(ctx, o4, s1)
+	s.IncrementTags(ctx, o4, s2)
+
+	// delete bucket meta only for storage s1 and bucket b1
+	s.DeleteBucketMeta(ctx, s1, b1)
+
+	// check that that version metadata only for s1&b1 combiantion was removed (version is zero)
+	// and the rest of metadata remained the same
+	ver, err := s.GetObj(ctx, o1)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetObj(ctx, o2)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetObj(ctx, o3)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetObj(ctx, o4)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetACL(ctx, o1)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetACL(ctx, o2)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetACL(ctx, o3)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetACL(ctx, o4)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetTags(ctx, o1)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetTags(ctx, o2)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetTags(ctx, o3)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetTags(ctx, o4)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetBucket(ctx, b1)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetBucket(ctx, b2)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetBucketACL(ctx, b1)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetBucketACL(ctx, b2)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetBucketTags(ctx, b1)
+	r.NoError(err)
+	r.Zero(ver[s1])
+	r.EqualValues(2, ver[s2])
+
+	ver, err = s.GetBucketTags(ctx, b2)
+	r.NoError(err)
+	r.EqualValues(1, ver[s1])
+	r.EqualValues(2, ver[s2])
+}
