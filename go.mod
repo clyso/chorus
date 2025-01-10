@@ -1,6 +1,6 @@
 module github.com/clyso/chorus
 
-go 1.21
+go 1.23
 
 require (
 	github.com/alicebob/miniredis/v2 v2.30.2
