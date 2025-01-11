@@ -10,6 +10,7 @@ package pb
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -25,390 +26,335 @@ import (
 )
 
 // Suppress "imported and not used" errors
-var _ codes.Code
-var _ io.Reader
-var _ status.Status
-var _ = runtime.String
-var _ = utilities.NewDoubleArray
-var _ = metadata.Join
+var (
+	_ codes.Code
+	_ io.Reader
+	_ status.Status
+	_ = errors.New
+	_ = runtime.String
+	_ = utilities.NewDoubleArray
+	_ = metadata.Join
+)
 
 func request_Chorus_GetStorages_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := client.GetStorages(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_GetStorages_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := server.GetStorages(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_GetProxyCredentials_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := client.GetProxyCredentials(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_GetProxyCredentials_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := server.GetProxyCredentials(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_ListBucketsForReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ListBucketsForReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ListBucketsForReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.ListBucketsForReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_ListBucketsForReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ListBucketsForReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ListBucketsForReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.ListBucketsForReplication(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_AddReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq AddReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq AddReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.AddReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_AddReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq AddReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq AddReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.AddReplication(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_ListReplications_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := client.ListReplications(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_ListReplications_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := server.ListReplications(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_ListUserReplications_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := client.ListUserReplications(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_ListUserReplications_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := server.ListUserReplications(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_PauseReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.PauseReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_PauseReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.PauseReplication(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_ResumeReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.ResumeReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_ResumeReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.ResumeReplication(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_DeleteReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.DeleteReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_DeleteReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq ReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq ReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.DeleteReplication(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_DeleteUserReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq DeleteUserReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq DeleteUserReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.DeleteUserReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_DeleteUserReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq DeleteUserReplicationRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq DeleteUserReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.DeleteUserReplication(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_SwitchMainBucket_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq SwitchMainBucketRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq SwitchMainBucketRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.SwitchMainBucket(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_SwitchMainBucket_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq SwitchMainBucketRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq SwitchMainBucketRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.SwitchMainBucket(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_CompareBucket_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq CompareBucketRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq CompareBucketRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := client.CompareBucket(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_CompareBucket_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq CompareBucketRequest
-	var metadata runtime.ServerMetadata
-
-	newReader, berr := utilities.IOReaderFactory(req.Body)
-	if berr != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
-	}
-	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+	var (
+		protoReq CompareBucketRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
 	msg, err := server.CompareBucket(ctx, &protoReq)
 	return msg, metadata, err
-
 }
 
 func request_Chorus_GetAgents_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := client.GetAgents(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
-
 }
 
 func local_request_Chorus_GetAgents_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var protoReq emptypb.Empty
-	var metadata runtime.ServerMetadata
-
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
 	msg, err := server.GetAgents(ctx, &protoReq)
 	return msg, metadata, err
+}
 
+func request_Chorus_AddBucketReplication_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq AddBucketReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.AddBucketReplication(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Chorus_AddBucketReplication_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq AddBucketReplicationRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.AddBucketReplication(ctx, &protoReq)
+	return msg, metadata, err
 }
 
 // RegisterChorusHandlerServer registers the http handlers for service Chorus to "mux".
 // UnaryRPC     :call ChorusServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterChorusHandlerFromEndpoint instead.
+// GRPC interceptors will not work for this type of registration. To use interceptors, you must use the "runtime.WithMiddlewares" option in the "runtime.NewServeMux" call.
 func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, server ChorusServer) error {
-
-	mux.Handle("GET", pattern_Chorus_GetStorages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetStorages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetStorages", runtime.WithHTTPPathPattern("/storage"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetStorages", runtime.WithHTTPPathPattern("/storage"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -420,20 +366,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_GetStorages_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_GetProxyCredentials_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetProxyCredentials_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetProxyCredentials", runtime.WithHTTPPathPattern("/proxy"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetProxyCredentials", runtime.WithHTTPPathPattern("/proxy"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -445,20 +386,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_GetProxyCredentials_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_ListBucketsForReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_ListBucketsForReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListBucketsForReplication", runtime.WithHTTPPathPattern("/replication/list-buckets"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListBucketsForReplication", runtime.WithHTTPPathPattern("/replication/list-buckets"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -470,20 +406,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ListBucketsForReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_AddReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_AddReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/AddReplication", runtime.WithHTTPPathPattern("/replication/add"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/AddReplication", runtime.WithHTTPPathPattern("/replication/add"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -495,20 +426,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_AddReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_ListReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_ListReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListReplications", runtime.WithHTTPPathPattern("/replication"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListReplications", runtime.WithHTTPPathPattern("/replication"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -520,20 +446,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ListReplications_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_ListUserReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_ListUserReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListUserReplications", runtime.WithHTTPPathPattern("/replication/user"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListUserReplications", runtime.WithHTTPPathPattern("/replication/user"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -545,20 +466,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ListUserReplications_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_PauseReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_PauseReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/PauseReplication", runtime.WithHTTPPathPattern("/replication/pause"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/PauseReplication", runtime.WithHTTPPathPattern("/replication/pause"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -570,20 +486,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_PauseReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_ResumeReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_ResumeReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ResumeReplication", runtime.WithHTTPPathPattern("/replication/resume"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ResumeReplication", runtime.WithHTTPPathPattern("/replication/resume"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -595,20 +506,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ResumeReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_DeleteReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_DeleteReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/DeleteReplication", runtime.WithHTTPPathPattern("/replication/delete"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/DeleteReplication", runtime.WithHTTPPathPattern("/replication/delete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -620,20 +526,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_DeleteReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_DeleteUserReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_DeleteUserReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/DeleteUserReplication", runtime.WithHTTPPathPattern("/replication/user/delete"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/DeleteUserReplication", runtime.WithHTTPPathPattern("/replication/user/delete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -645,20 +546,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_DeleteUserReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_SwitchMainBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_SwitchMainBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/SwitchMainBucket", runtime.WithHTTPPathPattern("/replication/switch"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/SwitchMainBucket", runtime.WithHTTPPathPattern("/replication/switch"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -670,20 +566,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_SwitchMainBucket_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_CompareBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_CompareBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/CompareBucket", runtime.WithHTTPPathPattern("/replication/compare-bucket"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/CompareBucket", runtime.WithHTTPPathPattern("/replication/compare-bucket"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -695,20 +586,15 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_CompareBucket_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_GetAgents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetAgents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetAgents", runtime.WithHTTPPathPattern("/agents"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetAgents", runtime.WithHTTPPathPattern("/agents"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -720,9 +606,27 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_GetAgents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
+	})
+	mux.Handle(http.MethodPost, pattern_Chorus_AddBucketReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/AddBucketReplication", runtime.WithHTTPPathPattern("/v2/replication/add"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Chorus_AddBucketReplication_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_AddBucketReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -731,25 +635,24 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 // RegisterChorusHandlerFromEndpoint is same as RegisterChorusHandler but
 // automatically dials to "endpoint" and closes the connection when "ctx" gets done.
 func RegisterChorusHandlerFromEndpoint(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) (err error) {
-	conn, err := grpc.DialContext(ctx, endpoint, opts...)
+	conn, err := grpc.NewClient(endpoint, opts...)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
 			if cerr := conn.Close(); cerr != nil {
-				grpclog.Infof("Failed to close conn to %s: %v", endpoint, cerr)
+				grpclog.Errorf("Failed to close conn to %s: %v", endpoint, cerr)
 			}
 			return
 		}
 		go func() {
 			<-ctx.Done()
 			if cerr := conn.Close(); cerr != nil {
-				grpclog.Infof("Failed to close conn to %s: %v", endpoint, cerr)
+				grpclog.Errorf("Failed to close conn to %s: %v", endpoint, cerr)
 			}
 		}()
 	}()
-
 	return RegisterChorusHandler(ctx, mux, conn)
 }
 
@@ -763,16 +666,13 @@ func RegisterChorusHandler(ctx context.Context, mux *runtime.ServeMux, conn *grp
 // to "mux". The handlers forward requests to the grpc endpoint over the given implementation of "ChorusClient".
 // Note: the gRPC framework executes interceptors within the gRPC handler. If the passed in "ChorusClient"
 // doesn't go through the normal gRPC flow (creating a gRPC client etc.) then it will be up to the passed in
-// "ChorusClient" to call the correct interceptors.
+// "ChorusClient" to call the correct interceptors. This client ignores the HTTP middlewares.
 func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, client ChorusClient) error {
-
-	mux.Handle("GET", pattern_Chorus_GetStorages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetStorages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetStorages", runtime.WithHTTPPathPattern("/storage"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetStorages", runtime.WithHTTPPathPattern("/storage"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -783,18 +683,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_GetStorages_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_GetProxyCredentials_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetProxyCredentials_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetProxyCredentials", runtime.WithHTTPPathPattern("/proxy"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetProxyCredentials", runtime.WithHTTPPathPattern("/proxy"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -805,18 +700,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_GetProxyCredentials_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_ListBucketsForReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_ListBucketsForReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListBucketsForReplication", runtime.WithHTTPPathPattern("/replication/list-buckets"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListBucketsForReplication", runtime.WithHTTPPathPattern("/replication/list-buckets"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -827,18 +717,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ListBucketsForReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_AddReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_AddReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/AddReplication", runtime.WithHTTPPathPattern("/replication/add"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/AddReplication", runtime.WithHTTPPathPattern("/replication/add"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -849,18 +734,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_AddReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_ListReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_ListReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListReplications", runtime.WithHTTPPathPattern("/replication"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListReplications", runtime.WithHTTPPathPattern("/replication"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -871,18 +751,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ListReplications_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_ListUserReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_ListUserReplications_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListUserReplications", runtime.WithHTTPPathPattern("/replication/user"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListUserReplications", runtime.WithHTTPPathPattern("/replication/user"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -893,18 +768,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ListUserReplications_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_PauseReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_PauseReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/PauseReplication", runtime.WithHTTPPathPattern("/replication/pause"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/PauseReplication", runtime.WithHTTPPathPattern("/replication/pause"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -915,18 +785,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_PauseReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_ResumeReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_ResumeReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ResumeReplication", runtime.WithHTTPPathPattern("/replication/resume"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ResumeReplication", runtime.WithHTTPPathPattern("/replication/resume"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -937,18 +802,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_ResumeReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_DeleteReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_DeleteReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/DeleteReplication", runtime.WithHTTPPathPattern("/replication/delete"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/DeleteReplication", runtime.WithHTTPPathPattern("/replication/delete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -959,18 +819,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_DeleteReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("PUT", pattern_Chorus_DeleteUserReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPut, pattern_Chorus_DeleteUserReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/DeleteUserReplication", runtime.WithHTTPPathPattern("/replication/user/delete"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/DeleteUserReplication", runtime.WithHTTPPathPattern("/replication/user/delete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -981,18 +836,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_DeleteUserReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_SwitchMainBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_SwitchMainBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/SwitchMainBucket", runtime.WithHTTPPathPattern("/replication/switch"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/SwitchMainBucket", runtime.WithHTTPPathPattern("/replication/switch"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1003,18 +853,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_SwitchMainBucket_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("POST", pattern_Chorus_CompareBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Chorus_CompareBucket_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/CompareBucket", runtime.WithHTTPPathPattern("/replication/compare-bucket"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/CompareBucket", runtime.WithHTTPPathPattern("/replication/compare-bucket"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1025,18 +870,13 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_CompareBucket_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
-	mux.Handle("GET", pattern_Chorus_GetAgents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetAgents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		var err error
-		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetAgents", runtime.WithHTTPPathPattern("/agents"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetAgents", runtime.WithHTTPPathPattern("/agents"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1047,66 +887,58 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
 		forward_Chorus_GetAgents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-
 	})
-
+	mux.Handle(http.MethodPost, pattern_Chorus_AddBucketReplication_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/AddBucketReplication", runtime.WithHTTPPathPattern("/v2/replication/add"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Chorus_AddBucketReplication_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_AddBucketReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_Chorus_GetStorages_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"storage"}, ""))
-
-	pattern_Chorus_GetProxyCredentials_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"proxy"}, ""))
-
+	pattern_Chorus_GetStorages_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"storage"}, ""))
+	pattern_Chorus_GetProxyCredentials_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"proxy"}, ""))
 	pattern_Chorus_ListBucketsForReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "list-buckets"}, ""))
-
-	pattern_Chorus_AddReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "add"}, ""))
-
-	pattern_Chorus_ListReplications_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"replication"}, ""))
-
-	pattern_Chorus_ListUserReplications_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "user"}, ""))
-
-	pattern_Chorus_PauseReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "pause"}, ""))
-
-	pattern_Chorus_ResumeReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "resume"}, ""))
-
-	pattern_Chorus_DeleteReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "delete"}, ""))
-
-	pattern_Chorus_DeleteUserReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "user", "delete"}, ""))
-
-	pattern_Chorus_SwitchMainBucket_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "switch"}, ""))
-
-	pattern_Chorus_CompareBucket_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "compare-bucket"}, ""))
-
-	pattern_Chorus_GetAgents_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"agents"}, ""))
+	pattern_Chorus_AddReplication_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "add"}, ""))
+	pattern_Chorus_ListReplications_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"replication"}, ""))
+	pattern_Chorus_ListUserReplications_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "user"}, ""))
+	pattern_Chorus_PauseReplication_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "pause"}, ""))
+	pattern_Chorus_ResumeReplication_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "resume"}, ""))
+	pattern_Chorus_DeleteReplication_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "delete"}, ""))
+	pattern_Chorus_DeleteUserReplication_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "user", "delete"}, ""))
+	pattern_Chorus_SwitchMainBucket_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "switch"}, ""))
+	pattern_Chorus_CompareBucket_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "compare-bucket"}, ""))
+	pattern_Chorus_GetAgents_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"agents"}, ""))
+	pattern_Chorus_AddBucketReplication_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v2", "replication", "add"}, ""))
 )
 
 var (
-	forward_Chorus_GetStorages_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_GetProxyCredentials_0 = runtime.ForwardResponseMessage
-
+	forward_Chorus_GetStorages_0               = runtime.ForwardResponseMessage
+	forward_Chorus_GetProxyCredentials_0       = runtime.ForwardResponseMessage
 	forward_Chorus_ListBucketsForReplication_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_AddReplication_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_ListReplications_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_ListUserReplications_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_PauseReplication_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_ResumeReplication_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_DeleteReplication_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_DeleteUserReplication_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_SwitchMainBucket_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_CompareBucket_0 = runtime.ForwardResponseMessage
-
-	forward_Chorus_GetAgents_0 = runtime.ForwardResponseMessage
+	forward_Chorus_AddReplication_0            = runtime.ForwardResponseMessage
+	forward_Chorus_ListReplications_0          = runtime.ForwardResponseMessage
+	forward_Chorus_ListUserReplications_0      = runtime.ForwardResponseMessage
+	forward_Chorus_PauseReplication_0          = runtime.ForwardResponseMessage
+	forward_Chorus_ResumeReplication_0         = runtime.ForwardResponseMessage
+	forward_Chorus_DeleteReplication_0         = runtime.ForwardResponseMessage
+	forward_Chorus_DeleteUserReplication_0     = runtime.ForwardResponseMessage
+	forward_Chorus_SwitchMainBucket_0          = runtime.ForwardResponseMessage
+	forward_Chorus_CompareBucket_0             = runtime.ForwardResponseMessage
+	forward_Chorus_GetAgents_0                 = runtime.ForwardResponseMessage
+	forward_Chorus_AddBucketReplication_0      = runtime.ForwardResponseMessage
 )

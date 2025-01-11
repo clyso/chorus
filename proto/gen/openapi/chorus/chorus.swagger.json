@@ -396,6 +396,39 @@
           "Chorus"
         ]
       }
+    },
+    "/v2/replication/add": {
+      "post": {
+        "operationId": "Chorus_AddBucketReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusAddBucketReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
     }
   },
   "definitions": {
@@ -422,6 +455,35 @@
       ],
       "default": "Other"
     },
+    "chorusAddBucketReplicationRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "title": "s3 user alias from chorus config"
+        },
+        "fromStorage": {
+          "type": "string",
+          "title": "source storage alias from chorus config"
+        },
+        "fromBucket": {
+          "type": "string",
+          "title": "source bucket name"
+        },
+        "toStorage": {
+          "type": "string",
+          "description": "destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source."
+        },
+        "toBucket": {
+          "type": "string",
+          "title": "custom destination bucket name. if not set, destination bucket name will be equal to soruce bucket"
+        },
+        "agentUrl": {
+          "type": "string",
+          "description": "webhook URL of chorus agent. Required if chorus agent setup is used."
+        }
+      }
+    },
     "chorusAddReplicationRequest": {
       "type": "object",
       "properties": {
@@ -444,6 +506,9 @@
           "type": "boolean"
         },
         "agentUrl": {
+          "type": "string"
+        },
+        "toBucket": {
           "type": "string"
         }
       }
@@ -714,6 +779,9 @@
         },
         "switchStatus": {
           "$ref": "#/definitions/ReplicationSwitchEnum"
+        },
+        "toBucket": {
+          "type": "string"
         }
       }
     },
@@ -730,6 +798,9 @@
           "type": "string"
         },
         "to": {
+          "type": "string"
+        },
+        "toBucket": {
           "type": "string"
         }
       }
