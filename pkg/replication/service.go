@@ -269,7 +269,7 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 		return policy.ReplicationPolicies{}, err
 	}
 	for to, priority := range userPolicy.To {
-		err = s.policySvc.AddBucketReplicationPolicy(ctx, user, bucket, userPolicy.From, to, priority, nil)
+		err = s.policySvc.AddBucketReplicationPolicy(ctx, user, bucket, userPolicy.From, to, nil, priority, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {
 				continue

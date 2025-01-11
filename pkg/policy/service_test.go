@@ -388,7 +388,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority3, res.To[s2])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
 
 		list, err = svc.ListReplicationPolicyInfo(ctx)
 		r.NoError(err)
@@ -405,7 +405,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s2, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority3, res.To[s1])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s1)])
 
 		err = svc.AddUserReplicationPolicy(ctx, u1, s1, s3, tasks.Priority4)
 		r.NoError(err)
@@ -413,8 +413,8 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 2)
-		r.EqualValues(tasks.Priority3, res.To[s2])
-		r.EqualValues(tasks.Priority4, res.To[s3])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
+		r.EqualValues(tasks.Priority4, res.To[ReplicationPolicyDest(s3)])
 	})
 
 	t.Run("add bucket repl policy", func(t *testing.T) {
@@ -440,7 +440,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority3, res.To[s2])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
 
 		info, err := svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2, nil)
 		r.NoError(err)
@@ -477,7 +477,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s2, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.PriorityDefault1, res.To[s1])
+		r.EqualValues(tasks.PriorityDefault1, res.To[ReplicationPolicyDest(s1)])
 
 		err = svc.AddBucketReplicationPolicy(ctx, u1, b2, s2, s1, nil, tasks.PriorityHighest5, nil)
 		r.NoError(err)
@@ -485,7 +485,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s2, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.PriorityHighest5, res.To[s1])
+		r.EqualValues(tasks.PriorityHighest5, res.To[ReplicationPolicyDest(s1)])
 
 		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s3, nil, tasks.Priority4, nil)
 		r.NoError(err)
@@ -493,8 +493,8 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 2)
-		r.EqualValues(tasks.Priority3, res.To[s2])
-		r.EqualValues(tasks.Priority4, res.To[s3])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
+		r.EqualValues(tasks.Priority4, res.To[ReplicationPolicyDest(s3)])
 
 		list, err = svc.ListReplicationPolicyInfo(ctx)
 		r.NoError(err)
@@ -533,7 +533,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority3, res.To[s2])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
 
 		info, err := svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2, nil)
 		r.NoError(err)
@@ -668,7 +668,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority3, res.To[s2])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
 
 		info, err := svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2, nil)
 		r.NoError(err)
@@ -719,7 +719,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority3, res.To[s2])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
 
 		err = svc.AddUserReplicationPolicy(ctx, u1, s1, s3, tasks.Priority4)
 		r.NoError(err)
@@ -728,8 +728,8 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 2)
-		r.EqualValues(tasks.Priority3, res.To[s2])
-		r.EqualValues(tasks.Priority4, res.To[s3])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
+		r.EqualValues(tasks.Priority4, res.To[ReplicationPolicyDest(s3)])
 
 		err = svc.DeleteUserReplication(ctx, u1, s1, s2)
 		r.NoError(err)
@@ -738,7 +738,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 1)
-		r.EqualValues(tasks.Priority4, res.To[s3])
+		r.EqualValues(tasks.Priority4, res.To[ReplicationPolicyDest(s3)])
 
 		err = svc.DeleteUserReplication(ctx, u1, s1, s2)
 		r.ErrorIs(err, dom.ErrNotFound)
@@ -813,8 +813,8 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s1, res.From)
 		r.Len(res.To, 2)
-		r.EqualValues(tasks.Priority3, res.To[s2])
-		r.EqualValues(tasks.Priority4, res.To[s3])
+		r.EqualValues(tasks.Priority3, res.To[ReplicationPolicyDest(s2)])
+		r.EqualValues(tasks.Priority4, res.To[ReplicationPolicyDest(s3)])
 
 		info, err := svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2, nil)
 		r.NoError(err)
@@ -865,7 +865,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(s2, replP.From)
 		r.Len(replP.To, 1)
-		_, ok := replP.To[s3]
+		_, ok := replP.To[ReplicationPolicyDest(s3)]
 		r.True(ok)
 
 		info, err = svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2, nil)
@@ -886,7 +886,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 func TestReplicationSwitch_GetOldFollowers(t *testing.T) {
 	r := require.New(t)
-	followers := map[string]tasks.Priority{
+	followers := map[ReplicationPolicyDest]tasks.Priority{
 		"f1": tasks.Priority3,
 		"f2": tasks.Priority2,
 		"f3": tasks.PriorityDefault1,
@@ -900,4 +900,145 @@ func TestReplicationSwitch_GetOldFollowers(t *testing.T) {
 	r.NotEmpty(s.OldFollowers)
 	r.NotEmpty(s.GetOldFollowers())
 	r.EqualValues(followers, s.GetOldFollowers())
+}
+
+func Test_CustomDestBucket(t *testing.T) {
+	r := require.New(t)
+	db := miniredis.RunT(t)
+	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	ctx := context.TODO()
+
+	svc := NewService(c)
+
+	// setup
+	user := "user"
+	srcBuck, dstBuck := "b1", "b2"
+	stor := "stor"
+	stor2 := "stor2"
+	r.NoError(svc.AddUserRoutingPolicy(ctx, user, stor), "route to main storage")
+
+	// validate policy creation
+	err := svc.AddBucketReplicationPolicy(ctx, user, srcBuck, stor, stor, &srcBuck, tasks.Priority3, nil)
+	r.ErrorIs(err, dom.ErrInvalidArg, "repl to same storage and bucket is not allowed")
+
+	err = svc.AddBucketReplicationPolicy(ctx, user, srcBuck, stor, stor, &dstBuck, tasks.Priority3, nil)
+	r.NoError(err, dom.ErrInvalidArg, "repl to same storage but different bucket is allowed")
+
+	err = svc.AddBucketReplicationPolicy(ctx, user, srcBuck, stor, stor2, &dstBuck, tasks.Priority2, nil)
+	r.NoError(err, dom.ErrInvalidArg, "repl to different storage and different bucket is allowed")
+
+	err = svc.AddBucketReplicationPolicy(ctx, user, srcBuck, stor, stor2, &dstBuck, tasks.Priority2, nil)
+	r.Error(err, "already exists")
+
+	// check replication lookup
+	rps, err := svc.GetBucketReplicationPolicies(ctx, user, srcBuck)
+	r.NoError(err)
+	r.EqualValues(stor, rps.From)
+	r.Len(rps.To, 2)
+	r.EqualValues(tasks.Priority3, rps.To[ReplicationPolicyDest(stor+":"+dstBuck)], "custom bucket is in destination")
+	r.EqualValues(tasks.Priority2, rps.To[ReplicationPolicyDest(stor2+":"+dstBuck)], "custom bucket is in destination")
+
+	route, err := svc.GetRoutingPolicy(ctx, user, srcBuck)
+	r.NoError(err)
+	r.EqualValues(stor, route, "route to main for src bucket")
+	_, err = svc.GetRoutingPolicy(ctx, user, dstBuck)
+	r.ErrorIs(err, dom.ErrRoutingBlock, "for dst bucket routing is blocked")
+
+	_, err = svc.GetReplicationPolicyInfo(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err, "info created")
+
+	list, err := svc.ListReplicationPolicyInfo(ctx)
+	r.NoError(err)
+	r.Len(list, 2)
+	for _, policy := range list {
+		r.EqualValues(stor, policy.From)
+		r.EqualValues(user, policy.User)
+		r.EqualValues(srcBuck, policy.Bucket)
+		r.NotNil(policy.ToBucket)
+		if policy.To == stor {
+			r.EqualValues(dstBuck, *policy.ToBucket)
+		} else if policy.To == stor2 {
+			r.EqualValues(dstBuck, *policy.ToBucket)
+		} else {
+			r.Fail("invalid policy dest storage")
+		}
+	}
+
+	ok, err := svc.IsReplicationPolicyExists(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.True(ok)
+
+	// check pause/resume:
+	ok, err = svc.IsReplicationPolicyPaused(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.False(ok)
+	err = svc.PauseReplication(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	ok, err = svc.IsReplicationPolicyPaused(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.True(ok)
+	err = svc.ResumeReplication(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	ok, err = svc.IsReplicationPolicyPaused(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.False(ok)
+
+	// check replication counters
+	info, err := svc.GetReplicationPolicyInfo(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.False(info.CreatedAt.IsZero())
+	r.False(info.IsPaused)
+	r.Zero(info.InitObjListed)
+	r.Zero(info.InitObjDone)
+	r.Zero(info.InitBytesListed)
+	r.Zero(info.InitBytesDone)
+	r.Zero(info.Events)
+	r.Zero(info.EventsDone)
+	r.Nil(info.LastEmittedAt)
+	r.Nil(info.LastProcessedAt)
+
+	eventTime := time.Now()
+	err = svc.IncReplInitObjListed(ctx, user, srcBuck, stor, stor, &dstBuck, 69, eventTime)
+	r.NoError(err)
+	err = svc.IncReplInitObjDone(ctx, user, srcBuck, stor, stor, &dstBuck, 69, eventTime)
+	r.NoError(err)
+
+	err = svc.IncReplEvents(ctx, user, srcBuck, stor, stor, &dstBuck, eventTime)
+	r.NoError(err)
+	err = svc.IncReplEvents(ctx, user, srcBuck, stor, stor, &dstBuck, eventTime)
+	r.NoError(err)
+	err = svc.IncReplEventsDone(ctx, user, srcBuck, stor, stor, &dstBuck, eventTime)
+	r.NoError(err)
+
+	info, err = svc.GetReplicationPolicyInfo(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.EqualValues(1, info.InitObjListed)
+	r.EqualValues(1, info.InitObjDone)
+	r.EqualValues(69, info.InitBytesListed)
+	r.EqualValues(69, info.InitBytesDone)
+	r.EqualValues(2, info.Events)
+	r.EqualValues(1, info.EventsDone)
+	r.NotNil(info.LastEmittedAt)
+	r.NotNil(info.LastProcessedAt)
+
+	// delete replication
+	err = svc.DeleteReplication(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+
+	// verify deletion
+	info, err = svc.GetReplicationPolicyInfo(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.ErrorIs(err, dom.ErrNotFound)
+
+	list, err = svc.ListReplicationPolicyInfo(ctx)
+	r.NoError(err)
+	r.Len(list, 1)
+	r.EqualValues(stor2, list[0].To)
+
+	ok, err = svc.IsReplicationPolicyExists(ctx, user, srcBuck, stor, stor, &dstBuck)
+	r.NoError(err)
+	r.False(ok)
+
+	route, err = svc.GetRoutingPolicy(ctx, user, dstBuck)
+	r.NoError(err, "routing block removed")
+	r.EqualValues(stor, route)
 }
