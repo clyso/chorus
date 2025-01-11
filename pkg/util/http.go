@@ -56,6 +56,14 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			Key:        xctx.GetObject(ctx),
 			StatusCode: http.StatusBadRequest,
 		}
+	} else if errors.Is(err, dom.ErrRoutingBlock) {
+		s3Err = mclient.ErrorResponse{
+			Code:       "NoSuchBucket",
+			Message:    "Bucket already used as replication destination",
+			BucketName: xctx.GetBucket(ctx),
+			Key:        xctx.GetObject(ctx),
+			StatusCode: http.StatusNotFound,
+		}
 	} else if errors.Is(err, dom.ErrPolicy) {
 		s3Err = mclient.ErrorResponse{
 			Code:       "InternalErrors",

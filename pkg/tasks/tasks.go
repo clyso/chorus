@@ -109,9 +109,10 @@ const (
 
 type SyncTask interface {
 	GetFrom() string
-	GetTo() string
+	GetToStorage() string
+	GetToBucket() *string
 	SetFrom(from string)
-	SetTo(to string)
+	SetTo(storage string, bucket *string)
 	InitDate()
 	GetDate() time.Time
 }
@@ -119,20 +120,25 @@ type SyncTask interface {
 type Sync struct {
 	FromStorage string
 	ToStorage   string
+	ToBucket    *string
 	CreatedAt   time.Time
 }
 
 func (t *Sync) GetFrom() string {
 	return t.FromStorage
 }
-func (t *Sync) GetTo() string {
+func (t *Sync) GetToStorage() string {
 	return t.ToStorage
+}
+func (t *Sync) GetToBucket() *string {
+	return t.ToBucket
 }
 func (t *Sync) SetFrom(from string) {
 	t.FromStorage = from
 }
-func (t *Sync) SetTo(to string) {
-	t.ToStorage = to
+func (t *Sync) SetTo(storage string, bucket *string) {
+	t.ToStorage = storage
+	t.ToBucket = bucket
 }
 func (t *Sync) InitDate() {
 	t.CreatedAt = time.Now().UTC()
