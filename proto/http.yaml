@@ -40,4 +40,6 @@ http:
     - selector: chorus.Chorus.SwitchMainBucket
       post: /replication/switch
       body: "*"
-
+    - selector: chorus.Chorus.AddBucketReplication
+      post: /v2/replication/add
+      body: "*"

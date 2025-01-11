@@ -38,6 +38,8 @@ service Chorus {
   rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse);
 
   rpc GetAgents(google.protobuf.Empty)returns(GetAgentsResponse);
+
+  rpc AddBucketReplication(AddBucketReplicationRequest) returns (google.protobuf.Empty);
 }
 
 message GetStoragesResponse {
@@ -84,6 +86,22 @@ message AddReplicationRequest{
   repeated string buckets = 5;
   bool is_for_all_buckets = 6;
   optional string agent_url = 7;
+  optional string to_bucket = 8;
+}
+
+message AddBucketReplicationRequest{
+  // s3 user alias from chorus config
+  string user = 1;
+  // source storage alias from chorus config
+  string from_storage = 2;
+  // source bucket name
+  string from_bucket = 3;
+  // destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source.
+  string  to_storage = 4;
+  // custom destination bucket name. if not set, destination bucket name will be equal to soruce bucket
+  optional string to_bucket = 5;
+  // webhook URL of chorus agent. Required if chorus agent setup is used.
+  optional string agent_url = 6;
 }
 
 message ListBucketsForReplicationRequest{
@@ -131,6 +149,8 @@ message Replication{
 
   optional string agent_url = 16;
   SwitchEnum switch_status = 17;
+
+  optional string to_bucket = 18;
 }
 
 message ReplicationRequest{
@@ -138,6 +158,7 @@ message ReplicationRequest{
   string bucket = 2;
   string from = 3;
   string to = 4;
+  optional string to_bucket = 5;
 }
 
 message ListUserReplicationsResponse{
