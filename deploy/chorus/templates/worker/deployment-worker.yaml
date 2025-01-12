@@ -6,6 +6,9 @@ metadata:
     app: worker
   {{- include "chorus.labels" . | nindent 4 }}
 spec:
+  strategy:
+    # stop all old workers before starting new workes
+    type: Recreate
   replicas: {{ .Values.worker.replicas }}
   selector:
     matchLabels:
