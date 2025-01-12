@@ -440,7 +440,7 @@ func (h *handlers) CompareBucket(ctx context.Context, req *pb.CompareBucketReque
 	}
 	ctx = log.WithUser(ctx, req.User)
 
-	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.From, req.To, req.Bucket)
+	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.From, req.To, req.Bucket, req.ToBucket)
 	if err != nil {
 		return nil, err
 	}

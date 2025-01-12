@@ -185,6 +185,7 @@ message CompareBucketRequest{
   string to = 4;
   // set true to get list of matching files (match) in response
   bool show_match = 5;
+  optional string to_bucket = 6;
 }
 
 message CompareBucketResponse{
