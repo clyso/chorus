@@ -65,7 +65,7 @@ func (f File) path() string {
 type Service interface {
 	CopyTo(ctx context.Context, from, to File, size int64) error
 
-	Compare(ctx context.Context, listMatch bool, from, to, bucket string) (*CompareRes, error)
+	Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket *string) (*CompareRes, error)
 }
 
 func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mamCalc *MemCalculator, memLimiter, fileLimiter ratelimit.Semaphore) (Service, error) {
@@ -137,16 +137,20 @@ func (s *svc) getConf(storage, user string) (*configmap.Map, error) {
 	return res, nil
 }
 
-func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, bucket string) (*CompareRes, error) {
+func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket *string) (*CompareRes, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "rclone.Compare")
-	span.SetAttributes(attribute.String("bucket", bucket), attribute.String("from", from), attribute.String("to", to))
+	span.SetAttributes(attribute.String("bucket", fromBucket), attribute.String("from", from), attribute.String("to", to))
 	defer span.End()
 
-	src, err := s.getFS(ctx, from, bucket)
+	src, err := s.getFS(ctx, from, fromBucket)
 	if err != nil {
 		return nil, err
 	}
-	dest, err := s.getFS(ctx, to, bucket)
+	toBucketName := fromBucket
+	if toBucket != nil {
+		toBucketName = *toBucket
+	}
+	dest, err := s.getFS(ctx, to, toBucketName)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +189,7 @@ func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, bucket stri
 	return &CompareRes{
 		SrcStor:  from,
 		DestStor: to,
-		Bucket:   bucket,
+		Bucket:   fromBucket,
 		IsMatch:  err == nil,
 		MissFrom: readFileNames(missingSrcBuf.Bytes()),
 		MissTo:   readFileNames(missingDstBuf.Bytes()),

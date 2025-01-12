@@ -542,6 +542,9 @@
         "showMatch": {
           "type": "boolean",
           "title": "set true to get list of matching files (match) in response"
+        },
+        "toBucket": {
+          "type": "string"
         }
       }
     },
