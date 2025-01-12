@@ -19,12 +19,13 @@ package storage
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func Test_svc_GetLastListedObj(t *testing.T) {
@@ -96,7 +97,7 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 			}
 		}
 	}
-	r.NoError(storage.CleanLastListedObj(ctx, s1.FromStorage, s1.ToStorage, b1))
+	r.NoError(storage.CleanLastListedObj(ctx, s1.FromStorage, s1.ToStorage, b1, nil))
 	for storIdx, stor := range stors {
 		for buckIdx, buck := range bucks {
 			for prefIdx, pref := range prefs {
@@ -115,6 +116,92 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 		}
 	}
 
+}
+
+func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
+	r := require.New(t)
+	red := miniredis.RunT(t)
+
+	c := redis.NewClient(&redis.Options{
+		Addr: red.Addr(),
+	})
+
+	storage := New(c)
+	ctx := context.Background()
+	destBuck := "bucket"
+
+	noDestBuckNoPrefix := tasks.MigrateBucketListObjectsPayload{
+		Sync: tasks.Sync{
+			FromStorage: "a",
+			ToStorage:   "b",
+			ToBucket:    nil,
+		},
+		Bucket: "c",
+		Prefix: "",
+	}
+	r.NoError(storage.SetLastListedObj(ctx, noDestBuckNoPrefix, "nbnp"))
+	noDestBuckWithPrefix := tasks.MigrateBucketListObjectsPayload{
+		Sync: tasks.Sync{
+			FromStorage: "a",
+			ToStorage:   "b",
+			ToBucket:    nil,
+		},
+		Bucket: "c",
+		Prefix: "d",
+	}
+	r.NoError(storage.SetLastListedObj(ctx, noDestBuckWithPrefix, "nbwp"))
+	withDestBuckNoPrefix := tasks.MigrateBucketListObjectsPayload{
+		Sync: tasks.Sync{
+			FromStorage: "a",
+			ToStorage:   "b",
+			ToBucket:    &destBuck,
+		},
+		Bucket: "c",
+		Prefix: "",
+	}
+	r.NoError(storage.SetLastListedObj(ctx, withDestBuckNoPrefix, "wbnp"))
+	withDestBuckWithPrefix := tasks.MigrateBucketListObjectsPayload{
+		Sync: tasks.Sync{
+			FromStorage: "a",
+			ToStorage:   "b",
+			ToBucket:    &destBuck,
+		},
+		Bucket: "c",
+		Prefix: "d",
+	}
+	r.NoError(storage.SetLastListedObj(ctx, withDestBuckWithPrefix, "wbwp"))
+
+	res, err := storage.GetLastListedObj(ctx, noDestBuckNoPrefix)
+	r.NoError(err)
+	r.EqualValues("nbnp", res)
+
+	res, err = storage.GetLastListedObj(ctx, noDestBuckWithPrefix)
+	r.NoError(err)
+	r.EqualValues("nbwp", res)
+
+	res, err = storage.GetLastListedObj(ctx, withDestBuckNoPrefix)
+	r.NoError(err)
+	r.EqualValues("wbnp", res)
+
+	res, err = storage.GetLastListedObj(ctx, withDestBuckWithPrefix)
+	r.NoError(err)
+	r.EqualValues("wbwp", res)
+
+	r.NoError(storage.DelLastListedObj(ctx, noDestBuckNoPrefix))
+	res, _ = storage.GetLastListedObj(ctx, noDestBuckNoPrefix)
+	r.Empty(res)
+
+	r.NoError(storage.DelLastListedObj(ctx, noDestBuckWithPrefix))
+	res, _ = storage.GetLastListedObj(ctx, noDestBuckWithPrefix)
+	r.Empty(res)
+
+	r.NoError(storage.DelLastListedObj(ctx, withDestBuckNoPrefix))
+	res, _ = storage.GetLastListedObj(ctx, withDestBuckNoPrefix)
+	r.Empty(res)
+
+	r.NoError(storage.DelLastListedObj(ctx, withDestBuckWithPrefix))
+	res, _ = storage.GetLastListedObj(ctx, withDestBuckWithPrefix)
+	r.Empty(res)
 }
 
 func Test_svc_StoreUploadID(t *testing.T) {

@@ -42,7 +42,7 @@ type Service interface {
 	GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error)
 	SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error
 	DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error
-	CleanLastListedObj(ctx context.Context, fromStor, toStor, bucket string) error
+	CleanLastListedObj(ctx context.Context, fromStor, toStor, fromBucket string, toBucket *string) error
 
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
 	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
@@ -58,8 +58,11 @@ type svc struct {
 	client redis.UniversalClient
 }
 
-func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, bucket string) error {
-	key := fmt.Sprintf("s:%s:%s:%s", fromStor, toStor, bucket)
+func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, fromBucket string, toBucket *string) error {
+	key := fmt.Sprintf("s:%s:%s:%s", fromStor, toStor, fromBucket)
+	if toBucket != nil {
+		key += ":" + *toBucket
+	}
 	if err := s.client.Del(ctx, key).Err(); err != nil {
 		return err
 	}
@@ -69,6 +72,9 @@ func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor st
 
 func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error {
 	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
+	if task.ToBucket != nil {
+		key += ":" + *task.ToBucket
+	}
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -77,6 +83,9 @@ func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 
 func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error) {
 	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
+	if task.ToBucket != nil {
+		key += ":" + *task.ToBucket
+	}
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -89,6 +98,9 @@ func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 
 func (s *svc) SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error {
 	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
+	if task.ToBucket != nil {
+		key += ":" + *task.ToBucket
+	}
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}

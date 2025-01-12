@@ -42,7 +42,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage)
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -75,12 +75,12 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 
 	// 2. copy tags
-	err = s.syncBucketTagging(ctx, fromClient, toClient, p.Bucket)
+	err = s.syncBucketTagging(ctx, fromClient, toClient, p.Bucket, p.ToBucket)
 	if err != nil {
 		return err
 	}
 	// 3. copy ACL
-	err = s.syncBucketACL(ctx, fromClient, toClient, p.Bucket)
+	err = s.syncBucketACL(ctx, fromClient, toClient, p.Bucket, p.ToBucket)
 	if err != nil {
 		return err
 	}
@@ -99,11 +99,12 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	if err != nil {
 		return err
 	}
-	// 7. crete list obj task
+	// 7. create list obj task
 	task, err := tasks.NewTask(ctx, tasks.MigrateBucketListObjectsPayload{
 		Sync: tasks.Sync{
 			FromStorage: p.FromStorage,
 			ToStorage:   p.ToStorage,
+			ToBucket:    p.ToBucket,
 		},
 		Bucket: p.Bucket,
 		Prefix: "",
@@ -127,9 +128,13 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Client, p tasks.BucketCreatePayload) error {
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
+	toBucketName := p.Bucket
+	if p.ToBucket != nil {
+		toBucketName = *p.ToBucket
+	}
 	// check if bucket already exists:
 	_, err := toClient.AWS().HeadBucketWithContext(ctx, &s3.HeadBucketInput{
-		Bucket: &p.Bucket,
+		Bucket: &toBucketName,
 	})
 	if err == nil {
 		// already exists
@@ -138,7 +143,7 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 
 	// create bucket
 	_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
-		Bucket: &p.Bucket,
+		Bucket: &toBucketName,
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
 			LocationConstraint: &p.Location,
 		},
@@ -150,7 +155,7 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 		}
 		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
 		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
-			Bucket: &p.Bucket,
+			Bucket: &toBucketName,
 			CreateBucketConfiguration: &s3.CreateBucketConfiguration{
 				LocationConstraint: &defaultRegion,
 			},
@@ -171,8 +176,12 @@ func (s *svc) bucketCopyLC(ctx context.Context, fromClient, toClient s3client.Cl
 		logger.Info().Msg("create bucket: lifecycle sync is disabled")
 		return nil
 	}
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
 
-	fromLC, err := fromClient.S3().GetBucketLifecycle(ctx, p.Bucket)
+	fromLC, err := fromClient.S3().GetBucketLifecycle(ctx, fromBucket)
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
 			return fmt.Errorf("create bucket: unable to get lifecycle: %w", err)
@@ -180,7 +189,7 @@ func (s *svc) bucketCopyLC(ctx context.Context, fromClient, toClient s3client.Cl
 		logger.Err(err).Msg("create bucket: skip lifecycle copy due to get lifecycle err")
 		return nil
 	}
-	err = toClient.S3().SetBucketLifecycle(ctx, p.Bucket, fromLC)
+	err = toClient.S3().SetBucketLifecycle(ctx, toBucket, fromLC)
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
 			return fmt.Errorf("create bucket: unable to set lifecycle: %w", err)
@@ -197,8 +206,12 @@ func (s *svc) bucketCopyPolicy(ctx context.Context, fromClient, toClient s3clien
 		logger.Info().Msg("create bucket: policy sync is disabled")
 		return nil
 	}
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
 
-	fromPolicy, err := fromClient.S3().GetBucketPolicy(ctx, p.Bucket)
+	fromPolicy, err := fromClient.S3().GetBucketPolicy(ctx, fromBucket)
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
 			return fmt.Errorf("migration bucket copy: unable to get policy: %w", err)
@@ -206,7 +219,7 @@ func (s *svc) bucketCopyPolicy(ctx context.Context, fromClient, toClient s3clien
 		logger.Err(err).Msg("create bucket: skip policy copy due to get policy err")
 		return nil
 	}
-	err = toClient.S3().SetBucketPolicy(ctx, p.Bucket, fromPolicy)
+	err = toClient.S3().SetBucketPolicy(ctx, toBucket, fromPolicy)
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
 			return fmt.Errorf("migration bucket copy: unable to set policy: %w", err)
@@ -223,8 +236,12 @@ func (s *svc) bucketCopyVersioning(ctx context.Context, fromClient, toClient s3c
 		logger.Info().Msg("create bucket: versioning sync is disabled")
 		return nil
 	}
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
 
-	fromVer, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
+	fromVer, err := fromClient.S3().GetBucketVersioning(ctx, fromBucket)
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
 			return fmt.Errorf("migration bucket copy: unable to get versioning: %w", err)
@@ -232,7 +249,7 @@ func (s *svc) bucketCopyVersioning(ctx context.Context, fromClient, toClient s3c
 		logger.Err(err).Msg("create bucket: skip versioning copy due to get versioning err")
 		return nil
 	}
-	err = toClient.S3().SetBucketVersioning(ctx, p.Bucket, fromVer)
+	err = toClient.S3().SetBucketVersioning(ctx, toBucket, fromVer)
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
 			return fmt.Errorf("migration bucket copy: unable to set versioning: %w", err)
@@ -250,7 +267,7 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage)
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -271,13 +288,17 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 		if err != nil {
 			return
 		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.CreatedAt)
+		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
 		if verErr != nil {
 			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
 		}
 	}()
 
-	srcExists, err := fromClient.S3().BucketExists(ctx, p.Bucket)
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
+	srcExists, err := fromClient.S3().BucketExists(ctx, fromBucket)
 	if err != nil {
 		return err
 	}
@@ -286,5 +307,5 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 		return nil
 	}
 
-	return toClient.S3().RemoveBucket(ctx, p.Bucket)
+	return toClient.S3().RemoveBucket(ctx, toBucket)
 }
