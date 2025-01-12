@@ -36,6 +36,7 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		Bucket:          in.Bucket,
 		From:            in.From,
 		To:              in.To,
+		ToBucket:        in.ToBucket,
 		CreatedAt:       timestamppb.New(in.CreatedAt),
 		IsPaused:        in.IsPaused,
 		IsInitDone:      in.ListingStarted && in.InitObjDone >= in.InitObjListed,

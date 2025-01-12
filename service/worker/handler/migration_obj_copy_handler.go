@@ -41,7 +41,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	ctx = log.WithObjName(ctx, p.Obj.Name)
 	logger := zerolog.Ctx(ctx)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage)
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -72,7 +72,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		if err != nil {
 			return
 		}
-		metaErr := s.policySvc.IncReplInitObjDone(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.Obj.Size, p.CreatedAt)
+		metaErr := s.policySvc.IncReplInitObjDone(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.Obj.Size, p.CreatedAt)
 		if metaErr != nil {
 			logger.Err(metaErr).Msg("migration obj copy: unable to inc obj done meta")
 		}
@@ -87,21 +87,29 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	if err != nil {
 		return fmt.Errorf("migration obj copy: unable to get obj meta: %w", err)
 	}
-	fromVer, toVer := objMeta[p.FromStorage], objMeta[p.ToStorage]
+	destVersionKey := p.ToStorage
+	if p.ToBucket != nil {
+		destVersionKey += ":" + *p.ToBucket
+	}
+	fromVer, toVer := objMeta[p.FromStorage], objMeta[destVersionKey]
 
 	if fromVer != 0 && fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("migration obj copy: identical from/to obj version: skip copy")
 		return nil
 	}
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
 	// 1. sync obj meta and content
 	err = lock.WithRefresh(ctx, func() error {
 		return s.rc.CopyTo(ctx, rclone.File{
 			Storage: p.FromStorage,
-			Bucket:  p.Bucket,
+			Bucket:  fromBucket,
 			Name:    p.Obj.Name,
 		}, rclone.File{
 			Storage: p.ToStorage,
-			Bucket:  p.Bucket,
+			Bucket:  toBucket,
 			Name:    p.Obj.Name,
 		}, p.Obj.Size)
 	}, refresh, time.Second*2)
@@ -120,19 +128,19 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 
 	// 2. sync obj ACL
-	err = s.syncObjectACL(ctx, fromClient, toClient, p.Bucket, p.Obj.Name)
+	err = s.syncObjectACL(ctx, fromClient, toClient, p.Bucket, p.Obj.Name, p.ToBucket)
 	if err != nil {
 		return err
 	}
 
 	// 3. sync obj tags
-	err = s.syncObjectTagging(ctx, fromClient, toClient, p.Bucket, p.Obj.Name)
+	err = s.syncObjectTagging(ctx, fromClient, toClient, p.Bucket, p.Obj.Name, p.ToBucket)
 	if err != nil {
 		return err
 	}
 
 	if fromVer != 0 {
-		err = s.versionSvc.UpdateIfGreater(ctx, domObj, p.ToStorage, fromVer)
+		err = s.versionSvc.UpdateIfGreater(ctx, domObj, destVersionKey, fromVer)
 		if err != nil {
 			return fmt.Errorf("migration obj copy: unable to update obj meta: %w", err)
 		}

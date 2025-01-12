@@ -50,7 +50,7 @@ func (s *svc) FinishReplicationSwitch(ctx context.Context, t *asynq.Task) error 
 	}
 
 	for oldFollower := range replSwitch.GetOldFollowers() {
-		oldRepl, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, replSwitch.OldMain, oldFollower)
+		oldRepl, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, replSwitch.OldMain, string(oldFollower), nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
 				continue

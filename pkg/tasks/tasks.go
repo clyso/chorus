@@ -267,6 +267,9 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		taskType = TypeApiCostEstimationList
 	case BucketCreatePayload:
 		id := fmt.Sprintf("cb:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
+		if p.ToBucket != nil {
+			id += ":" + *p.ToBucket
+		}
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue()), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
 	case BucketDeletePayload:
@@ -288,18 +291,24 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeObjectSyncACL
 	case MigrateBucketListObjectsPayload:
-		taskID := asynq.TaskID(fmt.Sprintf("mgr:lo:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket))
-		if p.Prefix != "" {
-			taskID = asynq.TaskID(fmt.Sprintf("mgr:lo:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix))
+		id := fmt.Sprintf("mgr:lo:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
+		if p.ToBucket != nil {
+			id += ":" + *p.ToBucket
 		}
-		optionList = []asynq.Option{asynq.Queue(QueueMigrateBucketListObjects), taskID}
+		if p.Prefix != "" {
+			id += ":" + p.Prefix
+		}
+		optionList = []asynq.Option{asynq.Queue(QueueMigrateBucketListObjects), asynq.TaskID(id)}
 		taskType = TypeMigrateBucketListObjects
 	case MigrateObjCopyPayload:
-		taskID := asynq.TaskID(fmt.Sprintf("mgr:co:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Obj.Name))
-		if p.Obj.VersionID != "" {
-			taskID = asynq.TaskID(fmt.Sprintf("mgr:co:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Obj.Name, p.Obj.VersionID))
+		id := fmt.Sprintf("mgr:co:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Obj.Name)
+		if p.ToBucket != nil {
+			id += ":" + *p.ToBucket
 		}
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), taskID}
+		if p.Obj.VersionID != "" {
+			id += ":" + p.Obj.VersionID
+		}
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
 		taskType = TypeMigrateObjCopy
 	default:
 		return nil, fmt.Errorf("%w: unknown task type %+v", dom.ErrInvalidArg, payload)
