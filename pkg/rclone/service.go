@@ -146,6 +146,7 @@ func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, fromBucket 
 	if err != nil {
 		return nil, err
 	}
+	// destination bucket name is equal to soruce bucke name unless toBucket param is set
 	toBucketName := fromBucket
 	if toBucket != nil {
 		toBucketName = *toBucket
