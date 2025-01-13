@@ -29,16 +29,20 @@ var (
 	raTo       string
 	raUser     string
 	raAgentURL string
-	raBuckets  []string
+	raBucket   string
+	raToBucket string
 )
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:   "add",
-	Short: "adds new bucket replication rule(-s)",
+	Short: "adds new bucket replication rule",
 	Long: `Example:
-chorctl repl add -f main -t follower -u admin -b bucket1 -b bucket2
-	- will create 2 replication rules for 2 buckets`,
+chorctl repl add -f main -t follower -u admin -b bucket1
+  - will replicate bucket "bucket1" from storage "main" to storage "follower"
+
+chorctl repl add -f main -t follower -u admin -b src-bucket --to-buckt=dest-bucket
+  - will replicate bucket "src-bucket" from storage "main" to bucket "dest-bucket" in storage "follower"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -49,18 +53,20 @@ chorctl repl add -f main -t follower -u admin -b bucket1 -b bucket2
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
 
-		req := &pb.AddReplicationRequest{
-			User:            raUser,
-			From:            raFrom,
-			To:              raTo,
-			Buckets:         raBuckets,
-			IsForAllBuckets: false,
+		req := &pb.AddBucketReplicationRequest{
+			User:        raUser,
+			FromStorage: raFrom,
+			ToStorage:   raTo,
+			FromBucket:  raBucket,
 		}
 		if raAgentURL != "" {
 			req.AgentUrl = &raAgentURL
 		}
+		if raToBucket != "" {
+			req.ToBucket = &raToBucket
+		}
 
-		_, err = client.AddReplication(ctx, req)
+		_, err = client.AddBucketReplication(ctx, req)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to add replication")
 		}
@@ -73,7 +79,8 @@ func init() {
 	addCmd.Flags().StringVarP(&raTo, "to", "t", "", "to storage")
 	addCmd.Flags().StringVarP(&raUser, "user", "u", "", "storage user")
 	addCmd.Flags().StringVar(&raAgentURL, "agent-url", "", "notifications agent url")
-	addCmd.Flags().StringArrayVarP(&raBuckets, "bucket", "b", nil, "bucket: multiple values supported: -b bucket1 -b bucket2")
+	addCmd.Flags().StringVarP(&raBucket, "bucket", "b", "", "bucket name to replicate")
+	addCmd.Flags().StringVar(&raToBucket, "to-bucket", "", "custom destinatin bucket name. Set if destination bucket should have different name from source bucket")
 	err := addCmd.MarkFlagRequired("from")
 	if err != nil {
 		logrus.WithError(err).Fatal()

@@ -200,7 +200,7 @@ type policySvc struct {
 }
 
 func (s *policySvc) ObjListStarted(ctx context.Context, user, bucket, from, to string, toBucket *string) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -429,7 +429,7 @@ func (s *policySvc) getReplicationPolicies(ctx context.Context, key string) (Rep
 }
 
 func (s *policySvc) GetReplicationPolicyInfo(ctx context.Context, user, bucket, from, to string, toBucket *string) (ReplicationPolicyStatus, error) {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -549,7 +549,7 @@ func (s *policySvc) ListReplicationPolicyInfo(ctx context.Context) ([]Replicatio
 }
 
 func (s *policySvc) IsReplicationPolicyExists(ctx context.Context, user, bucket, from, to string, toBucket *string) (bool, error) {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -569,7 +569,7 @@ func (s *policySvc) IsReplicationPolicyExists(ctx context.Context, user, bucket,
 }
 
 func (s *policySvc) IsReplicationPolicyPaused(ctx context.Context, user, bucket, from, to string, toBucket *string) (bool, error) {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -601,7 +601,7 @@ func (s *policySvc) IsReplicationPolicyPaused(ctx context.Context, user, bucket,
 }
 
 func (s *policySvc) IncReplInitObjListed(ctx context.Context, user, bucket, from, to string, toBucket *string, bytes int64, eventTime time.Time) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -640,7 +640,7 @@ func (s *policySvc) IncReplInitObjListed(ctx context.Context, user, bucket, from
 }
 
 func (s *policySvc) IncReplInitObjDone(ctx context.Context, user, bucket, from, to string, toBucket *string, bytes int64, eventTime time.Time) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -711,7 +711,7 @@ func (s *policySvc) IncReplInitObjDone(ctx context.Context, user, bucket, from, 
 }
 
 func (s *policySvc) IncReplEvents(ctx context.Context, user, bucket, from, to string, toBucket *string, eventTime time.Time) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -744,7 +744,7 @@ func (s *policySvc) IncReplEvents(ctx context.Context, user, bucket, from, to st
 }
 
 func (s *policySvc) IncReplEventsDone(ctx context.Context, user, bucket, from, to string, toBucket *string, eventTime time.Time) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -926,7 +926,7 @@ func (s *policySvc) DeleteBucketReplicationsByUser(ctx context.Context, user, fr
 }
 
 func (s *policySvc) AddBucketReplicationPolicy(ctx context.Context, user, bucket, fromStor string, toStor string, toBucket *string, priority tasks.Priority, agentURL *string) (err error) {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -1009,7 +1009,7 @@ func fromStrPtr(s *string) string {
 }
 
 func (s *policySvc) PauseReplication(ctx context.Context, user, bucket, from string, to string, toBucket *string) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -1025,7 +1025,7 @@ func (s *policySvc) PauseReplication(ctx context.Context, user, bucket, from str
 }
 
 func (s *policySvc) ResumeReplication(ctx context.Context, user, bucket, from string, to string, toBucket *string) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
@@ -1041,7 +1041,7 @@ func (s *policySvc) ResumeReplication(ctx context.Context, user, bucket, from st
 }
 
 func (s *policySvc) DeleteReplication(ctx context.Context, user, bucket, fromStor, toStor string, toBucket *string) error {
-	if toBucket != nil && *toBucket == bucket {
+	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
