@@ -26,10 +26,11 @@ import (
 )
 
 var (
-	rrFrom   string
-	rrTo     string
-	rrUser   string
-	rrBucket string
+	rrFrom     string
+	rrTo       string
+	rrUser     string
+	rrBucket   string
+	rrToBucket string
 )
 
 // resumeCmd represents the pause command
@@ -48,12 +49,16 @@ chorctl repl resume -f main -t follower -u admin -b bucket1`,
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
 
-		_, err = client.ResumeReplication(ctx, &pb.ReplicationRequest{
-			User:   rrUser,
-			Bucket: rrBucket,
-			From:   rrFrom,
-			To:     rrTo,
-		})
+		req := &pb.ReplicationRequest{
+			User:   rdUser,
+			Bucket: rdBucket,
+			From:   rdFrom,
+			To:     rdTo,
+		}
+		if rrToBucket != "" {
+			req.ToBucket = &rrToBucket
+		}
+		_, err = client.ResumeReplication(ctx, req)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to add replication")
 		}
@@ -66,6 +71,7 @@ func init() {
 	resumeCmd.Flags().StringVarP(&rrTo, "to", "t", "", "to storage")
 	resumeCmd.Flags().StringVarP(&rrUser, "user", "u", "", "storage user")
 	resumeCmd.Flags().StringVarP(&rrBucket, "bucket", "b", "", "bucket name")
+	resumeCmd.Flags().StringVar(&rrToBucket, "to-bucket", "", "custom destinatin bucket name. Set if destination bucket should have different name from source bucket")
 	err := resumeCmd.MarkFlagRequired("from")
 	if err != nil {
 		logrus.WithError(err).Fatal()
