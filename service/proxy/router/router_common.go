@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/rs/zerolog"
-	"net/http"
 )
 
 func (r *router) commonRead(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
@@ -90,21 +92,21 @@ func (r *router) adjustObjReadRoute(ctx context.Context, prevStorage, user, buck
 	if err != nil {
 		return "", err
 	}
-	prevStorageVer := objMeta[prevStorage]
-	maxVerStorage, maxVer := prevStorage, prevStorageVer
+	prevStorageVer := objMeta[meta.Destination(prevStorage)]
+	maxVerStorage, maxVer := meta.Destination(prevStorage), prevStorageVer
 	for storage, version := range objMeta {
 		if version > maxVer {
 			maxVerStorage = storage
 			maxVer = version
 		}
 	}
-	if maxVerStorage != prevStorage {
+	if string(maxVerStorage) != prevStorage {
 		zerolog.Ctx(ctx).Info().Msgf("change read route during switch process: storage %s obj ver %d is higher than main storage %s %d", maxVerStorage, maxVer, prevStorage, prevStorageVer)
 	}
-	return maxVerStorage, nil
+	return string(maxVerStorage), nil
 }
 
-func (r *router) getVersion(ctx context.Context) (map[string]int64, error) {
+func (r *router) getVersion(ctx context.Context) (map[meta.Destination]int64, error) {
 	method := xctx.GetMethod(ctx)
 	switch {
 	case method == s3.GetObjectAcl || method == s3.PutObjectAcl:
@@ -122,7 +124,7 @@ func (r *router) getVersion(ctx context.Context) (map[string]int64, error) {
 
 	}
 	zerolog.Ctx(ctx).Warn().Msg("trying to obtain version metadata for unsupported method")
-	return map[string]int64{}, nil
+	return map[meta.Destination]int64{}, nil
 }
 
 func hasACLChanged(r *http.Request) bool {

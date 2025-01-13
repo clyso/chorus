@@ -21,17 +21,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/hibiken/asynq"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
-	"strings"
 )
 
 func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
@@ -125,11 +127,8 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 	if err != nil {
 		return err
 	}
-	fromVer := versions[fromClient.Name()]
-	destVersionKey := toClient.Name()
-	if toBucket != nil {
-		destVersionKey += ":" + *toBucket
-	}
+	fromVer := versions[meta.ToDest(fromClient.Name(), nil)]
+	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip bucket tagging sync: already synced")
@@ -187,12 +186,9 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	if err != nil {
 		return err
 	}
-	fromVer := versions[fromClient.Name()]
-	destVerstionKey := toClient.Name()
-	if toBucket != nil {
-		destVerstionKey += ":" + *toBucket
-	}
-	toVer := versions[destVerstionKey]
+	fromVer := versions[meta.ToDest(fromClient.Name(), nil)]
+	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
+	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip object Tagging sync: already synced")
 		return nil
@@ -235,7 +231,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	if fromVer != 0 {
-		return s.versionSvc.UpdateTagsIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object}, destVerstionKey, fromVer)
+		return s.versionSvc.UpdateTagsIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object}, destVersionKey, fromVer)
 	}
 	return nil
 }

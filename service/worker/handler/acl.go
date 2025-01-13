@@ -28,6 +28,7 @@ import (
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/hibiken/asynq"
@@ -127,11 +128,8 @@ func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.C
 	if err != nil {
 		return err
 	}
-	destVersionKey := toClient.Name()
-	if toBucket != nil {
-		destVersionKey += ":" + *toBucket
-	}
-	fromVer := versions[fromClient.Name()]
+	fromVer := versions[meta.ToDest(fromClient.Name(), nil)]
+	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip bucket ACL sync: already synced")
@@ -190,11 +188,8 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 	if err != nil {
 		return err
 	}
-	fromVer := versions[fromClient.Name()]
-	destVersionKey := toClient.Name()
-	if toBucket != nil {
-		destVersionKey += ":" + *toBucket
-	}
+	fromVer := versions[meta.ToDest(fromClient.Name(), nil)]
+	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip object ACL sync: already synced")

@@ -112,7 +112,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.BucketSyncACLPayload:
-		_, err = s.versionSvc.IncrementBucketACL(ctx, t.Bucket, t.FromStorage)
+		_, err = s.versionSvc.IncrementBucketACL(ctx, t.Bucket, meta.ToDest(t.FromStorage, nil))
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.BucketSyncTagsPayload:
-		_, err = s.versionSvc.IncrementBucketTags(ctx, t.Bucket, t.FromStorage)
+		_, err = s.versionSvc.IncrementBucketTags(ctx, t.Bucket, meta.ToDest(t.FromStorage, nil))
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		if t.Deleted {
 			err = s.versionSvc.DeleteObjAll(ctx, t.Object)
 		} else {
-			_, err = s.versionSvc.IncrementObj(ctx, t.Object, t.FromStorage)
+			_, err = s.versionSvc.IncrementObj(ctx, t.Object, meta.ToDest(t.FromStorage, nil))
 		}
 		if err != nil {
 			return err
@@ -176,7 +176,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.ObjSyncACLPayload:
-		_, err = s.versionSvc.IncrementACL(ctx, t.Object, t.FromStorage)
+		_, err = s.versionSvc.IncrementACL(ctx, t.Object, meta.ToDest(t.FromStorage, nil))
 		if err != nil {
 			return err
 		}
@@ -196,7 +196,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.ObjSyncTagsPayload:
-		_, err = s.versionSvc.IncrementTags(ctx, t.Object, t.FromStorage)
+		_, err = s.versionSvc.IncrementTags(ctx, t.Object, meta.ToDest(t.FromStorage, nil))
 		if err != nil {
 			return err
 		}
