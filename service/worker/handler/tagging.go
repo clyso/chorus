@@ -136,6 +136,8 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 
 	fromTags, err := fromClient.S3().GetBucketTagging(ctx, fromBucket)
+
+	// destination bucket name is equal to soruce bucke name unless toBucket param is set
 	toBucketName := fromBucket
 	if toBucket != nil {
 		toBucketName = *toBucket
@@ -195,6 +197,8 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 
 	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object, mclient.GetObjectTaggingOptions{VersionID: ""}) //todo: versioning
+
+	// destination bucket name is equal to soruce bucke name unless toBucket param is set
 	toBucketName := fromBucket
 	if toBucket != nil {
 		toBucketName = *toBucket
