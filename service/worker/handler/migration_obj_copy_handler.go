@@ -21,15 +21,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
-	"time"
 )
 
 func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err error) {
@@ -87,11 +89,8 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	if err != nil {
 		return fmt.Errorf("migration obj copy: unable to get obj meta: %w", err)
 	}
-	destVersionKey := p.ToStorage
-	if p.ToBucket != nil {
-		destVersionKey += ":" + *p.ToBucket
-	}
-	fromVer, toVer := objMeta[p.FromStorage], objMeta[destVersionKey]
+	destVersionKey := meta.ToDest(p.ToStorage, p.ToBucket)
+	fromVer, toVer := objMeta[meta.ToDest(p.FromStorage, nil)], objMeta[destVersionKey]
 
 	if fromVer != 0 && fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("migration obj copy: identical from/to obj version: skip copy")

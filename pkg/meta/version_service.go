@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
@@ -61,54 +62,73 @@ end
 return new_cursor`)
 )
 
+// Destination - string alias for version destination
+// can be storage or storage and bucket
+type Destination string
+
+func (d Destination) Parse() (storage string, bucket *string) {
+	if dArr := strings.Split(string(d), ":"); len(dArr) == 2 {
+		return dArr[0], &dArr[1]
+	}
+	return string(d), nil
+}
+
+// ToDest builds destination from storage name and optional bucket name
+func ToDest(storage string, bucket *string) Destination {
+	if bucket == nil {
+		return Destination(storage)
+	}
+	return Destination(fmt.Sprintf("%s:%s", storage, *bucket))
+}
+
 type VersionService interface {
 	// GetObj returns object content versions in s3 storages
-	GetObj(ctx context.Context, obj dom.Object) (map[string]int64, error)
+	GetObj(ctx context.Context, obj dom.Object) (map[Destination]int64, error)
 	// IncrementObj increments object content version in given storage
-	IncrementObj(ctx context.Context, obj dom.Object, storage string) (int64, error)
+	IncrementObj(ctx context.Context, obj dom.Object, dest Destination) (int64, error)
 	// UpdateIfGreater updates object content version in given storage if it is greater than previous value
-	UpdateIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error
+	UpdateIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error
 	// DeleteObjAll deletes all obj meta for all storages
 	DeleteObjAll(ctx context.Context, obj dom.Object) error
 	// DeleteBucketMeta deletes all versions info for bucket and version info for all bucket objects
-	DeleteBucketMeta(ctx context.Context, storage, bucket string) error
+	DeleteBucketMeta(ctx context.Context, dest Destination, bucket string) error
 
 	// GetACL returns object ACL versions in s3 storages
-	GetACL(ctx context.Context, obj dom.Object) (map[string]int64, error)
+	GetACL(ctx context.Context, obj dom.Object) (map[Destination]int64, error)
 	// IncrementACL increments object ACL version in given storage
-	IncrementACL(ctx context.Context, obj dom.Object, storage string) (int64, error)
+	IncrementACL(ctx context.Context, obj dom.Object, dest Destination) (int64, error)
 	// UpdateACLIfGreater updates object ACL version in given storage if it is greater than previous value
-	UpdateACLIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error
+	UpdateACLIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error
 
 	// GetTags returns object Tagging versions in s3 storages
-	GetTags(ctx context.Context, obj dom.Object) (map[string]int64, error)
+	GetTags(ctx context.Context, obj dom.Object) (map[Destination]int64, error)
 	// IncrementTags increments object Tagging version in given storage
-	IncrementTags(ctx context.Context, obj dom.Object, storage string) (int64, error)
+	IncrementTags(ctx context.Context, obj dom.Object, dest Destination) (int64, error)
 	// UpdateTagsIfGreater updates object Tagging version in given storage if it is greater than previous value
-	UpdateTagsIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error
+	UpdateTagsIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error
 
 	// GetBucket returns bucket content versions in s3 storages
-	GetBucket(ctx context.Context, bucket string) (map[string]int64, error)
+	GetBucket(ctx context.Context, bucket string) (map[Destination]int64, error)
 	// IncrementBucket increments bucket content version in given storage
-	IncrementBucket(ctx context.Context, bucket string, storage string) (int64, error)
+	IncrementBucket(ctx context.Context, bucket string, dest Destination) (int64, error)
 	// UpdateBucketIfGreater updates bucket content version in given storage if it is greater than previous value
-	UpdateBucketIfGreater(ctx context.Context, bucket string, storage string, version int64) error
+	UpdateBucketIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error
 	// DeleteBucketAll deletes all bucket meta for all storages
 	DeleteBucketAll(ctx context.Context, bucket string) error
 
 	// GetBucketACL returns bucket ACL versions in s3 storages
-	GetBucketACL(ctx context.Context, bucket string) (map[string]int64, error)
+	GetBucketACL(ctx context.Context, bucket string) (map[Destination]int64, error)
 	// IncrementBucketACL increments bucket ACL version in given storage
-	IncrementBucketACL(ctx context.Context, bucket string, storage string) (int64, error)
+	IncrementBucketACL(ctx context.Context, bucket string, dest Destination) (int64, error)
 	// UpdateBucketACLIfGreater updates bucket ACL version in given storage if it is greater than previous value
-	UpdateBucketACLIfGreater(ctx context.Context, bucket string, storage string, version int64) error
+	UpdateBucketACLIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error
 
 	// GetBucketTags returns bucket Tagging versions in s3 storages
-	GetBucketTags(ctx context.Context, bucket string) (map[string]int64, error)
+	GetBucketTags(ctx context.Context, bucket string) (map[Destination]int64, error)
 	// IncrementBucketTags increments bucket Tagging version in given storage
-	IncrementBucketTags(ctx context.Context, bucket string, storage string) (int64, error)
+	IncrementBucketTags(ctx context.Context, bucket string, dest Destination) (int64, error)
 	// UpdateBucketTagsIfGreater updates bucket Tagging version in given storage if it is greater than previous value
-	UpdateBucketTagsIfGreater(ctx context.Context, bucket string, storage string, version int64) error
+	UpdateBucketTagsIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error
 }
 
 func NewVersionService(client redis.UniversalClient) VersionService {
@@ -119,33 +139,33 @@ type versionSvc struct {
 	client redis.UniversalClient
 }
 
-func (s *versionSvc) GetObj(ctx context.Context, obj dom.Object) (map[string]int64, error) {
+func (s *versionSvc) GetObj(ctx context.Context, obj dom.Object) (map[Destination]int64, error) {
 	return s.get(ctx, obj.Key())
 }
 
-func (s *versionSvc) get(ctx context.Context, key string) (map[string]int64, error) {
+func (s *versionSvc) get(ctx context.Context, key string) (map[Destination]int64, error) {
 	resMap, err := s.client.HGetAll(ctx, key).Result()
 	if err != nil {
 		return nil, err
 	}
-	res := map[string]int64{}
+	res := map[Destination]int64{}
 	for stor, verStr := range resMap {
 		ver, err := strconv.Atoi(verStr)
 		if err != nil {
 			zerolog.Ctx(ctx).Err(err).Interface("dom_object", key).Msgf("unable to parse %q version", stor)
 			continue
 		}
-		res[stor] = int64(ver)
+		res[Destination(stor)] = int64(ver)
 	}
 	return res, nil
 }
 
-func (s *versionSvc) IncrementObj(ctx context.Context, obj dom.Object, storage string) (int64, error) {
-	return s.incVersion(ctx, obj.Key(), storage)
+func (s *versionSvc) IncrementObj(ctx context.Context, obj dom.Object, dest Destination) (int64, error) {
+	return s.incVersion(ctx, obj.Key(), dest)
 }
 
-func (s *versionSvc) incVersion(ctx context.Context, key, storage string) (int64, error) {
-	result, err := luaHIncVersion.Run(ctx, s.client, []string{key}, storage).Result()
+func (s *versionSvc) incVersion(ctx context.Context, key string, dest Destination) (int64, error) {
+	result, err := luaHIncVersion.Run(ctx, s.client, []string{key}, string(dest)).Result()
 	if err != nil {
 		return 0, err
 	}
@@ -159,30 +179,30 @@ func (s *versionSvc) incVersion(ctx context.Context, key, storage string) (int64
 	return inc, nil
 }
 
-func (s *versionSvc) UpdateIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error {
-	return s.setIfGreater(ctx, obj.Key(), storage, int(version))
+func (s *versionSvc) UpdateIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error {
+	return s.setIfGreater(ctx, obj.Key(), string(dest), int(version))
 }
 
-func (s *versionSvc) DeleteBucketMeta(ctx context.Context, storage, bucket string) error {
+func (s *versionSvc) DeleteBucketMeta(ctx context.Context, dest Destination, bucket string) error {
 	err := s3.ValidateBucketName(bucket)
 	if err != nil {
 		return err
 	}
 	key := fmt.Sprintf("b:%s", bucket)
-	if err = s.client.HDel(ctx, key, storage).Err(); err != nil {
+	if err = s.client.HDel(ctx, key, string(dest)).Err(); err != nil {
 		return err
 	}
 	keyAcl := fmt.Sprintf("b:%s:a", bucket)
-	if err = s.client.HDel(ctx, keyAcl, storage).Err(); err != nil {
+	if err = s.client.HDel(ctx, keyAcl, string(dest)).Err(); err != nil {
 		return err
 	}
 	keyTags := fmt.Sprintf("b:%s:t", bucket)
-	if err = s.client.HDel(ctx, keyTags, storage).Err(); err != nil {
+	if err = s.client.HDel(ctx, keyTags, string(dest)).Err(); err != nil {
 		return err
 	}
 	var cursor int64
 	for {
-		cursor, err = luaDelKeysWithPrefix.Run(ctx, s.client, []string{storage}, cursor, bucket+":*").Int64()
+		cursor, err = luaDelKeysWithPrefix.Run(ctx, s.client, []string{string(dest)}, cursor, bucket+":*").Int64()
 		if err != nil {
 			return err
 		}
@@ -219,43 +239,43 @@ func (s *versionSvc) setIfGreater(ctx context.Context, key, field string, setTo 
 	return nil
 }
 
-func (s *versionSvc) GetACL(ctx context.Context, obj dom.Object) (map[string]int64, error) {
+func (s *versionSvc) GetACL(ctx context.Context, obj dom.Object) (map[Destination]int64, error) {
 	return s.get(ctx, obj.ACLKey())
 }
 
-func (s *versionSvc) IncrementACL(ctx context.Context, obj dom.Object, storage string) (int64, error) {
-	return s.incVersion(ctx, obj.ACLKey(), storage)
+func (s *versionSvc) IncrementACL(ctx context.Context, obj dom.Object, dest Destination) (int64, error) {
+	return s.incVersion(ctx, obj.ACLKey(), dest)
 }
 
-func (s *versionSvc) UpdateACLIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error {
-	return s.setIfGreater(ctx, obj.ACLKey(), storage, int(version))
+func (s *versionSvc) UpdateACLIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error {
+	return s.setIfGreater(ctx, obj.ACLKey(), string(dest), int(version))
 }
 
-func (s *versionSvc) GetTags(ctx context.Context, obj dom.Object) (map[string]int64, error) {
+func (s *versionSvc) GetTags(ctx context.Context, obj dom.Object) (map[Destination]int64, error) {
 	return s.get(ctx, obj.TagKey())
 }
 
-func (s *versionSvc) IncrementTags(ctx context.Context, obj dom.Object, storage string) (int64, error) {
-	return s.incVersion(ctx, obj.TagKey(), storage)
+func (s *versionSvc) IncrementTags(ctx context.Context, obj dom.Object, dest Destination) (int64, error) {
+	return s.incVersion(ctx, obj.TagKey(), dest)
 }
 
-func (s *versionSvc) UpdateTagsIfGreater(ctx context.Context, obj dom.Object, storage string, version int64) error {
-	return s.setIfGreater(ctx, obj.TagKey(), storage, int(version))
+func (s *versionSvc) UpdateTagsIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error {
+	return s.setIfGreater(ctx, obj.TagKey(), string(dest), int(version))
 }
 
-func (s *versionSvc) GetBucket(ctx context.Context, bucket string) (map[string]int64, error) {
+func (s *versionSvc) GetBucket(ctx context.Context, bucket string) (map[Destination]int64, error) {
 	key := fmt.Sprintf("b:%s", bucket)
 	return s.get(ctx, key)
 }
 
-func (s *versionSvc) IncrementBucket(ctx context.Context, bucket string, storage string) (int64, error) {
+func (s *versionSvc) IncrementBucket(ctx context.Context, bucket string, dest Destination) (int64, error) {
 	key := fmt.Sprintf("b:%s", bucket)
-	return s.incVersion(ctx, key, storage)
+	return s.incVersion(ctx, key, dest)
 }
 
-func (s *versionSvc) UpdateBucketIfGreater(ctx context.Context, bucket string, storage string, version int64) error {
+func (s *versionSvc) UpdateBucketIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error {
 	key := fmt.Sprintf("b:%s", bucket)
-	return s.setIfGreater(ctx, key, storage, int(version))
+	return s.setIfGreater(ctx, key, string(dest), int(version))
 }
 
 func (s *versionSvc) DeleteBucketAll(ctx context.Context, bucket string) error {
@@ -265,32 +285,32 @@ func (s *versionSvc) DeleteBucketAll(ctx context.Context, bucket string) error {
 	return s.client.Del(ctx, key, keyAcl, keyTags).Err()
 }
 
-func (s *versionSvc) GetBucketACL(ctx context.Context, bucket string) (map[string]int64, error) {
+func (s *versionSvc) GetBucketACL(ctx context.Context, bucket string) (map[Destination]int64, error) {
 	key := fmt.Sprintf("b:%s:a", bucket)
 	return s.get(ctx, key)
 }
 
-func (s *versionSvc) IncrementBucketACL(ctx context.Context, bucket string, storage string) (int64, error) {
+func (s *versionSvc) IncrementBucketACL(ctx context.Context, bucket string, dest Destination) (int64, error) {
 	key := fmt.Sprintf("b:%s:a", bucket)
-	return s.incVersion(ctx, key, storage)
+	return s.incVersion(ctx, key, dest)
 }
 
-func (s *versionSvc) UpdateBucketACLIfGreater(ctx context.Context, bucket string, storage string, version int64) error {
+func (s *versionSvc) UpdateBucketACLIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error {
 	key := fmt.Sprintf("b:%s:a", bucket)
-	return s.setIfGreater(ctx, key, storage, int(version))
+	return s.setIfGreater(ctx, key, string(dest), int(version))
 }
 
-func (s *versionSvc) GetBucketTags(ctx context.Context, bucket string) (map[string]int64, error) {
+func (s *versionSvc) GetBucketTags(ctx context.Context, bucket string) (map[Destination]int64, error) {
 	key := fmt.Sprintf("b:%s:t", bucket)
 	return s.get(ctx, key)
 }
 
-func (s *versionSvc) IncrementBucketTags(ctx context.Context, bucket string, storage string) (int64, error) {
+func (s *versionSvc) IncrementBucketTags(ctx context.Context, bucket string, dest Destination) (int64, error) {
 	key := fmt.Sprintf("b:%s:t", bucket)
-	return s.incVersion(ctx, key, storage)
+	return s.incVersion(ctx, key, dest)
 }
 
-func (s *versionSvc) UpdateBucketTagsIfGreater(ctx context.Context, bucket string, storage string, version int64) error {
+func (s *versionSvc) UpdateBucketTagsIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error {
 	key := fmt.Sprintf("b:%s:t", bucket)
-	return s.setIfGreater(ctx, key, storage, int(version))
+	return s.setIfGreater(ctx, key, string(dest), int(version))
 }

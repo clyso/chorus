@@ -18,11 +18,12 @@ package meta
 
 import (
 	"context"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_Version_svc(t *testing.T) {
@@ -53,7 +54,7 @@ func Test_Version_svc(t *testing.T) {
 	r.NoError(err)
 	r.Empty(vers)
 
-	stor := "stor1"
+	stor := Destination("stor1")
 	err = s.UpdateIfGreater(ctx, obj, stor, -1)
 	r.ErrorIs(err, dom.ErrInvalidArg)
 	err = s.UpdateIfGreater(ctx, obj, stor, 0)
@@ -92,7 +93,7 @@ func Test_Version_svc(t *testing.T) {
 	r.NoError(err)
 	r.EqualValues(421, vers[stor])
 
-	stor2 := "stor2"
+	stor2 := Destination("stor2")
 	incVer2, err := s.IncrementObj(ctx, obj, stor2)
 	r.NoError(err)
 	r.EqualValues(422, incVer2)
@@ -232,9 +233,9 @@ func Test_Version_svc(t *testing.T) {
 
 func Test_inc_version_during_switch(t *testing.T) {
 	var (
-		stor1   = "stor1"
-		stor2   = "stor2"
-		stor3   = "stor3"
+		stor1   = Destination("stor1")
+		stor2   = Destination("stor2")
+		stor3   = Destination("stor3")
 		buck    = "buck"
 		objName = "object"
 		obj     = dom.Object{
@@ -329,7 +330,7 @@ func Test_DeleteBucketMeta(t *testing.T) {
 
 	s := NewVersionService(c)
 
-	s1, s2 := "stor1", "stor2"
+	s1, s2 := Destination("stor1"), Destination("stor2")
 	b1, b2 := "buck1", "buck2"
 	o1, o2, o3, o4 := dom.Object{
 		Bucket: b1,
@@ -485,4 +486,96 @@ func Test_DeleteBucketMeta(t *testing.T) {
 	r.NoError(err)
 	r.EqualValues(1, ver[s1])
 	r.EqualValues(2, ver[s2])
+}
+
+func TestDestination_Parse(t *testing.T) {
+	strPtr := func(s string) *string { return &s }
+	tests := []struct {
+		name        string
+		d           Destination
+		wantStorage string
+		wantBucket  *string
+	}{
+		{
+			name:        "only storage set",
+			d:           "abc",
+			wantStorage: "abc",
+			wantBucket:  nil,
+		},
+		{
+			name:        "nothing is set",
+			d:           "",
+			wantStorage: "",
+			wantBucket:  nil,
+		},
+		{
+			name:        "storage and bucket",
+			d:           "s:b",
+			wantStorage: "s",
+			wantBucket:  strPtr("b"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStorage, gotBucket := tt.d.Parse()
+			if gotStorage != tt.wantStorage {
+				t.Errorf("Destination.Parse() gotStorage = %v, want %v", gotStorage, tt.wantStorage)
+			}
+			if gotBucket != tt.wantBucket {
+				if gotBucket == nil {
+					t.Errorf("Destination.Parse() gotBucket = %v, want %v", gotBucket, tt.wantBucket)
+				} else if tt.wantBucket == nil {
+					t.Errorf("Destination.Parse() gotBucket = %v, want %v", gotBucket, tt.wantBucket)
+
+				} else if *tt.wantBucket != *gotBucket {
+					t.Errorf("Destination.Parse() gotBucket = %s, want %s", *gotBucket, *tt.wantBucket)
+				}
+			}
+		})
+	}
+}
+
+func TestToDest(t *testing.T) {
+	strPtr := func(s string) *string { return &s }
+	type args struct {
+		storage string
+		bucket  *string
+	}
+	tests := []struct {
+		name string
+		args args
+		want Destination
+	}{
+		{
+			name: "empty",
+			args: args{
+				storage: "",
+				bucket:  nil,
+			},
+			want: "",
+		},
+		{
+			name: "only storage",
+			args: args{
+				storage: "stor",
+				bucket:  nil,
+			},
+			want: "stor",
+		},
+		{
+			name: "storage and bucket",
+			args: args{
+				storage: "stor",
+				bucket:  strPtr("buck"),
+			},
+			want: "stor:buck",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ToDest(tt.args.storage, tt.args.bucket); got != tt.want {
+				t.Errorf("ToDest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

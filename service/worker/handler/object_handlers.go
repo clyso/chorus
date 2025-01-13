@@ -21,16 +21,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/hibiken/asynq"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
-	"time"
 )
 
 func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
@@ -77,20 +79,17 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		return err
 	}
 	defer release()
-	meta, err := s.versionSvc.GetObj(ctx, p.Object)
+	objMeta, err := s.versionSvc.GetObj(ctx, p.Object)
 	if err != nil {
 		return err
 	}
-	isObjDeleted := len(meta) == 0
+	isObjDeleted := len(objMeta) == 0
 	if isObjDeleted {
 		return s.objectDelete(ctx, p)
 	}
 
-	destVersionKey := p.ToStorage
-	if p.ToBucket != nil {
-		destVersionKey += ":" + *p.ToBucket
-	}
-	fromVer, toVer := meta[p.FromStorage], meta[destVersionKey]
+	destVersionKey := meta.ToDest(p.ToStorage, p.ToBucket)
+	fromVer, toVer := objMeta[meta.ToDest(p.FromStorage, nil)], objMeta[destVersionKey]
 	if fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("object sync: identical from/to obj version: skip copy")
 		return nil
