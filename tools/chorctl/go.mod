@@ -1,6 +1,6 @@
 module github.com/clyso/chorus/tools/chorctl
 
-go 1.21
+go 1.23
 
 require (
 	github.com/charmbracelet/bubbles v0.16.1
