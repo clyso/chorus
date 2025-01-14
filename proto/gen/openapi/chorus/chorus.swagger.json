@@ -785,6 +785,10 @@
         },
         "toBucket": {
           "type": "string"
+        },
+        "initDoneAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
