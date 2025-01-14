@@ -354,6 +354,11 @@ func TestApi_Migrate_test(t *testing.T) {
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.NotNil(repl.Replications[i].LastProcessedAt)
 		r.NotNil(repl.Replications[i].LastEmittedAt)
+		r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
+		r.True(
+			repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) ||
+				repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()),
+		)
 		//		r.True(repl.Replications[i].LastProcessedAt.AsTime().Equal(repl.Replications[i].LastEmittedAt.AsTime()))
 		r.False(repl.Replications[i].LastEmittedAt.AsTime().IsZero())
 		r.False(repl.Replications[i].LastProcessedAt.AsTime().IsZero())
@@ -578,10 +583,10 @@ func TestApi_Migrate_test(t *testing.T) {
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.NotNil(repl.Replications[i].LastProcessedAt)
 		r.NotNil(repl.Replications[i].LastEmittedAt)
-		if repl.Replications[i].IsInitDone {
-			r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
-			r.True(repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) || repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()))
-		}
+		
+		r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
+		r.True(repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) || repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()))
+		
 		//		r.True(repl.Replications[i].LastProcessedAt.AsTime().Equal(repl.Replications[i].LastEmittedAt.AsTime()))
 		r.False(repl.Replications[i].LastEmittedAt.AsTime().IsZero())
 		r.False(repl.Replications[i].LastProcessedAt.AsTime().IsZero())
