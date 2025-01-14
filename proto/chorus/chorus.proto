@@ -151,6 +151,8 @@ message Replication{
   SwitchEnum switch_status = 17;
 
   optional string to_bucket = 18;
+
+  google.protobuf.Timestamp init_done_at = 19;
 }
 
 message ReplicationRequest{

@@ -17,10 +17,11 @@
 package api
 
 import (
+	"time"
+
 	"github.com/clyso/chorus/pkg/policy"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"time"
 )
 
 func tsToPb(ts *time.Time) *timestamppb.Timestamp {
@@ -39,13 +40,14 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		ToBucket:        in.ToBucket,
 		CreatedAt:       timestamppb.New(in.CreatedAt),
 		IsPaused:        in.IsPaused,
-		IsInitDone:      in.ListingStarted && in.InitObjDone >= in.InitObjListed,
+		IsInitDone:      in.ListingStarted && in.InitObjDone >= in.InitObjListed && in.InitDoneAt!=nil,
 		InitObjListed:   in.InitObjListed,
 		InitObjDone:     in.InitObjDone,
 		InitBytesListed: in.InitBytesListed,
 		InitBytesDone:   in.InitBytesDone,
 		Events:          in.Events,
 		EventsDone:      in.EventsDone,
+		InitDoneAt: 	 tsToPb(in.InitDoneAt),
 		LastEmittedAt:   tsToPb(in.LastEmittedAt),
 		LastProcessedAt: tsToPb(in.LastProcessedAt),
 		AgentUrl:        strPtr(in.AgentURL),
