@@ -13,4 +13,3 @@ standalone
 standalone/
 **/*.tar.gz
 **/*.zip
-changes.patch
