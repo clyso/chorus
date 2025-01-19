@@ -26,9 +26,38 @@ jobs:
         run: go vet ./...
       - name: Test
         run: go test ./...
+  check-proto-folder-changed:
+    name: Check files
+    outputs:
+      run_job: ${{ steps.check_files.outputs.run_job }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Check modified files
+        id: check_files
+        run: |
+          echo "=============== List modified files ==============="
+          git diff --name-only HEAD^ HEAD
+
+          echo "========== Check paths of modified files =========="
+          git diff --name-only HEAD^ HEAD > files.txt
+          while IFS= read -r file
+          do
+            echo $file
+            if [[ $file == proto/* ]]; then
+              echo "Found changes in the 'proto' folder."
+              echo "run_job=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done < files.txt
+          echo "No changes in the 'proto' folder."
+          echo "run_job=false" >> $GITHUB_OUTPUT
   check-proto-integrity:
     runs-on: ubuntu-latest
-
+    needs: check-proto-folder-changed
     steps:
       - uses: actions/checkout@v3
         name: Checkout repository
