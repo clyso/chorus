@@ -17,10 +17,11 @@
 package metrics
 
 import (
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/s3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 var countRequests = promauto.NewCounterVec(

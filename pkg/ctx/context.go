@@ -18,8 +18,10 @@ package ctx
 
 import (
 	"context"
-	"github.com/clyso/chorus/pkg/s3"
+
 	"github.com/rs/zerolog"
+
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 type methodKey struct{}

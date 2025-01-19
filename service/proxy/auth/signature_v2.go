@@ -23,14 +23,16 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3"
-	mclient "github.com/minio/minio-go/v7"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
+
+	mclient "github.com/minio/minio-go/v7"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 // AWS Signature Version '4' constants.
@@ -185,7 +187,7 @@ func compareSignatureV2(sig1, sig2 string) bool {
 
 // Return canonical headers.
 func canonicalizedAmzHeadersV2(headers http.Header) string {
-	var keys []string
+	keys := make([]string, 0)
 	keyval := make(map[string]string, len(headers))
 	for key := range headers {
 		lkey := strings.ToLower(key)
@@ -196,7 +198,7 @@ func canonicalizedAmzHeadersV2(headers http.Header) string {
 		keyval[lkey] = strings.Join(headers[key], ",")
 	}
 	sort.Strings(keys)
-	var canonicalHeaders []string
+	canonicalHeaders := make([]string, 0, len(keys))
 	for _, key := range keys {
 		canonicalHeaders = append(canonicalHeaders, key+":"+keyval[key])
 	}
@@ -218,7 +220,7 @@ func canonicalizedResourceV2(encodedResource, encodedQuery string) string {
 		keyval[key] = val
 	}
 
-	var canonicalQueries []string
+	canonicalQueries := make([]string, 0)
 	for _, key := range resourceList {
 		val, ok := keyval[key]
 		if !ok {
@@ -265,7 +267,7 @@ func unescapeQueries(encodedQuery string) (unescapedQueries []string, err error)
 		var unescapedQuery string
 		unescapedQuery, err = url.QueryUnescape(query)
 		if err != nil {
-			return nil, fmt.Errorf("%w: unable to unescape query %v", dom.ErrAuth, err)
+			return nil, fmt.Errorf("%w: unable to unescape query %w", dom.ErrAuth, err)
 		}
 		unescapedQueries = append(unescapedQueries, unescapedQuery)
 	}

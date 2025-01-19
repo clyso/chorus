@@ -19,13 +19,15 @@ package cmd
 import (
 	"context"
 	"fmt"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/tools/chorctl/internal/api"
+	"os"
+	"text/tabwriter"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"os"
-	"text/tabwriter"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/tools/chorctl/internal/api"
 )
 
 // agentsCmd represents the storage command

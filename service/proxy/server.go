@@ -19,6 +19,14 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"slices"
+	"strings"
+
+	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/extra/redisotel/v9"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
@@ -37,12 +45,6 @@ import (
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/proxy/router"
-	"github.com/hibiken/asynq"
-	"github.com/redis/go-redis/extra/redisotel/v9"
-	"github.com/redis/go-redis/v9"
-	"net/http"
-	"slices"
-	"strings"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -61,7 +63,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	defer shutdown(context.Background())
+	defer func() {
+		_ = shutdown(context.Background())
+	}()
 
 	appRedis := util.NewRedis(conf.Redis, conf.Redis.MetaDB)
 	defer appRedis.Close()

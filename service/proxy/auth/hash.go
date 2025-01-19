@@ -23,13 +23,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
 	"hash"
 	"io"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 var _ io.ReadCloser = &hashReader{}
 
+// TODO: figure out what to do with unused func
+//
+//lint:ignore U1000 Ignore unused function temporarily for debugging
 func newHashCheckReader(src io.ReadCloser, etag, sha256 string) (io.ReadCloser, error) {
 	if src == nil {
 		return nil, nil
@@ -38,14 +42,14 @@ func newHashCheckReader(src io.ReadCloser, etag, sha256 string) (io.ReadCloser, 
 	res := hashReader{}
 	res.md5Src, err = hex.DecodeString(etag)
 	if err != nil {
-		return nil, fmt.Errorf("%w: unable to decode etag %v", dom.ErrAuth, err)
+		return nil, fmt.Errorf("%w: unable to decode etag %w", dom.ErrAuth, err)
 	}
 	if len(res.md5Src) != 0 {
 		res.md5Hash = md5.New()
 	}
 	res.sha256Src, err = hex.DecodeString(sha256)
 	if err != nil {
-		return nil, fmt.Errorf("%w: unable to decode sha256 %v", dom.ErrAuth, err)
+		return nil, fmt.Errorf("%w: unable to decode sha256 %w", dom.ErrAuth, err)
 	}
 	if len(res.sha256Src) != 0 {
 		res.sha256Hash = sha.New()

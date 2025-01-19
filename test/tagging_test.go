@@ -2,12 +2,13 @@ package test
 
 import (
 	"bytes"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/tags"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"testing"
 	"time"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/tags"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApi_Tagging_Bucket(t *testing.T) {

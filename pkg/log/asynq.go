@@ -19,6 +19,7 @@ package log
 import (
 	"context"
 	"fmt"
+
 	"github.com/rs/zerolog"
 )
 

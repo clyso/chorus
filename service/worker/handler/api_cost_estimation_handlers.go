@@ -20,14 +20,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/clyso/chorus/pkg/tasks"
+
 	"github.com/hibiken/asynq"
+
+	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func (s *svc) CostsEstimation(ctx context.Context, t *asynq.Task) error {
 	var p tasks.CostEstimationPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("CostEstimationPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("CostEstimationPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 
 	//from, to := p.FromStorage, p.ToStorage
@@ -100,7 +102,7 @@ func (s *svc) CostsEstimation(ctx context.Context, t *asynq.Task) error {
 func (s *svc) CostsEstimationList(ctx context.Context, t *asynq.Task) error {
 	var p tasks.CostEstimationListPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("CostEstimationListPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("CostEstimationListPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	//fromClient, err := s.clients.GetByName(ctx, p.FromStorage)
 	//if err != nil {

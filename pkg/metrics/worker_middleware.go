@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+
 	"github.com/hibiken/asynq"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"

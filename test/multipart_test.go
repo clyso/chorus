@@ -2,12 +2,13 @@ package test
 
 import (
 	"bytes"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/encrypt"
-	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
 	"time"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/encrypt"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApi_Object_Multipart(t *testing.T) {

@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/bsm/redislock"
+	"github.com/rs/zerolog"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/util"
-	"github.com/rs/zerolog"
-	"time"
 )
 
 var overlap = time.Second
@@ -52,7 +54,7 @@ func WithRefresh(ctx context.Context, work func() error, refresh func(time.Durat
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("%w: refresh context canceled: %v", context.Canceled, ctx.Err())
+			return fmt.Errorf("%w: refresh context canceled: %w", context.Canceled, ctx.Err())
 		case <-timer.C:
 			i++
 			err = refresh(period + overlap)

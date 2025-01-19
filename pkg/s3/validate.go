@@ -18,9 +18,10 @@ package s3
 
 import (
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
 	"regexp"
 	"strings"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 var (

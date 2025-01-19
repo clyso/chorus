@@ -20,6 +20,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
@@ -29,14 +39,6 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/bench/pkg/config"
 	"github.com/clyso/chorus/tools/bench/pkg/db"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 func Start(conf *config.Config) error {

@@ -25,6 +25,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
@@ -38,10 +43,6 @@ import (
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService, storageSvc storage.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service) pb.ChorusServer {

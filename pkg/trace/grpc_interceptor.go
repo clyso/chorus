@@ -18,10 +18,12 @@ package trace
 
 import (
 	"context"
-	"github.com/clyso/chorus/pkg/log"
+
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+
+	"github.com/clyso/chorus/pkg/log"
 )
 
 func UnaryInterceptor() grpc.UnaryServerInterceptor {

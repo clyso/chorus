@@ -19,13 +19,15 @@ package router
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/rs/zerolog"
-	"io"
-	"net/http"
 )
 
 func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tasks.BucketCreatePayload, storage string, isApiErr bool, err error) {
@@ -65,7 +67,7 @@ func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tas
 	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return nil, nil, "", false, err
 	}
@@ -93,7 +95,7 @@ func (r *router) listBuckets(req *http.Request) (resp *http.Response, storage st
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			// todo: call all storages and merge buckets????
-			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return nil, "", false, err
 	}

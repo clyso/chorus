@@ -19,9 +19,10 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/johannesboyne/gofakes3"
 	"github.com/johannesboyne/gofakes3/backend/s3mem"
-	"net/http"
 )
 
 func serveFakeS3(ctx context.Context, port int) error {

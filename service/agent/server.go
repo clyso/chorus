@@ -19,6 +19,12 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+
+	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/extra/redisotel/v9"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
@@ -30,10 +36,6 @@ import (
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
-	"github.com/hibiken/asynq"
-	"github.com/redis/go-redis/extra/redisotel/v9"
-	"github.com/redis/go-redis/v9"
-	"net/http"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -52,7 +54,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	defer shutdown(context.Background())
+	defer func() {
+		_ = shutdown(context.Background())
+	}()
 
 	appRedis := util.NewRedis(conf.Redis, conf.Redis.MetaDB)
 	defer appRedis.Close()

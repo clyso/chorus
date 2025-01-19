@@ -18,9 +18,11 @@ package log
 
 import (
 	"context"
-	xctx "github.com/clyso/chorus/pkg/ctx"
+
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
 )
 
 func UnaryInterceptor(cfg *Config, app, appID string) grpc.UnaryServerInterceptor {

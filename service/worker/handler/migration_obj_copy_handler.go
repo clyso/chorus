@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
@@ -30,14 +33,12 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err error) {
 	var p tasks.MigrateObjCopyPayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("MigrateObjCopyPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("MigrateObjCopyPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	ctx = log.WithObjName(ctx, p.Obj.Name)
@@ -123,7 +124,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
-		return fmt.Errorf("migration obj copy: unable to get %q s3 client: %v: %w", p.FromStorage, err, asynq.SkipRetry)
+		return fmt.Errorf("migration obj copy: unable to get %q s3 client: %w: %w", p.FromStorage, err, asynq.SkipRetry)
 	}
 
 	// 2. sync obj ACL

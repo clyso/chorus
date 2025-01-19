@@ -28,11 +28,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/service/proxy"
-	"github.com/clyso/chorus/service/worker"
 	"github.com/hibiken/asynq"
 	"github.com/johannesboyne/gofakes3"
 	"github.com/johannesboyne/gofakes3/backend/s3mem"
@@ -41,6 +36,12 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/xid"
 	"gopkg.in/yaml.v3"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/service/proxy"
+	"github.com/clyso/chorus/service/worker"
 )
 
 var (

@@ -3,9 +3,10 @@ package util
 import (
 	"crypto/tls"
 
-	"github.com/clyso/chorus/pkg/config"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/clyso/chorus/pkg/config"
 )
 
 func NewRedis(conf *config.Redis, db int) redis.UniversalClient {

@@ -18,10 +18,12 @@ package api
 
 import (
 	"fmt"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"strings"
 	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func StorageHeader() string {

@@ -19,12 +19,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
 	"github.com/clyso/chorus/tools/chorctl/internal/ui"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 // dashCmd represents the dash command

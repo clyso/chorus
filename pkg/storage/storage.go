@@ -18,11 +18,14 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/redis/go-redis/v9"
-	"time"
 )
 
 const (
@@ -90,7 +93,7 @@ func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 		key += ":" + task.Prefix
 	}
 	val, err := s.client.Get(ctx, key).Result()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return "", nil
 	}
 	return val, err

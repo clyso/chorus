@@ -20,14 +20,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 )
 
 type Service interface {
@@ -258,13 +260,13 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 	}
 	// policy not found. Create new bucket policy from user policy only for CreateBucket method
 	if _, ok := task.(*tasks.BucketCreatePayload); !ok {
-		return policy.ReplicationPolicies{}, fmt.Errorf("%w: replication policy not configured: %v", dom.ErrPolicy, err)
+		return policy.ReplicationPolicies{}, fmt.Errorf("%w: replication policy not configured: %w", dom.ErrPolicy, err)
 	}
 
 	userPolicy, err := s.policySvc.GetUserReplicationPolicies(ctx, user)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return policy.ReplicationPolicies{}, fmt.Errorf("%w: user replication policy not configured: %v", dom.ErrPolicy, err)
+			return policy.ReplicationPolicies{}, fmt.Errorf("%w: user replication policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return policy.ReplicationPolicies{}, err
 	}

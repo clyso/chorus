@@ -2,11 +2,13 @@ package rpc
 
 import (
 	"context"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 var _ Proxy = &mockProxy{}

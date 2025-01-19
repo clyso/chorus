@@ -18,9 +18,10 @@ package db
 
 import (
 	"errors"
-	"github.com/boltdb/bolt"
 	"os"
 	"strconv"
+
+	"github.com/boltdb/bolt"
 )
 
 const (

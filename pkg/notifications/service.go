@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/minio/minio-go/v7/pkg/notification"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3client"
-	"github.com/minio/minio-go/v7/pkg/notification"
-	"strings"
 )
 
 type Service struct {

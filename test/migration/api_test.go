@@ -1,11 +1,13 @@
 package migration
 
 import (
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"testing"
+
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"testing"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func Test_api_storages(t *testing.T) {

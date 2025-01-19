@@ -19,14 +19,16 @@ package policy_helper
 import (
 	"context"
 	"errors"
+
+	"github.com/hibiken/asynq"
+	"golang.org/x/sync/errgroup"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"golang.org/x/sync/errgroup"
 )
 
 func CreateMainFollowerPolicies(

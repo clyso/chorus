@@ -18,10 +18,13 @@ package meta
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/redis/go-redis/v9"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 type MigrationCostService interface {
@@ -97,7 +100,7 @@ func (s *migrationCostSvc) MigrationCostsLastObjGet(ctx context.Context, from, t
 		field = fmt.Sprintf("bkt:%s:%s:lastObjName", bucket, prefix)
 	}
 	res, err := s.client.HGet(ctx, toMigrationCostsKey(from, to), field).Result()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return "", nil
 	}
 	return res, err

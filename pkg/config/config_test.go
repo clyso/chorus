@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/clyso/chorus/pkg/s3"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 func TestGet(t *testing.T) {

@@ -57,7 +57,7 @@ func handleSPA(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
-		w.Write(index)
+		_, _ = w.Write(index)
 		return
 	} else if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

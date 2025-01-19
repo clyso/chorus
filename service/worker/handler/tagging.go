@@ -23,6 +23,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hibiken/asynq"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -31,15 +35,12 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 	var p tasks.BucketSyncTagsPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("BucketSyncTagsPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("BucketSyncTagsPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
@@ -79,7 +80,7 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	var p tasks.ObjSyncTagsPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("ObjSyncTagsPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("ObjSyncTagsPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)

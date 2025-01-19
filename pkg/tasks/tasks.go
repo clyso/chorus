@@ -20,11 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/buger/jsonparser"
+	"github.com/hibiken/asynq"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/hibiken/asynq"
-	"time"
 )
 
 // A list of task types.

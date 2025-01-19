@@ -18,14 +18,15 @@ package main
 
 import (
 	"encoding/csv"
-	"github.com/wcharczuk/go-chart/v2" //exposes "chart"
-	"github.com/wcharczuk/go-chart/v2/drawing"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/wcharczuk/go-chart/v2" //exposes "chart"
+	"github.com/wcharczuk/go-chart/v2/drawing"
 )
 
 const (

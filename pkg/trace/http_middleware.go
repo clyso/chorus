@@ -17,12 +17,14 @@
 package trace
 
 import (
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/log"
+	"net/http"
+
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
-	"net/http"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/log"
 )
 
 func HttpMiddleware(tp trace.TracerProvider, next http.Handler) http.Handler {

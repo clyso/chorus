@@ -2,11 +2,13 @@ package meta
 
 import (
 	"context"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 func Test_svc_GetMigrationCosts(t *testing.T) {

@@ -18,14 +18,16 @@ package agent
 
 import (
 	"encoding/json"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/notifications"
-	"github.com/clyso/chorus/pkg/s3"
-	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/notifications"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
@@ -65,7 +67,8 @@ func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
 				reqCtx = xctx.SetMethod(reqCtx, s3.DeleteObject)
 			}
 
-			if strings.Contains(record.EventName, "ObjectCreated") {
+			switch {
+			case strings.Contains(record.EventName, "ObjectCreated"):
 				err = handler.PutObject(reqCtx, notifications.ObjCreated{
 					Bucket:  record.S3.Bucket.Name,
 					ObjKey:  record.S3.Object.Key,
@@ -75,7 +78,7 @@ func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
 				if err != nil {
 					zerolog.Ctx(reqCtx).Err(err).Msg("unable to replicate ObjectCreated")
 				}
-			} else if strings.Contains(record.EventName, "ObjectRemoved") {
+			case strings.Contains(record.EventName, "ObjectRemoved"):
 				err = handler.DeleteObject(reqCtx, notifications.ObjDeleted{
 					Bucket: record.S3.Bucket.Name,
 					ObjKey: record.S3.Object.Key,
@@ -83,7 +86,7 @@ func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
 				if err != nil {
 					zerolog.Ctx(reqCtx).Err(err).Msg("unable to replicate ObjectRemoved")
 				}
-			} else {
+			default:
 				zerolog.Ctx(reqCtx).Warn().Msgf("unknown s3 notification event %s", record.EventName)
 			}
 		}

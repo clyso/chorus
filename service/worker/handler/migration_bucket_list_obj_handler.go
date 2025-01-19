@@ -23,20 +23,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hibiken/asynq"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) error {
 	// todo: aggregate task to not list multiple times
 	var p tasks.MigrateBucketListObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("HandleMigrationBucketListObj Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("HandleMigrationBucketListObj Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
@@ -60,7 +61,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 	fromClient, err := s.clients.GetByName(ctx, p.FromStorage)
 	if err != nil {
-		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %v: %w", p.FromStorage, err, asynq.SkipRetry)
+		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.FromStorage, err, asynq.SkipRetry)
 	}
 
 	lastObjName, err := s.storageSvc.GetLastListedObj(ctx, p)
@@ -144,11 +145,13 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}
 		_, err = s.taskClient.EnqueueContext(ctx, task)
-		if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
+
+		switch {
+		case errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict):
 			logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
-		} else if err != nil {
+		case err != nil:
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
-		} else {
+		default:
 			err = s.policySvc.IncReplInitObjListed(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, 0, p.GetDate())
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)

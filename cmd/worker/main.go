@@ -19,15 +19,17 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/clyso/chorus/pkg/config"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/service/worker"
-	"github.com/rs/xid"
-	"github.com/rs/zerolog"
-	stdlog "github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/rs/xid"
+	"github.com/rs/zerolog"
+	stdlog "github.com/rs/zerolog/log"
+
+	"github.com/clyso/chorus/pkg/config"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/service/worker"
 )
 
 // this information will be collected when built, by -ldflags="-X 'main.version=$(tag)' -X 'main.commit=$(commit)'".

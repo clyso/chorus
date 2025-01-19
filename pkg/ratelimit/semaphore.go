@@ -18,15 +18,18 @@ package ratelimit
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/util"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/xid"
-	"github.com/rs/zerolog"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/xid"
+	"github.com/rs/zerolog"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/util"
 )
 
 const leaseInterval = time.Second * 2
@@ -177,7 +180,7 @@ func (g *Global) acquire(ctx context.Context, logger zerolog.Logger, n int64, ac
 	// Transactional function.
 	txf := func(tx *redis.Tx) error {
 		usage, err := g.rc.ZCard(ctx, g.key()).Result()
-		if err != nil && err != redis.Nil {
+		if err != nil && !errors.Is(err, redis.Nil) {
 			return err
 		}
 		if usage+n > g.c.Limit {
@@ -203,7 +206,7 @@ func (g *Global) acquire(ctx context.Context, logger zerolog.Logger, n int64, ac
 	// Retry if the key has been changed.
 	for i := 0; i < maxRetries; i++ {
 		err = g.rc.Watch(ctx, txf, g.key())
-		if err == redis.TxFailedErr {
+		if errors.Is(err, redis.TxFailedErr) {
 			// Optimistic lock lost. Retry.
 			continue
 		}

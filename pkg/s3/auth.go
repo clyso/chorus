@@ -18,12 +18,13 @@ package s3
 
 import (
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 // AWS Signature Version '4' constants.

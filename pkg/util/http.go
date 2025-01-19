@@ -21,26 +21,29 @@ import (
 	"context"
 	"encoding/xml"
 	"errors"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
+	"net/http"
+
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
-	"net/http"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 	zerolog.Ctx(ctx).Err(err).Msg("error returned")
 	s3Err := mclient.ErrorResponse{}
-	if errors.As(err, &s3Err) {
 
-	} else if errors.Is(err, dom.ErrAuth) {
+	switch {
+	case errors.As(err, &s3Err):
+	case errors.Is(err, dom.ErrAuth):
 		s3Err = mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "AccessDenied",
 			Message:    err.Error(),
 			StatusCode: http.StatusForbidden,
 		}
-	} else if errors.Is(err, dom.ErrNotImplemented) {
+	case errors.Is(err, dom.ErrNotImplemented):
 		s3Err = mclient.ErrorResponse{
 			Code:       "NotImplemented",
 			Message:    err.Error(),
@@ -48,7 +51,7 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			Key:        xctx.GetObject(ctx),
 			StatusCode: http.StatusNotImplemented,
 		}
-	} else if errors.Is(err, dom.ErrInvalidArg) {
+	case errors.Is(err, dom.ErrInvalidArg):
 		s3Err = mclient.ErrorResponse{
 			Code:       "InvalidArgument",
 			Message:    err.Error(),
@@ -56,7 +59,7 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			Key:        xctx.GetObject(ctx),
 			StatusCode: http.StatusBadRequest,
 		}
-	} else if errors.Is(err, dom.ErrRoutingBlock) {
+	case errors.Is(err, dom.ErrRoutingBlock):
 		s3Err = mclient.ErrorResponse{
 			Code:       "NoSuchBucket",
 			Message:    "Bucket already used as replication destination",
@@ -64,7 +67,7 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			Key:        xctx.GetObject(ctx),
 			StatusCode: http.StatusNotFound,
 		}
-	} else if errors.Is(err, dom.ErrPolicy) {
+	case errors.Is(err, dom.ErrPolicy):
 		s3Err = mclient.ErrorResponse{
 			Code:       "InternalErrors",
 			Message:    err.Error(),
@@ -72,7 +75,7 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			Key:        xctx.GetObject(ctx),
 			StatusCode: http.StatusInternalServerError,
 		}
-	} else {
+	default:
 		s3Err = mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "InternalError",

@@ -19,10 +19,12 @@ package log
 import (
 	"context"
 	"errors"
+
 	"github.com/buger/jsonparser"
+	"github.com/hibiken/asynq"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
 )
 
 func WorkerMiddleware(cfg *Config, app, appID string) asynq.MiddlewareFunc {

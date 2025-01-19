@@ -23,21 +23,22 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/hibiken/asynq"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error) {
 	var p tasks.BucketCreatePayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("BucketCreatePayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("BucketCreatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
@@ -263,7 +264,7 @@ func (s *svc) bucketCopyVersioning(ctx context.Context, fromClient, toClient s3c
 func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error) {
 	var p tasks.BucketDeletePayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("BucketDeletePayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("BucketDeletePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 

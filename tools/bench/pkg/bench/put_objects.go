@@ -20,20 +20,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/clyso/chorus/pkg/s3client"
-	"github.com/clyso/chorus/pkg/util"
-	"github.com/clyso/chorus/tools/bench/pkg/config"
-	"github.com/clyso/chorus/tools/bench/pkg/db"
-	"github.com/clyso/chorus/tools/bench/pkg/dump"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"math/rand"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/clyso/chorus/pkg/s3client"
+	"github.com/clyso/chorus/pkg/util"
+	"github.com/clyso/chorus/tools/bench/pkg/config"
+	"github.com/clyso/chorus/tools/bench/pkg/db"
+	"github.com/clyso/chorus/tools/bench/pkg/dump"
 )
 
 type Prev struct {

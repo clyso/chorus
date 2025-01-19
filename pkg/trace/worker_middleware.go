@@ -18,9 +18,11 @@ package trace
 
 import (
 	"context"
-	"github.com/clyso/chorus/pkg/log"
+
 	"github.com/hibiken/asynq"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/clyso/chorus/pkg/log"
 )
 
 func WorkerMiddleware(tp trace.TracerProvider) asynq.MiddlewareFunc {

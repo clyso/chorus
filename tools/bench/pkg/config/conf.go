@@ -18,12 +18,13 @@ package config
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (

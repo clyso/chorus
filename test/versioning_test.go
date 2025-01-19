@@ -3,10 +3,11 @@ package test
 import (
 	"bytes"
 	"fmt"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApi_Versioning_Bucket(t *testing.T) {

@@ -18,14 +18,16 @@ package s3client
 
 import (
 	"context"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/metrics"
-	"github.com/clyso/chorus/pkg/s3"
+
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/lifecycle"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 func newMinioClient(name, user string, c *mclient.Client, metricsSvc metrics.S3Service) *S3 {

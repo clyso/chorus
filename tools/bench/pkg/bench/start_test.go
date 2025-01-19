@@ -3,10 +3,11 @@ package bench
 import (
 	"encoding/csv"
 	"errors"
-	"github.com/clyso/chorus/tools/bench/pkg/config"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/clyso/chorus/tools/bench/pkg/config"
 )
 
 func TestStart(t *testing.T) {

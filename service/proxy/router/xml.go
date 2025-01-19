@@ -18,6 +18,7 @@ package router
 
 import (
 	"encoding/xml"
+
 	"github.com/clyso/chorus/pkg/dom"
 )
 

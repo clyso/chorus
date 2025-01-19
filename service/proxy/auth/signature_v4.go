@@ -23,15 +23,17 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"fmt"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/s3utils"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/s3utils"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 const (
@@ -116,7 +118,7 @@ func getCanonicalV4Request(extractedSignedHeaders http.Header, payload, queryStr
 }
 
 func getCanonicalV4Headers(signedHeaders http.Header) string {
-	var headers []string
+	headers := make([]string, 0, len(signedHeaders))
 	vals := make(http.Header)
 	for k, vv := range signedHeaders {
 		headers = append(headers, strings.ToLower(k))
@@ -143,7 +145,7 @@ func signV4TrimAll(input string) string {
 }
 
 func getSignedV4Headers(signedHeaders http.Header) string {
-	var headers []string
+	headers := make([]string, 0, len(signedHeaders))
 	for k := range signedHeaders {
 		headers = append(headers, strings.ToLower(k))
 	}

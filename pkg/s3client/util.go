@@ -25,9 +25,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/clyso/chorus/pkg/s3"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/signer"
+
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 // List of success status.
@@ -203,7 +204,7 @@ func closeResponse(resp *http.Response) {
 		// Without this closing connection would disallow re-using
 		// the same connection for future uses.
 		//  - http://stackoverflow.com/a/17961593/4465767
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}
 }

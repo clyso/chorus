@@ -17,13 +17,15 @@
 package router
 
 import (
+	"io"
+	"net/http"
+
+	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/util"
-	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel"
-	"io"
-	"net/http"
 )
 
 func Serve(router Router, replSvc replication.Service) *http.ServeMux {

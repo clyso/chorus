@@ -17,8 +17,9 @@
 package rclone
 
 import (
-	"github.com/clyso/chorus/pkg/ratelimit"
 	"time"
+
+	"github.com/clyso/chorus/pkg/ratelimit"
 )
 
 type Config struct {

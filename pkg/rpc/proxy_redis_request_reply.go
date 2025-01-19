@@ -19,14 +19,16 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"time"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
-	"time"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/s3"
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 const (
@@ -61,8 +63,10 @@ func NewProxyClient(client redis.UniversalClient) Proxy {
 func (c *ProxyClient) GetCredentials(ctx context.Context) (*pb.GetProxyCredentialsResponse, error) {
 	replyChanName := xid.New().String()
 	ps := c.client.Subscribe(ctx, replyChanName)
-	defer ps.Close()
-	defer ps.Unsubscribe(context.Background(), replyChanName)
+	defer func() {
+		_ = ps.Close()
+		_ = ps.Unsubscribe(context.Background(), replyChanName)
+	}()
 	resCh := make(chan any, 1)
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
@@ -108,8 +112,10 @@ func (c *ProxyClient) GetCredentials(ctx context.Context) (*pb.GetProxyCredentia
 
 func ProxyServe(ctx context.Context, client redis.UniversalClient, proxy Proxy) error {
 	ps := client.Subscribe(ctx, proxyCreds)
-	defer ps.Close()
-	defer ps.Unsubscribe(context.Background(), proxyCreds)
+	defer func() {
+		_ = ps.Close()
+		_ = ps.Unsubscribe(context.Background(), proxyCreds)
+	}()
 	messages := ps.Channel()
 	for {
 		select {

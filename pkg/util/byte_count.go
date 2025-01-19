@@ -18,10 +18,11 @@ package util
 
 import (
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 func ByteCountSI(b int64) string {

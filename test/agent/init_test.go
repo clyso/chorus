@@ -5,21 +5,23 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/rs/xid"
+	"google.golang.org/grpc"
+
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/agent"
 	"github.com/clyso/chorus/service/worker"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/rs/xid"
-	"google.golang.org/grpc"
-	"os"
-	"strings"
-	"testing"
-	"time"
 )
 
 var (

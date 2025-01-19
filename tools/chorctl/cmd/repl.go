@@ -19,13 +19,15 @@ package cmd
 import (
 	"context"
 	"fmt"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/tools/chorctl/internal/api"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"os"
 	"sort"
 	"text/tabwriter"
+
+	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/tools/chorctl/internal/api"
 
 	"github.com/spf13/cobra"
 )

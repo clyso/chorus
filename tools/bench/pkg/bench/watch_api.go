@@ -18,11 +18,13 @@ package bench
 
 import (
 	"context"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/tools/bench/pkg/config"
+	"sync"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
-	"sync"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/tools/bench/pkg/config"
 )
 
 var _repl *pb.Replication

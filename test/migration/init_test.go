@@ -19,20 +19,6 @@ package migration
 import (
 	"context"
 	"fmt"
-	"github.com/alicebob/miniredis/v2"
-	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/service/proxy"
-	"github.com/clyso/chorus/service/worker"
-	"github.com/johannesboyne/gofakes3"
-	"github.com/johannesboyne/gofakes3/backend/s3mem"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/xid"
-	"google.golang.org/grpc"
 	"math/rand"
 	"net"
 	"net/http/httptest"
@@ -43,6 +29,22 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+	"github.com/johannesboyne/gofakes3"
+	"github.com/johannesboyne/gofakes3/backend/s3mem"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/xid"
+	"google.golang.org/grpc"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/s3"
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/service/proxy"
+	"github.com/clyso/chorus/service/worker"
 )
 
 var (

@@ -17,8 +17,9 @@
 package log
 
 import (
-	"github.com/rs/zerolog"
 	"net/http"
+
+	"github.com/rs/zerolog"
 )
 
 func HttpMiddleware(cfg *Config, app, appID string, next http.Handler) http.Handler {

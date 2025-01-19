@@ -19,13 +19,15 @@ package router
 import (
 	"errors"
 	"fmt"
+	"net/http"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/rs/zerolog"
-	"net/http"
 )
 
 func (r *router) createMultipartUpload(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
@@ -177,7 +179,7 @@ func (r *router) routeMultipart(req *http.Request) (storage string, switchInProg
 	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return "", false, fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return "", false, err
 	}
@@ -213,7 +215,7 @@ func (r *router) routeListMultipart(req *http.Request) (storage string, err erro
 	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return "", fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return "", fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return "", err
 	}

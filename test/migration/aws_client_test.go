@@ -17,14 +17,16 @@
 package migration
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+
 	"github.com/clyso/chorus/pkg/s3"
-	"net/http"
-	"strings"
 )
 
 func newAWSClient(conf s3.Storage) *aws_s3.S3 {

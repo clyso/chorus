@@ -17,9 +17,10 @@
 package log
 
 import (
-	"github.com/rs/zerolog"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 const (

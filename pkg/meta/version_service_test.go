@@ -21,9 +21,10 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 func Test_Version_svc(t *testing.T) {

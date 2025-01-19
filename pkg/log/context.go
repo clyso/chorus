@@ -18,9 +18,11 @@ package log
 
 import (
 	"context"
+
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/rs/zerolog"
 )
 
 func WithMethod(ctx context.Context, method s3.Method) context.Context {

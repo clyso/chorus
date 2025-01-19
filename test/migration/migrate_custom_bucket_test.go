@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func TestApi_Migrate_CustomBucket(t *testing.T) {

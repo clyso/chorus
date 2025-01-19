@@ -19,12 +19,14 @@ package ratelimit
 import (
 	"context"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/s3"
+
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 // RPM storage rate limit based on requests per minute

@@ -19,15 +19,17 @@ package ui
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"sort"
-	"time"
 )
 
 var (

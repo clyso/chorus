@@ -23,12 +23,13 @@ import (
 	"os"
 	"strings"
 
+	stdlog "github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
+
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/trace"
-	stdlog "github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 )
 
 //go:embed config.yaml

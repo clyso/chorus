@@ -3,11 +3,13 @@
 package agent
 
 import (
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 const waitInterval = 5 * time.Second

@@ -21,12 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/metrics"
-	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/util"
+
 	_ "github.com/rclone/rclone/backend/s3"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config/configmap"
@@ -37,6 +32,13 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/ratelimit"
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/util"
 )
 
 type File struct {

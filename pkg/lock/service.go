@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/bsm/redislock"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/util"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
-	"time"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/util"
 )
 
 const defaultLockDuration = time.Second

@@ -19,12 +19,13 @@ package standalone
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/worker"
-	"io/fs"
 )
 
 //go:embed config.yaml

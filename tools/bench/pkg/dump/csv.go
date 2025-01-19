@@ -20,9 +20,11 @@ import (
 	"container/heap"
 	"encoding/csv"
 	"fmt"
-	"github.com/clyso/chorus/tools/bench/pkg/config"
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/clyso/chorus/tools/bench/pkg/config"
 )
 
 type BenchEvent struct {

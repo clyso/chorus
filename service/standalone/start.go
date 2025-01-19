@@ -25,14 +25,15 @@ import (
 	"strings"
 
 	"github.com/alicebob/miniredis/v2"
+	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v3"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/worker"
-	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
 )
 
 const (

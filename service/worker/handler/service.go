@@ -19,6 +19,10 @@ package handler
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/hibiken/asynq"
+
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/policy"
@@ -26,8 +30,6 @@ import (
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
-	"github.com/hibiken/asynq"
-	"time"
 )
 
 type Config struct {
@@ -54,12 +56,12 @@ func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
 func (s *svc) getClients(ctx context.Context, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {
 	fromClient, err = s.clients.GetByName(ctx, fromStorage)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get %q s3 client: %v: %w", fromStorage, err, asynq.SkipRetry)
+		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", fromStorage, err, asynq.SkipRetry)
 	}
 
 	toClient, err = s.clients.GetByName(ctx, toStorage)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get %q s3 client: %v: %w", toStorage, err, asynq.SkipRetry)
+		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", toStorage, err, asynq.SkipRetry)
 	}
 	return
 }

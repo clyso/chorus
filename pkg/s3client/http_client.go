@@ -29,14 +29,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	aws_credentials "github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/metrics"
-	"github.com/clyso/chorus/pkg/s3"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.S3Service, tp trace.TracerProvider) (Client, error) {
@@ -257,7 +258,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		err = mclient.ToErrorResponse(httpRespToErrorResponse(resp, bucket, object))
 
 		// Save the body back again.
-		errBodySeeker.Seek(0, 0) // Seek back to starting point.
+		_, _ = errBodySeeker.Seek(0, 0) // Seek back to starting point.
 		resp.Body = io.NopCloser(errBodySeeker)
 		return
 	}

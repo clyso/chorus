@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/clyso/chorus/pkg/s3"
-	mclient "github.com/minio/minio-go/v7"
 	"math/rand"
 	"strings"
 	"testing"
+
+	mclient "github.com/minio/minio-go/v7"
+
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 type testObj struct {

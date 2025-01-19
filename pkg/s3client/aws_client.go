@@ -17,6 +17,10 @@
 package s3client
 
 import (
+	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -24,10 +28,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
-	"net/http"
-	"strings"
 )
 
 func newAWSClient(conf s3.Storage, name, user string, metricsSvc metrics.S3Service) (*AWS, error) {
@@ -84,7 +87,8 @@ func AwsErrRetry(err error) bool {
 	if err == nil {
 		return false
 	}
-	if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
+	var aerr awserr.Error
+	if ok := errors.As(err, &aerr); ok && aerr.Code() == request.CanceledErrorCode {
 		return true
 	}
 	return request.IsErrorRetryable(err)

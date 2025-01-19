@@ -23,6 +23,9 @@ import (
 	"fmt"
 
 	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -31,14 +34,12 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
 	var p tasks.BucketSyncACLPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("BucketSyncACLPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("BucketSyncACLPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
@@ -79,7 +80,7 @@ func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
 func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	var p tasks.ObjSyncACLPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("ObjSyncACLPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("ObjSyncACLPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)

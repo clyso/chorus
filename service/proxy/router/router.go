@@ -18,6 +18,10 @@ package router
 
 import (
 	"fmt"
+	"net/http"
+
+	"github.com/hibiken/asynq"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -28,8 +32,6 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"net/http"
 )
 
 type Router interface {

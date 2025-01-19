@@ -19,16 +19,18 @@ package migration
 import (
 	"bytes"
 	"context"
-	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"math/rand"
 	"testing"
 	"time"
+
+	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func TestApi_switch_e2e(t *testing.T) {

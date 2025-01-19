@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
-	"github.com/clyso/chorus/pkg/log"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"math/rand"
+	"testing"
+	"time"
+
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"math/rand"
-	"testing"
-	"time"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/lock"
+	"github.com/clyso/chorus/pkg/log"
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func TestApi_Migrate_Load_test(t *testing.T) {

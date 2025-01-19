@@ -21,17 +21,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) FinishReplicationSwitch(ctx context.Context, t *asynq.Task) error {
 	var p tasks.FinishReplicationSwitchPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("FinishReplicationSwitchPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("FinishReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)

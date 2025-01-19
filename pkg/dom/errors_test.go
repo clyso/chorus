@@ -3,9 +3,10 @@ package dom
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrRateLimitExceeded_Error(t *testing.T) {

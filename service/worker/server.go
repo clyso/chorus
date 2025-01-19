@@ -22,6 +22,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/extra/redisotel/v9"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
+
 	"github.com/clyso/chorus/pkg/api"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -42,12 +49,6 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker/handler"
 	"github.com/clyso/chorus/service/worker/policy_helper"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/hibiken/asynq"
-	"github.com/redis/go-redis/extra/redisotel/v9"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -65,7 +66,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	defer shutdown(context.Background())
+	defer func() {
+		_ = shutdown(context.Background())
+	}()
 
 	appRedis := util.NewRedis(conf.Redis, conf.Redis.MetaDB)
 	defer appRedis.Close()

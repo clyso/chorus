@@ -19,11 +19,12 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
-	"strings"
-	"time"
 )
 
 const (
@@ -46,8 +47,10 @@ type AgentInfo struct {
 func (a *AgentClient) Ping(ctx context.Context) ([]AgentInfo, error) {
 	replyChanName := xid.New().String()
 	ps := a.client.Subscribe(ctx, replyChanName)
-	defer ps.Close()
-	defer ps.Unsubscribe(context.Background(), replyChanName)
+	defer func() {
+		_ = ps.Close()
+		_ = ps.Unsubscribe(context.Background(), replyChanName)
+	}()
 	resCh := make(chan AgentInfo, 1)
 	reqCtx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
@@ -97,8 +100,10 @@ func (a *AgentClient) Ping(ctx context.Context) ([]AgentInfo, error) {
 
 func AgentServe(ctx context.Context, client redis.UniversalClient, url, fromStorage string) error {
 	ps := client.Subscribe(ctx, agentPing)
-	defer ps.Close()
-	defer ps.Unsubscribe(context.Background(), agentPing)
+	defer func() {
+		_ = ps.Close()
+		_ = ps.Unsubscribe(context.Background(), agentPing)
+	}()
 	messages := ps.Channel()
 	for {
 		select {

@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func TestApi_Migrate_test(t *testing.T) {
@@ -583,10 +584,10 @@ func TestApi_Migrate_test(t *testing.T) {
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.NotNil(repl.Replications[i].LastProcessedAt)
 		r.NotNil(repl.Replications[i].LastEmittedAt)
-		
+
 		r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
 		r.True(repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) || repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()))
-		
+
 		//		r.True(repl.Replications[i].LastProcessedAt.AsTime().Equal(repl.Replications[i].LastEmittedAt.AsTime()))
 		r.False(repl.Replications[i].LastEmittedAt.AsTime().IsZero())
 		r.False(repl.Replications[i].LastProcessedAt.AsTime().IsZero())

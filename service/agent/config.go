@@ -19,8 +19,9 @@ package agent
 import (
 	"embed"
 	"fmt"
-	"github.com/clyso/chorus/pkg/config"
 	"io/fs"
+
+	"github.com/clyso/chorus/pkg/config"
 )
 
 //go:embed config.yaml

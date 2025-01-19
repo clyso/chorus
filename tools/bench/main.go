@@ -16,10 +16,11 @@
 package main
 
 import (
-	"github.com/clyso/chorus/tools/bench/pkg/bench"
-	"github.com/clyso/chorus/tools/bench/pkg/config"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
+
+	"github.com/clyso/chorus/tools/bench/pkg/bench"
+	"github.com/clyso/chorus/tools/bench/pkg/config"
 )
 
 func main() {

@@ -18,10 +18,12 @@ package cmd
 
 import (
 	"context"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/tools/chorctl/internal/api"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/tools/chorctl/internal/api"
 )
 
 var (

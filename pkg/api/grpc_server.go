@@ -24,11 +24,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/trace"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/golang/protobuf/proto"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -42,6 +37,12 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/trace"
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
 func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerProvider, logConf *log.Config, version dom.AppInfo) (start func(context.Context) error, stop func(context.Context) error, err error) {

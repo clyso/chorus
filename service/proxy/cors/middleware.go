@@ -17,8 +17,9 @@
 package cors
 
 import (
-	"github.com/rs/cors"
 	"net/http"
+
+	"github.com/rs/cors"
 )
 
 func HttpMiddleware(conf *Config, next http.Handler) http.Handler {

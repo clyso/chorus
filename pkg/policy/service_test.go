@@ -18,13 +18,15 @@ package policy
 
 import (
 	"context"
-	"github.com/alicebob/miniredis/v2"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/redis/go-redis/v9"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func Test_policySvc_UserRoutingPolicy(t *testing.T) {

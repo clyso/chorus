@@ -17,11 +17,13 @@
 package router
 
 import (
+	"net/http"
+
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/rs/zerolog"
-	"net/http"
 )
 
 func Middleware(next http.Handler) http.Handler {

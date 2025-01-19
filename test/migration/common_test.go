@@ -22,8 +22,9 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/clyso/chorus/pkg/s3"
 	mclient "github.com/minio/minio-go/v7"
+
+	"github.com/clyso/chorus/pkg/s3"
 )
 
 type testObj struct {

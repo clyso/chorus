@@ -18,8 +18,10 @@ package standalone
 
 import (
 	"fmt"
-	"github.com/clyso/chorus/pkg/config"
+
 	"gopkg.in/yaml.v3"
+
+	"github.com/clyso/chorus/pkg/config"
 )
 
 func PrintConfig(src ...config.Src) error {

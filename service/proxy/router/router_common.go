@@ -22,11 +22,12 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/rs/zerolog"
 )
 
 func (r *router) commonRead(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
@@ -35,7 +36,7 @@ func (r *router) commonRead(req *http.Request) (resp *http.Response, storage str
 	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return nil, "", false, err
 	}
@@ -64,7 +65,7 @@ func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage st
 	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %v", dom.ErrPolicy, err)
+			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
 		}
 		return nil, "", false, err
 	}

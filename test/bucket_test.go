@@ -2,12 +2,13 @@ package test
 
 import (
 	"bytes"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/stretchr/testify/require"
 	"io"
 	"math/rand"
 	"testing"
 	"time"
+
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApi_MockBucket(t *testing.T) {

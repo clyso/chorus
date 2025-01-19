@@ -19,10 +19,12 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/clyso/chorus/pkg/dom"
+	"sync"
+
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
-	"sync"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 func NewServer() *server {

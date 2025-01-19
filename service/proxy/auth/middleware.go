@@ -20,12 +20,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/xml"
+	"net/http"
+
+	mclient "github.com/minio/minio-go/v7"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/util"
-	mclient "github.com/minio/minio-go/v7"
-	"net/http"
 )
 
 func Middleware(conf *Config, storages map[string]s3.Storage) *middleware {
@@ -49,7 +51,8 @@ func Middleware(conf *Config, storages map[string]s3.Storage) *middleware {
 }
 
 func Credentials(conf *Config, storages map[string]s3.Storage) []s3.CredentialsV4 {
-	var credentials []s3.CredentialsV4
+	credentialsCount := len(conf.Custom) + len(storages)
+	credentials := make([]s3.CredentialsV4, 0, credentialsCount)
 	for _, cred := range storages[conf.UseStorage].Credentials {
 		credentials = append(credentials, cred)
 	}

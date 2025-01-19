@@ -18,11 +18,12 @@ package rpc
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestAgent(t *testing.T) {

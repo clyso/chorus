@@ -22,7 +22,8 @@ import (
 
 const MB = 1000000
 
-var benchmark = [][]int64{
+//nolint:unused // TODO: Unless the global var is exported, it will be marked by linter as unused https://golangci-lint.run/usage/linters/#unused
+var benchmark = [7][2]int64{
 	{7 * MB, 9 * MB},
 	{35 * MB, 17 * MB},
 	{170 * MB, 27 * MB},
@@ -51,11 +52,12 @@ type MemCalculator struct {
 
 func (m MemCalculator) calcMemFromFileSize(fileSize int64) int64 {
 	var res int64
-	if fileSize < 2*MB {
+	switch {
+	case fileSize < 2*MB:
 		res = 2 * MB
-	} else if fileSize < 50*MB {
+	case fileSize < 50*MB:
 		res = fileSize
-	} else {
+	default:
 		res = 50 * MB
 	}
 	return int64(m.memMul*float64(res)) + m.memConst

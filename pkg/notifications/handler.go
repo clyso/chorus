@@ -18,6 +18,7 @@ package notifications
 
 import (
 	"context"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/tasks"

@@ -19,15 +19,17 @@ package s3client
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel/trace"
-	"net/http"
 )
 
 type Service interface {

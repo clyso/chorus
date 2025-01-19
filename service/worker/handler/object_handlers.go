@@ -23,6 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hibiken/asynq"
+	mclient "github.com/minio/minio-go/v7"
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
@@ -30,15 +34,12 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/rs/zerolog"
 )
 
 func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	var p tasks.ObjectSyncPayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("ObjectSyncPayload Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("ObjectSyncPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
