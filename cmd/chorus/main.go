@@ -149,6 +149,7 @@ func main() {
 	err = standalone.Start(ctx, dom.AppInfo{
 		Version: version,
 		Commit:  commit,
+		Date:    date,
 	}, conf)
 	if err != nil {
 		stdlog.Err(err).Msg("critical error. Shutdown application")

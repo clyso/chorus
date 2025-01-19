@@ -19,6 +19,7 @@ package dom
 type AppInfo struct {
 	Version string `yaml:"version"`
 	Commit  string `yaml:"commit"`
+	Date    string `yaml:"data"`
 	App     string `yaml:"app"`
 	AppID   string `yaml:"appID"`
 }

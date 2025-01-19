@@ -36,6 +36,7 @@ import (
 var (
 	version            = "development"
 	commit             = "not set"
+	date               = "not set"
 	configPath         = flag.String("config", "config/config.yaml", "set path to config directory")
 	configOverridePath = flag.String("config-override", "config/override.yaml", "set path to config override directory")
 )
@@ -67,6 +68,7 @@ func main() {
 	err = worker.Start(ctx, dom.AppInfo{
 		Version: version,
 		Commit:  commit,
+		Date:    date,
 		App:     "worker",
 		AppID:   xid.New().String(),
 	}, conf)
