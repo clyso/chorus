@@ -14,6 +14,7 @@ linters-settings:
   maligned:
     suggest-new: true
   staticcheck:
+    # TODO: decide what to do with static checks
     # checks: [ "all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022","-SA6005","-SA1019" ]
   gocritic:
     disabled-checks:

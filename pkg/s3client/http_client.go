@@ -103,7 +103,10 @@ func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsS
 	c.sns = sns.NewFromConfig(aws.Config{
 		Region:      "default",
 		Credentials: aws_credentials.NewStaticCredentialsProvider(conf.Credentials[user].AccessKeyID, conf.Credentials[user].SecretAccessKey, ""),
-		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		// EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		// 	return aws.Endpoint{URL: snsEndpoint}, nil
+		// }),
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, opts ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: snsEndpoint}, nil
 		}),
 	})

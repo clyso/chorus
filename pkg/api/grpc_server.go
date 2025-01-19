@@ -24,7 +24,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -36,6 +35,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/runtime/protoiface"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
@@ -170,7 +170,7 @@ func convertApiError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
-	details := []proto.Message{&errdetails.RequestInfo{RequestId: xctx.GetTraceID(ctx)}}
+	details := []protoiface.MessageV1{&errdetails.RequestInfo{RequestId: xctx.GetTraceID(ctx)}}
 	var code codes.Code
 	var mappedErr error
 	var retryErr *dom.ErrRateLimitExceeded
