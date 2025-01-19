@@ -1,3 +1,7 @@
+GIT_COMMIT=$(shell git log -1 --format=%H)
+GIT_TAG=$(shell git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
+BUILD_DATE=$(shell date -Ins)
+
 .PHONY: all
 all: agent chorus proxy worker chorctl bench
 
@@ -40,27 +44,27 @@ mkdir-build:
 
 .PHONY: agent
 agent: agent-bin
-	go build -o build/agent cmd/agent/main.go
+	go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o build/agent cmd/agent/main.go
 
 .PHONY: chorus
 chorus: chorus-bin
-	go build -o build/chorus cmd/chorus/main.go
+	go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o build/chorus cmd/chorus/main.go
 
 .PHONY: proxy
 proxy: proxy-bin
-	go build -o build/proxy cmd/proxy/main.go
+	go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o build/proxy cmd/proxy/main.go
 
 .PHONY: worker
 worker: worker-bin
-	go build -o build/worker cmd/worker/main.go
+	go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o build/worker cmd/worker/main.go
 
 .PHONY: chorctl
 chorctl: chorctl-bin
-	cd tools/chorctl; go build -o ../../build/chorctl main.go
+	cd tools/chorctl; go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o ../../build/chorctl main.go
 
 .PHONY: bench
 bench: bench-bin
-	cd tools/bench; go build -o ../../build/bench main.go
+	cd tools/bench; go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o ../../build/bench main.go
 
 .PHONY: clean
 clean:
