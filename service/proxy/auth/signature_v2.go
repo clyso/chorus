@@ -275,7 +275,7 @@ func unescapeQueries(encodedQuery string) (unescapedQueries []string, err error)
 }
 
 // Returns "/bucketName/objectName" for path-style or virtual-host-style requests.
-func getResource(path string, host string, domains []string) (string, error) {
+func getResource(path string, _ string, domains []string) (string, error) {
 	if len(domains) == 0 {
 		return path, nil
 	}

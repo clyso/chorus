@@ -129,7 +129,7 @@ func unaryServerAccessLog(ctx context.Context, req interface{}, info *grpc.Unary
 	return resp, err
 }
 
-func rpcLogHandler(l zerolog.Logger, err error, fullMethod string) {
+func rpcLogHandler(l zerolog.Logger, err error, _ string) {
 	s := status.Convert(err)
 	code, msg := s.Code(), s.Message()
 	switch code {

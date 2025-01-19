@@ -40,7 +40,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.S3Service, tp trace.TracerProvider) (Client, error) {
+func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.S3Service, _ trace.TracerProvider) (Client, error) {
 	c := &client{
 		c: &http.Client{
 			Timeout: conf.HttpTimeout,
