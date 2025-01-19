@@ -13,3 +13,4 @@ standalone
 standalone/
 **/*.tar.gz
 **/*.zip
+.build
