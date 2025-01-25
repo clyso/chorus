@@ -45,8 +45,8 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService, storageSvc storage.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service) pb.ChorusServer {
-	return &handlers{storages: storages, rclone: rclone, s3clients: s3clients, taskClient: taskClient, policySvc: policySvc, versionSvc: versionSvc, storageSvc: storageSvc, locker: locker, proxyClient: proxyClient, agentClient: agentClient, notificationSvc: notificationSvc}
+func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService, storageSvc storage.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service, appInfo *dom.AppInfo) pb.ChorusServer {
+	return &handlers{storages: storages, rclone: rclone, s3clients: s3clients, taskClient: taskClient, policySvc: policySvc, versionSvc: versionSvc, storageSvc: storageSvc, locker: locker, proxyClient: proxyClient, agentClient: agentClient, notificationSvc: notificationSvc, appInfo: appInfo}
 }
 
 var _ pb.ChorusServer = &handlers{}
@@ -63,6 +63,15 @@ type handlers struct {
 	proxyClient     rpc.Proxy
 	agentClient     *rpc.AgentClient
 	notificationSvc *notifications.Service
+	appInfo         *dom.AppInfo
+}
+
+func (h *handlers) GetAppVersion(_ context.Context, _ *emptypb.Empty) (*pb.GetAppVersionResponse, error) {
+	return &pb.GetAppVersionResponse{
+		Version: h.appInfo.Version,
+		Commit:  h.appInfo.Commit,
+		Date:    h.appInfo.Date,
+	}, nil
 }
 
 func (h *handlers) GetStorages(_ context.Context, _ *emptypb.Empty) (*pb.GetStoragesResponse, error) {

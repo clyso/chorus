@@ -9,10 +9,13 @@ import "google/protobuf/empty.proto";
 
 
 service Chorus {
+  // Get app version
+  rpc GetAppVersion(google.protobuf.Empty) returns (GetAppVersionResponse);
+
   // Lists configured storages with users
-  rpc GetStorages (google.protobuf.Empty) returns (GetStoragesResponse);
+  rpc GetStorages(google.protobuf.Empty) returns (GetStoragesResponse);
   // Returns connection details for proxy s3 endpoint
-  rpc GetProxyCredentials(google.protobuf.Empty)returns (GetProxyCredentialsResponse);
+  rpc GetProxyCredentials(google.protobuf.Empty) returns (GetProxyCredentialsResponse);
 
   // Returns list of buckets to configure new replication.
   rpc ListBucketsForReplication(ListBucketsForReplicationRequest) returns (ListBucketsForReplicationResponse);
@@ -22,7 +25,7 @@ service Chorus {
   rpc ListReplications(google.protobuf.Empty) returns (ListReplicationsResponse);
   rpc ListUserReplications(google.protobuf.Empty) returns (ListUserReplicationsResponse);
 
-  rpc StreamBucketReplication(ReplicationRequest) returns  (stream Replication);
+  rpc StreamBucketReplication(ReplicationRequest) returns (stream Replication);
 
   // Pauses given replication
   rpc PauseReplication(ReplicationRequest) returns (google.protobuf.Empty);
@@ -37,9 +40,15 @@ service Chorus {
   // Compares contents of given bucket in given storages
   rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse);
 
-  rpc GetAgents(google.protobuf.Empty)returns(GetAgentsResponse);
+  rpc GetAgents(google.protobuf.Empty) returns (GetAgentsResponse);
 
   rpc AddBucketReplication(AddBucketReplicationRequest) returns (google.protobuf.Empty);
+}
+
+message GetAppVersionResponse {
+  string version = 1;
+  string commit = 2;
+  string date = 3;
 }
 
 message GetStoragesResponse {
@@ -129,7 +138,7 @@ message Replication{
   string user = 1;
   string bucket = 2;
   string from = 3;
-  string  to = 4;
+  string to = 4;
 
   google.protobuf.Timestamp created_at = 5;
   bool is_paused = 6;

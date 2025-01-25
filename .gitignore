@@ -14,3 +14,4 @@ standalone/
 **/*.tar.gz
 **/*.zip
 build/
+.tools/

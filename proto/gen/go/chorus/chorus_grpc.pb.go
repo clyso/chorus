@@ -20,6 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	Chorus_GetAppVersion_FullMethodName             = "/chorus.Chorus/GetAppVersion"
 	Chorus_GetStorages_FullMethodName               = "/chorus.Chorus/GetStorages"
 	Chorus_GetProxyCredentials_FullMethodName       = "/chorus.Chorus/GetProxyCredentials"
 	Chorus_ListBucketsForReplication_FullMethodName = "/chorus.Chorus/ListBucketsForReplication"
@@ -41,6 +42,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChorusClient interface {
+	// Get app version
+	GetAppVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAppVersionResponse, error)
 	// Lists configured storages with users
 	GetStorages(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStoragesResponse, error)
 	// Returns connection details for proxy s3 endpoint
@@ -73,6 +76,16 @@ type chorusClient struct {
 
 func NewChorusClient(cc grpc.ClientConnInterface) ChorusClient {
 	return &chorusClient{cc}
+}
+
+func (c *chorusClient) GetAppVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAppVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAppVersionResponse)
+	err := c.cc.Invoke(ctx, Chorus_GetAppVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *chorusClient) GetStorages(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStoragesResponse, error) {
@@ -238,6 +251,8 @@ func (c *chorusClient) AddBucketReplication(ctx context.Context, in *AddBucketRe
 // All implementations should embed UnimplementedChorusServer
 // for forward compatibility.
 type ChorusServer interface {
+	// Get app version
+	GetAppVersion(context.Context, *emptypb.Empty) (*GetAppVersionResponse, error)
 	// Lists configured storages with users
 	GetStorages(context.Context, *emptypb.Empty) (*GetStoragesResponse, error)
 	// Returns connection details for proxy s3 endpoint
@@ -271,6 +286,9 @@ type ChorusServer interface {
 // pointer dereference when methods are called.
 type UnimplementedChorusServer struct{}
 
+func (UnimplementedChorusServer) GetAppVersion(context.Context, *emptypb.Empty) (*GetAppVersionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAppVersion not implemented")
+}
 func (UnimplementedChorusServer) GetStorages(context.Context, *emptypb.Empty) (*GetStoragesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStorages not implemented")
 }
@@ -334,6 +352,24 @@ func RegisterChorusServer(s grpc.ServiceRegistrar, srv ChorusServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Chorus_ServiceDesc, srv)
+}
+
+func _Chorus_GetAppVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).GetAppVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_GetAppVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).GetAppVersion(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Chorus_GetStorages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -606,6 +642,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "chorus.Chorus",
 	HandlerType: (*ChorusServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetAppVersion",
+			Handler:    _Chorus_GetAppVersion_Handler,
+		},
 		{
 			MethodName: "GetStorages",
 			Handler:    _Chorus_GetStorages_Handler,
