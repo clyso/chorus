@@ -1,5 +1,5 @@
 /*
- * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/sirupsen/logrus"
@@ -31,47 +32,41 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// lsUserCmd represents the lsUser command
-var lsUserCmd = &cobra.Command{
-	Use:   "ls-user",
-	Short: "Lists user-level replications",
+var consistencyCmd = &cobra.Command{
+	Use:   "consistency",
+	Short: "list consistency checks",
 	Long: `Example:
-chorctl repl ls-user`,
+chorctl consistency 87009fd62551da208508`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		conn, err := api.Connect(ctx, address)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
 
-		res, err := client.ListUserReplications(ctx, &emptypb.Empty{})
+		client := pb.NewChorusClient(conn)
+		res, err := client.ListConsistencyChecks(ctx, &emptypb.Empty{})
 		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get buckets for replication")
+			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency checks")
 		}
+
+		sort.Slice(res.Checks, func(i, j int) bool {
+			return res.Checks[i].Id < res.Checks[j].Id
+		})
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, "FROM\tTO\tUSER")
-		for _, m := range res.Replications {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", m.From, m.To, m.User)
+		fmt.Fprintln(w, api.ConsistencyCheckHeader())
+		for _, check := range res.Checks {
+			fmt.Fprintln(w, api.ConsistencyCheckRow(check))
 		}
 		w.Flush()
 	},
 }
 
 func init() {
-	replCmd.AddCommand(lsUserCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// lsUserCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// lsUserCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(consistencyCmd)
 }

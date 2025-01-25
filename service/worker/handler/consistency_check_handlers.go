@@ -10,7 +10,6 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/minio/minio-go/v7"
-	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
@@ -31,17 +30,17 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 	}
 
 	locationCount := len(payload.Locations)
+	storages := make([]string, 0, locationCount)
 
 	if locationCount == 0 {
 		return fmt.Errorf("migration location list is empty: %w", asynq.SkipRetry)
 	}
 
-	consistencyCheckID := xid.New().String()
 	for _, location := range payload.Locations {
 		listTask := tasks.ConsistencyCheckListPayload{
 			MigrateLocation: location,
 			StorageCount:    uint8(locationCount),
-			ID:              consistencyCheckID,
+			ID:              payload.ID,
 		}
 
 		task, err := tasks.NewTask(ctx, listTask)
@@ -49,17 +48,26 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 			return fmt.Errorf("unable to create consistency check list task: %w", err)
 		}
 
-		if err := s.storageSvc.IncrementConsistencyCheckScheduledCounter(ctx, consistencyCheckID, 1); err != nil {
+		if err := s.storageSvc.IncrementConsistencyCheckScheduledCounter(ctx, payload.ID, 1); err != nil {
 			return fmt.Errorf("unable to increment consistency check scheduled counter: %w", err)
 		}
 
 		if _, err := s.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
+
+		storages = append(storages, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
 	}
 
 	readinessTask := tasks.ConsistencyCheckReadinessPayload{
-		ID: consistencyCheckID,
+		ID: payload.ID,
+	}
+
+	if err := s.storageSvc.SetConsistencyCheckStorages(ctx, payload.ID, storages); err != nil {
+		return fmt.Errorf("unable to record consistency check storages: %w", err)
+	}
+	if err := s.storageSvc.SetConsistencyCheckReadiness(ctx, payload.ID, false); err != nil {
+		return fmt.Errorf("unable to record consistency check readiness: %w", err)
 	}
 
 	task, err := tasks.NewTask(ctx, readinessTask)
@@ -225,23 +233,15 @@ func (s *svc) HandleConsistencyCheckReadiness(ctx context.Context, t *asynq.Task
 		return &dom.ErrRateLimitExceeded{RetryIn: util.DurationJitter(time.Second, time.Second*5)}
 	}
 
-	resultPayload := tasks.ConsistencyCheckResultPayload(readinessPayload)
-
-	resultTask, err := tasks.NewTask(ctx, resultPayload)
-	if err != nil {
-		return fmt.Errorf("unable to create consistency check result task: %w", err)
-	}
-
-	_, err = s.taskClient.EnqueueContext(ctx, resultTask)
-	if !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-		return fmt.Errorf("unable to enqueue result task: %w", err)
+	if err := s.storageSvc.SetConsistencyCheckReadiness(ctx, readinessPayload.ID, true); err != nil {
+		return fmt.Errorf("unable to set readiness to true: %w", err)
 	}
 
 	return nil
 }
 
-func (s *svc) HandleConsistencyCheckResult(ctx context.Context, t *asynq.Task) (err error) {
-	var payload tasks.ConsistencyCheckResultPayload
+func (s *svc) HandleConsistencyCheckDelete(ctx context.Context, t *asynq.Task) (err error) {
+	var payload tasks.ConsistencyCheckDeletePayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
 		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
 	}
@@ -260,6 +260,12 @@ func (s *svc) HandleConsistencyCheckResult(ctx context.Context, t *asynq.Task) (
 	}
 	if err := s.storageSvc.DeleteConsistencyCheckID(ctx, payload.ID); err != nil {
 		return fmt.Errorf("unable to delete consistency check id: %w", err)
+	}
+	if err := s.storageSvc.DeleteConsistencyCheckStorages(ctx, payload.ID); err != nil {
+		return fmt.Errorf("unable to delete consistency check storages: %w", err)
+	}
+	if err := s.storageSvc.DeleteConsistencyCheckReadiness(ctx, payload.ID); err != nil {
+		return fmt.Errorf("unable tp delete consistency check readiness flag: %w", err)
 	}
 
 	return nil

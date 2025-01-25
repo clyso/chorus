@@ -38,6 +38,123 @@
         ]
       }
     },
+    "/consistency/delete": {
+      "put": {
+        "operationId": "Chorus_DeleteConsistencyCheckReport",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusDeleteConsistencyCheckReportRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/consistency/list": {
+      "get": {
+        "operationId": "Chorus_ListConsistencyChecks",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListConsistencyChecksResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/consistency/report": {
+      "get": {
+        "operationId": "Chorus_GetConsistencyCheckReport",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetConsistencyCheckReportResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/consistency/start": {
+      "post": {
+        "operationId": "Chorus_StartConsistencyCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusStartConsistencyCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusStartConsistencyCheckRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/proxy": {
       "get": {
         "summary": "Returns connection details for proxy s3 endpoint",
@@ -647,6 +764,49 @@
         }
       }
     },
+    "chorusConsistencyCheck": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        },
+        "queued": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "completed": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "ready": {
+          "type": "boolean"
+        }
+      }
+    },
+    "chorusConsistencyCheckReportEntry": {
+      "type": "object",
+      "properties": {
+        "object": {
+          "type": "string"
+        },
+        "etag": {
+          "type": "string"
+        },
+        "storages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "chorusCredential": {
       "type": "object",
       "properties": {
@@ -657,6 +817,14 @@
           "type": "string"
         },
         "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusDeleteConsistencyCheckReportRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
           "type": "string"
         }
       }
@@ -701,6 +869,21 @@
         },
         "date": {
           "type": "string"
+        }
+      }
+    },
+    "chorusGetConsistencyCheckReportResponse": {
+      "type": "object",
+      "properties": {
+        "check": {
+          "$ref": "#/definitions/chorusConsistencyCheck"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusConsistencyCheckReportEntry"
+          }
         }
       }
     },
@@ -765,6 +948,18 @@
         }
       }
     },
+    "chorusListConsistencyChecksResponse": {
+      "type": "object",
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusConsistencyCheck"
+          }
+        }
+      }
+    },
     "chorusListReplicationsResponse": {
       "type": "object",
       "properties": {
@@ -786,6 +981,17 @@
             "type": "object",
             "$ref": "#/definitions/chorusUserReplication"
           }
+        }
+      }
+    },
+    "chorusMigrateLocation": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
         }
       }
     },
@@ -877,6 +1083,26 @@
           "type": "string"
         },
         "toBucket": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusStartConsistencyCheckRequest": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        }
+      }
+    },
+    "chorusStartConsistencyCheckResponse": {
+      "type": "object",
+      "properties": {
+        "id": {
           "type": "string"
         }
       }

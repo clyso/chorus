@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -64,6 +65,141 @@ type handlers struct {
 	agentClient     *rpc.AgentClient
 	notificationSvc *notifications.Service
 	appInfo         *dom.AppInfo
+}
+
+func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsistencyCheckRequest) (*pb.StartConsistencyCheckResponse, error) {
+	consistencyCheckID := xid.New().String()
+
+	locations := make([]tasks.MigrateLocation, 0, len(req.Locations))
+	for _, location := range req.Locations {
+		locations = append(locations, tasks.MigrateLocation{
+			Storage: location.Storage,
+			Bucket:  location.Bucket,
+		})
+	}
+
+	consistencyCheckTask := tasks.ConsistencyCheckPayload{
+		ID:        consistencyCheckID,
+		Locations: locations,
+	}
+
+	task, err := tasks.NewTask(ctx, consistencyCheckTask)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create consistency check task: %w", err)
+	}
+	if _, err := h.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		return nil, fmt.Errorf("unable to enqueue consistency check readiness task: %w", err)
+	}
+
+	return &pb.StartConsistencyCheckResponse{
+		Id: consistencyCheckID,
+	}, nil
+}
+
+func (h *handlers) ListConsistencyChecks(ctx context.Context, _ *emptypb.Empty) (*pb.ListConsistencyChecksResponse, error) {
+	ids, err := h.storageSvc.ListConsistencyCheckIDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list consistency check ids: %w", err)
+	}
+
+	consistencyChecks := make([]*pb.ConsistencyCheck, 0, len(ids))
+	for _, id := range ids {
+		consistencyCheck, err := h.constructConsistencyCheck(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("unable to construct consistency check: %w", err)
+		}
+
+		consistencyChecks = append(consistencyChecks, consistencyCheck)
+	}
+
+	return &pb.ListConsistencyChecksResponse{
+		Checks: consistencyChecks,
+	}, nil
+}
+
+func (h *handlers) constructConsistencyCheck(ctx context.Context, id string) (*pb.ConsistencyCheck, error) {
+	completedCounter, err := h.storageSvc.GetConsistencyCheckCompletedCounter(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get complete counter: %w", err)
+	}
+	scheduledCounter, err := h.storageSvc.GetConsistencyCheckScheduledCounter(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get scheduled counter: %w", err)
+	}
+	ready, err := h.storageSvc.GetConsistencyCheckReadiness(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get readiness: %w", err)
+	}
+	checkedStorages, err := h.storageSvc.GetConsistencyCheckStorages(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get storages: %w", err)
+	}
+
+	migrateLocations := make([]*pb.MigrateLocation, 0, len(checkedStorages))
+	for _, checkedStorage := range checkedStorages {
+		storage, bucket, found := strings.Cut(checkedStorage, ":")
+		if !found {
+			return nil, fmt.Errorf("can not separate storage from bucket in %s", checkedStorages)
+		}
+		migrateLocations = append(migrateLocations, &pb.MigrateLocation{
+			Storage: storage,
+			Bucket:  bucket,
+		})
+	}
+
+	return &pb.ConsistencyCheck{
+		Queued:    scheduledCounter,
+		Completed: completedCounter,
+		Locations: migrateLocations,
+		Ready:     ready,
+	}, nil
+}
+
+func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.GetConsistencyCheckReportRequest) (*pb.GetConsistencyCheckReportResponse, error) {
+	consistencyCheck, err := h.constructConsistencyCheck(ctx, req.Id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to construct consistency check: %w", err)
+	}
+	if !consistencyCheck.Ready {
+		return &pb.GetConsistencyCheckReportResponse{
+			Check: consistencyCheck,
+		}, nil
+	}
+
+	checkSets, err := h.storageSvc.FindConsistencyCheckSets(ctx, req.Id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get consistency check sets")
+	}
+
+	reportEntries := make([]*pb.ConsistencyCheckReportEntry, 0, len(checkSets))
+	for _, checkSet := range checkSets {
+		reportEntries = append(reportEntries, &pb.ConsistencyCheckReportEntry{
+			Object:   checkSet.Object,
+			Etag:     checkSet.ETag,
+			Storages: checkSet.Storages,
+		})
+	}
+
+	return &pb.GetConsistencyCheckReportResponse{
+		Check:   consistencyCheck,
+		Entries: reportEntries,
+	}, nil
+}
+
+func (h *handlers) DeleteConsistencyCheckReport(ctx context.Context, req *pb.DeleteConsistencyCheckReportRequest) (*emptypb.Empty, error) {
+	deleteConsistencyCheckReportTask := tasks.ConsistencyCheckDeletePayload{
+		ID: req.Id,
+	}
+
+	task, err := tasks.NewTask(ctx, deleteConsistencyCheckReportTask)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create consistency check readiness task: %w", err)
+	}
+	if _, err := h.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		return nil, fmt.Errorf("unable to enqueue consistency check readiness task: %w", err)
+	}
+
+	return nil, nil
 }
 
 func (h *handlers) GetAppVersion(_ context.Context, _ *emptypb.Empty) (*pb.GetAppVersionResponse, error) {
