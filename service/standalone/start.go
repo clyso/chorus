@@ -124,7 +124,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	workerConf := conf.Config
-	workerConf.Redis.Addresses = []string{redisSvc.Addr()}
+	if len(workerConf.Redis.Addresses) == 0 {
+		workerConf.Redis.Addresses = []string{redisSvc.Addr()}
+	}
 
 	// deep copy worker config
 	wcBytes, err := yaml.Marshal(&workerConf)
@@ -149,7 +151,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			Storage: conf.Storage,
 			Cors:    conf.Proxy.Cors,
 		}
-		proxyConf.Redis.Addresses = []string{redisSvc.Addr()}
+		if len(proxyConf.Redis.Addresses) == 0 {
+			proxyConf.Redis.Addresses = []string{redisSvc.Addr()}
+		}
 
 		// deep copy proxy config
 		pcBytes, err := yaml.Marshal(&proxyConf)
