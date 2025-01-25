@@ -18,6 +18,7 @@ package api
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -138,4 +139,41 @@ func DurationToStr(age time.Duration) string {
 		return fmt.Sprintf("%dd%dh", int(age.Hours()/24), int(age.Hours())%24)
 	}
 	return fmt.Sprintf("%dd", int(age.Hours()/24))
+}
+
+func ConsistencyCheckHeader() string {
+	return "ID\tREADY\tQUEUED\tCOMPLETED\tSTORAGES"
+}
+
+func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
+	storageLocations := make([]string, 0, len(in.Locations))
+	for _, location := range in.Locations {
+		storageLocations = append(storageLocations, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
+	}
+	return fmt.Sprintf("%s\t%t\t%d\t%d\t%s", in.Id, in.Ready, in.Queued, in.Completed, strings.Join(storageLocations, ", "))
+}
+
+func ConsistencyCheckReportBrief(in *pb.ConsistencyCheck, hasErrors bool) string {
+	briefTable := `ID:\t%s
+READY:\t%t
+QUEUED:\t%d
+COMPLETED:\t%d
+HAS ERRORS:\t%t`
+	return fmt.Sprintf(briefTable, in.Id, in.Ready, in.Queued, in.Completed, hasErrors)
+}
+
+func ConsistencyCheckReportHeader(storages []string) string {
+	return fmt.Sprintf("PATH\tETAG\t%s", strings.Join(storages, "\t"))
+}
+
+func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry) string {
+	storageMarkers := ""
+	for _, storage := range storages {
+		if slices.Contains(entry.Storages, storage) {
+			storageMarkers += "\t✓"
+		} else {
+			storageMarkers += "\tX"
+		}
+	}
+	return fmt.Sprintf("%s\t%s%s", entry.Object, entry.Etag, storageMarkers)
 }

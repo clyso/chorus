@@ -384,6 +384,104 @@ func local_request_Chorus_GetReplication_0(ctx context.Context, marshaler runtim
 	return msg, metadata, err
 }
 
+func request_Chorus_StartConsistencyCheck_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq StartConsistencyCheckRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.StartConsistencyCheck(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Chorus_StartConsistencyCheck_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq StartConsistencyCheckRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.StartConsistencyCheck(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_Chorus_ListConsistencyChecks_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
+	msg, err := client.ListConsistencyChecks(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Chorus_ListConsistencyChecks_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
+	msg, err := server.ListConsistencyChecks(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+var filter_Chorus_GetConsistencyCheckReport_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+
+func request_Chorus_GetConsistencyCheckReport_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetConsistencyCheckReportRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Chorus_GetConsistencyCheckReport_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.GetConsistencyCheckReport(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Chorus_GetConsistencyCheckReport_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetConsistencyCheckReportRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Chorus_GetConsistencyCheckReport_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.GetConsistencyCheckReport(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_Chorus_DeleteConsistencyCheckReport_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq DeleteConsistencyCheckReportRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.DeleteConsistencyCheckReport(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Chorus_DeleteConsistencyCheckReport_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq DeleteConsistencyCheckReportRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.DeleteConsistencyCheckReport(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 // RegisterChorusHandlerServer registers the http handlers for service Chorus to "mux".
 // UnaryRPC     :call ChorusServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -710,6 +808,86 @@ func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		}
 		forward_Chorus_GetReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Chorus_StartConsistencyCheck_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/StartConsistencyCheck", runtime.WithHTTPPathPattern("/consistency/start"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Chorus_StartConsistencyCheck_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_StartConsistencyCheck_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_Chorus_ListConsistencyChecks_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/ListConsistencyChecks", runtime.WithHTTPPathPattern("/consistency/list"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Chorus_ListConsistencyChecks_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_ListConsistencyChecks_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_Chorus_GetConsistencyCheckReport_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetConsistencyCheckReport", runtime.WithHTTPPathPattern("/consistency/report"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Chorus_GetConsistencyCheckReport_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_GetConsistencyCheckReport_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_Chorus_DeleteConsistencyCheckReport_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/DeleteConsistencyCheckReport", runtime.WithHTTPPathPattern("/consistency/delete"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Chorus_DeleteConsistencyCheckReport_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_DeleteConsistencyCheckReport_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 
 	return nil
 }
@@ -1022,6 +1200,74 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		}
 		forward_Chorus_GetReplication_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Chorus_StartConsistencyCheck_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/StartConsistencyCheck", runtime.WithHTTPPathPattern("/consistency/start"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Chorus_StartConsistencyCheck_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_StartConsistencyCheck_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_Chorus_ListConsistencyChecks_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/ListConsistencyChecks", runtime.WithHTTPPathPattern("/consistency/list"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Chorus_ListConsistencyChecks_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_ListConsistencyChecks_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_Chorus_GetConsistencyCheckReport_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetConsistencyCheckReport", runtime.WithHTTPPathPattern("/consistency/report"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Chorus_GetConsistencyCheckReport_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_GetConsistencyCheckReport_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_Chorus_DeleteConsistencyCheckReport_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/DeleteConsistencyCheckReport", runtime.WithHTTPPathPattern("/consistency/delete"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Chorus_DeleteConsistencyCheckReport_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_DeleteConsistencyCheckReport_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
@@ -1042,6 +1288,25 @@ var (
 	pattern_Chorus_GetAgents_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"agents"}, ""))
 	pattern_Chorus_AddBucketReplication_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v2", "replication", "add"}, ""))
 	pattern_Chorus_GetReplication_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "get"}, ""))
+	pattern_Chorus_GetAppVersion_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"version"}, ""))
+	pattern_Chorus_GetStorages_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"storage"}, ""))
+	pattern_Chorus_GetProxyCredentials_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"proxy"}, ""))
+	pattern_Chorus_ListBucketsForReplication_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "list-buckets"}, ""))
+	pattern_Chorus_AddReplication_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "add"}, ""))
+	pattern_Chorus_ListReplications_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"replication"}, ""))
+	pattern_Chorus_ListUserReplications_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "user"}, ""))
+	pattern_Chorus_PauseReplication_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "pause"}, ""))
+	pattern_Chorus_ResumeReplication_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "resume"}, ""))
+	pattern_Chorus_DeleteReplication_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "delete"}, ""))
+	pattern_Chorus_DeleteUserReplication_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "user", "delete"}, ""))
+	pattern_Chorus_SwitchMainBucket_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "switch"}, ""))
+	pattern_Chorus_CompareBucket_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "compare-bucket"}, ""))
+	pattern_Chorus_GetAgents_0                    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"agents"}, ""))
+	pattern_Chorus_AddBucketReplication_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v2", "replication", "add"}, ""))
+	pattern_Chorus_StartConsistencyCheck_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "start"}, ""))
+	pattern_Chorus_ListConsistencyChecks_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "list"}, ""))
+	pattern_Chorus_GetConsistencyCheckReport_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "report"}, ""))
+	pattern_Chorus_DeleteConsistencyCheckReport_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "delete"}, ""))
 )
 
 var (
@@ -1061,4 +1326,23 @@ var (
 	forward_Chorus_GetAgents_0                 = runtime.ForwardResponseMessage
 	forward_Chorus_AddBucketReplication_0      = runtime.ForwardResponseMessage
 	forward_Chorus_GetReplication_0            = runtime.ForwardResponseMessage
+	forward_Chorus_GetAppVersion_0                = runtime.ForwardResponseMessage
+	forward_Chorus_GetStorages_0                  = runtime.ForwardResponseMessage
+	forward_Chorus_GetProxyCredentials_0          = runtime.ForwardResponseMessage
+	forward_Chorus_ListBucketsForReplication_0    = runtime.ForwardResponseMessage
+	forward_Chorus_AddReplication_0               = runtime.ForwardResponseMessage
+	forward_Chorus_ListReplications_0             = runtime.ForwardResponseMessage
+	forward_Chorus_ListUserReplications_0         = runtime.ForwardResponseMessage
+	forward_Chorus_PauseReplication_0             = runtime.ForwardResponseMessage
+	forward_Chorus_ResumeReplication_0            = runtime.ForwardResponseMessage
+	forward_Chorus_DeleteReplication_0            = runtime.ForwardResponseMessage
+	forward_Chorus_DeleteUserReplication_0        = runtime.ForwardResponseMessage
+	forward_Chorus_SwitchMainBucket_0             = runtime.ForwardResponseMessage
+	forward_Chorus_CompareBucket_0                = runtime.ForwardResponseMessage
+	forward_Chorus_GetAgents_0                    = runtime.ForwardResponseMessage
+	forward_Chorus_AddBucketReplication_0         = runtime.ForwardResponseMessage
+	forward_Chorus_StartConsistencyCheck_0        = runtime.ForwardResponseMessage
+	forward_Chorus_ListConsistencyChecks_0        = runtime.ForwardResponseMessage
+	forward_Chorus_GetConsistencyCheckReport_0    = runtime.ForwardResponseMessage
+	forward_Chorus_DeleteConsistencyCheckReport_0 = runtime.ForwardResponseMessage
 )

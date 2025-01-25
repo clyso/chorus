@@ -45,6 +45,55 @@ service Chorus {
   rpc AddBucketReplication(AddBucketReplicationRequest) returns (google.protobuf.Empty);
 
   rpc GetReplication(ReplicationRequest) returns (Replication);
+
+  rpc StartConsistencyCheck(StartConsistencyCheckRequest) returns (StartConsistencyCheckResponse);
+  rpc ListConsistencyChecks(google.protobuf.Empty) returns (ListConsistencyChecksResponse);
+  rpc GetConsistencyCheckReport(GetConsistencyCheckReportRequest) returns (GetConsistencyCheckReportResponse);
+  rpc DeleteConsistencyCheckReport(DeleteConsistencyCheckReportRequest) returns (google.protobuf.Empty);
+}
+
+message MigrateLocation {
+  string storage = 1;
+  string bucket = 2;
+}
+
+message StartConsistencyCheckRequest {
+  repeated MigrateLocation locations = 1;
+}
+
+message StartConsistencyCheckResponse {
+  string id = 1;
+}
+
+message ConsistencyCheck {
+  string id = 1;
+  repeated MigrateLocation locations = 2;
+  uint64 queued = 3;
+  uint64 completed = 4;
+  bool ready = 5;
+}
+
+message ListConsistencyChecksResponse {
+  repeated ConsistencyCheck checks = 1;
+}
+
+message GetConsistencyCheckReportRequest {
+  string id = 1;
+}
+
+message ConsistencyCheckReportEntry {
+  string object = 1;
+  string etag = 2;
+  repeated string storages = 3;
+}
+
+message GetConsistencyCheckReportResponse {
+  ConsistencyCheck check = 1;
+  repeated ConsistencyCheckReportEntry entries = 2;
+}
+
+message DeleteConsistencyCheckReportRequest {
+  string id = 1;
 }
 
 message GetAppVersionResponse {

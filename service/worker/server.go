@@ -221,7 +221,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeConsistencyCheck, workerSvc.HandleConsistencyCheck)
 	mux.HandleFunc(tasks.TypeConsistencyCheckList, workerSvc.HandleConsistencyCheckList)
 	mux.HandleFunc(tasks.TypeConsistencyCheckReadiness, workerSvc.HandleConsistencyCheckReadiness)
-	mux.HandleFunc(tasks.TypeConsistencyCheckResult, workerSvc.HandleConsistencyCheckResult)
+	mux.HandleFunc(tasks.TypeConsistencyCheckResult, workerSvc.HandleConsistencyCheckDelete)
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
