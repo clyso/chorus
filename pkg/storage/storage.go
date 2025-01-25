@@ -88,15 +88,22 @@ type Service interface {
 	IncrementConsistencyCheckCompletedCounter(ctx context.Context, id string, count int64) error
 	DecrementConsistencyCheckScheduledCounter(ctx context.Context, id string, count int64) error
 	DecrementConsistencyCheckCompletedCounter(ctx context.Context, id string, count int64) error
-	GetConsistencyCheckScheduledCounter(ctx context.Context, id string) (string, error)
-	GetConsistencyCheckCompletedCounter(ctx context.Context, id string) (string, error)
+	GetConsistencyCheckScheduledCounter(ctx context.Context, id string) (uint64, error)
+	GetConsistencyCheckCompletedCounter(ctx context.Context, id string) (uint64, error)
 	DeleteConsistencyCheckScheduledCounter(ctx context.Context, id string) error
 	DeleteConsistencyCheckCompletedCounter(ctx context.Context, id string) error
 	StoreConsistencyCheckID(ctx context.Context, id string) error
 	DeleteConsistencyCheckID(ctx context.Context, id string) error
+	ListConsistencyCheckIDs(ctx context.Context) ([]string, error)
 	AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyCheckRecord) error
 	FindConsistencyCheckSets(ctx context.Context, id string) ([]ConsistencyCheckResultEntry, error)
 	DeleteAllConsistencyCheckSets(ctx context.Context, id string) error
+	SetConsistencyCheckReadiness(ctx context.Context, id string, ready bool) error
+	GetConsistencyCheckReadiness(ctx context.Context, id string) (bool, error)
+	DeleteConsistencyCheckReadiness(ctx context.Context, id string) error
+	SetConsistencyCheckStorages(ctx context.Context, id string, storages []string) error
+	GetConsistencyCheckStorages(ctx context.Context, id string) ([]string, error)
+	DeleteConsistencyCheckStorages(ctx context.Context, id string) error
 }
 
 func New(client redis.UniversalClient) Service {
@@ -314,24 +321,24 @@ func (s *svc) DecrementConsistencyCheckCompletedCounter(ctx context.Context, id 
 	return nil
 }
 
-func (s *svc) GetConsistencyCheckScheduledCounter(ctx context.Context, id string) (string, error) {
+func (s *svc) GetConsistencyCheckScheduledCounter(ctx context.Context, id string) (uint64, error) {
 	key := fmt.Sprintf("ccv:c:%s:scheduled", id)
-	cmd := s.client.Get(ctx, key)
-	if cmd.Err() != nil {
-		return "", fmt.Errorf("unable to get amount of scheduled consistency check tasks: %w", cmd.Err())
+	count, err := s.client.Get(ctx, key).Uint64()
+	if err != nil {
+		return 0, fmt.Errorf("unable to get amount of scheduled consistency check tasks: %w", err)
 	}
 
-	return cmd.Val(), nil
+	return count, nil
 }
 
-func (s *svc) GetConsistencyCheckCompletedCounter(ctx context.Context, id string) (string, error) {
+func (s *svc) GetConsistencyCheckCompletedCounter(ctx context.Context, id string) (uint64, error) {
 	key := fmt.Sprintf("ccv:c:%s:completed", id)
-	cmd := s.client.Get(ctx, key)
-	if cmd.Err() != nil {
-		return "", fmt.Errorf("unable to get amount of scheduled consistency check tasks: %w", cmd.Err())
+	count, err := s.client.Get(ctx, key).Uint64()
+	if err != nil {
+		return 0, fmt.Errorf("unable to get amount of scheduled consistency check tasks: %w", err)
 	}
 
-	return cmd.Val(), nil
+	return count, nil
 }
 
 func (s *svc) DeleteConsistencyCheckScheduledCounter(ctx context.Context, id string) error {
@@ -373,6 +380,18 @@ func (s *svc) DeleteConsistencyCheckID(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *svc) ListConsistencyCheckIDs(ctx context.Context) ([]string, error) {
+	res, err := s.client.SMembers(ctx, "ccv:id").Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to list set: %w", err)
+	}
+
+	return res, nil
 }
 
 func (s *svc) AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyCheckRecord) error {
@@ -455,5 +474,55 @@ func (s *svc) DeleteAllConsistencyCheckSets(ctx context.Context, id string) erro
 		cursor = nextCursor
 	}
 
+	return nil
+}
+
+func (s *svc) SetConsistencyCheckReadiness(ctx context.Context, id string, ready bool) error {
+	key := fmt.Sprintf("ccv:r:%s", id)
+	if err := s.client.Set(ctx, key, ready, lastListedObjTTL).Err(); err != nil {
+		return fmt.Errorf("unable to set readiness flag: %w", err)
+	}
+	return nil
+}
+
+func (s *svc) GetConsistencyCheckReadiness(ctx context.Context, id string) (bool, error) {
+	key := fmt.Sprintf("ccv:r:%s", id)
+	flag, err := s.client.Get(ctx, key).Bool()
+	if err != nil {
+		return false, fmt.Errorf("unable to get readiness flag: %w", err)
+	}
+	return flag, nil
+}
+
+func (s *svc) DeleteConsistencyCheckReadiness(ctx context.Context, id string) error {
+	key := fmt.Sprintf("ccv:r:%s", id)
+	if err := s.client.Unlink(ctx, key).Err(); err != nil {
+		return fmt.Errorf("unable to delete readiness flag: %w", err)
+	}
+	return nil
+}
+
+func (s *svc) SetConsistencyCheckStorages(ctx context.Context, id string, storages []string) error {
+	key := fmt.Sprintf("ccv:stor:%s", id)
+	if err := s.client.SAdd(ctx, key, storages).Err(); err != nil {
+		return fmt.Errorf("unable to set storage set: %w", err)
+	}
+	return nil
+}
+
+func (s *svc) GetConsistencyCheckStorages(ctx context.Context, id string) ([]string, error) {
+	key := fmt.Sprintf("ccv:stor:%s", id)
+	storages, err := s.client.SMembers(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get storage set: %w", err)
+	}
+	return storages, nil
+}
+
+func (s *svc) DeleteConsistencyCheckStorages(ctx context.Context, id string) error {
+	key := fmt.Sprintf("ccv:stor:%s", id)
+	if err := s.client.Unlink(ctx, key).Err(); err != nil {
+		return fmt.Errorf("unable to delete stroage set: %w", err)
+	}
 	return nil
 }

@@ -248,6 +248,7 @@ type MigrateLocation struct {
 }
 
 type ConsistencyCheckPayload struct {
+	ID        string
 	Locations []MigrateLocation
 }
 
@@ -262,7 +263,7 @@ type ConsistencyCheckReadinessPayload struct {
 	ID string
 }
 
-type ConsistencyCheckResultPayload struct {
+type ConsistencyCheckDeletePayload struct {
 	ID string
 }
 
@@ -271,7 +272,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload |
-	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckResultPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
+	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -358,7 +359,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		id := fmt.Sprintf("cc:c:%s", p.ID)
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id), asynq.ProcessIn(5 * time.Second)}
 		taskType = TypeConsistencyCheckReadiness
-	case ConsistencyCheckResultPayload:
+	case ConsistencyCheckDeletePayload:
 		id := fmt.Sprintf("cc:r:%s", p.ID)
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckResult

@@ -76,7 +76,7 @@ var checkCmd = &cobra.Command{
 			if len(checkBucket) > max {
 				max = len(checkBucket)
 			}
-			fmt.Println(fmt.Sprintf("🪣 %s | Match\t | MissSrc\t | MissDst\t | Differ\t | Error", fillName("BUCKET", max, " ")))
+			fmt.Printf("🪣 %s | Match\t | MissSrc\t | MissDst\t | Differ\t | Error\n", fillName("BUCKET", max, " "))
 			check(ctx, client, from, to, checkBucket, max)
 			return
 		}
@@ -105,7 +105,7 @@ var checkCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println(fmt.Sprintf("🪣 %s | Match\t | MissSrc\t | MissDst\t | Differ \t | Error\t|", fillName("BUCKET", max, " ")))
+		fmt.Printf("🪣 %s | Match\t | MissSrc\t | MissDst\t | Differ \t | Error\t|\n", fillName("BUCKET", max, " "))
 		var wg sync.WaitGroup
 		wg.Add(len(buckets))
 		for i := range buckets {
@@ -130,13 +130,13 @@ func check(ctx context.Context, client pb.ChorusClient, from, to, bucket string,
 		logrus.WithError(err).Fatal("unable to check bucket")
 	}
 	if res.IsMatch {
-		fmt.Println(fmt.Sprintf("✅ %s | %-7d\t | %-7d\t | %-7d\t | %-7d\t | %-7d", fillName(bucket, max, "."),
+		fmt.Printf("✅ %s | %-7d\t | %-7d\t | %-7d\t | %-7d\t | %-7d\n", fillName(bucket, max, "."),
 			len(res.Match),
 			len(res.MissFrom),
 			len(res.MissTo),
 			len(res.Differ),
 			len(res.Error),
-		))
+		)
 	} else {
 		fmt.Println("\033[31m" + fmt.Sprintf("❌ %s | %-7d\t | %-7d\t | %-7d\t | %-7d\t | %-7d", fillName(bucket, max, "."),
 			len(res.Match),

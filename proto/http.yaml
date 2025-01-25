@@ -3,6 +3,16 @@ config_version: 3
 
 http:
   rules:
+    - selector: chorus.Chorus.StartConsistencyCheck
+      post: /consistency/start
+      body: "*"
+    - selector: chorus.Chorus.ListConsistencyChecks
+      get: /consistency/list
+    - selector: chorus.Chorus.GetConsistencyCheckReport
+      get: /consistency/report
+    - selector: chorus.Chorus.DeleteConsistencyCheckReport
+      put: /consistency/delete
+      body: "*"
     - selector: chorus.Chorus.GetAppVersion
       get: /version
     - selector: chorus.Chorus.GetStorages
