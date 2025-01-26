@@ -2,7 +2,7 @@ TOOLS_DIR="$(PWD)/.tools"
 
 GIT_COMMIT=$(shell git log -1 --format=%H)
 GIT_TAG=$(shell git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
-BUILD_DATE=$(shell date -Ins)
+BUILD_DATE=$(shell date -Is -u)
 
 GOIMPORTS_VERSION="v0.29.0"
 GOLANGCI_LINT_VERSION="v1.63.4"
