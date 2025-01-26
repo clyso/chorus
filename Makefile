@@ -4,31 +4,37 @@ GIT_COMMIT=$(shell git log -1 --format=%H)
 GIT_TAG=$(shell git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 BUILD_DATE=$(shell date -Is -u)
 
-GOIMPORTS_VERSION="v0.29.0"
-GOLANGCI_LINT_VERSION="v1.63.4"
-PROTOC_GEN_GO_VERSION="v1.36.2"
-PROTOC_GEN_GO_GRPC_VERSION="v1.5.1"
-PROTOC_GEN_GO_GRPC_GATEWAY_VERSION="v2.25.1"
-BUF_VERSION="v1.45.0"
-PROTOC_GEN_OPENAPIV2_VERSION="v2.15.2"
+GOIMPORTS_VERSION="0.29.0"
+GOLANGCI_LINT_VERSION="1.63.4"
+PROTOC_GEN_GO_VERSION="1.36.2"
+PROTOC_GEN_GO_GRPC_VERSION="1.5.1"
+PROTOC_GEN_GO_GRPC_GATEWAY_VERSION="2.25.1"
+BUF_VERSION="1.45.0"
+PROTOC_GEN_OPENAPIV2_VERSION="2.15.2"
 
 .PHONY: all
 all: agent chorus proxy worker chorctl bench
 
-.PHONY: install-tools
-install-tools:
-	mkdir -p $(TOOLS_DIR)
-	GOBIN=$(TOOLS_DIR) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOLS_DIR) $(GOLANGCI_LINT_VERSION)
-	GOBIN=$(TOOLS_DIR) go install "google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO_VERSION)"
-	GOBIN=$(TOOLS_DIR) go install "google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GEN_GO_GRPC_VERSION)"
-	GOBIN=$(TOOLS_DIR) go install "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@$(PROTOC_GEN_GO_GRPC_GATEWAY_VERSION)"
-	GOBIN=$(TOOLS_DIR) go install "github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION)"
-	GOBIN=$(TOOLS_DIR) go install "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@$(PROTOC_GEN_OPENAPIV2_VERSION)"
+.PHONY: install-protobuf-tools
+install-protobuf-tools:
+	GOBIN=$(TOOLS_DIR) go install "google.golang.org/protobuf/cmd/protoc-gen-go@v$(PROTOC_GEN_GO_VERSION)"
+	GOBIN=$(TOOLS_DIR) go install "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v$(PROTOC_GEN_GO_GRPC_VERSION)"
+	GOBIN=$(TOOLS_DIR) go install "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v$(PROTOC_GEN_GO_GRPC_GATEWAY_VERSION)"
+	GOBIN=$(TOOLS_DIR) go install "github.com/bufbuild/buf/cmd/buf@v$(BUF_VERSION)"
+	GOBIN=$(TOOLS_DIR) go install "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v$(PROTOC_GEN_OPENAPIV2_VERSION)"
 
-.PHONY: ensure-tools
-ensure-tools:
-	@if [[ ! -f $(TOOLS_DIR)/buf || ! -f $(TOOLS_DIR)/protoc-gen-go || ! -f $(TOOLS_DIR)/protoc-gen-go-grpc || ! -f $(TOOLS_DIR)/protoc-gen-grpc-gateway || ! -f $(TOOLS_DIR)/protoc-gen-openapiv2 || ! -f $(TOOLS_DIR)/goimports || ! -f $(TOOLS_DIR)/golangci-lint ]]; then echo 'Some tools are mising. Execute "make install-tools".' && exit 1; fi;
+.PHONY: install-goimports-tools
+install-goimports-tools:
+	GOBIN=$(TOOLS_DIR) go install "golang.org/x/tools/cmd/goimports@v$(GOIMPORTS_VERSION)"
+
+.PHONY: install-golangci-lint-tools
+install-golangci-lint-tools:
+	@if [ ! -f $(TOOLS_DIR)/golangci-lint ] || [ "$(shell $(TOOLS_DIR)/golangci-lint version | grep -c $(GOLANGCI_LINT_VERSION))" = 0 ]; then \
+		 curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOLS_DIR) v$(GOLANGCI_LINT_VERSION); \
+	fi;
+	
+.PHONY: install-tools
+install-tools: install-protobuf-tools install-goimports-tools install-golangci-lint-tools
 
 .PHONY: tidy
 tidy:
@@ -66,7 +72,7 @@ mkdir-build:
 # common goals only once per project, instead of once per every binary.
 # Means, formatting and linting would be executed once for whole repository.
 # `:` is a no-op operator in shell.
-%-bin: ensure-tools pretty mkdir-build
+%-bin: install-tools pretty mkdir-build
 	:
 
 .PHONY: agent
@@ -98,7 +104,7 @@ test: pretty
 	go test ./...
 
 .PHONY: proto-gen
-proto-gen: ensure-tools
+proto-gen: install-protobuf-tools
 	cd proto; PATH="$(TOOLS_DIR):$(PATH)" $(TOOLS_DIR)/buf generate --template "buf.gen.yaml" --config "buf.yaml"
 
 .PHONY: clean
