@@ -4,6 +4,7 @@ GIT_COMMIT=$(shell git log -1 --format=%H)
 GIT_TAG=$(shell git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 BUILD_DATE=$(shell date -Ins)
 
+GOIMPORTS_VERSION="v0.29.0"
 GOLANGCI_LINT_VERSION="v1.63.4"
 PROTOC_GEN_GO_VERSION="v1.36.2"
 PROTOC_GEN_GO_GRPC_VERSION="v1.5.1"
@@ -17,7 +18,7 @@ all: agent chorus proxy worker chorctl bench
 .PHONY: install-tools
 install-tools:
 	mkdir -p $(TOOLS_DIR)
-	GOBIN=$(TOOLS_DIR) go install golang.org/x/tools/cmd/goimports@latest
+	GOBIN=$(TOOLS_DIR) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOLS_DIR) $(GOLANGCI_LINT_VERSION)
 	GOBIN=$(TOOLS_DIR) go install "google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO_VERSION)"
 	GOBIN=$(TOOLS_DIR) go install "google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GEN_GO_GRPC_VERSION)"
@@ -61,6 +62,10 @@ pretty: tidy fmt vet imports lint
 mkdir-build: 
 	mkdir -p build
 
+# This target matches all targets ending with `-bin` and allows to execute 
+# common goals only once per project, instead of once per every binary.
+# Means, formatting and linting would be executed once for whole repository.
+# `:` is a no-op operator in shell.
 %-bin: ensure-tools pretty mkdir-build
 	:
 
