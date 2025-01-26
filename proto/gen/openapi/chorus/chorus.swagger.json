@@ -429,6 +429,29 @@
           "Chorus"
         ]
       }
+    },
+    "/version": {
+      "get": {
+        "summary": "Get app version",
+        "operationId": "Chorus_GetAppVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetAppVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      }
     }
   },
   "definitions": {

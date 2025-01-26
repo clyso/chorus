@@ -36,6 +36,24 @@ var (
 	_ = metadata.Join
 )
 
+func request_Chorus_GetAppVersion_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
+	msg, err := client.GetAppVersion(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Chorus_GetAppVersion_0(ctx context.Context, marshaler runtime.Marshaler, server ChorusServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq emptypb.Empty
+		metadata runtime.ServerMetadata
+	)
+	msg, err := server.GetAppVersion(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_Chorus_GetStorages_0(ctx context.Context, marshaler runtime.Marshaler, client ChorusClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq emptypb.Empty
@@ -348,6 +366,26 @@ func local_request_Chorus_AddBucketReplication_0(ctx context.Context, marshaler 
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterChorusHandlerFromEndpoint instead.
 // GRPC interceptors will not work for this type of registration. To use interceptors, you must use the "runtime.WithMiddlewares" option in the "runtime.NewServeMux" call.
 func RegisterChorusHandlerServer(ctx context.Context, mux *runtime.ServeMux, server ChorusServer) error {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetAppVersion_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Chorus/GetAppVersion", runtime.WithHTTPPathPattern("/version"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Chorus_GetAppVersion_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_GetAppVersion_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_Chorus_GetStorages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -668,6 +706,23 @@ func RegisterChorusHandler(ctx context.Context, mux *runtime.ServeMux, conn *grp
 // doesn't go through the normal gRPC flow (creating a gRPC client etc.) then it will be up to the passed in
 // "ChorusClient" to call the correct interceptors. This client ignores the HTTP middlewares.
 func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, client ChorusClient) error {
+	mux.Handle(http.MethodGet, pattern_Chorus_GetAppVersion_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Chorus/GetAppVersion", runtime.WithHTTPPathPattern("/version"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Chorus_GetAppVersion_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Chorus_GetAppVersion_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_Chorus_GetStorages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -910,6 +965,7 @@ func RegisterChorusHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 }
 
 var (
+	pattern_Chorus_GetAppVersion_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"version"}, ""))
 	pattern_Chorus_GetStorages_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"storage"}, ""))
 	pattern_Chorus_GetProxyCredentials_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"proxy"}, ""))
 	pattern_Chorus_ListBucketsForReplication_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "list-buckets"}, ""))
@@ -927,6 +983,7 @@ var (
 )
 
 var (
+	forward_Chorus_GetAppVersion_0             = runtime.ForwardResponseMessage
 	forward_Chorus_GetStorages_0               = runtime.ForwardResponseMessage
 	forward_Chorus_GetProxyCredentials_0       = runtime.ForwardResponseMessage
 	forward_Chorus_ListBucketsForReplication_0 = runtime.ForwardResponseMessage
