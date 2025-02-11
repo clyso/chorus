@@ -46,6 +46,11 @@ const (
 	TypeApiCostEstimation     = "api:cost_estimation"
 	TypeApiCostEstimationList = "api:cost_estimation:list"
 	TypeApiReplicationSwitch  = "api:replication_switch"
+
+	TypeConsistencyCheck          = "consistency"
+	TypeConsistencyCheckList      = "consistency:list"
+	TypeConsistencyCheckReadiness = "consistency:readiness"
+	TypeConsistencyCheckResult    = "consistency:result"
 )
 
 type Priority uint8
@@ -82,6 +87,10 @@ func (p Priority) MigrationQueue() string {
 	return QueueMigrateObjCopyDefault1
 }
 
+func (p Priority) ConsistencyCheckQueue() string {
+	return QueueConsistencyCheck
+}
+
 const (
 	PriorityDefault1 Priority = iota
 	Priority2        Priority = iota
@@ -103,6 +112,7 @@ const (
 	QueueMigrateObjCopy4          = "migrate_obj_copy4"
 	QueueMigrateObjCopyHighest5   = "migrate_obj_copy5"
 	QueueAPI                      = "api"
+	QueueConsistencyCheck         = "consistency_check"
 )
 
 const (
@@ -232,11 +242,36 @@ type ObjPayload struct {
 	ContentType string
 }
 
+type MigrateLocation struct {
+	Storage string
+	Bucket  string
+}
+
+type ConsistencyCheckPayload struct {
+	Locations []MigrateLocation
+}
+
+type ConsistencyCheckListPayload struct {
+	MigrateLocation
+	Prefix       string
+	ID           string
+	StorageCount uint8
+}
+
+type ConsistencyCheckReadinessPayload struct {
+	ID string
+}
+
+type ConsistencyCheckResultPayload struct {
+	ID string
+}
+
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
-	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
+	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload |
+	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckResultPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -312,6 +347,21 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		}
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
 		taskType = TypeMigrateObjCopy
+	case ConsistencyCheckPayload:
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue())}
+		taskType = TypeConsistencyCheck
+	case ConsistencyCheckListPayload:
+		id := fmt.Sprintf("cc:l:%s:%s:%s:%s", p.ID, p.Storage, p.Bucket, p.Prefix)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
+		taskType = TypeConsistencyCheckList
+	case ConsistencyCheckReadinessPayload:
+		id := fmt.Sprintf("cc:c:%s", p.ID)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id), asynq.ProcessIn(5 * time.Second)}
+		taskType = TypeConsistencyCheckReadiness
+	case ConsistencyCheckResultPayload:
+		id := fmt.Sprintf("cc:r:%s", p.ID)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
+		taskType = TypeConsistencyCheckResult
 	default:
 		return nil, fmt.Errorf("%w: unknown task type %+v", dom.ErrInvalidArg, payload)
 	}
