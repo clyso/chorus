@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +31,7 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
+	"github.com/clyso/chorus/tools/chorctl/internal/common"
 )
 
 var (
@@ -50,14 +52,15 @@ var (
 	maxWidth = 120
 )
 
-func New(ctx context.Context, client pb.ChorusClient) tea.Model {
+func New(ctx context.Context, client pb.ChorusClient, nameBuilder common.ReplNameBuilder) tea.Model {
 	model := &UI{
-		client:   client,
-		ctx:      ctx,
-		selected: "",
-		table:    nil,
-		events:   make(chan tea.Msg),
-		spinner:  spinner.New(spinner.WithSpinner(spinner.Points), spinner.WithStyle(lipgloss.NewStyle().Foreground(borderCol).AlignHorizontal(lipgloss.Center))),
+		client:          client,
+		ctx:             ctx,
+		selected:        "",
+		table:           nil,
+		events:          make(chan tea.Msg),
+		spinner:         spinner.New(spinner.WithSpinner(spinner.Points), spinner.WithStyle(lipgloss.NewStyle().Foreground(borderCol).AlignHorizontal(lipgloss.Center))),
+		replNameBuilder: nameBuilder,
 	}
 	return model
 }
@@ -72,11 +75,12 @@ type UI struct {
 	main     *pb.Storage
 	err      error
 
-	data     []*pb.Replication
-	selected string
-	table    *table.Model
-	spinner  spinner.Model
-	events   chan tea.Msg
+	data            []*pb.Replication
+	selected        string
+	table           *table.Model
+	spinner         spinner.Model
+	events          chan tea.Msg
+	replNameBuilder common.ReplNameBuilder
 }
 
 func (u *UI) Init() tea.Cmd {
@@ -247,9 +251,12 @@ func (u *UI) updateTable(changeSelection bool) {
 			objects := fmt.Sprintf("%d/%d", d.InitObjDone, d.InitObjListed)
 			events := fmt.Sprintf("%d/%d", d.EventsDone, d.Events)
 
-			rows[i] = table.Row{fmt.Sprintf("%s:%s:%s->%s", d.User, d.Bucket, d.From, d.To), api.ToPercentage(p), bytes, objects, events, fmt.Sprintf("%v", d.IsPaused), api.DateToAge(d.CreatedAt)}
+			rows[i] = table.Row{u.replNameBuilder(d), api.ToPercentage(p), bytes, objects, events, fmt.Sprintf("%v", d.IsPaused), api.DateToAge(d.CreatedAt)}
+
 			updateLen(maxLen, rows[i])
+
 		}
+
 		columns = []table.Column{
 			{Title: "Name", Width: maxLen[0]},
 			{Title: "Progress", Width: maxLen[1]},
@@ -259,6 +266,7 @@ func (u *UI) updateTable(changeSelection bool) {
 			{Title: "Paused", Width: maxLen[5]},
 			{Title: "Age", Width: maxLen[6]},
 		}
+
 		columnsLen(maxLen, columns)
 	} else {
 		//maxLen := make([]int, 6)

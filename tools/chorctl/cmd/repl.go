@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,9 +29,12 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
+	"github.com/clyso/chorus/tools/chorctl/internal/common"
 
 	"github.com/spf13/cobra"
 )
+
+var replNameFormat string
 
 // replCmd represents the repl command
 var replCmd = &cobra.Command{
@@ -55,17 +59,23 @@ chorctl repl`,
 			return res.Replications[i].CreatedAt.AsTime().After(res.Replications[j].CreatedAt.AsTime())
 		})
 
+		replNameBuilder, err := common.NewReplNameBuilder(&replNameFormat)
+		if err != nil {
+			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication naem format")
+		}
+
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 		fmt.Fprintln(w, api.ReplHeader())
 		for _, m := range res.Replications {
-			fmt.Fprintln(w, api.ReplRow(m))
+			fmt.Fprintln(w, api.ReplRow(m, replNameBuilder(m)))
 		}
 		w.Flush()
 	},
 }
 
 func init() {
+	replCmd.Flags().StringVarP(&replNameFormat, "name-format", "n", "%u:%F:%f->%t:%T", common.ReplNameFormatHelp)
 	rootCmd.AddCommand(replCmd)
 
 	// Here you will define your flags and configuration settings.
