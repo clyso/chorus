@@ -152,6 +152,41 @@ func (d ReplicationPolicyDest) Parse() (storage string, bucket *string) {
 	return string(d), nil
 }
 
+type ReplicationID struct {
+	User     string
+	Bucket   string
+	From     string
+	To       string
+	ToBucket *string
+}
+
+type Window struct {
+	StartOnInitDone bool           `redis:"onInitDone,omitempty"`
+	Cron            *string        `redis:"cron,omitempty"`
+	StartAt         *time.Time     `redis:"startAt,omitempty"`
+	MaxDuration     *time.Duration `redis:"maxDuration,omitempty"`
+	MaxEventLag     *uint32        `redis:"maxEventLag,omitempty"`
+}
+
+type SwitchWithDowntime struct {
+	Window
+	ContinueReplication bool                     `redis:"continueReplication"`
+	LastStatus          SwitchWithDowntimeStatus `redis:"lastStatus"`
+	LastStartedAt       *time.Time               `redis:"startedAt"`
+	DoneAt              *time.Time               `redis:"doneAt,omitempty"`
+	History             []string                 `redis:"-"`
+}
+
+type SwitchWithDowntimeStatus string
+
+const (
+	StatusNotStarted SwitchWithDowntimeStatus = "not_started"
+	StatusInProgress SwitchWithDowntimeStatus = "in_progress"
+	StatusDone       SwitchWithDowntimeStatus = "done"
+	StatusError      SwitchWithDowntimeStatus = "error"
+	StatusSkipped    SwitchWithDowntimeStatus = "skipped"
+)
+
 type Service interface {
 	// GetRoutingPolicy returns destination storage name.
 	// Errors:
@@ -169,6 +204,10 @@ type Service interface {
 	GetReplicationSwitch(ctx context.Context, user, bucket string) (ReplicationSwitch, error)
 	DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error
 	ReplicationSwitchDone(ctx context.Context, user, bucket string) error
+
+	SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *Window) error
+	DeleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) error
+	GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (*SwitchWithDowntime, error)
 
 	GetBucketReplicationPolicies(ctx context.Context, user, bucket string) (ReplicationPolicies, error)
 	GetUserReplicationPolicies(ctx context.Context, user string) (ReplicationPolicies, error)
@@ -1170,4 +1209,19 @@ func (s *policySvc) ReplicationSwitchDone(ctx context.Context, user, bucket stri
 		return err
 	}
 	return s.hSetKeyExists(ctx, key, "DoneAt", time.Now().UTC())
+}
+
+// SetReplicationSwitchWithDowntime implements Service.
+func (s *policySvc) SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *Window) error {
+	panic("unimplemented")
+}
+
+// DeleteReplicationSwitchWithDowntime implements Service.
+func (s *policySvc) DeleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) error {
+	panic("unimplemented")
+}
+
+// GetReplicationSwitchWithDowntime implements Service.
+func (s *policySvc) GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (*SwitchWithDowntime, error) {
+	panic("unimplemented")
 }

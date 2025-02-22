@@ -42,6 +42,25 @@ const (
 	Chorus_GetConsistencyCheckReport_FullMethodName        = "/chorus.Chorus/GetConsistencyCheckReport"
 	Chorus_GetConsistencyCheckReportEntries_FullMethodName = "/chorus.Chorus/GetConsistencyCheckReportEntries"
 	Chorus_DeleteConsistencyCheckReport_FullMethodName     = "/chorus.Chorus/DeleteConsistencyCheckReport"
+	Chorus_GetAppVersion_FullMethodName             = "/chorus.Chorus/GetAppVersion"
+	Chorus_GetStorages_FullMethodName               = "/chorus.Chorus/GetStorages"
+	Chorus_GetProxyCredentials_FullMethodName       = "/chorus.Chorus/GetProxyCredentials"
+	Chorus_ListBucketsForReplication_FullMethodName = "/chorus.Chorus/ListBucketsForReplication"
+	Chorus_AddReplication_FullMethodName            = "/chorus.Chorus/AddReplication"
+	Chorus_ListReplications_FullMethodName          = "/chorus.Chorus/ListReplications"
+	Chorus_ListUserReplications_FullMethodName      = "/chorus.Chorus/ListUserReplications"
+	Chorus_StreamBucketReplication_FullMethodName   = "/chorus.Chorus/StreamBucketReplication"
+	Chorus_PauseReplication_FullMethodName          = "/chorus.Chorus/PauseReplication"
+	Chorus_ResumeReplication_FullMethodName         = "/chorus.Chorus/ResumeReplication"
+	Chorus_DeleteReplication_FullMethodName         = "/chorus.Chorus/DeleteReplication"
+	Chorus_DeleteUserReplication_FullMethodName     = "/chorus.Chorus/DeleteUserReplication"
+	Chorus_SwitchWithDowntime_FullMethodName        = "/chorus.Chorus/SwitchWithDowntime"
+	Chorus_DeleteSwitchWithDowntime_FullMethodName  = "/chorus.Chorus/DeleteSwitchWithDowntime"
+	Chorus_GetSwitchWithDowntime_FullMethodName     = "/chorus.Chorus/GetSwitchWithDowntime"
+	Chorus_SwitchMainBucket_FullMethodName          = "/chorus.Chorus/SwitchMainBucket"
+	Chorus_CompareBucket_FullMethodName             = "/chorus.Chorus/CompareBucket"
+	Chorus_GetAgents_FullMethodName                 = "/chorus.Chorus/GetAgents"
+	Chorus_AddBucketReplication_FullMethodName      = "/chorus.Chorus/AddBucketReplication"
 )
 
 // ChorusClient is the client API for Chorus service.
@@ -69,6 +88,23 @@ type ChorusClient interface {
 	// Deletes given replication
 	DeleteReplication(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeleteUserReplication(ctx context.Context, in *DeleteUserReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Switch main<->follower for selected replication with downtime.
+	// This method Can be used to update existing switch if it has not started yet.
+	// Switch with downtime stops write request to bucket on chorus proxy until all replication tasks will be processed.
+	// Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket.
+	// Method will return error in following cases:
+	//   - there is no existing bucket replication
+	//   - there are multiple replications from the same main bucket to multiple followers
+	//   - switch is in progress - aka writes already blocked. Use DeleteSwitchWithDowntime in this case.
+	//   - switch is successfully finished
+	//   - if downtime window is not set and initial migration is not done
+	//
+	// Switch status will be shown in Replication status.
+	SwitchWithDowntime(ctx context.Context, in *SwitchWithDowntimeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Deletes Switch if exists and sets old main bucket back as main if switch was already completed.
+	DeleteSwitchWithDowntime(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Returns Switch with donwntime info
+	GetSwitchWithDowntime(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*GetSwitchWithDowntimeResponse, error)
 	SwitchMainBucket(ctx context.Context, in *SwitchMainBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
@@ -219,6 +255,36 @@ func (c *chorusClient) DeleteUserReplication(ctx context.Context, in *DeleteUser
 	return out, nil
 }
 
+func (c *chorusClient) SwitchWithDowntime(ctx context.Context, in *SwitchWithDowntimeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Chorus_SwitchWithDowntime_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chorusClient) DeleteSwitchWithDowntime(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Chorus_DeleteSwitchWithDowntime_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chorusClient) GetSwitchWithDowntime(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*GetSwitchWithDowntimeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSwitchWithDowntimeResponse)
+	err := c.cc.Invoke(ctx, Chorus_GetSwitchWithDowntime_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chorusClient) SwitchMainBucket(ctx context.Context, in *SwitchMainBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -344,6 +410,23 @@ type ChorusServer interface {
 	// Deletes given replication
 	DeleteReplication(context.Context, *ReplicationRequest) (*emptypb.Empty, error)
 	DeleteUserReplication(context.Context, *DeleteUserReplicationRequest) (*emptypb.Empty, error)
+	// Switch main<->follower for selected replication with downtime.
+	// This method Can be used to update existing switch if it has not started yet.
+	// Switch with downtime stops write request to bucket on chorus proxy until all replication tasks will be processed.
+	// Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket.
+	// Method will return error in following cases:
+	//   - there is no existing bucket replication
+	//   - there are multiple replications from the same main bucket to multiple followers
+	//   - switch is in progress - aka writes already blocked. Use DeleteSwitchWithDowntime in this case.
+	//   - switch is successfully finished
+	//   - if downtime window is not set and initial migration is not done
+	//
+	// Switch status will be shown in Replication status.
+	SwitchWithDowntime(context.Context, *SwitchWithDowntimeRequest) (*emptypb.Empty, error)
+	// Deletes Switch if exists and sets old main bucket back as main if switch was already completed.
+	DeleteSwitchWithDowntime(context.Context, *ReplicationRequest) (*emptypb.Empty, error)
+	// Returns Switch with donwntime info
+	GetSwitchWithDowntime(context.Context, *ReplicationRequest) (*GetSwitchWithDowntimeResponse, error)
 	SwitchMainBucket(context.Context, *SwitchMainBucketRequest) (*emptypb.Empty, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)
@@ -399,6 +482,15 @@ func (UnimplementedChorusServer) DeleteReplication(context.Context, *Replication
 }
 func (UnimplementedChorusServer) DeleteUserReplication(context.Context, *DeleteUserReplicationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteUserReplication not implemented")
+}
+func (UnimplementedChorusServer) SwitchWithDowntime(context.Context, *SwitchWithDowntimeRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SwitchWithDowntime not implemented")
+}
+func (UnimplementedChorusServer) DeleteSwitchWithDowntime(context.Context, *ReplicationRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSwitchWithDowntime not implemented")
+}
+func (UnimplementedChorusServer) GetSwitchWithDowntime(context.Context, *ReplicationRequest) (*GetSwitchWithDowntimeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSwitchWithDowntime not implemented")
 }
 func (UnimplementedChorusServer) SwitchMainBucket(context.Context, *SwitchMainBucketRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SwitchMainBucket not implemented")
@@ -659,6 +751,60 @@ func _Chorus_DeleteUserReplication_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Chorus_SwitchWithDowntime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchWithDowntimeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).SwitchWithDowntime(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_SwitchWithDowntime_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).SwitchWithDowntime(ctx, req.(*SwitchWithDowntimeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chorus_DeleteSwitchWithDowntime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).DeleteSwitchWithDowntime(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_DeleteSwitchWithDowntime_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).DeleteSwitchWithDowntime(ctx, req.(*ReplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chorus_GetSwitchWithDowntime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).GetSwitchWithDowntime(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_GetSwitchWithDowntime_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).GetSwitchWithDowntime(ctx, req.(*ReplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Chorus_SwitchMainBucket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SwitchMainBucketRequest)
 	if err := dec(in); err != nil {
@@ -889,6 +1035,18 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteUserReplication",
 			Handler:    _Chorus_DeleteUserReplication_Handler,
+		},
+		{
+			MethodName: "SwitchWithDowntime",
+			Handler:    _Chorus_SwitchWithDowntime_Handler,
+		},
+		{
+			MethodName: "DeleteSwitchWithDowntime",
+			Handler:    _Chorus_DeleteSwitchWithDowntime_Handler,
+		},
+		{
+			MethodName: "GetSwitchWithDowntime",
+			Handler:    _Chorus_GetSwitchWithDowntime_Handler,
 		},
 		{
 			MethodName: "SwitchMainBucket",

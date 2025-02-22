@@ -51,6 +51,8 @@ const (
 	TypeConsistencyCheckList      = "consistency:list"
 	TypeConsistencyCheckReadiness = "consistency:readiness"
 	TypeConsistencyCheckResult    = "consistency:result"
+
+	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 )
 
 type Priority uint8
@@ -268,11 +270,17 @@ type ConsistencyCheckDeletePayload struct {
 	ID string
 }
 
+type SwitchWithDowntimePayload struct {
+	Sync
+	Bucket string
+	User   string
+}
+
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
-	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload |
+	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload | SwitchWithDowntimePayload |
 	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
@@ -311,6 +319,13 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		}
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue()), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
+	case SwitchWithDowntimePayload:
+		id := fmt.Sprintf("api:sd:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
+		if p.ToBucket != nil {
+			id += ":" + *p.ToBucket
+		}
+		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(id)}
+		taskType = TypeApiSwitchWithDowntime
 	case BucketDeletePayload:
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeBucketDelete

@@ -67,6 +67,18 @@ func ObjKey(storage string, o dom.Object) key {
 	}
 }
 
+func StringKey(k string) key {
+	if k == "" {
+		return &keyImpl{
+			err: fmt.Errorf("%w: invalid string lock key: key is empty", dom.ErrInvalidArg),
+		}
+	}
+	return &keyImpl{
+		k:   "lks:" + k,
+		err: nil,
+	}
+}
+
 func BucketKey(storage, bucket string) key {
 	if storage == "" {
 		return &keyImpl{

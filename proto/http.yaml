@@ -51,6 +51,15 @@ http:
     - selector: chorus.Chorus.SwitchMainBucket
       post: /replication/switch
       body: "*"
+    - selector: chorus.Chorus.SwitchWithDowntime
+      post: /replication/switch-with-downtime
+      body: "*"
+    - selector: chorus.Chorus.DeleteSwitchWithDowntime
+      post: /replication/switch-with-downtime/delete
+      body: "*"
+    - selector: chorus.Chorus.GetSwitchWithDowntime
+      post: /replication/switch-with-downtime/get
+      body: "*"
     - selector: chorus.Chorus.AddBucketReplication
       post: /v2/replication/add
       body: "*"
