@@ -19,6 +19,7 @@ package api
 import (
 	"time"
 
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/clyso/chorus/pkg/policy"
@@ -41,7 +42,7 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		ToBucket:        in.ToBucket,
 		CreatedAt:       timestamppb.New(in.CreatedAt),
 		IsPaused:        in.IsPaused,
-		IsInitDone:      in.ListingStarted && in.InitObjDone >= in.InitObjListed && in.InitDoneAt != nil,
+		IsInitDone:      isInitDone(in.ReplicationPolicyStatus),
 		InitObjListed:   in.InitObjListed,
 		InitObjDone:     in.InitObjDone,
 		InitBytesListed: in.InitBytesListed,
@@ -54,6 +55,10 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		AgentUrl:        strPtr(in.AgentURL),
 		SwitchStatus:    switchStatusToPb(in.SwitchStatus),
 	}
+}
+
+func isInitDone(in policy.ReplicationPolicyStatus) bool {
+	return in.ListingStarted && in.InitObjDone >= in.InitObjListed && in.InitDoneAt != nil
 }
 
 func switchStatusToPb(status policy.SwitchStatus) pb.Replication_SwitchEnum {
@@ -72,4 +77,43 @@ func strPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func pbToReplicationID(in *pb.ReplicationRequest) policy.ReplicationID {
+	return policy.ReplicationID{
+		User:     in.User,
+		Bucket:   in.Bucket,
+		From:     in.From,
+		To:       in.To,
+		ToBucket: in.ToBucket,
+	}
+}
+
+func pbToWindow(in *pb.SwitchWindow) *policy.Window {
+	if in == nil {
+		return nil
+	}
+	return &policy.Window{
+		StartOnInitDone: in.StartOnInitDone,
+		Cron:            in.Cron,
+		StartAt:         pbToTs(in.StartAt),
+		MaxDuration:     pbToDuration(in.MaxDuration),
+		MaxEventLag:     in.MaxEventLag,
+	}
+}
+
+func pbToTs(in *timestamppb.Timestamp) *time.Time {
+	if in == nil {
+		return nil
+	}
+	ts := in.AsTime()
+	return &ts
+}
+
+func pbToDuration(in *durationpb.Duration) *time.Duration {
+	if in == nil {
+		return nil
+	}
+	d := in.AsDuration()
+	return &d
 }

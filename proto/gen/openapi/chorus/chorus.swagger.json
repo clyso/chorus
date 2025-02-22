@@ -29,7 +29,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -200,7 +200,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -223,7 +223,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -247,7 +247,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -280,7 +280,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -314,7 +314,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -379,7 +379,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -413,7 +413,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -447,7 +447,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -480,7 +480,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -491,6 +491,107 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/chorusSwitchMainBucketRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/switch-with-downtime": {
+      "post": {
+        "summary": "Switch main\u003c-\u003efollower for selected replication with downtime.\nThis method Can be used to update existing switch if it has not started yet.\nSwitch with downtime stops write request to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteSwitchWithDowntime in this case.\n  - switch is successfully finished\n  - if downtime window is not set and initial migration is not done\nSwitch status will be shown in Replication status.",
+        "operationId": "Chorus_SwitchWithDowntime",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSwitchWithDowntimeRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/switch-with-downtime/delete": {
+      "post": {
+        "summary": "Deletes Switch if exists and sets old main bucket back as main if switch was already completed.",
+        "operationId": "Chorus_DeleteSwitchWithDowntime",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/switch-with-downtime/get": {
+      "post": {
+        "summary": "Returns Switch with donwntime info",
+        "operationId": "Chorus_GetSwitchWithDowntime",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetSwitchWithDowntimeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
             }
           }
         ],
@@ -512,7 +613,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -535,7 +636,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -568,7 +669,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -591,7 +692,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -624,7 +725,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -961,6 +1062,45 @@
         }
       }
     },
+    "chorusGetSwitchWithDowntimeResponse": {
+      "type": "object",
+      "properties": {
+        "lastStatus": {
+          "$ref": "#/definitions/chorusGetSwitchWithDowntimeResponseStatus"
+        },
+        "continueReplication": {
+          "type": "boolean"
+        },
+        "downtimeWindow": {
+          "$ref": "#/definitions/chorusSwitchWindow"
+        },
+        "lastStartedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "doneAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "chorusGetSwitchWithDowntimeResponseStatus": {
+      "type": "string",
+      "enum": [
+        "NotStarted",
+        "InProgress",
+        "Done",
+        "Error",
+        "Skipped"
+      ],
+      "default": "NotStarted"
+    },
     "chorusListBucketsForReplicationRequest": {
       "type": "object",
       "properties": {
@@ -1179,6 +1319,50 @@
         }
       }
     },
+    "chorusSwitchWindow": {
+      "type": "object",
+      "properties": {
+        "startOnInitDone": {
+          "type": "boolean",
+          "title": "If true, chorus will perform switch automatically when initial migration will be done.\nInitial migration copies all objects that existed in source bucket before replication started.\ndefault is false"
+        },
+        "cron": {
+          "type": "string",
+          "description": "If set, chorus will try or retry to execute switch according to CRON schedule until it will be done.\nBucket check and draining work queue is time consuming operation\nso in most cases it is not makes sense to set cron frequency less than one hour\nor less than max_duration if used.\nEither cron or start_at can be set, but not both. If both are set, an error will be returned."
+        },
+        "startAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "If set, switch will be executed at given time.\nIf at this point initial migration will not be done, switch will be marked as failed and not executed.\nEither cron or start_at can be set, but not both. If both are set, an error will be returned."
+        },
+        "maxDuration": {
+          "type": "string",
+          "description": "If set, chorus will abort switch if it will not be able to complete in given time.\nIn this case, chorus will unblock bucket writes and keep old main as main.\nSwitch will be marked as failed and will be retried on next cron execution if set."
+        },
+        "maxEventLag": {
+          "type": "integer",
+          "format": "int64",
+          "description": "If set, switch execution will be skipped if number of unprocessed events is more than max_event_lag.\nSwitch will be marked as failed and will be retried on next cron execution if set."
+        }
+      },
+      "description": "Defines downtime window for replication switch.\nAll dates and times depends on local times of machine running chorus worker.\nTime precision is ~1 minute."
+    },
+    "chorusSwitchWithDowntimeRequest": {
+      "type": "object",
+      "properties": {
+        "replicationId": {
+          "$ref": "#/definitions/chorusReplicationRequest"
+        },
+        "continueReplication": {
+          "type": "boolean",
+          "title": "set true to replicate data updates from new main to old main bucket after successful switch\ndefault is false"
+        },
+        "downtimeWindow": {
+          "$ref": "#/definitions/chorusSwitchWindow",
+          "description": "Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.\nIf NOT set, switch will be performed right away and writes will be blocked until it is done."
+        }
+      }
+    },
     "chorusUserReplication": {
       "type": "object",
       "properties": {
@@ -1193,16 +1377,7 @@
         }
       }
     },
-    "protobufAny": {
-      "type": "object",
-      "properties": {
-        "@type": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": {}
-    },
-    "rpcStatus": {
+    "googlerpcStatus": {
       "type": "object",
       "properties": {
         "code": {
@@ -1220,6 +1395,15 @@
           }
         }
       }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
     }
   }
 }

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adhocore/gronx"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
@@ -865,4 +866,91 @@ func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationReques
 		To:                      req.To,
 		ToBucket:                req.ToBucket,
 	}), nil
+}
+
+func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDowntimeRequest) (*emptypb.Empty, error) {
+	policies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.ReplicationId.User, req.ReplicationId.Bucket)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get replication policy: %w", err)
+	}
+	if len(policies.To) != 1 {
+		return nil, fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
+	}
+
+	ctx = log.WithUser(ctx, req.ReplicationId.User)
+	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.ReplicationId.User), lock.WithDuration(time.Second), lock.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = lock.WithRefresh(ctx, func() error {
+		// validate:
+		// todo: move this logic into policy service
+		policyStatus, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.ReplicationId.User, req.ReplicationId.Bucket, req.ReplicationId.From, req.ReplicationId.To, req.ReplicationId.ToBucket)
+		if err != nil {
+			return fmt.Errorf("unable to get replication policy status: %w", err)
+		}
+		if policyStatus.SwitchStatus != policy.NotStarted {
+			return fmt.Errorf("switch is already done or in progress")
+		}
+		startNow := req.DowntimeWindow == nil || (!req.DowntimeWindow.StartOnInitDone && req.DowntimeWindow.Cron == nil && req.DowntimeWindow.StartAt == nil)
+		if startNow && !isInitDone(policyStatus) {
+			return fmt.Errorf("unable to start switch right away: initial replication is not done")
+		}
+		if err = validateSwitchWindow(req.DowntimeWindow); err != nil {
+			return err
+		}
+		// store switch metadata:
+		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, pbToReplicationID(req.ReplicationId), pbToWindow(req.DowntimeWindow))
+		if err != nil {
+			return fmt.Errorf("unable to store switch metadata: %w", err)
+		}
+
+		task, err := tasks.NewTask(ctx, tasks.SwitchWithDowntimePayload{
+			Sync: tasks.Sync{
+				FromStorage: req.ReplicationId.From,
+				ToStorage:   req.ReplicationId.To,
+				ToBucket:    req.ReplicationId.ToBucket,
+				CreatedAt:   time.Now(),
+			},
+			Bucket: req.ReplicationId.Bucket,
+			User:   req.ReplicationId.User,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = h.taskClient.EnqueueContext(ctx, task)
+		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+			return fmt.Errorf("unable to enqueue switch task: %w", err)
+		}
+		return nil
+	}, refresh, time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func validateSwitchWindow(in *pb.SwitchWindow) error {
+	if in == nil {
+		return nil
+	}
+	if in.Cron != nil && in.StartAt != nil {
+		return fmt.Errorf("either cron or start_at can be set, but not both")
+	}
+	if in.Cron != nil && !gronx.IsValid(*in.Cron) {
+		return fmt.Errorf("invalid cron expression %q", *in.Cron)
+	}
+	if in.StartAt != nil && in.StartAt.AsTime().UTC().Before(time.Now().UTC()) {
+		return fmt.Errorf("start_at is in the past according to server time: %q", time.Now().Format(time.RFC3339))
+	}
+	return nil
+}
+
+func (h *handlers) GetSwitchWithDowntime(context.Context, *pb.ReplicationRequest) (*pb.GetSwitchWithDowntimeResponse, error) {
+	panic("unimplemented")
+}
+
+func (h *handlers) DeleteSwitchWithDowntime(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
+	panic("unimplemented")
 }
