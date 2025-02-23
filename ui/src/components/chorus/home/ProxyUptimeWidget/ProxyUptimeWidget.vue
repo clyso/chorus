@@ -1,0 +1,154 @@
+<script setup lang="ts">
+  import {
+    CAspectRatio,
+    CResult,
+    CSkeleton,
+    CTile,
+    I18nLocale,
+  } from '@clyso/clyso-ui-kit';
+  import { useI18n } from 'vue-i18n';
+  import { ref } from 'vue';
+  import ChorusUptimeChart from '@/components/chorus/common/ChorusUptimeChart/ChorusUptimeChart.vue';
+  import { PrometheusService } from '@/services/PrometheusService';
+  import type { PrometheusUptimeDataItem } from '@/utils/types/prometheus';
+  import { IconName } from '@/utils/types/icon';
+
+  const { t } = useI18n({
+    messages: {
+      [I18nLocale.EN]: {
+        proxyUptimeTitle: 'S3 Proxy Uptime',
+        notEnabledMessage: 'Prometheus is not available',
+        errorMessage: 'An error occurred while getting the chart data.',
+      },
+      [I18nLocale.DE]: {
+        proxyUptimeTitle: 'S3 Proxy Uptime',
+        notEnabledMessage: 'Prometheus is not available',
+        errorMessage: 'An error occurred while getting the chart data.',
+      },
+    },
+  });
+
+  const props = withDefaults(
+    defineProps<{
+      isInitializing?: boolean;
+      isEnabled?: boolean;
+    }>(),
+    {
+      isInitializing: false,
+      isEnabled: true,
+    },
+  );
+
+  const emit = defineEmits<{
+    (e: 'init', value: boolean): void;
+  }>();
+
+  const proxyUptimeData = ref<PrometheusUptimeDataItem[]>([]);
+  const hasError = ref<boolean>(false);
+  const isLoading = ref<boolean>(false);
+
+  async function getProxyUptimeData() {
+    if (!props.isEnabled) {
+      return;
+    }
+
+    isLoading.value = true;
+    hasError.value = false;
+
+    try {
+      proxyUptimeData.value = await PrometheusService.getProxyUptimeData();
+    } catch {
+      hasError.value = true;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function initProxyUptimeData() {
+    emit('init', true);
+
+    try {
+      await getProxyUptimeData();
+    } finally {
+      emit('init', false);
+    }
+  }
+
+  initProxyUptimeData();
+</script>
+
+<template>
+  <CTile
+    class="proxy-uptime-widget"
+    :is-loading="isLoading || isInitializing"
+  >
+    <template #title>
+      {{ t('proxyUptimeTitle') }}
+    </template>
+
+    <template #loading-content>
+      <CAspectRatio ratio="4:1">
+        <CSkeleton
+          class="proxy-uptime-widget__skeleton"
+          type="chart"
+          chart-group-height="100%"
+          chart-height="100%"
+          chart-width="100%"
+        />
+      </CAspectRatio>
+    </template>
+
+    <div class="proxy-uptime-widget__content">
+      <CAspectRatio
+        v-if="!isEnabled"
+        key="not-enabled"
+        ratio="4:1"
+      >
+        <CResult
+          type="empty"
+          :icon-name="IconName.BASE_BAR_CHART"
+          :has-content="false"
+          size="tiny"
+          class="proxy-uptime-widget__not-enabled-result"
+        >
+          <template #title>
+            {{ t('notEnabledMessage') }}
+          </template>
+        </CResult>
+      </CAspectRatio>
+      <CAspectRatio
+        v-else-if="hasError"
+        key="error"
+        ratio="4:1"
+      >
+        <CResult
+          type="error"
+          size="tiny"
+          class="proxy-uptime-widget__error-result"
+          @positive-click="getProxyUptimeData"
+        >
+          <template #title>
+            {{ t('errorTitle') }}
+          </template>
+          {{ t('errorMessage') }}
+        </CResult>
+      </CAspectRatio>
+      <ChorusUptimeChart
+        v-else
+        key="chart"
+        class="proxy-uptime-widget__chart"
+        :data="proxyUptimeData"
+      />
+    </div>
+  </CTile>
+</template>
+
+<style lang="scss" scoped>
+  @use '@/styles/utils' as utils;
+
+  .proxy-uptime-widget {
+    &__skeleton {
+      @include utils.absolute-fit;
+    }
+  }
+</style>

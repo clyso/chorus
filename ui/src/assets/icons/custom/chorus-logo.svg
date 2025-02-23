@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" id="3d-dice">
+    <g fill="none" stroke="#d7ff84" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10">
+        <path d="M6.25 21.5.5 11.5l5.75-10h11.5l5.75 10-5.75 10z"></path><path d="M23.5 11.5 6.25 1.5 5.5 13l.75 8.5L15.5 19z"></path>
+        <path d="M17.75 21.5 15.5 19l-10-6-5-1.5M5.5 13l10.1-6.08 2.15-5.42M15.5 19l.1-12.08"></path>
+    </g>
+    <path fill="none" d="M0 0h24v24H0z"></path>
+</svg>
