@@ -1,0 +1,29 @@
+@forward '@clyso/clyso-ui-kit/dist/styles/utils/_index.scss';
+
+$scrollbar-padding: 0px;
+$scrollbar-margin: 2px;
+$scrollbar-track-size: 4px;
+$scrollbar-width: $scrollbar-padding * 2 + $scrollbar-track-size;
+
+@mixin custom-scroll {
+  &::-webkit-scrollbar {
+    background-color: transparent;
+    width: $scrollbar-width;
+    border-radius: $scrollbar-width;
+  }
+
+  &::-webkit-scrollbar-track {
+    background-clip: padding-box;
+    border: $scrollbar-padding solid transparent;
+    background-color: var(--skeleton-color);
+    border-radius: $scrollbar-width;
+    margin: $scrollbar-margin 0;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-clip: padding-box;
+    border: $scrollbar-padding solid transparent;
+    background-color: var(--text-color-3);
+    border-radius: $scrollbar-width;
+  }
+}
