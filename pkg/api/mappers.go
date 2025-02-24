@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,12 +35,19 @@ func tsToPb(ts *time.Time) *timestamppb.Timestamp {
 }
 
 func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication {
+	var toBucket *string
+	if in.ToBucket == nil {
+		toBucket = &in.Bucket
+	} else {
+		toBucket = in.ToBucket
+	}
+
 	return &pb.Replication{
 		User:            in.User,
 		Bucket:          in.Bucket,
 		From:            in.From,
 		To:              in.To,
-		ToBucket:        in.ToBucket,
+		ToBucket:        toBucket,
 		CreatedAt:       timestamppb.New(in.CreatedAt),
 		IsPaused:        in.IsPaused,
 		IsInitDone:      in.ReplicationPolicyStatus.InitDone(),
