@@ -42,7 +42,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/adhocore/gronx v1.19.5
+require (
+	github.com/adhocore/gronx v1.19.5
+	github.com/go-redis/redismock/v9 v9.2.0
+)
 
 require github.com/vektra/mockery/v2 v2.52.4 // indirect
 

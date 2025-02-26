@@ -105,6 +105,7 @@ func Test_Restart_Replication(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &bucket,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -131,6 +132,7 @@ func Test_Restart_Replication(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &bucket,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
@@ -172,6 +174,7 @@ func Test_Restart_Replication(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &bucket,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)

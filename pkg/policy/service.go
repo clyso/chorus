@@ -256,6 +256,7 @@ type Service interface {
 	DeleteUserReplication(ctx context.Context, user string, from string, to string) error
 
 	AddBucketReplicationPolicy(ctx context.Context, user, bucket, from string, to string, toBucket *string, priority tasks.Priority, agentURL *string) error
+	GetBucketReplicationPolicyDest(ctx context.Context, user, bucket, from string, to *string) (ReplicationPolicyDest, error)
 	GetReplicationPolicyInfo(ctx context.Context, user, bucket, from, to string, toBucket *string) (ReplicationPolicyStatus, error)
 	ListReplicationPolicyInfo(ctx context.Context) ([]ReplicationPolicyStatusExtended, error)
 	IsReplicationPolicyExists(ctx context.Context, user, bucket, from, to string, toBucket *string) (bool, error)
@@ -1097,6 +1098,33 @@ func (s *policySvc) AddBucketReplicationPolicy(ctx context.Context, user, bucket
 
 	}
 	return
+}
+
+func (s *policySvc) GetBucketReplicationPolicyDest(ctx context.Context, user, from, bucket string, to *string) (ReplicationPolicyDest, error) {
+	var keys []string
+	var err error
+	zerolog.Ctx(ctx).Debug().Msgf("user: %s, bucket: %s, from: %s, to: %v", user, bucket, from, to)
+	if to == nil || *to == "" {
+		keys, _, err = s.client.Scan(ctx, 0, fmt.Sprintf("p:repl_st:%s:%s:%s:*", user, bucket, from), 1).Result()
+	} else {
+		keys, _, err = s.client.Scan(ctx, 0, fmt.Sprintf("p:repl_st:%s:%s:%s:%s*", user, bucket, from, *to), 1).Result()
+	}
+	zerolog.Ctx(ctx).Debug().Msgf("keys: %v", keys)
+	if err != nil {
+		return "", err
+	}
+	if len(keys) == 0 {
+		return "", dom.ErrUnknownDestination
+	}
+	if len(keys) > 1 {
+		return "", dom.ErrAmbiguousDestination
+	}
+	key := keys[0]
+	key = strings.TrimPrefix(key, fmt.Sprintf("p:repl_st:%s:%s:%s:", user, bucket, from))
+	if strings.Contains(key, ":") {
+		return ReplicationPolicyDest(key), nil
+	}
+	return ReplicationPolicyDest(key + ":" + bucket), nil
 }
 
 func fromStrPtr(s *string) string {

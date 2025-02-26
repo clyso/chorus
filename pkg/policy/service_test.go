@@ -19,12 +19,15 @@ package policy
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
+
+	"github.com/go-redis/redismock/v9"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -1148,4 +1151,119 @@ func TestReplicationID(t *testing.T) {
 			r.EqualValues(tt.in.SwitchHistoryKey(), got.SwitchHistoryKey())
 		})
 	}
+}
+
+func TestGetBucketReplicationPolicyDest(t *testing.T) {
+	client, mock := redismock.NewClientMock()
+	service := NewService(client)
+
+	user := "testUser"
+	from := "sourceStorage"
+	bucket := "testBucket"
+	dest := "destinationStorage"
+	customBucket := "customBucket"
+
+	ctx := context.Background()
+	r := require.New(t)
+
+	t.Run("successful default destination retrieval", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + dest}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.NoError(err)
+		r.Equal(ReplicationPolicyDest(dest+":"+bucket), result)
+
+		storage, parsedBucket := result.Parse()
+		r.Equal(dest, storage)
+		r.Equal(*parsedBucket, bucket)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("no keys found", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.ErrorIs(err, dom.ErrUnknownDestination)
+		r.Empty(result)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("multiple keys found", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{
+			"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + dest,
+			"p:repl_st:" + user + ":" + bucket + ":" + from + ":anotherDest",
+		}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.ErrorIs(err, dom.ErrAmbiguousDestination)
+		r.Empty(result)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("redis error", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetErr(fmt.Errorf("redis error"))
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.Error(err)
+		r.Empty(result)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("custom destination bucket matches source bucket", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + from + ":" + bucket}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.NoError(err)
+		r.Equal(ReplicationPolicyDest(from+":"+bucket), result)
+
+		storage, parsedBucket := result.Parse()
+		r.Equal(from, storage)
+		r.NotNil(parsedBucket)
+		r.Equal(bucket, *parsedBucket)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("custom destination bucket differs from source bucket", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + from + ":" + customBucket}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.NoError(err)
+		r.Equal(ReplicationPolicyDest(from+":"+customBucket), result)
+
+		storage, parsedBucket := result.Parse()
+		r.Equal(from, storage)
+		r.NotNil(parsedBucket)
+		r.Equal(customBucket, *parsedBucket)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("query with non-nil destination", func(t *testing.T) {
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":"+from+"*", 1).SetVal([]string{}, 0)
+		service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, &from)
+		r.NoError(mock.ExpectationsWereMet())
+	})
 }
