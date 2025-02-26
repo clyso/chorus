@@ -33,7 +33,7 @@
 
   defineProps<{
     isShown: boolean;
-    proxy: ChorusProxyCredentials;
+    proxy: ChorusProxyCredentials | null;
   }>();
 
   const emit = defineEmits<{

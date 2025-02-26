@@ -1,8 +1,5 @@
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
-  import { computed } from 'vue';
-  import type { DropdownOption } from 'naive-ui';
-  import { useI18n } from 'vue-i18n';
   import {
     CColorSchemeToggle,
     CDashboardHeader,
@@ -14,60 +11,14 @@
   import { IconName } from '@/utils/types/icon';
   import { useI18nStore } from '@/stores/i18nStore';
   import { useColorSchemeStore } from '@/stores/colorSchemeStore';
-  import { useAuthStore } from '@/stores/authStore';
-  import { LogHelper } from '@/utils/helpers/LogHelper';
-  import i18nDashboardView from '@/components/dashboard/DashboardView/i18nDashboardView';
   import DashboardNav from '@/components/dashboard/DashboardNav/DashboardNav.vue';
-  import { HAS_AUTH, IS_DEV_ENV } from '@/utils/constants/env';
-
-  enum DashboardMenuItemKey {
-    LOGOUT = 'LOGOUT',
-  }
-
-  const { t } = useI18n({
-    messages: i18nDashboardView,
-  });
+  import { IS_DEV_ENV } from '@/utils/constants/env';
 
   const { locale } = storeToRefs(useI18nStore());
   const { setLocale } = useI18nStore();
 
   const { colorScheme } = storeToRefs(useColorSchemeStore());
   const { setColorScheme } = useColorSchemeStore();
-
-  const { logout } = useAuthStore();
-  const { userInfo } = storeToRefs(useAuthStore());
-  const userName = computed(() => {
-    if (!userInfo.value) {
-      return '';
-    }
-
-    const givenName = userInfo.value.givenName?.split(' ')[0] ?? '';
-    const familyName = userInfo.value.familyName ?? '';
-
-    return `${givenName} ${familyName}`.trim();
-  });
-  const userEmail = computed(() => userInfo.value?.email ?? '');
-
-  const menuOptions = computed<DropdownOption[]>(() =>
-    HAS_AUTH
-      ? [
-          {
-            label: t('logout'),
-            key: DashboardMenuItemKey.LOGOUT,
-          },
-        ]
-      : [],
-  );
-
-  function handleOptionSelect(key: string) {
-    if (key === DashboardMenuItemKey.LOGOUT) {
-      logout({ isChannelMessageForced: true, isRedirectRouteSaved: false });
-
-      return;
-    }
-
-    LogHelper.log(key);
-  }
 </script>
 
 <template>
@@ -77,12 +28,9 @@
   >
     <template #header>
       <CDashboardHeader
-        :options="menuOptions"
-        :user-name="userName"
-        :user-email="userEmail"
+        :options="[]"
         :has-side-menu="false"
-        :has-user-menu="HAS_AUTH"
-        @select:option="handleOptionSelect"
+        :has-user-menu="false"
       >
         <template #start>
           <div class="logo-wrapper">

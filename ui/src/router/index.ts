@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import accessGuard from '@/router/guards/access-guard';
 import metaHook from '@/router/guards/meta-hook';
 import { routes } from '@/router/routes';
 
@@ -26,8 +25,6 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach(accessGuard);
-// TODO: research - i18n fails if no timeout
 router.afterEach(metaHook);
 
 export default router;

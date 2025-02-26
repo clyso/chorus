@@ -31,7 +31,6 @@
     "@vuelidate/core": "^2.0.3",
     "@vuelidate/validators": "^2.0.4",
     "axios": "^1.7.7",
-    "broadcast-channel": "^7.0.0",
     "lodash-es": "^4.17.21",
     "naive-ui": "^2.40.1",
     "pinia": "^2.2.6",

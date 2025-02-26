@@ -4,7 +4,6 @@
     "env.d.ts",
     "src/**/*",
     "src/**/*.vue",
-    "global.d.ts",
     "broadcast-channel/types/broadcast-channel.d.ts",
     "broadcast-channel/types/leader-election.d.ts"
   ],
