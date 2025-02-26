@@ -21,9 +21,10 @@
         errorMessage: 'An error occurred while getting the chart data.',
       },
       [I18nLocale.DE]: {
-        workerUptimeTitle: 'Worker Uptime',
-        notEnabledMessage: 'Prometheus is not available',
-        errorMessage: 'An error occurred while getting the chart data.',
+        workerUptimeTitle: 'Arbeiter Uptime',
+        notEnabledMessage: 'Prometheus ist nicht verfügbar',
+        errorMessage:
+          'Beim Abrufen der Diagrammdaten ist ein Fehler aufgetreten.',
       },
     },
   });

@@ -10,11 +10,11 @@ export default <I18nMessages>{
     storageDetailsBreadcrumb: 'Storage Details',
   },
   [I18nLocale.DE]: {
-    storageDetailsErrorTitle: 'Fehler bei Speicherdetails',
+    storageDetailsErrorTitle: 'Fehler bei den Speicherdetails',
     storageDetailsErrorText:
       'Beim Abrufen der Speicherdetails ist ein Fehler aufgetreten.\nBitte versuchen Sie es erneut.',
     storageDetailsErrorAction: 'Erneut versuchen',
-    storagesBreadcrumb: 'Storages',
-    storageDetailsBreadcrumb: 'Storage Details',
+    storagesBreadcrumb: 'Speicher',
+    storageDetailsBreadcrumb: 'Speicherdetails',
   },
 };

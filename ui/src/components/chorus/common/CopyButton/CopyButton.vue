@@ -19,8 +19,8 @@
         failed: 'Copy failed!',
       },
       [I18nLocale.DE]: {
-        copied: 'Copied!',
-        failed: 'Copy failed!',
+        copied: 'Kopiert!',
+        failed: 'Kopieren fehlgeschlagen!',
       },
     },
   });
