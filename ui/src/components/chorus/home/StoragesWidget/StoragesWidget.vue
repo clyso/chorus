@@ -38,9 +38,11 @@
   const hasError = ref<boolean>(false);
   const isLoading = ref<boolean>(false);
 
-  const mainStorage = computed<ChorusStorage | undefined>(() =>
-    storages.value.find((storage) => storage.isMain),
-  );
+  const mainStorage = computed<ChorusStorage | undefined>(() => {
+    console.log(storages.value);
+
+    return storages.value.find((storage) => storage.isMain);
+  });
   const followerStorages = computed<ChorusStorage[]>(() =>
     storages.value.filter((storage) => !storage.isMain),
   );
@@ -52,7 +54,7 @@
     try {
       const { storages: storagesValue } = await ChorusService.getStorages();
 
-      storages.value = storagesValue;
+      storages.value = storagesValue ?? [];
     } catch {
       hasError.value = true;
     } finally {

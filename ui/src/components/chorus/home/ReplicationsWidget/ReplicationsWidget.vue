@@ -72,7 +72,7 @@
     try {
       const res = await ChorusService.getReplications();
 
-      replications.value = res.replications;
+      replications.value = res?.replications ?? [];
     } catch {
       hasError.value = true;
     } finally {
