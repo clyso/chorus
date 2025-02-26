@@ -21,16 +21,16 @@ export default <I18nMessages>{
     storageBrowserTitle: 'Storage Explorer',
   },
   [I18nLocale.DE]: {
-    replicationsTitle: 'Storages',
-    mainStorageTitle: 'Main',
-    followersStoragesTitle: 'Followers',
+    replicationsTitle: 'Speicher',
+    mainStorageTitle: 'Hauptspeicher',
+    followersStoragesTitle: 'Follower',
     storagesErrorTitle: 'Fehler bei Storages',
     storagesErrorText:
       'Beim Abrufen der Speicher ist ein Fehler aufgetreten.\nBitte versuchen Sie es erneut.',
     storagesErrorAction: 'Erneut versuchen',
 
     storageGeneralTitle: 'Allgemeine Informationen',
-    mainStorage: 'Main',
+    mainStorage: 'Hauptspeicher',
     followerStorage: 'Follower',
     nameLabel: 'Name',
     addressLabel: 'Adresse',

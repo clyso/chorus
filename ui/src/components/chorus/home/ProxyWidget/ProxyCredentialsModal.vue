@@ -23,10 +23,10 @@
         secretKeyLabel: 'Secret Key',
       },
       [I18nLocale.DE]: {
-        title: 'S3 Proxy Credentials',
+        title: 'S3-Proxy-Anmeldeinformationen',
         aliasLabel: 'Principal ID',
-        accessKeyLabel: 'Access Key',
-        secretKeyLabel: 'Secret Key',
+        accessKeyLabel: 'Zugriffsschlüssel',
+        secretKeyLabel: 'Geheimer Schlüssel',
       },
     },
   });

@@ -18,8 +18,8 @@ const routes: I18nMessages<Routes> = {
   [I18nLocale.DE]: {
     [RouteName.LOGIN]: 'Login',
     [RouteName.CHORUS_HOME]: 'Startseite',
-    [RouteName.CHORUS_STORAGES]: 'Storages',
-    [RouteName.CHORUS_STORAGE_DETAILS]: 'Storage Details',
+    [RouteName.CHORUS_STORAGES]: 'Speicher',
+    [RouteName.CHORUS_STORAGE_DETAILS]: 'Speicherdetails',
     [RouteName.CHORUS_REPLICATION]: 'Replikation',
     [RouteName.CHORUS_ADD_REPLICATION]: 'Replikation hinzufügen',
     [RouteName.CHORUS_MONITORING]: 'Monitoring',

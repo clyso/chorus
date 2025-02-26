@@ -23,10 +23,11 @@
         errorMessage: 'An error occurred while getting the proxy data.',
       },
       [I18nLocale.DE]: {
-        credentials: 'Credentials',
-        seeCredentials: 'See Credentials',
-        proxyCredentialsTitle: 'S3 Proxy Credentials',
-        errorMessage: 'An error occurred while getting the proxy data.',
+        credentials: 'Anmeldeinformationen',
+        seeCredentials: 'Anmeldeinformationen anzeigen',
+        proxyCredentialsTitle: 'S3-Proxy-Anmeldeinformationen',
+        errorMessage:
+          'Beim Abrufen der Proxy-Daten ist ein Fehler aufgetreten.',
       },
     },
   });

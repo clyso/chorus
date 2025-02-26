@@ -14,9 +14,10 @@
         errorMessage: 'An error occurred while getting the storages data.',
       },
       [I18nLocale.DE]: {
-        storagesOverviewTitle: 'Storages Overview',
-        actionText: 'See Replications',
-        errorMessage: 'An error occurred while getting the storages data.',
+        storagesOverviewTitle: 'Speicherübersicht',
+        actionText: 'Replikationen anzeigen',
+        errorMessage:
+          'Beim Abrufen der Speicherdaten ist ein Fehler aufgetreten.',
       },
     },
   });
