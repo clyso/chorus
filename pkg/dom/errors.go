@@ -35,6 +35,8 @@ var (
 	ErrPolicy               = errors.New("PolicyError")
 	ErrRoutingBlock         = errors.New("RoutingBlockedError")
 	ErrDestinationConflict  = errors.New("DestinationConflict")
+	ErrAmbiguousDestination = errors.New("AmbiguousDestination")
+	ErrUnknownDestination   = errors.New("UnknownDestination")
 )
 
 func ErrCode(err error) int {

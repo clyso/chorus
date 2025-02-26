@@ -41,6 +41,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &b1,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -55,6 +56,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &b2,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -98,6 +100,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &b1,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
@@ -113,6 +116,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &b2,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
@@ -299,6 +303,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  &b1,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -314,6 +319,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		To:        "f1",
 		ShowMatch: false,
 		User:      user,
+		ToBucket:  &b2,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)

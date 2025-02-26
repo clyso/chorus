@@ -62,6 +62,23 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	_, err = mainClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
 	r.NoError(err)
 
+	// use CompareBucket to check that the destination bucket misses all objects before migration
+	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Bucket:    bucketSrc,
+		From:      "main",
+		To:        "main",
+		ShowMatch: true,
+		User:      user,
+		ToBucket:  &bucketDst,
+	})
+	r.NoError(err)
+	r.False(diff.IsMatch)
+	r.Empty(diff.Error)
+	r.Empty(diff.Match)
+	r.Len(diff.MissTo, 4)
+	r.Empty(diff.MissFrom)
+	r.Empty(diff.Differ)
+
 	// start replication to same storage and custom bucket
 	repl, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
@@ -125,13 +142,28 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
 	}, waitInterval, retryInterval)
 
-	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucketSrc,
 		From:      "main",
 		To:        "main",
 		ShowMatch: true,
 		User:      user,
 		ToBucket:  &bucketDst,
+	})
+	r.NoError(err)
+	r.True(diff.IsMatch)
+	r.Empty(diff.Error)
+	r.Len(diff.Match, 5)
+	r.Empty(diff.MissFrom)
+	r.Empty(diff.MissTo)
+
+	// re-run CompareBucket without ToBucket to check if it works
+	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Bucket:    bucketSrc,
+		From:      "main",
+		To:        "main",
+		ShowMatch: true,
+		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -242,4 +274,5 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	r.Len(diff.Match, 5)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
+
 }

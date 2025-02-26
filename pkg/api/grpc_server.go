@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"runtime/debug"
+	"testing"
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -203,9 +204,11 @@ func convertApiError(ctx context.Context, err error) error {
 		details = append(details, &errdetails.ErrorInfo{
 			Reason: err.Error(),
 		})
-	case errors.Is(err, dom.ErrDestinationConflict):
+	case errors.Is(err, dom.ErrDestinationConflict) ||
+		errors.Is(err, dom.ErrAmbiguousDestination) ||
+		errors.Is(err, dom.ErrUnknownDestination):
 		code = codes.FailedPrecondition
-		mappedErr = dom.ErrDestinationConflict
+		mappedErr = err
 		details = append(details, &errdetails.ErrorInfo{
 			Reason: err.Error(),
 		})
@@ -228,6 +231,10 @@ func convertApiError(ctx context.Context, err error) error {
 	zerolog.Ctx(ctx).Err(err).Msg("api error returned")
 
 	st := status.New(code, mappedErr.Error())
+	// If we are in testing mode, we return the error without details to allow easy error comparison via r.ErrorIs().
+	if testing.Testing() {
+		return st.Err()
+	}
 	stInfo, wdErr := st.WithDetails(details...)
 	if wdErr != nil {
 		zerolog.Ctx(ctx).Err(wdErr).Msg("unable to build details for grpc error message")

@@ -150,12 +150,14 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	}, waitInterval, retryInterval)
 
 	r.Eventually(func() bool {
+		toBucket := bucket
 		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucket,
 			From:      "main",
 			To:        "f1",
 			ShowMatch: false,
 			User:      user,
+			ToBucket:  &toBucket,
 		})
 		if err != nil {
 			return false
@@ -495,12 +497,15 @@ func TestApi_switch_multipart(t *testing.T) {
 	}, waitInterval, retryInterval)
 
 	r.Eventually(func() bool {
+
+		toBucket := bucket
 		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucket,
 			From:      "main",
 			To:        "f1",
 			ShowMatch: false,
 			User:      user,
+			ToBucket:  &toBucket,
 		})
 		if err != nil {
 			return false
