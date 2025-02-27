@@ -4,15 +4,13 @@
     CColorSchemeToggle,
     CDashboardHeader,
     CDashboardLayout,
-    CIcon,
     CLanguageSelect,
   } from '@clyso/clyso-ui-kit';
-  import { RouteName } from '@/utils/types/router';
-  import { IconName } from '@/utils/types/icon';
   import { useI18nStore } from '@/stores/i18nStore';
   import { useColorSchemeStore } from '@/stores/colorSchemeStore';
   import DashboardNav from '@/components/dashboard/DashboardNav/DashboardNav.vue';
   import { IS_DEV_ENV } from '@/utils/constants/env';
+  import DashboardLogo from '@/components/dashboard/DashboardLogo/DashboardLogo.vue';
 
   const { locale } = storeToRefs(useI18nStore());
   const { setLocale } = useI18nStore();
@@ -33,30 +31,7 @@
         :has-user-menu="false"
       >
         <template #start>
-          <div class="logo-wrapper">
-            <RouterLink :to="{ name: RouteName.CHORUS_HOME }">
-              <div class="logo">
-                <CIcon
-                  :is-inline="true"
-                  class="logo__icon"
-                  :name="IconName.CUSTOM_CHORUS_LOGO"
-                />
-                <span class="logo__text">Chorus</span>
-              </div>
-            </RouterLink>
-            <a
-              href="https://clyso.com"
-              rel="noopener"
-              target="_blank"
-              class="clyso-logo"
-            >
-              <span class="clyso-logo__text">by</span>
-              <CIcon
-                class="clyso-logo__icon"
-                :name="IconName.BASE_LOGO_CLYSO"
-              />
-            </a>
-          </div>
+          <DashboardLogo />
         </template>
 
         <template #end>
@@ -111,71 +86,9 @@
     &__render-view {
       min-width: 0;
     }
-  }
 
-  .logo {
-    @include utils.apply-styles(utils.$text-h1);
-    line-height: 0.8;
-    display: flex;
-    align-items: center;
-    gap: utils.unit(2);
-    height: 40px;
-    font-family: utils.$font-highlight;
-
-    @include utils.mobile {
-      @include utils.apply-styles(utils.$text-h2);
-    }
-
-    &__icon {
-      width: 40px;
-      height: 40px;
-      color: var(--primary-color);
-
-      @include utils.mobile {
-        width: 30px;
-        height: 30px;
-      }
-    }
-
-    &__text {
-      z-index: 1;
-      letter-spacing: -0.08em;
-    }
-  }
-
-  .logo-wrapper {
-    display: flex;
-    align-items: center;
-    gap: utils.unit(3);
-  }
-
-  .clyso-logo {
-    font-size: 6px;
-    line-height: 1;
-    font-family: utils.$font-highlight;
-    display: flex;
-    align-items: center;
-    gap: utils.unit(1);
-    opacity: 0.5;
-    transition: opacity utils.$transition-duration;
-
-    &:hover {
-      opacity: 0.6;
-    }
-
-    &:active {
-      opacity: 0.45;
-    }
-
-    &__icon {
-      width: 50px;
-      height: auto;
-      position: relative;
-    }
-
-    &__text {
-      position: relative;
-      top: 2px;
+    ::v-deep(.c-dashboard-header) {
+      z-index: 2;
     }
   }
 </style>

@@ -8,6 +8,7 @@ export enum IconName {
   BASE_ARROW_FORWARD = 'base-arrow-forward',
   BASE_BUCKET = 'base-bucket',
   BASE_CYLINDER = 'base-cylinder',
+  BASE_CHORUS_LOGO = 'base-chorus-logo',
   BASE_TIMER = 'base-timer',
   BASE_TRASH = 'base-trash',
   BASE_PLAY = 'base-play',
@@ -29,7 +30,6 @@ export enum IconName {
   BASE_REFRESH = 'base-refresh',
 
   // custom folder
-  CUSTOM_CHORUS_LOGO = 'custom-chorus-logo',
   PROVIDER_ALIBABA = 'custom-provider-alibaba',
   PROVIDER_AWS = 'custom-provider-aws',
   PROVIDER_CEPH = 'custom-provider-ceph',
