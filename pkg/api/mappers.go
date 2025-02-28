@@ -42,7 +42,7 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		ToBucket:        in.ToBucket,
 		CreatedAt:       timestamppb.New(in.CreatedAt),
 		IsPaused:        in.IsPaused,
-		IsInitDone:      isInitDone(in.ReplicationPolicyStatus),
+		IsInitDone:      in.ReplicationPolicyStatus.InitDone(),
 		InitObjListed:   in.InitObjListed,
 		InitObjDone:     in.InitObjDone,
 		InitBytesListed: in.InitBytesListed,
@@ -55,10 +55,6 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		AgentUrl:        strPtr(in.AgentURL),
 		SwitchStatus:    switchStatusToPb(in.SwitchStatus),
 	}
-}
-
-func isInitDone(in policy.ReplicationPolicyStatus) bool {
-	return in.ListingStarted && in.InitObjDone >= in.InitObjListed && in.InitDoneAt != nil
 }
 
 func switchStatusToPb(status policy.SwitchStatus) pb.Replication_SwitchEnum {
