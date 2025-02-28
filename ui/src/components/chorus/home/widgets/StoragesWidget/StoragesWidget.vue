@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { computed, onBeforeMount, ref } from 'vue';
   import { CSkeleton, I18nLocale } from '@clyso/clyso-ui-kit';
   import { useI18n } from 'vue-i18n';
   import { type ChorusStorage } from '@/utils/types/chorus';
@@ -77,7 +77,7 @@
     }
   }
 
-  initStorages();
+  onBeforeMount(initStorages);
 </script>
 
 <template>

@@ -4,6 +4,7 @@
   import { HAS_PROMETHEUS } from '@/utils/constants/env';
   import WorkerUptimeWidget from '@/components/chorus/home/widgets/WorkerUptimeWidget/WorkerUptimeWidget.vue';
   import StoragesWidget from '@/components/chorus/home/widgets/StoragesWidget/StoragesWidget.vue';
+  import ProxyWidget from '@/components/chorus/home/widgets/ProxyWidget/ProxyWidget.vue';
 
   const loadingState = ref<number>(0);
   const isLoadingFinished = ref(false);
@@ -41,6 +42,10 @@
       />
 
       <StoragesWidget
+        :is-initializing="isPageLoading"
+        @loading="setLoadingState"
+      />
+      <ProxyWidget
         :is-initializing="isPageLoading"
         @loading="setLoadingState"
       />
