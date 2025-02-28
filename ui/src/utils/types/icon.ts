@@ -28,6 +28,7 @@ export enum IconName {
   BASE_CLOUD_DOWNLOAD = 'base-cloud-download',
   BASE_CONTRACT = 'base-contract',
   BASE_REFRESH = 'base-refresh',
+  BASE_SERVER = 'base-server',
 
   // custom folder
   PROVIDER_ALIBABA = 'custom-provider-alibaba',

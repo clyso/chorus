@@ -36,6 +36,10 @@
       <template #trigger>
         <CIcon
           class="chorus-storage-provider__icon"
+          :class="{
+            'chorus-storage-provider__icon--other':
+              storageProvider === StorageProvider.Other,
+          }"
           :name="storageProviderIconName"
           :is-inline="true"
         />
@@ -61,9 +65,8 @@
       width: 24px;
       height: 24px;
 
-      &:focus-visible {
-        outline: 2px solid var(--primary-color);
-        border-radius: utils.$border-radius;
+      &--other {
+        color: var(--primary-color);
       }
     }
   }

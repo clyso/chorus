@@ -69,12 +69,12 @@
         width: 1px;
         background: var(--text-color-base);
         opacity: 0.3;
+        pointer-events: none;
       }
     }
 
     &__chorus-text {
       @include utils.apply-styles(utils.$text-h1);
-      font-weight: 100;
       line-height: 1;
       gap: utils.unit(2);
       margin-bottom: -4px;

@@ -1,10 +1,11 @@
 <script setup lang="ts">
   import {
-    CTag,
-    CDescriptionList,
     CDescriptionItem,
+    CDescriptionList,
+    CTag,
   } from '@clyso/clyso-ui-kit';
   import { computed } from 'vue';
+  import type { RouteLocationRaw } from 'vue-router';
   import type { ChorusStorage } from '@/utils/types/chorus';
   import ChorusStorageProvider from '@/components/chorus/common/ChorusStorageProvider/ChorusStorageProvider.vue';
 
@@ -12,6 +13,7 @@
     defineProps<{
       storage: ChorusStorage;
       type?: 'success' | 'warning' | 'info' | 'error';
+      to?: RouteLocationRaw; // to be used as link
       isSelectable?: boolean;
       isSelected?: boolean;
       isDisabled?: boolean;
@@ -22,6 +24,7 @@
       isSelectable: false,
       isSelected: false,
       isDisabled: false,
+      to: undefined,
       size: 'medium',
     },
   );
@@ -30,14 +33,15 @@
     `chorus-storage-card--${props.type}`,
     `chorus-storage-card--${props.size}`,
     {
-      'chorus-storage-card--selectable': props.isSelectable,
-      'chorus-storage-card--selected': props.isSelected,
-      'chorus-storage-card--disabled': props.isDisabled,
+      'chorus-storage-card--link': !!props.to,
+      'chorus-storage-card--selectable': props.isSelectable && !props.to,
+      'chorus-storage-card--selected': props.isSelected && !props.to,
+      'chorus-storage-card--disabled': props.isDisabled && !props.to,
     },
   ]);
 
   const tabindex = computed<number | undefined>(() =>
-    props.isSelectable && !props.isSelected && !props.isDisabled
+    !!props.to || (props.isSelectable && !props.isSelected && !props.isDisabled)
       ? 0
       : undefined,
   );
@@ -47,7 +51,12 @@
   }>();
 
   function handleClick() {
-    if (!props.isSelectable || props.isSelected || props.isDisabled) {
+    if (
+      !!props.to ||
+      !props.isSelectable ||
+      props.isSelected ||
+      props.isDisabled
+    ) {
       return;
     }
 
@@ -56,7 +65,9 @@
 </script>
 
 <template>
-  <div
+  <component
+    :is="to ? 'RouterLink' : 'div'"
+    :to="to"
     :class="storageCardClasses"
     class="chorus-storage-card"
     :tabindex="tabindex"
@@ -70,7 +81,8 @@
         </div>
         <div class="chorus-storage-card__header-right">
           <CTag
-            :size="size === 'small' ? 'tiny' : 'small'"
+            size="tiny"
+            class="chorus-storage-card__storage-tag"
             :type="storage.isMain ? 'success' : 'warning'"
           >
             {{ $t(storage.isMain ? 'mainStorage' : 'followerStorage') }}
@@ -96,7 +108,7 @@
         </CDescriptionList>
       </div>
     </div>
-  </div>
+  </component>
 </template>
 
 <style lang="scss" scoped>
@@ -142,6 +154,12 @@
       .chorus-storage-card__title {
         margin-bottom: 0;
         @include utils.apply-styles(utils.$text);
+        font-family: utils.$font-highlight;
+        font-weight: utils.$font-weight-semibold;
+      }
+
+      ::v-deep(.c-description-item) {
+        @include utils.apply-styles(utils.$text-tiny);
         font-weight: utils.$font-weight-semibold;
       }
 
@@ -187,6 +205,28 @@
       cursor: not-allowed;
     }
 
+    &--link {
+      cursor: pointer;
+      outline: 2px solid transparent;
+      transition: outline-color utils.$transition-duration;
+
+      &:focus-visible {
+        outline-color: var(--primary-color);
+      }
+
+      &:hover {
+        &::before {
+          opacity: 0.15;
+        }
+      }
+
+      &:active {
+        &::before {
+          opacity: 0.25;
+        }
+      }
+    }
+
     &::before {
       content: '';
       @include utils.absolute-fit;
@@ -199,6 +239,11 @@
       @include utils.apply-styles(utils.$text-h4);
       font-weight: utils.$font-weight-medium;
       margin-bottom: utils.unit(2);
+    }
+
+    &__storage-tag {
+      @include utils.apply-styles(utils.$text-tiny);
+      pointer-events: none;
     }
 
     &__inner {
