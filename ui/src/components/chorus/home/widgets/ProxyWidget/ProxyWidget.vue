@@ -8,9 +8,9 @@
     I18nLocale,
   } from '@clyso/clyso-ui-kit';
   import { useI18n } from 'vue-i18n';
+  import ProxyCredentialsModal from './ProxyCredentialsModal.vue';
   import { type ChorusProxyCredentials } from '@/utils/types/chorus';
   import { ChorusService } from '@/services/ChorusService';
-  import ProxyCredentialsModal from '@/components/chorus/home/ProxyWidget/ProxyCredentialsModal.vue';
   import HomeWidget from '@/components/chorus/common/HomeWidget/HomeWidget.vue';
 
   const { t } = useI18n({
@@ -23,7 +23,7 @@
       },
       [I18nLocale.DE]: {
         credentials: 'Anmeldeinformationen',
-        seeCredentials: 'Anmeldeinformationen anzeigen',
+        seeCredentials: 'Anzeigen',
         proxyCredentialsTitle: 'S3-Proxy-Anmeldeinformationen',
         errorMessage:
           'Beim Abrufen der Proxy-Daten ist ein Fehler aufgetreten.',
