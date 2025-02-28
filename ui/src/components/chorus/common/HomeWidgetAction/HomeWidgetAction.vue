@@ -45,6 +45,7 @@
           secondary
           circle
           :tag="to ? 'span' : undefined"
+          :tabindex="to ? '-1' : '0'"
           :loading="isLoading"
           size="small"
           :type="type"
@@ -69,5 +70,13 @@
 
   .home-widget-action {
     display: inline-flex;
+    border-radius: 50%;
+    border: 0;
+    outline: 2px solid transparent;
+    transform-style: outline utils.$transition-duration;
+
+    &:focus-visible {
+      outline-color: var(--primary-color) !important;
+    }
   }
 </style>

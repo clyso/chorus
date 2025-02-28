@@ -41,6 +41,7 @@
               storageProvider === StorageProvider.Other,
           }"
           :name="storageProviderIconName"
+          tabindex="-1"
           :is-inline="true"
         />
       </template>

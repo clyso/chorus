@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { ref } from 'vue';
+  import { onBeforeMount, ref } from 'vue';
   import {
     I18nLocale,
     CSkeleton,
@@ -72,7 +72,7 @@
     }
   }
 
-  initProxyUptimeData();
+  onBeforeMount(initProxyUptimeData);
 </script>
 
 <template>
