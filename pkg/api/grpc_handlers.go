@@ -894,7 +894,7 @@ func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDow
 			return fmt.Errorf("switch is already done or in progress")
 		}
 		startNow := req.DowntimeWindow == nil || (!req.DowntimeWindow.StartOnInitDone && req.DowntimeWindow.Cron == nil && req.DowntimeWindow.StartAt == nil)
-		if startNow && !isInitDone(policyStatus) {
+		if startNow && !policyStatus.InitDone() {
 			return fmt.Errorf("unable to start switch right away: initial replication is not done")
 		}
 		if err = validateSwitchWindow(req.DowntimeWindow); err != nil {
