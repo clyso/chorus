@@ -1,47 +1,44 @@
 <script setup lang="ts">
-  import {
-    CAspectRatio,
-    CResult,
-    CSkeleton,
-    CTile,
-    I18nLocale,
-  } from '@clyso/clyso-ui-kit';
   import { useI18n } from 'vue-i18n';
   import { ref } from 'vue';
-  import ChorusUptimeChart from '@/components/chorus/common/ChorusUptimeChart/ChorusUptimeChart.vue';
-  import { PrometheusService } from '@/services/PrometheusService';
+  import {
+    I18nLocale,
+    CSkeleton,
+    CAspectRatio,
+    CResult,
+  } from '@clyso/clyso-ui-kit';
+  import HomeWidget from '@/components/chorus/common/HomeWidget/HomeWidget.vue';
   import type { PrometheusUptimeDataItem } from '@/utils/types/prometheus';
+  import { PrometheusService } from '@/services/PrometheusService';
   import { IconName } from '@/utils/types/icon';
+  import ChorusUptimeChart from '@/components/chorus/common/ChorusUptimeChart/ChorusUptimeChart.vue';
 
   const { t } = useI18n({
     messages: {
       [I18nLocale.EN]: {
         workerUptimeTitle: 'Worker Uptime',
         notEnabledMessage: 'Prometheus is not available',
-        errorMessage: 'An error occurred while getting the chart data.',
       },
       [I18nLocale.DE]: {
         workerUptimeTitle: 'Arbeiter Uptime',
         notEnabledMessage: 'Prometheus ist nicht verfügbar',
-        errorMessage:
-          'Beim Abrufen der Diagrammdaten ist ein Fehler aufgetreten.',
       },
     },
   });
 
   const props = withDefaults(
     defineProps<{
-      isInitializing?: boolean;
+      isPageLoading?: boolean;
       isEnabled?: boolean;
     }>(),
     {
-      isInitializing: false,
+      isPageLoading: false,
       isEnabled: true,
     },
   );
 
   const emit = defineEmits<{
-    (e: 'init', value: boolean): void;
+    (e: 'loading', value: boolean): void;
   }>();
 
   const workerUptimeData = ref<PrometheusUptimeDataItem[]>([]);
@@ -66,12 +63,12 @@
   }
 
   async function initWorkerUptimeData() {
-    emit('init', true);
+    emit('loading', true);
 
     try {
       await getWorkerUptimeData();
     } finally {
-      emit('init', false);
+      emit('loading', false);
     }
   }
 
@@ -79,9 +76,11 @@
 </script>
 
 <template>
-  <CTile
+  <HomeWidget
+    :is-loading="isLoading || isPageLoading"
+    :has-error="hasError"
     class="worker-uptime-widget"
-    :is-loading="isLoading || isInitializing"
+    @retry="getWorkerUptimeData"
   >
     <template #title>
       {{ t('workerUptimeTitle') }}
@@ -117,23 +116,6 @@
           </template>
         </CResult>
       </CAspectRatio>
-      <CAspectRatio
-        v-else-if="hasError"
-        key="error"
-        ratio="4:1"
-      >
-        <CResult
-          type="error"
-          size="tiny"
-          class="worker-uptime-widget__error-result"
-          @positive-click="getWorkerUptimeData"
-        >
-          <template #title>
-            {{ t('errorTitle') }}
-          </template>
-          {{ t('errorMessage') }}
-        </CResult>
-      </CAspectRatio>
       <ChorusUptimeChart
         v-else
         key="chart"
@@ -141,13 +123,25 @@
         :data="workerUptimeData"
       />
     </div>
-  </CTile>
+  </HomeWidget>
 </template>
 
 <style lang="scss" scoped>
   @use '@/styles/utils' as utils;
 
   .worker-uptime-widget {
+    overflow: hidden;
+    grid-column: span 5;
+
+    @media screen and (min-width: utils.$viewport-desktop) and (max-width: 1300px) {
+      grid-column: span 4;
+    }
+
+    @include utils.touch {
+      grid-column: auto;
+      width: 100%;
+    }
+
     &__skeleton {
       @include utils.absolute-fit;
     }

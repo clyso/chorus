@@ -38,10 +38,10 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 8080,
+    port: 8081,
     proxy: {
       '^/(token|api|spec|prometheus/api.*)': {
-        target: 'https://oss-dev.mcb.clyso.cloud',
+        target: 'http://localhost:9671',
         changeOrigin: true,
         secure: true,
       },

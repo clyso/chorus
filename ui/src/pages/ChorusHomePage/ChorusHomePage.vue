@@ -1,63 +1,48 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue';
-  import ProxyUptimeWidget from '@/components/chorus/home/ProxyUptimeWidget/ProxyUptimeWidget.vue';
+  import ProxyUptimeWidget from '@/components/chorus/home/widgets/ProxyUptimeWidget/ProxyUptimeWidget.vue';
   import { HAS_PROMETHEUS } from '@/utils/constants/env';
-  import WorkerUptimeWidget from '@/components/chorus/home/WorkerUptimeWidget/WorkerUptimeWidget.vue';
-  import StoragesWidget from '@/components/chorus/home/StoragesWidget/StoragesWidget.vue';
-  import ProxyWidget from '@/components/chorus/home/ProxyWidget/ProxyWidget.vue';
-  import ReplicationsWidget from '@/components/chorus/home/ReplicationsWidget/ReplicationsWidget.vue';
+  import WorkerUptimeWidget from '@/components/chorus/home/widgets/WorkerUptimeWidget/WorkerUptimeWidget.vue';
+  import StoragesWidget from '@/components/chorus/home/widgets/StoragesWidget/StoragesWidget.vue';
 
-  const initState = ref<number>(0);
-  const isInitFinished = ref(false);
-  const isPageInitializing = computed(
-    () => !isInitFinished.value || initState.value > 0,
+  const loadingState = ref<number>(0);
+  const isLoadingFinished = ref(false);
+  const isPageLoading = computed(
+    () => !isLoadingFinished.value || loadingState.value > 0,
   );
 
-  function setInitState(value: boolean) {
+  function setLoadingState(value: boolean) {
     if (value) {
-      initState.value += 1;
+      loadingState.value += 1;
 
       return;
     }
 
-    initState.value -= 1;
+    loadingState.value -= 1;
 
-    if (initState.value === 0) {
-      isInitFinished.value = true;
+    if (loadingState.value === 0) {
+      isLoadingFinished.value = true;
     }
   }
 </script>
 
 <template>
-  <div class="home-page">
-    <div class="home-page__row home-page__row--1">
+  <div class="chorus-home-page">
+    <div class="chorus-home-page__widgets">
       <ProxyUptimeWidget
-        :is-initializing="isPageInitializing"
+        :is-initializing="isPageLoading"
         :is-enabled="HAS_PROMETHEUS"
-        @init="setInitState"
+        @loading="setLoadingState"
       />
       <WorkerUptimeWidget
-        :is-initializing="isPageInitializing"
+        :is-initializing="isPageLoading"
         :is-enabled="HAS_PROMETHEUS"
-        @init="setInitState"
+        @loading="setLoadingState"
       />
-    </div>
 
-    <div class="home-page__row home-page__row--2">
       <StoragesWidget
-        class="home-page__storages"
-        :is-initializing="isPageInitializing"
-        @init="setInitState"
-      />
-      <ReplicationsWidget
-        class="home-page__replications"
-        :is-initializing="isPageInitializing"
-        @init="setInitState"
-      />
-      <ProxyWidget
-        class="home-page__proxy"
-        :is-initializing="isPageInitializing"
-        @init="setInitState"
+        :is-initializing="isPageLoading"
+        @loading="setLoadingState"
       />
     </div>
   </div>
@@ -66,42 +51,26 @@
 <style lang="scss" scoped>
   @use '@/styles/utils' as utils;
 
-  .home-page {
-    display: grid;
-    gap: 12px;
+  .chorus-home-page {
+    max-width: 1800px;
 
-    &__row {
+    &__widgets {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(12, minmax(50px, 1fr));
+      gap: utils.unit(3);
+      margin-bottom: utils.unit(3);
 
-      @include utils.mobile {
+      @media screen and (min-width: utils.$viewport-desktop) and (max-width: 1300px) {
+        grid-template-columns: repeat(8, minmax(100px, 1fr));
+      }
+
+      @include utils.touch {
         grid-template-columns: auto;
       }
 
-      &--2 {
-        @include utils.touch {
-          grid-template-columns: auto;
-        }
+      &:last-child {
+        margin-bottom: 0;
       }
-    }
-
-    &__storages {
-      grid-column: span 2;
-
-      @include utils.touch {
-        grid-column: span 1;
-      }
-    }
-
-    &__proxy {
-      grid-column: span 1;
-      align-self: start;
-    }
-
-    &__replications {
-      grid-column: span 1;
-      align-self: start;
     }
   }
 </style>
