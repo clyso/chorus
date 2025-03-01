@@ -11,7 +11,7 @@ import (
 var (
 	// timeNow is a function to get current time
 	// it is a variable so that it can be mocked in tests
-	timeNow = func() time.Time { return time.Now() }
+	timeNow = time.Now
 )
 
 type Window struct {
@@ -128,11 +128,11 @@ func (s *policySvc) DeleteReplicationSwitchWithDowntime(ctx context.Context, rep
 	panic("unimplemented")
 }
 
-func (s *policySvc) GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (*SwitchWithDowntime, error) {
+func (s *policySvc) GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (SwitchWithDowntime, error) {
 	panic("unimplemented")
 }
 
-func (s *policySvc) UpdateSwitchWithDowntimeStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string) error {
+func (s *policySvc) UpdateSwitchWithDowntimeStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt, doneAt *time.Time) error {
 	panic("unimplemented")
 }
 func (s *policySvc) CompleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, continueReplication bool) error {
