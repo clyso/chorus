@@ -16,7 +16,7 @@
 
 package s3
 
-//go:generate stringer -type Method
+//go:generate go tool stringer -type Method
 
 type Method uint8
 

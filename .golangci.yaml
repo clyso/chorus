@@ -1,12 +1,11 @@
-go: 1.23
+go: 1.24
 
 run:
   tests: false
-  go: "1.23"
+  go: "1.24"
 
 issues:
-  exclude-dirs:
-    -test
+  exclude-dirs: -test
 
 fix: true
 

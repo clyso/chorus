@@ -164,6 +164,7 @@ type ReplicationID struct {
 	ToBucket *string
 }
 
+//go:generate go tool mockery --name=Service --filename=service_mock.go --inpackage --structname=MockService
 type Service interface {
 	// GetRoutingPolicy returns destination storage name.
 	// Errors:
