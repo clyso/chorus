@@ -15,19 +15,26 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// check mock values:
+var (
+	checkResultIsEqual, checkResultIsInProgress = true, false
+)
+
 func (s *svc) SwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
 	var p tasks.SwitchWithDowntimePayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwitchWithDowntimePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
-	taskID, ok := asynq.GetTaskID(ctx)
-	if !ok {
-		// should never happen
-		return errors.New("task id not found in worker ctx")
+	policyID := policy.ReplicationID{
+		User:     p.User,
+		Bucket:   p.Bucket,
+		From:     p.FromStorage,
+		To:       p.ToStorage,
+		ToBucket: p.ToBucket,
 	}
 
 	// acquire exclusive lock to switch task:
-	release, refresh, err := s.locker.Lock(ctx, lock.StringKey(taskID))
+	release, refresh, err := s.locker.Lock(ctx, lock.StringKey(policyID.String()))
 	if err != nil {
 		return err
 	}
@@ -45,13 +52,6 @@ func (s *svc) SwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
 		if replStatus.IsPaused {
 			// replication is paused - retry later
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-		}
-		policyID := policy.ReplicationID{
-			User:     p.User,
-			Bucket:   p.Bucket,
-			From:     p.FromStorage,
-			To:       p.ToStorage,
-			ToBucket: p.ToBucket,
 		}
 		switchPolicy, err := s.policySvc.GetReplicationSwitchWithDowntime(ctx, policyID)
 		if err != nil {
@@ -107,7 +107,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			}
 		}
 		// handle the case where switch is not recurring (no cron) and was already attempted:
-		_, alredyAttempted := switchStatus.GetLastStartAt()
+		alredyAttempted := switchStatus.LastStatus != policy.StatusNotStarted && switchStatus.LastStatus != ""
 		_, isRecurring := switchStatus.GetCron()
 		if alredyAttempted && !isRecurring {
 			zerolog.Ctx(ctx).Error().Msgf("switch with downtime already executed with status %q and should not be retried: drop task", string(switchStatus.LastStatus))
@@ -292,5 +292,5 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 
 func (s *svc) checkBuckets(_ context.Context, _ policy.ReplicationID) (isEqual, isInProgress bool, err error) {
 	// todo: implement when https://github.com/clyso/chorus/issues/38 is done
-	return true, true, nil
+	return checkResultIsEqual, checkResultIsInProgress, nil
 }
