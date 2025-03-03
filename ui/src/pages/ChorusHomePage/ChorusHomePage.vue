@@ -1,10 +1,11 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue';
-  import ProxyUptimeWidget from '@/components/chorus/home/widgets/ProxyUptimeWidget/ProxyUptimeWidget.vue';
+  import ProxyUptimeWidget from '@/components/chorus/home/ProxyUptimeWidget/ProxyUptimeWidget.vue';
   import { HAS_PROMETHEUS } from '@/utils/constants/env';
-  import WorkerUptimeWidget from '@/components/chorus/home/widgets/WorkerUptimeWidget/WorkerUptimeWidget.vue';
-  import StoragesWidget from '@/components/chorus/home/widgets/StoragesWidget/StoragesWidget.vue';
-  import ProxyWidget from '@/components/chorus/home/widgets/ProxyWidget/ProxyWidget.vue';
+  import WorkerUptimeWidget from '@/components/chorus/home/WorkerUptimeWidget/WorkerUptimeWidget.vue';
+  import StoragesWidget from '@/components/chorus/home/StoragesWidget/StoragesWidget.vue';
+  import ProxyWidget from '@/components/chorus/home/ProxyWidget/ProxyWidget.vue';
+  import ReplicationsWidget from '@/components/chorus/home/ReplicationsWidget/ReplicationsWidget.vue';
 
   const loadingState = ref<number>(0);
   const isLoadingFinished = ref(false);
@@ -31,22 +32,28 @@
   <div class="chorus-home-page">
     <div class="chorus-home-page__widgets">
       <ProxyUptimeWidget
-        :is-initializing="isPageLoading"
+        v-if="HAS_PROMETHEUS"
+        :is-page-loading="isPageLoading"
         :is-enabled="HAS_PROMETHEUS"
         @loading="setLoadingState"
       />
       <WorkerUptimeWidget
-        :is-initializing="isPageLoading"
+        v-if="HAS_PROMETHEUS"
+        :is-page-loading="isPageLoading"
         :is-enabled="HAS_PROMETHEUS"
         @loading="setLoadingState"
       />
 
       <StoragesWidget
-        :is-initializing="isPageLoading"
+        :is-page-loading="isPageLoading"
         @loading="setLoadingState"
       />
       <ProxyWidget
-        :is-initializing="isPageLoading"
+        :is-page-loading="isPageLoading"
+        @loading="setLoadingState"
+      />
+      <ReplicationsWidget
+        :is-page-loading="isPageLoading"
         @loading="setLoadingState"
       />
     </div>
