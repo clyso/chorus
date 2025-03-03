@@ -164,6 +164,13 @@ type ReplicationID struct {
 	ToBucket *string
 }
 
+func (r ReplicationID) String() string {
+	if r.ToBucket != nil {
+		return fmt.Sprintf("%s:%s:%s:%s:%s", r.User, r.Bucket, r.From, r.To, *r.ToBucket)
+	}
+	return fmt.Sprintf("%s:%s:%s:%s", r.User, r.Bucket, r.From, r.To)
+}
+
 //go:generate go tool mockery --name=Service --filename=service_mock.go --inpackage --structname=MockService
 type Service interface {
 	// GetRoutingPolicy returns destination storage name.
