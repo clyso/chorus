@@ -35,26 +35,24 @@ service Chorus {
   rpc DeleteReplication(ReplicationRequest) returns (google.protobuf.Empty);
   rpc DeleteUserReplication(DeleteUserReplicationRequest) returns (google.protobuf.Empty);
 
-  // Switch main<->follower for selected replication with downtime.
-  // This method Can be used to update existing switch if it has not started yet.
-  // Switch with downtime stops write request to bucket on chorus proxy until all replication tasks will be processed.
-  // Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket.
+  // Switch main<->follower for selected replication.
+  // This method Can also be used to update existing switch if it has not started yet.
+  // 2 Switch types are supported:
+  //  - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
+  // Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.
+  //  - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
   // Method will return error in following cases:
   //   - there is no existing bucket replication
   //   - there are multiple replications from the same main bucket to multiple followers
-  //   - switch is in progress - aka writes already blocked. Use DeleteSwitchWithDowntime in this case.
+  //   - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.
   //   - switch is successfully finished
-  //   - if downtime window is not set and initial migration is not done
-  // Switch status will be shown in Replication status.
-  rpc SwitchWithDowntime(SwitchWithDowntimeRequest) returns (google.protobuf.Empty);
+  rpc SwitchBucket(SwitchBucketRequest) returns (google.protobuf.Empty);
 
   // Deletes Switch if exists and sets old main bucket back as main if switch was already completed.
-  rpc DeleteSwitchWithDowntime(ReplicationRequest) returns (google.protobuf.Empty);
+  rpc DeleteBucketSwitch(ReplicationRequest) returns (google.protobuf.Empty);
 
   // Returns Switch with donwntime info
-  rpc GetSwitchWithDowntime(ReplicationRequest) returns (GetSwitchWithDowntimeResponse);
-
-  rpc SwitchMainBucket(SwitchMainBucketRequest) returns (google.protobuf.Empty);
+  rpc GetBucketSwitchStatus(ReplicationRequest) returns (GetBucketSwitchStatusResponse);
 
   // Compares contents of given bucket in given storages
   rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse);
@@ -300,21 +298,24 @@ message Agent {
   string url = 2;
 }
 
-message SwitchMainBucketRequest {
-  string user = 1;
-  string bucket = 2;
-  string new_main = 3;
-}
-
-message SwitchWithDowntimeRequest {
+message SwitchBucketRequest {
+  // Id of bucket replication policy to switch source and destination buckets on proxy.
+  // Replication policy should already exist.
   ReplicationRequest replication_id = 1;
-  // set true to replicate data updates from new main to old main bucket after successful switch
-  // default is false
-  bool continue_replication = 2;
+
+  // Set true to perform bucket switch without downtime.
+  // Once started, no downtime switch cannot be aborted or reverted without risk of data loss.
+  // Default is false. If true, other request parameters like continue_replication and downtime_window will be ignored.
+  bool no_downtime = 2;
+
+  // Set true to replicate data updates from new main to old main bucket after successful switch
+  // Default is false. Can be used only for switch with downtime.
+  bool continue_replication = 3;
 
   // Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.
   // If NOT set, switch will be performed right away and writes will be blocked until it is done.
-  optional SwitchWindow downtime_window = 3;
+  // Can be used only for switch with downtime.
+  optional SwitchWindow downtime_window = 4;
 }
 
 // Defines downtime window for replication switch.
@@ -348,20 +349,38 @@ message SwitchWindow {
   optional uint32 max_event_lag = 5;
 }
 
-message GetSwitchWithDowntimeResponse {
+message GetBucketSwitchStatusResponse {
   enum Status {
+    // Switch is not started yet
     NotStarted = 0;
+    // Switch is in progress. Draining replication events queue.
+    // For switch with downtime, writes to bucket are blocked at this point.
     InProgress = 1;
-    Done = 2;
+    // Switch is in progress. Queue is drained. Checking if main and follower buckets are the same.
+    // Writes to bucket are still blocked. Used only for switch with downtime.
+    CheckInProgress = 2;
+    // Switch failed to complete in downtime window and was aborted.
+    // Writes to bucket are unblocked. Used only for switch with downtime.
+    // If cron downtime_window is used, switch will be retried on next cron execution.
     Error = 3;
+    // Switch was not able to start in given downtime window because conditions were not met.
+    // Used only for switch with downtime. If cron downtime_window is used, switch will be retried on next cron execution.
     Skipped = 4;
+    // Switch was successfully completed.
+    // All data was replicated to new main bucket and all read and write requests are now routed to it.
+    Done = 5;
   }
 
+  // Current switch status
   Status last_status = 1;
-  bool continue_replication = 2;
-  optional SwitchWindow downtime_window = 3;
+  bool no_downtime = 2;
+  bool continue_replication = 3;
+  optional SwitchWindow downtime_window = 4;
 
-  optional google.protobuf.Timestamp last_started_at = 4;
-  optional google.protobuf.Timestamp done_at = 5;
-  repeated string history = 6;
+  // Time of last switch attempt - last time when switch was moved to InProgress status.
+  optional google.protobuf.Timestamp last_started_at = 5;
+  // Time of last switch completion. Set only if switch status is Done.
+  optional google.protobuf.Timestamp done_at = 6;
+  // History of switch status changes
+  repeated string history = 7;
 }

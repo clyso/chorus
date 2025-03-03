@@ -48,17 +48,14 @@ http:
     - selector: chorus.Chorus.CompareBucket
       post: /replication/compare-bucket
       body: "*"
-    - selector: chorus.Chorus.SwitchMainBucket
+    - selector: chorus.Chorus.SwitchBucket
       post: /replication/switch
       body: "*"
-    - selector: chorus.Chorus.SwitchWithDowntime
-      post: /replication/switch-with-downtime
+    - selector: chorus.Chorus.DeleteBucketSwitch
+      post: /replication/switch/delete
       body: "*"
-    - selector: chorus.Chorus.DeleteSwitchWithDowntime
-      post: /replication/switch-with-downtime/delete
-      body: "*"
-    - selector: chorus.Chorus.GetSwitchWithDowntime
-      post: /replication/switch-with-downtime/get
+    - selector: chorus.Chorus.GetBucketSwitchStatus
+      post: /replication/switch/status
       body: "*"
     - selector: chorus.Chorus.AddBucketReplication
       post: /v2/replication/add

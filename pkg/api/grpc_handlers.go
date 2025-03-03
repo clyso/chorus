@@ -869,6 +869,12 @@ func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationReques
 }
 
 func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDowntimeRequest) (*emptypb.Empty, error) {
+	if _, ok := h.storages.Storages[req.ReplicationId.From]; !ok {
+		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.ReplicationId.From)
+	}
+	if _, ok := h.storages.Storages[req.ReplicationId.To]; !ok {
+		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ReplicationId.To)
+	}
 	policies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.ReplicationId.User, req.ReplicationId.Bucket)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get replication policy: %w", err)
@@ -877,8 +883,8 @@ func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDow
 		return nil, fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
 	}
 
-	ctx = log.WithUser(ctx, req.ReplicationId.User)
-	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.ReplicationId.User), lock.WithDuration(time.Second), lock.WithRetry(true))
+	policyID := pbToReplicationID(req.ReplicationId)
+	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
@@ -901,7 +907,7 @@ func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDow
 			return err
 		}
 		// store switch metadata:
-		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, pbToReplicationID(req.ReplicationId), pbToWindow(req.DowntimeWindow))
+		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, policyID, pbToWindow(req.DowntimeWindow))
 		if err != nil {
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}
