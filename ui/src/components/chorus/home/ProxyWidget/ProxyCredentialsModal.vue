@@ -48,7 +48,8 @@
 
 <template>
   <CDialog
-    type="info"
+    type="primary"
+    :has-negative="false"
     :icon-name="IconName.BASE_KEY"
     :is-shown="isShown"
     class="proxy-credentials-modal"
@@ -122,6 +123,8 @@
         </CDescriptionItem>
       </CDescriptionList>
     </div>
+
+    <template #positive-text>{{ 'OK' }}</template>
   </CDialog>
 </template>
 

@@ -110,7 +110,7 @@
 
     <template #actions>
       <HomeWidgetAction
-        :icon-name="IconName.BASE_SERVER"
+        :icon-name="IconName.BASE_LIST"
         :to="{ name: RouteName.CHORUS_STORAGES }"
         :tooltip-text="t('storagesActionLink')"
       />
