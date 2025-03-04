@@ -1,19 +1,24 @@
 # Build stage
-FROM node:20 as build
+FROM node:20 as build-stage
 WORKDIR /app
 
 # Install dependencies
 COPY package.json yarn.lock ./
-RUN yarn install --pure-lockfile
-
-# Copy source files and build
+ENV NODE_ENV=development
+RUN yarn install
 COPY . .
-RUN yarn run build
+# Build
+ENV NODE_ENV=production
+RUN yarn build
 
 # Production stage
-FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
-COPY nginx/default.conf /etc/nginx/nginx.conf
+FROM nginx:stable-alpine as production-stage
+COPY --from=build-stage /app/build /usr/share/nginx/html
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+ARG GIT_COMMIT
+ARG GIT_TAG
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV GIT_TAG=$GIT_TAG
+
+# --env BACKEND_URL=http://127.0.0.1:9090

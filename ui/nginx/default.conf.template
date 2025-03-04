@@ -1,0 +1,33 @@
+server {
+    listen       80;
+    listen  [::]:80;
+    server_name  localhost;
+
+    #access_log  /var/log/nginx/host.access.log  main;
+
+    #error_page  404              /404.html;
+    error_page 404  /index.html;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        # First attempt to serve request as file, then
+        # as directory, then fall back to redirecting to index.html
+        try_files $uri $uri/ $uri.html /index.html;
+    }
+
+    location ~* \.(?:css|js|jpg|svg|png|ico)$ {
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+     location ^~/api/ {
+       proxy_pass  ${BACKEND_URL}/;
+     }
+     
+     location /nginx_status {
+        stub_status on;
+        allow 127.0.0.1;  #only allow requests from localhost
+        deny all;   #deny all other hosts 
+    }
+}
