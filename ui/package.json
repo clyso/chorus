@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "vite build",
     "preview": "vite preview",
     "test:unit": "vitest",
-    "build-only": "vite build",
     "lint:types": "vue-tsc --build --force",
     "lint:eslint": "eslint --no-fix --max-warnings 0",
     "lint:oxlint": "oxlint . -D correctness",
