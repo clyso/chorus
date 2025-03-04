@@ -9,8 +9,8 @@
   import { useI18nStore } from '@/stores/i18nStore';
   import { useColorSchemeStore } from '@/stores/colorSchemeStore';
   import DashboardNav from '@/components/dashboard/DashboardNav/DashboardNav.vue';
-  import { IS_DEV_ENV } from '@/utils/constants/env';
   import DashboardLogo from '@/components/dashboard/DashboardLogo/DashboardLogo.vue';
+  import { HAS_LANG_SELECT } from '@/utils/constants/env';
 
   const { locale } = storeToRefs(useI18nStore());
   const { setLocale } = useI18nStore();
@@ -36,7 +36,7 @@
 
         <template #end>
           <CLanguageSelect
-            v-if="IS_DEV_ENV"
+            v-if="HAS_LANG_SELECT"
             :value="locale"
             @update:value="setLocale"
           />
