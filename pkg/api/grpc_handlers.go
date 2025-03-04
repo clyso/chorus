@@ -704,41 +704,6 @@ func (h *handlers) GetAgents(ctx context.Context, _ *emptypb.Empty) (*pb.GetAgen
 	return &pb.GetAgentsResponse{Agents: res}, nil
 }
 
-func (h *handlers) SwitchMainBucket(ctx context.Context, req *pb.SwitchMainBucketRequest) (*emptypb.Empty, error) {
-	// validate req
-	if _, ok := h.storages.Storages[req.NewMain]; !ok {
-		return nil, fmt.Errorf("%w: invalid NewMain", dom.ErrInvalidArg)
-	}
-	ctx = log.WithUser(ctx, req.User)
-	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second), lock.WithRetry(true))
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
-		err := h.policySvc.DoReplicationSwitch(ctx, req.User, req.Bucket, req.NewMain)
-		if err != nil {
-			return err
-		}
-		task, err := tasks.NewTask(ctx, tasks.FinishReplicationSwitchPayload{
-			User:   req.User,
-			Bucket: req.Bucket,
-		})
-		if err != nil {
-			return err
-		}
-		_, err = h.taskClient.EnqueueContext(ctx, task)
-		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-			return err
-		}
-		return nil
-	}, refresh, time.Second)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
-}
-
 func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketReplicationRequest) (*emptypb.Empty, error) {
 	// validate
 	if _, ok := h.storages.Storages[req.FromStorage]; !ok {
@@ -868,13 +833,21 @@ func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationReques
 	}), nil
 }
 
-func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDowntimeRequest) (*emptypb.Empty, error) {
+func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest) (*emptypb.Empty, error) {
+	// validate
+	if err := validateSwitchRequest(req); err != nil {
+		return nil, err
+	}
 	if _, ok := h.storages.Storages[req.ReplicationId.From]; !ok {
 		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.ReplicationId.From)
 	}
 	if _, ok := h.storages.Storages[req.ReplicationId.To]; !ok {
 		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ReplicationId.To)
 	}
+	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
+		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
+	}
+	// todo: move to SetReplicationSwitchWithDowntime
 	policies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.ReplicationId.User, req.ReplicationId.Bucket)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get replication policy: %w", err)
@@ -883,6 +856,7 @@ func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDow
 		return nil, fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
 	}
 
+	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
 	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
 	if err != nil {
@@ -890,28 +864,12 @@ func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDow
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		// validate:
-		// todo: move this logic into policy service
-		policyStatus, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.ReplicationId.User, req.ReplicationId.Bucket, req.ReplicationId.From, req.ReplicationId.To, req.ReplicationId.ToBucket)
-		if err != nil {
-			return fmt.Errorf("unable to get replication policy status: %w", err)
-		}
-		if policyStatus.SwitchStatus != policy.NotStarted {
-			return fmt.Errorf("switch is already done or in progress")
-		}
-		startNow := req.DowntimeWindow == nil || (!req.DowntimeWindow.StartOnInitDone && req.DowntimeWindow.Cron == nil && req.DowntimeWindow.StartAt == nil)
-		if startNow && !policyStatus.InitDone() {
-			return fmt.Errorf("unable to start switch right away: initial replication is not done")
-		}
-		if err = validateSwitchWindow(req.DowntimeWindow); err != nil {
-			return err
-		}
-		// store switch metadata:
+		// persist switch metadata
 		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, policyID, pbToWindow(req.DowntimeWindow))
 		if err != nil {
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}
-
+		// create switch task
 		task, err := tasks.NewTask(ctx, tasks.SwitchWithDowntimePayload{
 			Sync: tasks.Sync{
 				FromStorage: req.ReplicationId.From,
@@ -937,26 +895,10 @@ func (h *handlers) SwitchWithDowntime(ctx context.Context, req *pb.SwitchWithDow
 	return &emptypb.Empty{}, nil
 }
 
-func validateSwitchWindow(in *pb.SwitchWindow) error {
-	if in == nil {
-		return nil
-	}
-	if in.Cron != nil && in.StartAt != nil {
-		return fmt.Errorf("either cron or start_at can be set, but not both")
-	}
-	if in.Cron != nil && !gronx.IsValid(*in.Cron) {
-		return fmt.Errorf("invalid cron expression %q", *in.Cron)
-	}
-	if in.StartAt != nil && in.StartAt.AsTime().UTC().Before(time.Now().UTC()) {
-		return fmt.Errorf("start_at is in the past according to server time: %q", time.Now().Format(time.RFC3339))
-	}
-	return nil
-}
-
-func (h *handlers) GetSwitchWithDowntime(context.Context, *pb.ReplicationRequest) (*pb.GetSwitchWithDowntimeResponse, error) {
+func (h *handlers) DeleteBucketSwitch(context.Context, *pb.ReplicationRequest) (*emptypb.Empty, error) {
 	panic("unimplemented")
 }
 
-func (h *handlers) DeleteSwitchWithDowntime(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
+func (h *handlers) GetBucketSwitchStatus(context.Context, *pb.ReplicationRequest) (*pb.GetBucketSwitchStatusResponse, error) {
 	panic("unimplemented")
 }
