@@ -95,6 +95,7 @@ func pbToWindow(in *pb.SwitchWindow) *policy.Window {
 		StartAt:         pbToTs(in.StartAt),
 		MaxDuration:     pbToDuration(in.MaxDuration),
 		MaxEventLag:     in.MaxEventLag,
+		SkipBucketCheck: in.SkipBucketCheck,
 	}
 }
 

@@ -20,6 +20,7 @@ type Window struct {
 	StartAt         *time.Time     `redis:"startAt,omitempty"`
 	MaxDuration     *time.Duration `redis:"maxDuration,omitempty"`
 	MaxEventLag     *uint32        `redis:"maxEventLag,omitempty"`
+	SkipBucketCheck bool           `redis:"skipBucketCheck,omitempty"`
 }
 
 func (w *Window) GetCron() (string, bool) {
