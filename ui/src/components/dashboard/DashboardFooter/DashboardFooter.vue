@@ -95,6 +95,7 @@
 
 <template>
   <CDashboardFooter
+    class="dashboard-footer"
     :is-centered="true"
     :links="footerLinks"
   >
@@ -122,6 +123,15 @@
 
 <style lang="scss" scoped>
   @use '@/styles/utils' as utils;
+
+  .dashboard-footer {
+    ::v-deep(.container) {
+      @include utils.desktop {
+        padding: 0 utils.unit(8);
+        max-width: none;
+      }
+    }
+  }
 
   .logo-link {
     font-size: 0;

@@ -91,11 +91,11 @@
       grid-template-rows: auto 1fr;
 
       @include utils.tablet-only {
-        padding: utils.unit(5) utils.unit(6);
+        padding: utils.unit(5) utils.unit(6) utils.unit(12);
       }
 
       @include utils.mobile {
-        padding: utils.unit(3) utils.unit(3);
+        padding: utils.unit(3) utils.unit(3) utils.unit(12);
       }
     }
 
@@ -110,6 +110,10 @@
 
     ::v-deep(.c-dashboard-header) {
       z-index: 2;
+    }
+
+    ::v-deep(.c-dashboard-layout__footer) {
+      padding: 0;
     }
   }
 </style>
