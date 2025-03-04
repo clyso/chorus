@@ -48,7 +48,7 @@
 
 <template>
   <CDialog
-    type="primary"
+    type="confirm"
     :has-negative="false"
     :icon-name="IconName.BASE_KEY"
     :is-shown="isShown"
