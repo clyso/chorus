@@ -1,8 +1,8 @@
 address: "http://localhost:9669" # Chorus proxy s3 api address
 port: 9669
 cors:
-  enabled: false
-  allowAll: false
+  enabled: true
+  allowAll: true
   whitelist:
 auth:
   allowV2Signature: false

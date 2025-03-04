@@ -26,6 +26,7 @@ services:
       source: ./s3-credentials.yaml
       target: /bin/config/override.yaml
     ports:
+      - "9671:9671" # expose REST api for web UI
       - "9670:9670" # expose grpc management API for CLI
   proxy:
     # To enable run with proxy profile: "docker-compose up --profile proxy up". See https://docs.docker.com/compose/profiles/
@@ -64,8 +65,17 @@ services:
       source: ./agent-conf.yaml
       target: /bin/config/config.yaml
     ports:
-      - "9673:9673" # expose agent bucket notifications webhook 
-
+      - "9673:9673" # expose agent bucket notifications webhook
+  web-ui:
+    depends_on:
+      - worker
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - "BACKEND_URL=http://worker:9671"
   # start fake in-memory s3 endpoint. To enable run with fake profile: "docker-compose up --profile fake up"
   fake-s3-main:
     profiles:
