@@ -10,10 +10,19 @@ jobs:
   docker:
     strategy:
       matrix:
-        service:
-          - worker
-          - proxy
-          - agent
+        image:
+          - context: .
+            dockerfile: Dockerfile
+            name: worker
+          - context: .
+            dockerfile: Dockerfile
+            name: proxy
+          - context: .
+            dockerfile: Dockerfile
+            name: agent
+          - context: ./ui
+            dockerfile: ./ui/Dockerfile
+            name: web-ui
     runs-on: ubuntu-latest
     steps:
       - name: Set build date
@@ -33,16 +42,18 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:${{ github.ref_name }}
-            ${{ env.REGISTRY }}/chorus/${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/chorus/${{ matrix.image.name }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/chorus/${{ matrix.image.name }}:latest
           build-args: |
             BUILD_DATE=${{ steps.date.outputs.date }}
             GIT_TAG=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
-            SERVICE=${{ matrix.service }}
+            SERVICE=${{ matrix.image.name }}
   # publish helm chart
   helm:
     needs: docker
