@@ -29,6 +29,7 @@ For more details, see:
 - [agent](./service/agent)
 - [standalone](./service/standalone)
 - [management CLI](./tools/chorctl)
+- [web UI](./ui)
 
 ## Documentation
 
