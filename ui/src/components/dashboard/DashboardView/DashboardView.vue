@@ -11,6 +11,7 @@
   import DashboardNav from '@/components/dashboard/DashboardNav/DashboardNav.vue';
   import DashboardLogo from '@/components/dashboard/DashboardLogo/DashboardLogo.vue';
   import { HAS_LANG_SELECT } from '@/utils/constants/env';
+  import DashboardFooter from '@/components/dashboard/DashboardFooter/DashboardFooter.vue';
 
   const { locale } = storeToRefs(useI18nStore());
   const { setLocale } = useI18nStore();
@@ -55,6 +56,10 @@
         <RouterView />
       </div>
     </main>
+
+    <template #footer>
+      <DashboardFooter />
+    </template>
   </CDashboardLayout>
 </template>
 
@@ -65,7 +70,7 @@
     &__main {
       height: 100%;
       max-width: 100vw;
-      padding: utils.unit(5) utils.unit(8);
+      padding: utils.unit(5) utils.unit(8) utils.unit(12);
       display: grid;
       grid-template-rows: auto 1fr;
 
