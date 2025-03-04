@@ -48,10 +48,18 @@ service Chorus {
   //   - switch is successfully finished
   rpc SwitchBucket(SwitchBucketRequest) returns (google.protobuf.Empty);
 
-  // Deletes Switch if exists and sets old main bucket back as main if switch was already completed.
+  // Deletes Switch with following implications:
+  // - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
+  //   proxy will route all requests to old bucket.
+  // - If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed
+  //   proxy will route all requests to old bucket, no data will be lost.
+  //   !!!For no_downtime migration, routing will be reverted back to old bucket.
+  //   Old and new buckets may end up in inconsistent state because all object writes happened
+  //   since start of no_downtime migration were routed only to new bucket.
+  // - If switch was done. Only switch metadata will be removed, replication or routing will not be affected.
   rpc DeleteBucketSwitch(ReplicationRequest) returns (google.protobuf.Empty);
 
-  // Returns Switch with donwntime info
+  // Returns Switch status
   rpc GetBucketSwitchStatus(ReplicationRequest) returns (GetBucketSwitchStatusResponse);
 
   // Compares contents of given bucket in given storages
@@ -347,6 +355,11 @@ message SwitchWindow {
   // If set, switch execution will be skipped if number of unprocessed events is more than max_event_lag.
   // Switch will be marked as failed and will be retried on next cron execution if set.
   optional uint32 max_event_lag = 5;
+
+  // if true, chorus will not perform equality check of bucket contents before completing switch with downtime.
+  // Might be useful for buckets with large number of objects. In this case check will consume a lot of time and memory in Redis.
+  // Default is false.
+  bool skip_bucket_check = 6;
 }
 
 message GetBucketSwitchStatusResponse {

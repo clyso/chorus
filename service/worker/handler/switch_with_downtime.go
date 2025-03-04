@@ -74,7 +74,7 @@ func (s *svc) SwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
 			}
 		}
 		if result.retryLater {
-			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
+			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 		}
 		return nil
 	}, refresh, time.Second*2)
@@ -205,7 +205,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			}, nil
 		}
 		// queue is drained, initiate bucket contents check:
-		_, _, err := s.checkBuckets(ctx, id)
+		_, _, err := s.checkBuckets(ctx, id, switchStatus.Window.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}
@@ -223,7 +223,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			// should never happen
 			return switchResult{}, fmt.Errorf("switch with downtime started at is nil")
 		}
-		isEqual, isInProgress, err := s.checkBuckets(ctx, id)
+		isEqual, isInProgress, err := s.checkBuckets(ctx, id, switchStatus.Window.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}
@@ -290,7 +290,10 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 	}
 }
 
-func (s *svc) checkBuckets(_ context.Context, _ policy.ReplicationID) (isEqual, isInProgress bool, err error) {
+func (s *svc) checkBuckets(_ context.Context, _ policy.ReplicationID, skip bool) (isEqual, isInProgress bool, err error) {
+	if skip {
+		return true, false, nil
+	}
 	// todo: implement when https://github.com/clyso/chorus/issues/38 is done
 	return checkResultIsEqual, checkResultIsInProgress, nil
 }

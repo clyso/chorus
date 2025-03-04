@@ -85,9 +85,17 @@ type ChorusClient interface {
 	//   - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.
 	//   - switch is successfully finished
 	SwitchBucket(ctx context.Context, in *SwitchBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Deletes Switch if exists and sets old main bucket back as main if switch was already completed.
+	// Deletes Switch with following implications:
+	//   - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
+	//     proxy will route all requests to old bucket.
+	//   - If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed
+	//     proxy will route all requests to old bucket, no data will be lost.
+	//     !!!For no_downtime migration, routing will be reverted back to old bucket.
+	//     Old and new buckets may end up in inconsistent state because all object writes happened
+	//     since start of no_downtime migration were routed only to new bucket.
+	//   - If switch was done. Only switch metadata will be removed, replication or routing will not be affected.
 	DeleteBucketSwitch(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Returns Switch with donwntime info
+	// Returns Switch status
 	GetBucketSwitchStatus(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*GetBucketSwitchStatusResponse, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
@@ -397,9 +405,17 @@ type ChorusServer interface {
 	//   - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.
 	//   - switch is successfully finished
 	SwitchBucket(context.Context, *SwitchBucketRequest) (*emptypb.Empty, error)
-	// Deletes Switch if exists and sets old main bucket back as main if switch was already completed.
+	// Deletes Switch with following implications:
+	//   - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
+	//     proxy will route all requests to old bucket.
+	//   - If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed
+	//     proxy will route all requests to old bucket, no data will be lost.
+	//     !!!For no_downtime migration, routing will be reverted back to old bucket.
+	//     Old and new buckets may end up in inconsistent state because all object writes happened
+	//     since start of no_downtime migration were routed only to new bucket.
+	//   - If switch was done. Only switch metadata will be removed, replication or routing will not be affected.
 	DeleteBucketSwitch(context.Context, *ReplicationRequest) (*emptypb.Empty, error)
-	// Returns Switch with donwntime info
+	// Returns Switch status
 	GetBucketSwitchStatus(context.Context, *ReplicationRequest) (*GetBucketSwitchStatusResponse, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)

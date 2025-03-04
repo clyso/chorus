@@ -502,7 +502,7 @@
     },
     "/replication/switch/delete": {
       "post": {
-        "summary": "Deletes Switch if exists and sets old main bucket back as main if switch was already completed.",
+        "summary": "Deletes Switch with following implications:\n- If switch was in not_started, error, or skipped state, it will not be attempted anymore.\n  proxy will route all requests to old bucket.\n- If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed\n  proxy will route all requests to old bucket, no data will be lost.\n  !!!For no_downtime migration, routing will be reverted back to old bucket.\n  Old and new buckets may end up in inconsistent state because all object writes happened\n  since start of no_downtime migration were routed only to new bucket.\n- If switch was done. Only switch metadata will be removed, replication or routing will not be affected.",
         "operationId": "Chorus_DeleteBucketSwitch",
         "responses": {
           "200": {
@@ -536,7 +536,7 @@
     },
     "/replication/switch/status": {
       "post": {
-        "summary": "Returns Switch with donwntime info",
+        "summary": "Returns Switch status",
         "operationId": "Chorus_GetBucketSwitchStatus",
         "responses": {
           "200": {
@@ -1326,6 +1326,10 @@
           "type": "integer",
           "format": "int64",
           "description": "If set, switch execution will be skipped if number of unprocessed events is more than max_event_lag.\nSwitch will be marked as failed and will be retried on next cron execution if set."
+        },
+        "skipBucketCheck": {
+          "type": "boolean",
+          "description": "if true, chorus will not perform equality check of bucket contents before completing switch with downtime.\nMight be useful for buckets with large number of objects. In this case check will consume a lot of time and memory in Redis.\nDefault is false."
         }
       },
       "description": "Defines downtime window for replication switch.\nAll dates and times depends on local times of machine running chorus worker.\nTime precision is ~1 minute."
