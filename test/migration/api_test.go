@@ -59,3 +59,20 @@ func Test_api_list_replications(t *testing.T) {
 	r.EqualValues("main", res.Replications[0].From)
 	r.EqualValues("f1", res.Replications[0].To)
 }
+
+func Test_api_compare(t *testing.T) {
+	r := require.New(t)
+	err := proxyClient.MakeBucket(tstCtx, "compare", mclient.MakeBucketOptions{})
+	r.NoError(err)
+	t.Cleanup(func() {
+		cleanup("compare")
+	})
+
+	res, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(res.Replications, 1)
+	r.EqualValues("replications", res.Replications[0].Bucket)
+	r.EqualValues(user, res.Replications[0].User)
+	r.EqualValues("main", res.Replications[0].From)
+	r.EqualValues("f1", res.Replications[0].To)
+}
