@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  - Copyright © 2025 Clyso GmbH
+  -
+  -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
+  -  you may not use this file except in compliance with the License.
+  -  You may obtain a copy of the License at
+  -
+  -  https://www.gnu.org/licenses/agpl-3.0.html
+  -
+  -  Unless required by applicable law or agreed to in writing, software
+  -  distributed under the License is distributed on an "AS IS" BASIS,
+  -  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  -  See the License for the specific language governing permissions and
+  -  limitations under the License.
+  -->
+
 <svg version="1.1" id="Ebene_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 283.465 63.493" style="enable-background:new 0 0 283.465 63.493;" xml:space="preserve">
 <g>
@@ -15,9 +31,9 @@
 		c13.339,0,23.788-9.998,23.788-22.761S273.016,10.643,259.677,10.643z M259.745,46.646c-7.757,0-12.968-5.321-12.968-13.241
 		c0-7.797,5.332-13.243,12.968-13.243c7.513,0,12.967,5.57,12.967,13.243C272.712,41.202,267.38,46.646,259.745,46.646z"/>
 	<rect x="131.527" y="45.998" class="st0" width="10.47" height="17.495"/>
-	
+
 		<rect x="108.244" y="1.409" transform="matrix(0.8105 -0.5857 0.5857 0.8105 15.5556 68.3939)" class="st0" width="10.47" height="17.495"/>
-	
+
 		<rect x="151.301" y="4.922" transform="matrix(0.5854 -0.8107 0.8107 0.5854 58.1179 133.9672)" class="st0" width="17.495" height="10.47"/>
 </g>
 <g>
