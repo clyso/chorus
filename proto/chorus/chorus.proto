@@ -46,6 +46,7 @@ service Chorus {
   //   - there are multiple replications from the same main bucket to multiple followers
   //   - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.
   //   - switch is successfully finished
+  //   - replication is to different bucket name. Will be supported later.
   rpc SwitchBucket(SwitchBucketRequest) returns (google.protobuf.Empty);
 
   // Deletes Switch with following implications:
@@ -316,20 +317,16 @@ message SwitchBucketRequest {
   // Default is false. If true, other request parameters like continue_replication and downtime_window will be ignored.
   bool no_downtime = 2;
 
-  // Set true to replicate data updates from new main to old main bucket after successful switch
-  // Default is false. Can be used only for switch with downtime.
-  bool continue_replication = 3;
-
   // Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.
   // If NOT set, switch will be performed right away and writes will be blocked until it is done.
   // Can be used only for switch with downtime.
-  optional SwitchWindow downtime_window = 4;
+  optional SwitchDowntimeOpts downtime_opts = 4;
 }
 
-// Defines downtime window for replication switch.
+// Defines downtime window for replication switch with downtime.
 // All dates and times depends on local times of machine running chorus worker.
 // Time precision is ~1 minute.
-message SwitchWindow {
+message SwitchDowntimeOpts {
   // If true, chorus will perform switch automatically when initial migration will be done.
   // Initial migration copies all objects that existed in source bucket before replication started.
   // default is false
@@ -360,6 +357,10 @@ message SwitchWindow {
   // Might be useful for buckets with large number of objects. In this case check will consume a lot of time and memory in Redis.
   // Default is false.
   bool skip_bucket_check = 6;
+
+  // Set true to replicate data updates from new main to old main bucket after successful switch
+  // Default is false.
+  bool continue_replication = 7;
 }
 
 message GetBucketSwitchStatusResponse {
@@ -388,7 +389,7 @@ message GetBucketSwitchStatusResponse {
   Status last_status = 1;
   bool no_downtime = 2;
   bool continue_replication = 3;
-  optional SwitchWindow downtime_window = 4;
+  optional SwitchDowntimeOpts downtime_opts = 4;
 
   // Time of last switch attempt - last time when switch was moved to InProgress status.
   optional google.protobuf.Timestamp last_started_at = 5;

@@ -15,7 +15,7 @@ func timePtr(t time.Time) *time.Time {
 
 func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 	type fields struct {
-		Window        Window
+		Window        SwitchDowntimeOpts
 		LastStatus    SwitchWithDowntimeStatus
 		CreatedAt     time.Time
 		LastStartedAt *time.Time
@@ -30,7 +30,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 		{
 			name: "nothing set - start now",
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron:    nil,
 					StartAt: nil,
 				},
@@ -42,7 +42,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 		{
 			name: "all empty - start now",
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron:    strPtr(""),
 					StartAt: timePtr(time.Time{}),
 				},
@@ -54,7 +54,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 		{
 			name: "error - both cron and startAt set",
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron:    strPtr("0 * * * *"),
 					StartAt: timePtr(time.Now()),
 				},
@@ -66,7 +66,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 		{
 			name: "error - both cron and startAt set",
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron:    strPtr("0 * * * *"),
 					StartAt: timePtr(time.Now()),
 				},
@@ -80,7 +80,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name:        "not start: startAt is in the future",
 			currentTime: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					StartAt: timePtr(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)),
 				},
 				LastStartedAt: nil,
@@ -92,7 +92,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name:        "start: startAt is in the past",
 			currentTime: time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC),
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					StartAt: timePtr(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)),
 				},
 				LastStartedAt: nil,
@@ -105,7 +105,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name:        "no start: cron first start not expired",
 			currentTime: time.Date(2021, 1, 1, 0, 59, 0, 0, time.UTC), // 00:59
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron: strPtr("0 * * * *"), // every hour
 				},
 				// first start
@@ -119,7 +119,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name:        "start: cron first start expired",
 			currentTime: time.Date(2021, 1, 1, 1, 0, 0, 0, time.UTC), // 01:00
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron: strPtr("0 * * * *"), // every hour
 				},
 				// first start
@@ -133,7 +133,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name:        "no start: cron recurring start not expired",
 			currentTime: time.Date(2021, 1, 1, 0, 59, 0, 0, time.UTC), // 00:59
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron: strPtr("0 * * * *"), // every hour
 				},
 				// first start
@@ -147,7 +147,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name:        "start: cron recurring start is expired",
 			currentTime: time.Date(2021, 1, 1, 1, 1, 0, 0, time.UTC), // 01:01
 			fields: fields{
-				Window: Window{
+				Window: SwitchDowntimeOpts{
 					Cron: strPtr("0 * * * *"), // every hour
 				},
 				// first start
@@ -172,10 +172,10 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 				}()
 			}
 			s := &SwitchWithDowntime{
-				Window:        tt.fields.Window,
-				LastStatus:    tt.fields.LastStatus,
-				LastStartedAt: tt.fields.LastStartedAt,
-				CreatedAt:     tt.fields.CreatedAt,
+				SwitchDowntimeOpts: tt.fields.Window,
+				LastStatus:         tt.fields.LastStatus,
+				LastStartedAt:      tt.fields.LastStartedAt,
+				CreatedAt:          tt.fields.CreatedAt,
 			}
 			got, err := s.IsTimeToStart()
 			if (err != nil) != tt.wantErr {
