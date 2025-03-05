@@ -52,7 +52,7 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 			return fmt.Errorf("unable to increment consistency check scheduled counter: %w", err)
 		}
 
-		if _, err := s.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		if _, err := s.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
 
@@ -74,7 +74,7 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 	if err != nil {
 		return fmt.Errorf("unable to create consistency check readiness task: %w", err)
 	}
-	if _, err := s.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+	if _, err := s.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 		return fmt.Errorf("unable to enqueue consistency check readiness task: %w", err)
 	}
 
@@ -120,11 +120,11 @@ func (s *svc) HandleConsistencyCheckList(ctx context.Context, t *asynq.Task) (er
 	objects := storageClient.S3().ListObjects(ctx, payload.Bucket, listOpts)
 	for object := range objects {
 		if err := s.checkConsistencyForListedObject(ctx, &payload, &object); err != nil {
-			return fmt.Errorf("unable to check consistency for listed object: %w", object.Err)
+			return fmt.Errorf("unable to check consistency for listed object: %w", err)
 		}
 
 		if err := s.storageSvc.SetLastListedConsistencyCheckObj(ctx, obj, object.Key); err != nil {
-			return fmt.Errorf("unable to set last listed object: %w", object.Err)
+			return fmt.Errorf("unable to set last listed object: %w", err)
 		}
 	}
 
@@ -156,7 +156,7 @@ func (s *svc) HandleConsistencyCheckList(ctx context.Context, t *asynq.Task) (er
 
 func (s *svc) checkConsistencyForListedObject(ctx context.Context, payload *tasks.ConsistencyCheckListPayload, object *minio.ObjectInfo) error {
 	if object.Err != nil {
-		return fmt.Errorf("unable to list objects: %w", object.Err)
+		return fmt.Errorf("object has error: %w", object.Err)
 	}
 
 	isDir := object.Size == 0 && strings.HasSuffix(object.Key, "/")
@@ -182,7 +182,7 @@ func (s *svc) checkConsistencyForListedObject(ctx context.Context, payload *task
 		ETag:               object.ETag,
 	}
 	if err := s.checkConsistencyForObject(ctx, record); err != nil {
-		return fmt.Errorf("unable to list objects: %w", object.Err)
+		return fmt.Errorf("unable to list objects: %w", err)
 	}
 
 	return nil
@@ -198,7 +198,7 @@ func (s *svc) checkConsistencyForDirectory(ctx context.Context, payload *tasks.C
 		return fmt.Errorf("unable to increment consistency check scheduled counter: %w", err)
 	}
 
-	if _, err = s.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+	if _, err = s.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 		return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 	}
 

@@ -75,6 +75,7 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 		locations = append(locations, tasks.MigrateLocation{
 			Storage: location.Storage,
 			Bucket:  location.Bucket,
+			User:    location.User,
 		})
 	}
 
@@ -87,8 +88,8 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 	if err != nil {
 		return nil, fmt.Errorf("unable to create consistency check task: %w", err)
 	}
-	if _, err := h.taskClient.EnqueueContext(ctx, task); !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-		return nil, fmt.Errorf("unable to enqueue consistency check readiness task: %w", err)
+	if _, err := h.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)
 	}
 
 	return &pb.StartConsistencyCheckResponse{

@@ -94,10 +94,12 @@ func TestConsistency_2Storages_Success(t *testing.T) {
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckBucket1,
+				User:    user,
 			},
 			{
-				Storage: ConsistencyCheckStorage1,
-				Bucket:  ConsistencyCheckStorage2,
+				Storage: ConsistencyCheckStorage2,
+				Bucket:  ConsistencyCheckBucket2,
+				User:    user,
 			},
 		},
 	}
@@ -141,10 +143,12 @@ func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckBucket1,
+				User:    user,
 			},
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckStorage2,
+				User:    user,
 			},
 		},
 	}
@@ -189,10 +193,12 @@ func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckBucket1,
+				User:    user,
 			},
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckStorage2,
+				User:    user,
 			},
 		},
 	}
@@ -238,10 +244,12 @@ func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckBucket1,
+				User:    user,
 			},
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckStorage2,
+				User:    user,
 			},
 		},
 	}
@@ -291,10 +299,12 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckBucket1,
+				User:    user,
 			},
 			{
 				Storage: ConsistencyCheckStorage1,
 				Bucket:  ConsistencyCheckStorage2,
+				User:    user,
 			},
 		},
 	}

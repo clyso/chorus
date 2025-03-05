@@ -55,6 +55,7 @@ service Chorus {
 message MigrateLocation {
   string storage = 1;
   string bucket = 2;
+  string user = 3;
 }
 
 message StartConsistencyCheckRequest {

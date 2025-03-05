@@ -29,8 +29,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	consistencyCheckUser string
+)
+
 var consistencyCheckCmd = &cobra.Command{
-	Use:   "consistency check <storage_1>:<bucket_1> <storage_2>:<bucket_2> ...",
+	Use:   "consistency check <storage_1>:<bucket_1> <storage_2>:<bucket_2> --user user  ...",
 	Short: "start consistency check",
 	Long: `Example:
 chorctl consistency check oldstorage:bucket newstorage:altbucket`,
@@ -54,6 +58,7 @@ chorctl consistency check oldstorage:bucket newstorage:altbucket`,
 			locations = append(locations, &pb.MigrateLocation{
 				Storage: storage,
 				Bucket:  bucket,
+				User:    consistencyCheckUser,
 			})
 		}
 
@@ -68,4 +73,9 @@ chorctl consistency check oldstorage:bucket newstorage:altbucket`,
 
 func init() {
 	consistencyCmd.AddCommand(consistencyCheckCmd)
+	consistencyCheckCmd.Flags().StringVarP(&consistencyCheckUser, "user", "u", "", "storage user")
+	err := addCmd.MarkFlagRequired("user")
+	if err != nil {
+		logrus.WithError(err).Fatal()
+	}
 }
