@@ -992,6 +992,9 @@
         },
         "bucket": {
           "type": "string"
+        },
+        "user": {
+          "type": "string"
         }
       }
     },

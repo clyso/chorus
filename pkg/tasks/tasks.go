@@ -245,6 +245,7 @@ type ObjPayload struct {
 type MigrateLocation struct {
 	Storage string
 	Bucket  string
+	User    string
 }
 
 type ConsistencyCheckPayload struct {

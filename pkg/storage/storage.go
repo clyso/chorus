@@ -42,11 +42,12 @@ else
 	return 0
 end`)
 
-	luaAddToConsistencySet = redis.NewScript(`redis.call("SADD", keys[1], ARGS[1])
-local count = redis.call("SCARD", keys[1])
-if count == ARGS[2] then
-	redis.call("UNLINK", keys[1])
-end`)
+	luaAddToConsistencySet = redis.NewScript(`redis.call("SADD", KEYS[1], ARGV[1])
+local count = redis.call("SCARD", KEYS[1])
+if count == tonumber(ARGV[2]) then
+	redis.call("UNLINK", KEYS[1])
+end
+return 0`)
 )
 
 type ConsistencyCheckObject struct {
@@ -324,6 +325,9 @@ func (s *svc) DecrementConsistencyCheckCompletedCounter(ctx context.Context, id 
 func (s *svc) GetConsistencyCheckScheduledCounter(ctx context.Context, id string) (uint64, error) {
 	key := fmt.Sprintf("ccv:c:%s:scheduled", id)
 	count, err := s.client.Get(ctx, key).Uint64()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, fmt.Errorf("unable to get amount of scheduled consistency check tasks: %w", err)
 	}
@@ -334,6 +338,9 @@ func (s *svc) GetConsistencyCheckScheduledCounter(ctx context.Context, id string
 func (s *svc) GetConsistencyCheckCompletedCounter(ctx context.Context, id string) (uint64, error) {
 	key := fmt.Sprintf("ccv:c:%s:completed", id)
 	count, err := s.client.Get(ctx, key).Uint64()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, fmt.Errorf("unable to get amount of scheduled consistency check tasks: %w", err)
 	}
@@ -400,7 +407,7 @@ func (s *svc) AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyC
 		return fmt.Errorf("unable to add object info to consistency check set: %w", err)
 	}
 
-	return luaAddToConsistencySet.Run(ctx, s.client, []string{key}, record.Storage, record.StorageCount).Err()
+	return nil
 }
 
 func (s *svc) FindConsistencyCheckSets(ctx context.Context, id string) ([]ConsistencyCheckResultEntry, error) {
@@ -488,6 +495,9 @@ func (s *svc) SetConsistencyCheckReadiness(ctx context.Context, id string, ready
 func (s *svc) GetConsistencyCheckReadiness(ctx context.Context, id string) (bool, error) {
 	key := fmt.Sprintf("ccv:r:%s", id)
 	flag, err := s.client.Get(ctx, key).Bool()
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("unable to get readiness flag: %w", err)
 	}
