@@ -85,17 +85,18 @@ func pbToReplicationID(in *pb.ReplicationRequest) policy.ReplicationID {
 	}
 }
 
-func pbToWindow(in *pb.SwitchWindow) *policy.Window {
+func pbToDowntimeOpts(in *pb.SwitchDowntimeOpts) *policy.SwitchDowntimeOpts {
 	if in == nil {
 		return nil
 	}
-	return &policy.Window{
-		StartOnInitDone: in.StartOnInitDone,
-		Cron:            in.Cron,
-		StartAt:         pbToTs(in.StartAt),
-		MaxDuration:     pbToDuration(in.MaxDuration),
-		MaxEventLag:     in.MaxEventLag,
-		SkipBucketCheck: in.SkipBucketCheck,
+	return &policy.SwitchDowntimeOpts{
+		StartOnInitDone:     in.StartOnInitDone,
+		Cron:                in.Cron,
+		StartAt:             pbToTs(in.StartAt),
+		MaxDuration:         pbToDuration(in.MaxDuration),
+		MaxEventLag:         in.MaxEventLag,
+		SkipBucketCheck:     in.SkipBucketCheck,
+		ContinueReplication: in.ContinueReplication,
 	}
 }
 

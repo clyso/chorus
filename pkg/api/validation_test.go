@@ -10,10 +10,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestValidateSwitchWindow(t *testing.T) {
+func TestValidateSwitchDowntimeOpts(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   *pb.SwitchWindow
+		input   *pb.SwitchDowntimeOpts
 		wantErr string
 	}{
 		{
@@ -23,14 +23,14 @@ func TestValidateSwitchWindow(t *testing.T) {
 		},
 		{
 			name: "valid empty config",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				StartOnInitDone: false,
 			},
 			wantErr: "",
 		},
 		{
 			name: "both cron and start_at set",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				Cron:    stringPtr("0 * * * *"),
 				StartAt: timestamppb.New(time.Now().Add(time.Hour)),
 			},
@@ -38,35 +38,35 @@ func TestValidateSwitchWindow(t *testing.T) {
 		},
 		{
 			name: "invalid cron expression",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				Cron: stringPtr("invalid cron"),
 			},
 			wantErr: `invalid cron expression "invalid cron"`,
 		},
 		{
 			name: "valid cron expression",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				Cron: stringPtr("0 0 * * *"), // daily at midnight
 			},
 			wantErr: "",
 		},
 		{
 			name: "start_at in past",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				StartAt: timestamppb.New(time.Now().Add(-time.Hour)),
 			},
 			wantErr: "start_at is in the past according to server time",
 		},
 		{
 			name: "start_at in future",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				StartAt: timestamppb.New(time.Now().Add(time.Hour)),
 			},
 			wantErr: "",
 		},
 		{
 			name: "complete valid config",
-			input: &pb.SwitchWindow{
+			input: &pb.SwitchDowntimeOpts{
 				StartOnInitDone: true,
 				Cron:            stringPtr("0 0 * * *"),
 				MaxDuration:     durationpb.New(time.Hour),
@@ -78,7 +78,7 @@ func TestValidateSwitchWindow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateSwitchWindow(tt.input)
+			err := validateSwitchDonwtimeOpts(tt.input)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
@@ -179,24 +179,10 @@ func TestValidateSwitchRequest(t *testing.T) {
 					From:   "f",
 					To:     "t",
 				},
-				NoDowntime:     true,
-				DowntimeWindow: &pb.SwitchWindow{},
+				NoDowntime:   true,
+				DowntimeOpts: &pb.SwitchDowntimeOpts{},
 			},
 			wantErr: "no_downtime and downtime_window are mutually exclusive",
-		},
-		{
-			name: "no_downtime with continue_replication",
-			input: &pb.SwitchBucketRequest{
-				ReplicationId: &pb.ReplicationRequest{
-					User:   "u",
-					Bucket: "b",
-					From:   "f",
-					To:     "t",
-				},
-				NoDowntime:          true,
-				ContinueReplication: true,
-			},
-			wantErr: "no_downtime and continue_replication are mutually exclusive",
 		},
 		{
 			name: "valid no_downtime",
@@ -220,7 +206,7 @@ func TestValidateSwitchRequest(t *testing.T) {
 					From:   "f",
 					To:     "t",
 				},
-				DowntimeWindow: &pb.SwitchWindow{
+				DowntimeOpts: &pb.SwitchDowntimeOpts{
 					Cron:    stringPtr("0 * * * *"),
 					StartAt: timestamppb.New(time.Now().Add(time.Hour)),
 				},
@@ -236,8 +222,7 @@ func TestValidateSwitchRequest(t *testing.T) {
 					From:   "f",
 					To:     "t",
 				},
-				ContinueReplication: true,
-				DowntimeWindow: &pb.SwitchWindow{
+				DowntimeOpts: &pb.SwitchDowntimeOpts{
 					StartAt: timestamppb.New(time.Now().Add(time.Hour)),
 				},
 			},

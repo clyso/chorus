@@ -681,7 +681,7 @@ func (_m *MockService) ResumeReplication(ctx context.Context, user string, bucke
 }
 
 // SetReplicationSwitchWithDowntime provides a mock function with given fields: ctx, replID, downtimeWindow
-func (_m *MockService) SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *Window) error {
+func (_m *MockService) SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *SwitchDowntimeOpts) error {
 	ret := _m.Called(ctx, replID, downtimeWindow)
 
 	if len(ret) == 0 {
@@ -689,7 +689,7 @@ func (_m *MockService) SetReplicationSwitchWithDowntime(ctx context.Context, rep
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID, *Window) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID, *SwitchDowntimeOpts) error); ok {
 		r0 = rf(ctx, replID, downtimeWindow)
 	} else {
 		r0 = ret.Error(0)

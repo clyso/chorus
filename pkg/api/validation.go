@@ -13,14 +13,11 @@ func validateSwitchRequest(req *pb.SwitchBucketRequest) error {
 		return fmt.Errorf("invalid replication_id: %w", err)
 	}
 	if req.NoDowntime {
-		if req.DowntimeWindow != nil {
+		if req.DowntimeOpts != nil {
 			return fmt.Errorf("no_downtime and downtime_window are mutually exclusive")
 		}
-		if req.ContinueReplication {
-			return fmt.Errorf("no_downtime and continue_replication are mutually exclusive")
-		}
 	}
-	return validateSwitchWindow(req.DowntimeWindow)
+	return validateSwitchDonwtimeOpts(req.DowntimeOpts)
 }
 
 func validateReplicationID(in *pb.ReplicationRequest) error {
@@ -42,7 +39,7 @@ func validateReplicationID(in *pb.ReplicationRequest) error {
 	return nil
 }
 
-func validateSwitchWindow(in *pb.SwitchWindow) error {
+func validateSwitchDonwtimeOpts(in *pb.SwitchDowntimeOpts) error {
 	if in == nil {
 		return nil
 	}

@@ -45,7 +45,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 				InitDoneAt:     &hourAgo,
 				ListingStarted: true,
 			}, policy.SwitchWithDowntime{
-				Window: policy.Window{
+				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 					Cron: stringPtr("@5minutes"),
 				},
 				CreatedAt:     hourAgo,
@@ -83,7 +83,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 				InitDoneAt:     &hourAgo,
 				ListingStarted: true,
 			}, policy.SwitchWithDowntime{
-				Window: policy.Window{
+				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 					StartAt: &now,
 				},
 				CreatedAt:     hourAgo,
@@ -117,7 +117,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{}, policy.SwitchWithDowntime{
-				Window: policy.Window{
+				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 					// run every hour
 					Cron: stringPtr("@hourly"),
 				},
@@ -150,7 +150,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 				InitObjDone:    0,
 				ListingStarted: true,
 			}, policy.SwitchWithDowntime{
-				Window: policy.Window{
+				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 					// wait for init done
 					StartOnInitDone: true,
 					Cron:            stringPtr("@5minutes"),
@@ -183,7 +183,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 				InitObjDone:    0,
 				ListingStarted: true,
 			}, policy.SwitchWithDowntime{
-				Window: policy.Window{
+				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 					// skip if init not done
 					StartOnInitDone: false,
 					Cron:            stringPtr("@5minutes"),
@@ -223,7 +223,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 				Events:     15,
 				EventsDone: 5,
 			}, policy.SwitchWithDowntime{
-				Window: policy.Window{
+				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 					// skip if init not done
 					StartOnInitDone: false,
 					Cron:            stringPtr("@5minutes"),
@@ -264,7 +264,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 			},
 			CreatedAt:     hourAgo,
@@ -295,7 +295,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 				// max duration is 59 minutes
 				MaxDuration: durationPtr(time.Minute * 59),
@@ -329,7 +329,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 			},
 			CreatedAt: hourAgo,
@@ -363,7 +363,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 			},
 			CreatedAt: hourAgo,
@@ -397,7 +397,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 				// max duration is 59 minutes
 				MaxDuration: durationPtr(time.Minute * 59),
@@ -434,7 +434,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 			},
 			CreatedAt: hourAgo,
@@ -471,7 +471,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 			},
 			ContinueReplication: true,
@@ -506,7 +506,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			InitDoneAt:     &hourAgo,
 			ListingStarted: true,
 		}, policy.SwitchWithDowntime{
-			Window: policy.Window{
+			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 			},
 			ContinueReplication: true,
