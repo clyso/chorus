@@ -205,7 +205,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			}, nil
 		}
 		// queue is drained, initiate bucket contents check:
-		_, _, err := s.checkBuckets(ctx, id, switchStatus.Window.SkipBucketCheck)
+		_, _, err := s.checkBuckets(ctx, id, switchStatus.SwitchDowntimeOpts.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}
@@ -223,7 +223,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			// should never happen
 			return switchResult{}, fmt.Errorf("switch with downtime started at is nil")
 		}
-		isEqual, isInProgress, err := s.checkBuckets(ctx, id, switchStatus.Window.SkipBucketCheck)
+		isEqual, isInProgress, err := s.checkBuckets(ctx, id, switchStatus.SwitchDowntimeOpts.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}

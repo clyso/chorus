@@ -468,7 +468,7 @@
     },
     "/replication/switch": {
       "post": {
-        "summary": "Switch main\u003c-\u003efollower for selected replication.\nThis method Can also be used to update existing switch if it has not started yet.\n2 Switch types are supported:\n - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.\n - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.\n  - switch is successfully finished",
+        "summary": "Switch main\u003c-\u003efollower for selected replication.\nThis method Can also be used to update existing switch if it has not started yet.\n2 Switch types are supported:\n - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.\n - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.\n  - switch is successfully finished\n  - replication is to different bucket name. Will be supported later.",
         "operationId": "Chorus_SwitchBucket",
         "responses": {
           "200": {
@@ -991,8 +991,8 @@
         "continueReplication": {
           "type": "boolean"
         },
-        "downtimeWindow": {
-          "$ref": "#/definitions/chorusSwitchWindow"
+        "downtimeOpts": {
+          "$ref": "#/definitions/chorusSwitchDowntimeOpts"
         },
         "lastStartedAt": {
           "type": "string",
@@ -1292,17 +1292,13 @@
           "type": "boolean",
           "description": "Set true to perform bucket switch without downtime.\nOnce started, no downtime switch cannot be aborted or reverted without risk of data loss.\nDefault is false. If true, other request parameters like continue_replication and downtime_window will be ignored."
         },
-        "continueReplication": {
-          "type": "boolean",
-          "description": "Set true to replicate data updates from new main to old main bucket after successful switch\nDefault is false. Can be used only for switch with downtime."
-        },
-        "downtimeWindow": {
-          "$ref": "#/definitions/chorusSwitchWindow",
+        "downtimeOpts": {
+          "$ref": "#/definitions/chorusSwitchDowntimeOpts",
           "description": "Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.\nIf NOT set, switch will be performed right away and writes will be blocked until it is done.\nCan be used only for switch with downtime."
         }
       }
     },
-    "chorusSwitchWindow": {
+    "chorusSwitchDowntimeOpts": {
       "type": "object",
       "properties": {
         "startOnInitDone": {
@@ -1330,9 +1326,13 @@
         "skipBucketCheck": {
           "type": "boolean",
           "description": "if true, chorus will not perform equality check of bucket contents before completing switch with downtime.\nMight be useful for buckets with large number of objects. In this case check will consume a lot of time and memory in Redis.\nDefault is false."
+        },
+        "continueReplication": {
+          "type": "boolean",
+          "description": "Set true to replicate data updates from new main to old main bucket after successful switch\nDefault is false."
         }
       },
-      "description": "Defines downtime window for replication switch.\nAll dates and times depends on local times of machine running chorus worker.\nTime precision is ~1 minute."
+      "description": "Defines downtime window for replication switch with downtime.\nAll dates and times depends on local times of machine running chorus worker.\nTime precision is ~1 minute."
     },
     "chorusUserReplication": {
       "type": "object",

@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adhocore/gronx"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
@@ -847,6 +846,11 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
 		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
 	}
+	if req.ReplicationId.ToBucket != nil && *req.ReplicationId.ToBucket != "" && *req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
+		// TODO: support replication to different bucket name in a separate PR.
+		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
+	}
+	req.ReplicationId.ToBucket = nil
 	// todo: move to SetReplicationSwitchWithDowntime
 	policies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.ReplicationId.User, req.ReplicationId.Bucket)
 	if err != nil {
@@ -865,7 +869,7 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
 		// persist switch metadata
-		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, policyID, pbToWindow(req.DowntimeWindow))
+		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, policyID, pbToDowntimeOpts(req.DowntimeOpts))
 		if err != nil {
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}

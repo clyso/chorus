@@ -84,6 +84,7 @@ type ChorusClient interface {
 	//   - there are multiple replications from the same main bucket to multiple followers
 	//   - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.
 	//   - switch is successfully finished
+	//   - replication is to different bucket name. Will be supported later.
 	SwitchBucket(ctx context.Context, in *SwitchBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Deletes Switch with following implications:
 	//   - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
@@ -404,6 +405,7 @@ type ChorusServer interface {
 	//   - there are multiple replications from the same main bucket to multiple followers
 	//   - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.
 	//   - switch is successfully finished
+	//   - replication is to different bucket name. Will be supported later.
 	SwitchBucket(context.Context, *SwitchBucketRequest) (*emptypb.Empty, error)
 	// Deletes Switch with following implications:
 	//   - If switch was in not_started, error, or skipped state, it will not be attempted anymore.

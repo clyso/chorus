@@ -191,8 +191,8 @@ type Service interface {
 	DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error
 	ReplicationSwitchDone(ctx context.Context, user, bucket string) error
 
-	SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *Window) error
-	DeleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) error
+	SetReplicationSwitch(ctx context.Context, replID ReplicationID, downtimeWindow *SwitchDowntimeOpts) error
+	DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
 	GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (SwitchWithDowntime, error)
 	CompleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, continueReplication bool) error
 	UpdateSwitchWithDowntimeStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt, doneAt *time.Time) error

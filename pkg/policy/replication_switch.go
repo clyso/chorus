@@ -14,37 +14,42 @@ var (
 	timeNow = time.Now
 )
 
-type Window struct {
-	StartOnInitDone bool           `redis:"onInitDone,omitempty"`
-	Cron            *string        `redis:"cron,omitempty"`
-	StartAt         *time.Time     `redis:"startAt,omitempty"`
-	MaxDuration     *time.Duration `redis:"maxDuration,omitempty"`
-	MaxEventLag     *uint32        `redis:"maxEventLag,omitempty"`
-	SkipBucketCheck bool           `redis:"skipBucketCheck,omitempty"`
+type SwitchDowntimeOpts struct {
+	StartOnInitDone     bool           `redis:"onInitDone,omitempty"`
+	Cron                *string        `redis:"cron,omitempty"`
+	StartAt             *time.Time     `redis:"startAt,omitempty"`
+	MaxDuration         *time.Duration `redis:"maxDuration,omitempty"`
+	MaxEventLag         *uint32        `redis:"maxEventLag,omitempty"`
+	SkipBucketCheck     bool           `redis:"skipBucketCheck,omitempty"`
+	ContinueReplication bool           `redis:"continueReplication,omitempty"`
 }
 
-func (w *Window) GetCron() (string, bool) {
+type SwitchZeroDowntimeOpts struct {
+	MultipartTTL time.Duration `redis:"multipartTTL,omitempty"`
+}
+
+func (w *SwitchDowntimeOpts) GetCron() (string, bool) {
 	if w != nil && w.Cron != nil && *w.Cron != "" {
 		return *w.Cron, true
 	}
 	return "", false
 }
 
-func (w *Window) GetStartAt() (time.Time, bool) {
+func (w *SwitchDowntimeOpts) GetStartAt() (time.Time, bool) {
 	if w != nil && w.StartAt != nil && !w.StartAt.IsZero() {
 		return *w.StartAt, true
 	}
 	return time.Time{}, false
 }
 
-func (w *Window) GetMaxEventLag() (uint32, bool) {
+func (w *SwitchDowntimeOpts) GetMaxEventLag() (uint32, bool) {
 	if w != nil && w.MaxEventLag != nil {
 		return *w.MaxEventLag, true
 	}
 	return 0, false
 }
 
-func (w *Window) GetMaxDuration() (time.Duration, bool) {
+func (w *SwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 	if w != nil && w.MaxDuration != nil && *w.MaxDuration > 0 {
 		return *w.MaxDuration, true
 	}
@@ -52,13 +57,13 @@ func (w *Window) GetMaxDuration() (time.Duration, bool) {
 }
 
 type SwitchWithDowntime struct {
-	Window
-	ContinueReplication bool                     `redis:"continueReplication"`
-	CreatedAt           time.Time                `redis:"createdAt"`
-	LastStatus          SwitchWithDowntimeStatus `redis:"lastStatus"`
-	LastStartedAt       *time.Time               `redis:"startedAt"`
-	DoneAt              *time.Time               `redis:"doneAt,omitempty"`
-	History             []string                 `redis:"-"`
+	SwitchDowntimeOpts
+	SwitchZeroDowntimeOpts
+	CreatedAt     time.Time                `redis:"createdAt"`
+	LastStatus    SwitchWithDowntimeStatus `redis:"lastStatus"`
+	LastStartedAt *time.Time               `redis:"startedAt"`
+	DoneAt        *time.Time               `redis:"doneAt,omitempty"`
+	History       []string                 `redis:"-"`
 }
 
 func (s *SwitchWithDowntime) GetLastStartAt() (time.Time, bool) {
@@ -121,7 +126,7 @@ const (
 	StatusSkipped SwitchWithDowntimeStatus = "skipped"
 )
 
-func (s *policySvc) SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *Window) error {
+func (s *policySvc) SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *SwitchDowntimeOpts) error {
 	panic("unimplemented")
 }
 
