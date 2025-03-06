@@ -1,8 +1,13 @@
 package policy
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
 )
 
 func strPtr(s string) *string {
@@ -171,7 +176,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 					}
 				}()
 			}
-			s := &SwitchWithDowntime{
+			s := &SwitchInfo{
 				SwitchDowntimeOpts: tt.fields.Window,
 				LastStatus:         tt.fields.LastStatus,
 				LastStartedAt:      tt.fields.LastStartedAt,
@@ -187,4 +192,151 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
+	db := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	ctx := context.TODO()
+	svc := &policySvc{client: client}
+	replID := ReplicationID{
+		User:   "u",
+		Bucket: "b",
+		From:   "f",
+		To:     "t",
+	}
+
+	tests := []struct {
+		name    string
+		before  *SwitchDowntimeOpts
+		opts    *SwitchDowntimeOpts
+		wantErr bool
+	}{
+		{
+			name: "set switch with optional values",
+			opts: &SwitchDowntimeOpts{
+				StartOnInitDone: true,
+				Cron:            stringPtr("0 0 * * *"),
+				MaxDuration:     durationPtr(10 * time.Second),
+				MaxEventLag:     nil, // Should trigger HDEL
+			},
+			wantErr: false,
+		},
+		{
+			name: "set switch with all values",
+			opts: &SwitchDowntimeOpts{
+				StartOnInitDone:     true,
+				Cron:                stringPtr("0 0 * * *"),
+				StartAt:             timePtr(time.Now()),
+				MaxDuration:         durationPtr(10 * time.Second),
+				MaxEventLag:         uint32Ptr(100),
+				SkipBucketCheck:     true,
+				ContinueReplication: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "update existing data with empty opts",
+			before: &SwitchDowntimeOpts{
+				StartOnInitDone:     true,
+				Cron:                stringPtr("0 0 * * *"),
+				StartAt:             timePtr(time.Now()),
+				MaxDuration:         durationPtr(10 * time.Second),
+				MaxEventLag:         uint32Ptr(100),
+				SkipBucketCheck:     true,
+				ContinueReplication: true,
+			},
+			opts:    &SwitchDowntimeOpts{}, // All pointers nil, bools false
+			wantErr: false,
+		},
+		{
+			name: "delete existing data with nil opts",
+			before: &SwitchDowntimeOpts{
+				StartOnInitDone:     true,
+				Cron:                stringPtr("0 0 * * *"),
+				StartAt:             timePtr(time.Now()),
+				MaxDuration:         durationPtr(10 * time.Second),
+				MaxEventLag:         uint32Ptr(100),
+				SkipBucketCheck:     true,
+				ContinueReplication: true,
+			},
+			opts:    nil,
+			wantErr: false,
+		},
+		{
+			name: "update existing data with new values",
+			before: &SwitchDowntimeOpts{
+				StartOnInitDone: true,
+				Cron:            stringPtr("0 0 * * *"),
+				MaxDuration:     durationPtr(10 * time.Second),
+				MaxEventLag:     uint32Ptr(100),
+			},
+			opts: &SwitchDowntimeOpts{
+				StartOnInitDone: false,
+				Cron:            stringPtr("1 1 * * *"),
+				MaxDuration:     durationPtr(20 * time.Second),
+				MaxEventLag:     nil, // Should delete this field
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clear Redis state
+			if err := client.FlushAll(ctx).Err(); err != nil {
+				t.Fatalf("failed to flush Redis: %v", err)
+			}
+
+			// Set initial state if provided
+			if tt.before != nil {
+				if err := svc.updateDowntimeSwitchOpts(ctx, replID, tt.before); err != nil {
+					t.Fatalf("failed to set initial state: %v", err)
+				}
+			}
+
+			// Run the update
+			err := svc.updateDowntimeSwitchOpts(ctx, replID, tt.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("updateDowntimeSwitchOpts() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.opts == nil {
+				// Check if all fields were deleted
+				res, err := client.HGetAll(ctx, replID.SwitchKey()).Result()
+				assert.NoError(t, err)
+				assert.Empty(t, res)
+			} else {
+				// Check if all fields were set correctly
+				var got SwitchDowntimeOpts
+				err = client.HGetAll(ctx, replID.SwitchKey()).Scan(&got)
+				assert.NoError(t, err)
+				if tt.opts.StartAt != nil || got.StartAt != nil {
+					if tt.opts.StartAt == nil || got.StartAt == nil {
+						t.Errorf("StartAt mismatch: got %v, want %v", got.StartAt, tt.opts.StartAt)
+						return
+					}
+					assert.True(t, got.StartAt.Truncate(time.Second).Equal(tt.opts.StartAt.Truncate(time.Second)),
+						"StartAt mismatch: got %v, want %v", got.StartAt, tt.opts.StartAt)
+					// Temporarily nil out StartAt for the Equal check
+					got.StartAt = nil
+					tt.opts.StartAt = nil
+				}
+				assert.EqualValues(t, *tt.opts, got)
+			}
+		})
+	}
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
+}
+
+func uint32Ptr(u uint32) *uint32 {
+	return &u
 }

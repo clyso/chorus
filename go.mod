@@ -22,7 +22,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rclone/rclone v1.64.0
 	github.com/redis/go-redis/extra/redisotel/v9 v9.0.5
-	github.com/redis/go-redis/v9 v9.2.1
+	github.com/redis/go-redis/v9 v9.7.1
 	github.com/rs/cors v1.10.1
 	github.com/rs/xid v1.5.0
 	github.com/rs/zerolog v1.33.0

@@ -35,12 +35,19 @@ service Chorus {
   rpc DeleteReplication(ReplicationRequest) returns (google.protobuf.Empty);
   rpc DeleteUserReplication(DeleteUserReplicationRequest) returns (google.protobuf.Empty);
 
-  // Switch main<->follower for selected replication.
+  // Switch main<->follower for selected replication without downtime.
+  // Switch will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
+  // Method will return error in following cases:
+  //   - there is no existing bucket replication
+  //   - there are multiple replications from the same main bucket to multiple followers
+  //   - switch already exists. Zero downtime switch cannot be updated. Use DeleteBucketSwitch in this case.
+  //   - replication is to different bucket name. Will be supported later.
+  rpc SwitchBucketZeroDowntime(SwitchBucketZeroDowntimeRequest) returns (google.protobuf.Empty);
+
+  // Switch main<->follower for selected replication with downtime.
   // This method Can also be used to update existing switch if it has not started yet.
-  // 2 Switch types are supported:
-  //  - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
+  // Workflow: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
   // Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.
-  //  - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
   // Method will return error in following cases:
   //   - there is no existing bucket replication
   //   - there are multiple replications from the same main bucket to multiple followers
@@ -50,11 +57,12 @@ service Chorus {
   rpc SwitchBucket(SwitchBucketRequest) returns (google.protobuf.Empty);
 
   // Deletes Switch with following implications:
+  // !!!Use with caution for ZeroDowntime switch.
   // - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
   //   proxy will route all requests to old bucket.
   // - If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed
   //   proxy will route all requests to old bucket, no data will be lost.
-  //   !!!For no_downtime migration, routing will be reverted back to old bucket.
+  //   !!!For ZeroDowntime switch, routing will be reverted back to old bucket.
   //   Old and new buckets may end up in inconsistent state because all object writes happened
   //   since start of no_downtime migration were routed only to new bucket.
   // - If switch was done. Only switch metadata will be removed, replication or routing will not be affected.
@@ -307,20 +315,24 @@ message Agent {
   string url = 2;
 }
 
+message SwitchBucketZeroDowntimeRequest {
+  // Id of bucket replication policy to switch source and destination buckets on proxy.
+  // Replication policy should already exist.
+  ReplicationRequest replication_id = 1;
+
+  // Max Amount of time to wait for uncompleted multipart uploads to finish before switching buckets.
+  // Default is 1 hour.
+  optional google.protobuf.Duration multipart_ttl = 2;
+}
+
 message SwitchBucketRequest {
   // Id of bucket replication policy to switch source and destination buckets on proxy.
   // Replication policy should already exist.
   ReplicationRequest replication_id = 1;
 
-  // Set true to perform bucket switch without downtime.
-  // Once started, no downtime switch cannot be aborted or reverted without risk of data loss.
-  // Default is false. If true, other request parameters like continue_replication and downtime_window will be ignored.
-  bool no_downtime = 2;
-
   // Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.
   // If NOT set, switch will be performed right away and writes will be blocked until it is done.
-  // Can be used only for switch with downtime.
-  optional SwitchDowntimeOpts downtime_opts = 4;
+  optional SwitchDowntimeOpts downtime_opts = 2;
 }
 
 // Defines downtime window for replication switch with downtime.
@@ -387,8 +399,10 @@ message GetBucketSwitchStatusResponse {
 
   // Current switch status
   Status last_status = 1;
-  bool no_downtime = 2;
-  bool continue_replication = 3;
+  // true if switch is zero downtime
+  bool zero_downtime = 2;
+  // multipart uploads TTL for zero downtime switch
+  optional google.protobuf.Duration multipart_ttl = 3;
   optional SwitchDowntimeOpts downtime_opts = 4;
 
   // Time of last switch attempt - last time when switch was moved to InProgress status.

@@ -468,7 +468,7 @@
     },
     "/replication/switch": {
       "post": {
-        "summary": "Switch main\u003c-\u003efollower for selected replication.\nThis method Can also be used to update existing switch if it has not started yet.\n2 Switch types are supported:\n - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.\n - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.\n  - switch is successfully finished\n  - replication is to different bucket name. Will be supported later.",
+        "summary": "Switch main\u003c-\u003efollower for selected replication with downtime.\nThis method Can also be used to update existing switch if it has not started yet.\nWorkflow: stops write requests to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.\n  - switch is successfully finished\n  - replication is to different bucket name. Will be supported later.",
         "operationId": "Chorus_SwitchBucket",
         "responses": {
           "200": {
@@ -502,7 +502,7 @@
     },
     "/replication/switch/delete": {
       "post": {
-        "summary": "Deletes Switch with following implications:\n- If switch was in not_started, error, or skipped state, it will not be attempted anymore.\n  proxy will route all requests to old bucket.\n- If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed\n  proxy will route all requests to old bucket, no data will be lost.\n  !!!For no_downtime migration, routing will be reverted back to old bucket.\n  Old and new buckets may end up in inconsistent state because all object writes happened\n  since start of no_downtime migration were routed only to new bucket.\n- If switch was done. Only switch metadata will be removed, replication or routing will not be affected.",
+        "summary": "Deletes Switch with following implications:\n!!!Use with caution for ZeroDowntime switch.\n- If switch was in not_started, error, or skipped state, it will not be attempted anymore.\n  proxy will route all requests to old bucket.\n- If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed\n  proxy will route all requests to old bucket, no data will be lost.\n  !!!For ZeroDowntime switch, routing will be reverted back to old bucket.\n  Old and new buckets may end up in inconsistent state because all object writes happened\n  since start of no_downtime migration were routed only to new bucket.\n- If switch was done. Only switch metadata will be removed, replication or routing will not be affected.",
         "operationId": "Chorus_DeleteBucketSwitch",
         "responses": {
           "200": {
@@ -559,6 +559,40 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/chorusReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/replication/switch/zero-downtime": {
+      "post": {
+        "summary": "Switch main\u003c-\u003efollower for selected replication without downtime.\nSwitch will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch already exists. Zero downtime switch cannot be updated. Use DeleteBucketSwitch in this case.\n  - replication is to different bucket name. Will be supported later.",
+        "operationId": "Chorus_SwitchBucketZeroDowntime",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSwitchBucketZeroDowntimeRequest"
             }
           }
         ],
@@ -985,11 +1019,13 @@
           "$ref": "#/definitions/chorusGetBucketSwitchStatusResponseStatus",
           "title": "Current switch status"
         },
-        "noDowntime": {
-          "type": "boolean"
+        "zeroDowntime": {
+          "type": "boolean",
+          "title": "true if switch is zero downtime"
         },
-        "continueReplication": {
-          "type": "boolean"
+        "multipartTtl": {
+          "type": "string",
+          "title": "multipart uploads TTL for zero downtime switch"
         },
         "downtimeOpts": {
           "$ref": "#/definitions/chorusSwitchDowntimeOpts"
@@ -1288,13 +1324,22 @@
           "$ref": "#/definitions/chorusReplicationRequest",
           "description": "Id of bucket replication policy to switch source and destination buckets on proxy.\nReplication policy should already exist."
         },
-        "noDowntime": {
-          "type": "boolean",
-          "description": "Set true to perform bucket switch without downtime.\nOnce started, no downtime switch cannot be aborted or reverted without risk of data loss.\nDefault is false. If true, other request parameters like continue_replication and downtime_window will be ignored."
-        },
         "downtimeOpts": {
           "$ref": "#/definitions/chorusSwitchDowntimeOpts",
-          "description": "Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.\nIf NOT set, switch will be performed right away and writes will be blocked until it is done.\nCan be used only for switch with downtime."
+          "description": "Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.\nIf NOT set, switch will be performed right away and writes will be blocked until it is done."
+        }
+      }
+    },
+    "chorusSwitchBucketZeroDowntimeRequest": {
+      "type": "object",
+      "properties": {
+        "replicationId": {
+          "$ref": "#/definitions/chorusReplicationRequest",
+          "description": "Id of bucket replication policy to switch source and destination buckets on proxy.\nReplication policy should already exist."
+        },
+        "multipartTtl": {
+          "type": "string",
+          "description": "Max Amount of time to wait for uncompleted multipart uploads to finish before switching buckets.\nDefault is 1 hour."
         }
       }
     },

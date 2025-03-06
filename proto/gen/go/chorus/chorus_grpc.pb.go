@@ -32,6 +32,7 @@ const (
 	Chorus_ResumeReplication_FullMethodName                = "/chorus.Chorus/ResumeReplication"
 	Chorus_DeleteReplication_FullMethodName                = "/chorus.Chorus/DeleteReplication"
 	Chorus_DeleteUserReplication_FullMethodName            = "/chorus.Chorus/DeleteUserReplication"
+	Chorus_SwitchBucketZeroDowntime_FullMethodName         = "/chorus.Chorus/SwitchBucketZeroDowntime"
 	Chorus_SwitchBucket_FullMethodName                     = "/chorus.Chorus/SwitchBucket"
 	Chorus_DeleteBucketSwitch_FullMethodName               = "/chorus.Chorus/DeleteBucketSwitch"
 	Chorus_GetBucketSwitchStatus_FullMethodName            = "/chorus.Chorus/GetBucketSwitchStatus"
@@ -71,14 +72,18 @@ type ChorusClient interface {
 	// Deletes given replication
 	DeleteReplication(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeleteUserReplication(ctx context.Context, in *DeleteUserReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Switch main<->follower for selected replication.
+	// Switch main<->follower for selected replication without downtime.
+	// Switch will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
+	// Method will return error in following cases:
+	//   - there is no existing bucket replication
+	//   - there are multiple replications from the same main bucket to multiple followers
+	//   - switch already exists. Zero downtime switch cannot be updated. Use DeleteBucketSwitch in this case.
+	//   - replication is to different bucket name. Will be supported later.
+	SwitchBucketZeroDowntime(ctx context.Context, in *SwitchBucketZeroDowntimeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Switch main<->follower for selected replication with downtime.
 	// This method Can also be used to update existing switch if it has not started yet.
-	// 2 Switch types are supported:
-	//   - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
-	//
+	// Workflow: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
 	// Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.
-	//   - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
-	//
 	// Method will return error in following cases:
 	//   - there is no existing bucket replication
 	//   - there are multiple replications from the same main bucket to multiple followers
@@ -87,11 +92,12 @@ type ChorusClient interface {
 	//   - replication is to different bucket name. Will be supported later.
 	SwitchBucket(ctx context.Context, in *SwitchBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Deletes Switch with following implications:
+	// !!!Use with caution for ZeroDowntime switch.
 	//   - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
 	//     proxy will route all requests to old bucket.
 	//   - If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed
 	//     proxy will route all requests to old bucket, no data will be lost.
-	//     !!!For no_downtime migration, routing will be reverted back to old bucket.
+	//     !!!For ZeroDowntime switch, routing will be reverted back to old bucket.
 	//     Old and new buckets may end up in inconsistent state because all object writes happened
 	//     since start of no_downtime migration were routed only to new bucket.
 	//   - If switch was done. Only switch metadata will be removed, replication or routing will not be affected.
@@ -247,6 +253,16 @@ func (c *chorusClient) DeleteUserReplication(ctx context.Context, in *DeleteUser
 	return out, nil
 }
 
+func (c *chorusClient) SwitchBucketZeroDowntime(ctx context.Context, in *SwitchBucketZeroDowntimeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Chorus_SwitchBucketZeroDowntime_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chorusClient) SwitchBucket(ctx context.Context, in *SwitchBucketRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -392,14 +408,18 @@ type ChorusServer interface {
 	// Deletes given replication
 	DeleteReplication(context.Context, *ReplicationRequest) (*emptypb.Empty, error)
 	DeleteUserReplication(context.Context, *DeleteUserReplicationRequest) (*emptypb.Empty, error)
-	// Switch main<->follower for selected replication.
+	// Switch main<->follower for selected replication without downtime.
+	// Switch will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
+	// Method will return error in following cases:
+	//   - there is no existing bucket replication
+	//   - there are multiple replications from the same main bucket to multiple followers
+	//   - switch already exists. Zero downtime switch cannot be updated. Use DeleteBucketSwitch in this case.
+	//   - replication is to different bucket name. Will be supported later.
+	SwitchBucketZeroDowntime(context.Context, *SwitchBucketZeroDowntimeRequest) (*emptypb.Empty, error)
+	// Switch main<->follower for selected replication with downtime.
 	// This method Can also be used to update existing switch if it has not started yet.
-	// 2 Switch types are supported:
-	//   - Switch with downtime: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
-	//
+	// Workflow: stops write requests to bucket on chorus proxy until all replication tasks will be processed.
 	// Then it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.
-	//   - Switch without downtime: will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.
-	//
 	// Method will return error in following cases:
 	//   - there is no existing bucket replication
 	//   - there are multiple replications from the same main bucket to multiple followers
@@ -408,11 +428,12 @@ type ChorusServer interface {
 	//   - replication is to different bucket name. Will be supported later.
 	SwitchBucket(context.Context, *SwitchBucketRequest) (*emptypb.Empty, error)
 	// Deletes Switch with following implications:
+	// !!!Use with caution for ZeroDowntime switch.
 	//   - If switch was in not_started, error, or skipped state, it will not be attempted anymore.
 	//     proxy will route all requests to old bucket.
 	//   - If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed
 	//     proxy will route all requests to old bucket, no data will be lost.
-	//     !!!For no_downtime migration, routing will be reverted back to old bucket.
+	//     !!!For ZeroDowntime switch, routing will be reverted back to old bucket.
 	//     Old and new buckets may end up in inconsistent state because all object writes happened
 	//     since start of no_downtime migration were routed only to new bucket.
 	//   - If switch was done. Only switch metadata will be removed, replication or routing will not be affected.
@@ -473,6 +494,9 @@ func (UnimplementedChorusServer) DeleteReplication(context.Context, *Replication
 }
 func (UnimplementedChorusServer) DeleteUserReplication(context.Context, *DeleteUserReplicationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteUserReplication not implemented")
+}
+func (UnimplementedChorusServer) SwitchBucketZeroDowntime(context.Context, *SwitchBucketZeroDowntimeRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SwitchBucketZeroDowntime not implemented")
 }
 func (UnimplementedChorusServer) SwitchBucket(context.Context, *SwitchBucketRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SwitchBucket not implemented")
@@ -735,6 +759,24 @@ func _Chorus_DeleteUserReplication_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ChorusServer).DeleteUserReplication(ctx, req.(*DeleteUserReplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chorus_SwitchBucketZeroDowntime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchBucketZeroDowntimeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).SwitchBucketZeroDowntime(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_SwitchBucketZeroDowntime_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).SwitchBucketZeroDowntime(ctx, req.(*SwitchBucketZeroDowntimeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1005,6 +1047,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteUserReplication",
 			Handler:    _Chorus_DeleteUserReplication_Handler,
+		},
+		{
+			MethodName: "SwitchBucketZeroDowntime",
+			Handler:    _Chorus_SwitchBucketZeroDowntime_Handler,
 		},
 		{
 			MethodName: "SwitchBucket",

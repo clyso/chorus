@@ -311,22 +311,22 @@ func (_m *MockService) GetReplicationSwitch(ctx context.Context, user string, bu
 }
 
 // GetReplicationSwitchWithDowntime provides a mock function with given fields: ctx, replID
-func (_m *MockService) GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (SwitchWithDowntime, error) {
+func (_m *MockService) GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (SwitchInfo, error) {
 	ret := _m.Called(ctx, replID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetReplicationSwitchWithDowntime")
 	}
 
-	var r0 SwitchWithDowntime
+	var r0 SwitchInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID) (SwitchWithDowntime, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID) (SwitchInfo, error)); ok {
 		return rf(ctx, replID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID) SwitchWithDowntime); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID) SwitchInfo); ok {
 		r0 = rf(ctx, replID)
 	} else {
-		r0 = ret.Get(0).(SwitchWithDowntime)
+		r0 = ret.Get(0).(SwitchInfo)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, ReplicationID) error); ok {
