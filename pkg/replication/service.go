@@ -251,6 +251,8 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[pol
 
 func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (policy.ReplicationPolicies, error) {
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
+	// TODO: handle refactored zero-downtime switch
+	// either filter poliys with active switch here or inside GetBucketReplicationPolicies
 	bucketPolicy, err := s.policySvc.GetBucketReplicationPolicies(ctx, user, bucket)
 	if err == nil {
 		return bucketPolicy, nil

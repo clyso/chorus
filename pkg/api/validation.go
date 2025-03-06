@@ -12,11 +12,6 @@ func validateSwitchRequest(req *pb.SwitchBucketRequest) error {
 	if err := validateReplicationID(req.ReplicationId); err != nil {
 		return fmt.Errorf("invalid replication_id: %w", err)
 	}
-	if req.NoDowntime {
-		if req.DowntimeOpts != nil {
-			return fmt.Errorf("no_downtime and downtime_window are mutually exclusive")
-		}
-	}
 	return validateSwitchDonwtimeOpts(req.DowntimeOpts)
 }
 

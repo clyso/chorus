@@ -156,6 +156,27 @@ func (d ReplicationPolicyDest) Parse() (storage string, bucket *string) {
 	return string(d), nil
 }
 
+func ReplicationIDFromStr(s string) (ReplicationID, error) {
+	if s == "" {
+		return ReplicationID{}, fmt.Errorf("%w: replication id is empty", dom.ErrInvalidArg)
+	}
+	s = strings.TrimPrefix(s, "p:repl_st:")
+	arr := strings.Split(s, ":")
+	if len(arr) < 4 {
+		return ReplicationID{}, fmt.Errorf("%w: invalid replication id %q", dom.ErrInvalidArg, s)
+	}
+	res := ReplicationID{
+		User:   arr[0],
+		Bucket: arr[1],
+		From:   arr[2],
+		To:     arr[3],
+	}
+	if len(arr) == 5 {
+		res.ToBucket = &arr[4]
+	}
+	return res, nil
+}
+
 type ReplicationID struct {
 	User     string
 	Bucket   string
@@ -169,6 +190,18 @@ func (r ReplicationID) String() string {
 		return fmt.Sprintf("%s:%s:%s:%s:%s", r.User, r.Bucket, r.From, r.To, *r.ToBucket)
 	}
 	return fmt.Sprintf("%s:%s:%s:%s", r.User, r.Bucket, r.From, r.To)
+}
+
+func (r ReplicationID) SwitchKey() string {
+	return fmt.Sprintf("p:switch:%s:%s", r.User, r.Bucket)
+}
+
+func (r ReplicationID) SwitchHistoryKey() string {
+	return fmt.Sprintf("p:switch-hist:%s:%s", r.User, r.Bucket)
+}
+
+func (r ReplicationID) RoutingKey() string {
+	return fmt.Sprintf("p:route:%s:%s", r.User, r.Bucket)
 }
 
 //go:generate go tool mockery --name=Service --filename=service_mock.go --inpackage --structname=MockService
@@ -186,16 +219,21 @@ type Service interface {
 	GetUserRoutingPolicy(ctx context.Context, user string) (string, error)
 	AddUserRoutingPolicy(ctx context.Context, user, toStorage string) error
 
+	// Deprecated
 	IsReplicationSwitchInProgress(ctx context.Context, user, bucket string) (bool, error)
+	// Deprecated
 	GetReplicationSwitch(ctx context.Context, user, bucket string) (ReplicationSwitch, error)
+	// Deprecated
 	DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error
+	// Deprecated
 	ReplicationSwitchDone(ctx context.Context, user, bucket string) error
 
-	SetReplicationSwitch(ctx context.Context, replID ReplicationID, downtimeWindow *SwitchDowntimeOpts) error
+	SetDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchDowntimeOpts) error
+	SetZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error
 	DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
-	GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (SwitchWithDowntime, error)
-	CompleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, continueReplication bool) error
-	UpdateSwitchWithDowntimeStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt, doneAt *time.Time) error
+	GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error)
+	CompleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
+	UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt, doneAt *time.Time) error
 
 	GetBucketReplicationPolicies(ctx context.Context, user, bucket string) (ReplicationPolicies, error)
 	GetUserReplicationPolicies(ctx context.Context, user string) (ReplicationPolicies, error)

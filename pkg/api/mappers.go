@@ -115,3 +115,55 @@ func pbToDuration(in *durationpb.Duration) *time.Duration {
 	d := in.AsDuration()
 	return &d
 }
+
+func toPbSwitchStatus(in policy.SwitchInfo) *pb.GetBucketSwitchStatusResponse {
+	res := &pb.GetBucketSwitchStatusResponse{
+		LastStatus:    toPbSwitchWithDowntimeStatus(in.LastStatus),
+		ZeroDowntime:  in.IsZeroDowntime(),
+		LastStartedAt: tsToPb(in.LastStartedAt),
+		DoneAt:        tsToPb(in.DoneAt),
+		History:       in.History,
+	}
+	if in.IsZeroDowntime() {
+		res.MultipartTtl = durationToPb(&in.MultipartTTL)
+	} else {
+		res.DowntimeOpts = toPbDowntimeOpts(in.SwitchDowntimeOpts)
+	}
+	return res
+}
+
+func toPbSwitchWithDowntimeStatus(in policy.SwitchWithDowntimeStatus) pb.GetBucketSwitchStatusResponse_Status {
+	switch in {
+	case policy.StatusInProgress:
+		return pb.GetBucketSwitchStatusResponse_InProgress
+	case policy.StatusCheckInProgress:
+		return pb.GetBucketSwitchStatusResponse_CheckInProgress
+	case policy.StatusSkipped:
+		return pb.GetBucketSwitchStatusResponse_Skipped
+	case policy.StatusError:
+		return pb.GetBucketSwitchStatusResponse_Error
+	case policy.StatusDone:
+		return pb.GetBucketSwitchStatusResponse_Done
+	default:
+		return pb.GetBucketSwitchStatusResponse_NotStarted
+	}
+}
+
+func durationToPb(in *time.Duration) *durationpb.Duration {
+	if in == nil {
+		return nil
+	}
+	return durationpb.New(*in)
+}
+
+func toPbDowntimeOpts(in policy.SwitchDowntimeOpts) *pb.SwitchDowntimeOpts {
+	return &pb.SwitchDowntimeOpts{
+		StartOnInitDone:     in.StartOnInitDone,
+		Cron:                in.Cron,
+		StartAt:             tsToPb(in.StartAt),
+		MaxDuration:         durationToPb(in.MaxDuration),
+		MaxEventLag:         in.MaxEventLag,
+		SkipBucketCheck:     in.SkipBucketCheck,
+		ContinueReplication: in.ContinueReplication,
+	}
+}

@@ -102,7 +102,7 @@ Routing logic:
 1. get target storage name from bucket-level routing
 2. if not found then get from user-level routing
 3. check if storage bucket is blocked
-4. if replication switch is in progress adjust target storage based on version vector info for read requests. And based on uploadID for multipart request.
+4. if zero donwtime replication switch is in progress adjust target storage based on version vector info for read requests. And based on uploadID for multipart request.
 
 ### 5.2 Replication
 

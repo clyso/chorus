@@ -92,7 +92,7 @@ type state struct {
 	doneAt    *time.Time
 }
 
-func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.ReplicationID, replStatus policy.ReplicationPolicyStatus, switchStatus policy.SwitchWithDowntime) (switchResult, error) {
+func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.ReplicationID, replStatus policy.ReplicationPolicyStatus, switchStatus policy.SwitchInfo) (switchResult, error) {
 	// state machine for switch with downtime:
 	// switch statement contain all states in logical order
 	// each task handling iteration handles one state and returns new state or error
