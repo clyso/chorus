@@ -45,6 +45,11 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
+const (
+	// TODO: move to config
+	defaultZeroDowntimeMultipartTTL = time.Hour
+)
+
 func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService, storageSvc storage.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service, appInfo *dom.AppInfo) pb.ChorusServer {
 	return &handlers{storages: storages, rclone: rclone, s3clients: s3clients, taskClient: taskClient, policySvc: policySvc, versionSvc: versionSvc, storageSvc: storageSvc, locker: locker, proxyClient: proxyClient, agentClient: agentClient, notificationSvc: notificationSvc, appInfo: appInfo}
 }
@@ -869,7 +874,7 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
 		// persist switch metadata
-		err = h.policySvc.SetReplicationSwitchWithDowntime(ctx, policyID, pbToDowntimeOpts(req.DowntimeOpts))
+		err = h.policySvc.SetDowntimeReplicationSwitch(ctx, policyID, pbToDowntimeOpts(req.DowntimeOpts))
 		if err != nil {
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}
@@ -899,10 +904,96 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 	return &emptypb.Empty{}, nil
 }
 
-func (h *handlers) DeleteBucketSwitch(context.Context, *pb.ReplicationRequest) (*emptypb.Empty, error) {
-	panic("unimplemented")
+func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchBucketZeroDowntimeRequest) (*emptypb.Empty, error) {
+	// validate
+	if err := validateReplicationID(req.ReplicationId); err != nil {
+		return nil, err
+	}
+	if _, ok := h.storages.Storages[req.ReplicationId.From]; !ok {
+		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.ReplicationId.From)
+	}
+	if _, ok := h.storages.Storages[req.ReplicationId.To]; !ok {
+		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ReplicationId.To)
+	}
+	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
+		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
+	}
+	if req.ReplicationId.ToBucket != nil && *req.ReplicationId.ToBucket != "" && *req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
+		// TODO: support replication to different bucket name in a separate PR.
+		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
+	}
+	req.ReplicationId.ToBucket = nil
+
+	// obtain exclusive lock for the replication policy
+	policyID := pbToReplicationID(req.ReplicationId)
+	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = lock.WithRefresh(ctx, func() error {
+		// persist switch metadata
+		opts := &policy.SwitchZeroDowntimeOpts{
+			MultipartTTL: defaultZeroDowntimeMultipartTTL,
+		}
+		if req.MultipartTtl != nil && req.MultipartTtl.AsDuration() > 0 {
+			opts.MultipartTTL = req.MultipartTtl.AsDuration()
+		}
+
+		err = h.policySvc.SetZeroDowntimeReplicationSwitch(ctx, policyID, opts)
+		if err != nil {
+			return fmt.Errorf("unable to store switch metadata: %w", err)
+		}
+		// create switch task
+		// TODO: refactor switch task to use replicationID
+		task, err := tasks.NewTask(ctx, tasks.FinishReplicationSwitchPayload{
+			User:   req.ReplicationId.User,
+			Bucket: req.ReplicationId.Bucket,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = h.taskClient.EnqueueContext(ctx, task)
+		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+			return err
+		}
+		return nil
+	}, refresh, time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (h *handlers) GetBucketSwitchStatus(context.Context, *pb.ReplicationRequest) (*pb.GetBucketSwitchStatusResponse, error) {
-	panic("unimplemented")
+func (h *handlers) DeleteBucketSwitch(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
+	// validate
+	if err := validateReplicationID(req); err != nil {
+		return nil, err
+	}
+	// obtain exclusive lock for the replication policy
+	policyID := pbToReplicationID(req)
+	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	err = lock.WithRefresh(ctx, func() error {
+		return h.policySvc.DeleteReplicationSwitch(ctx, policyID)
+	}, refresh, time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *handlers) GetBucketSwitchStatus(ctx context.Context, req *pb.ReplicationRequest) (*pb.GetBucketSwitchStatusResponse, error) {
+	// validate
+	if err := validateReplicationID(req); err != nil {
+		return nil, err
+	}
+	res, err := h.policySvc.GetReplicationSwitchInfo(ctx, pbToReplicationID(req))
+	if err != nil {
+		return nil, err
+	}
+	return toPbSwitchStatus(res), nil
 }

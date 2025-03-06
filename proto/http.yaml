@@ -48,6 +48,9 @@ http:
     - selector: chorus.Chorus.CompareBucket
       post: /replication/compare-bucket
       body: "*"
+    - selector: chorus.Chorus.SwitchBucketZeroDowntime
+      post: /replication/switch/zero-downtime
+      body: "*"
     - selector: chorus.Chorus.SwitchBucket
       post: /replication/switch
       body: "*"
