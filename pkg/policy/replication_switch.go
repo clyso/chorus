@@ -21,13 +21,13 @@ var (
 )
 
 type SwitchDowntimeOpts struct {
-	StartOnInitDone     bool           `redis:"onInitDone,omitempty"`
-	Cron                *string        `redis:"cron,omitempty"`
-	StartAt             *time.Time     `redis:"startAt,omitempty"`
-	MaxDuration         *time.Duration `redis:"maxDuration,omitempty"`
-	MaxEventLag         *uint32        `redis:"maxEventLag,omitempty"`
-	SkipBucketCheck     bool           `redis:"skipBucketCheck,omitempty"`
-	ContinueReplication bool           `redis:"continueReplication,omitempty"`
+	StartOnInitDone     bool          `redis:"onInitDone"`
+	Cron                *string       `redis:"cron,omitempty"`
+	StartAt             *time.Time    `redis:"startAt,omitempty"`
+	MaxDuration         time.Duration `redis:"maxDuration,omitempty"`
+	MaxEventLag         *uint32       `redis:"maxEventLag,omitempty"`
+	SkipBucketCheck     bool          `redis:"skipBucketCheck,omitempty"`
+	ContinueReplication bool          `redis:"continueReplication,omitempty"`
 }
 
 type SwitchZeroDowntimeOpts struct {
@@ -56,8 +56,8 @@ func (w *SwitchDowntimeOpts) GetMaxEventLag() (uint32, bool) {
 }
 
 func (w *SwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
-	if w != nil && w.MaxDuration != nil && *w.MaxDuration > 0 {
-		return *w.MaxDuration, true
+	if w != nil && w.MaxDuration > 0 {
+		return w.MaxDuration, true
 	}
 	return 0, false
 }
@@ -66,7 +66,7 @@ func (w *SwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 type ZeroDowntimeSwitchInProgressInfo struct {
 	ReplicationIDStr string                   `redis:"replicationID"`
 	Status           SwitchWithDowntimeStatus `redis:"lastStatus"`
-	MultipartTTL     time.Duration            `redis:"MultipartTTL"`
+	MultipartTTL     time.Duration            `redis:"multipartTTL"`
 }
 
 func (s *ZeroDowntimeSwitchInProgressInfo) ReplicationID() (ReplicationID, error) {
@@ -216,7 +216,7 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 	pipe := s.client.TxPipeline()
 	pipe.HSet(ctx, replID.SwitchKey(), info)
 	if opts != nil {
-		pipe.HSet(ctx, replID.SwitchKey(), *opts)
+		pipe.HSet(ctx, replID.SwitchKey(), opts)
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to set downtime switch: %w", err)
@@ -294,13 +294,20 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	if policy.IsPaused {
 		return fmt.Errorf("cannot create zero-downtime switch: replication is paused")
 	}
+	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	if err != nil {
+		return fmt.Errorf("unable to get replication policies: %w", err)
+	}
+	if len(policies.To) != 1 {
+		return fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
+	}
 
 	// validate routing policy
 	toStorage, err := s.getRoutingPolicy(ctx, replID.User, replID.Bucket)
 	if err != nil {
 		return fmt.Errorf("unable to get routing policy: %w", err)
 	}
-	if toStorage == replID.From {
+	if toStorage != replID.From {
 		return fmt.Errorf("cannot create zero-downtime switch: given replication is not routed to destination")
 	}
 
@@ -310,14 +317,17 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	pipe.Set(ctx, replID.RoutingKey(), replID.To, 0)
 	// create switch metadata
 	pipe.HSet(ctx, replID.SwitchKey(), SwitchInfo{
-		SwitchZeroDowntimeOpts: SwitchZeroDowntimeOpts{
-			MultipartTTL: opts.MultipartTTL,
-		},
 		ReplicationIDStr: replID.String(),
 		CreatedAt:        now,
 		LastStatus:       StatusInProgress,
-		LastStartedAt:    &now,
+		// LastStartedAt:    &now,
 	})
+	// set time separately because of go-redis bug with *time.Time
+	pipe.HSet(ctx, replID.SwitchKey(), "startedAt", now)
+	pipe.HSet(ctx, replID.SwitchKey(), SwitchZeroDowntimeOpts{
+		MultipartTTL: opts.MultipartTTL,
+	})
+
 	// archive replication
 	if err = archiveReplicationWithClient(ctx, pipe, replID); err != nil {
 		return fmt.Errorf("unable to archive replication: %w", err)
@@ -393,27 +403,28 @@ func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID Replica
 	return info, nil
 }
 
-func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user string, bucket string) (info ZeroDowntimeSwitchInProgressInfo, exists bool, err error) {
+func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user string, bucket string) (ZeroDowntimeSwitchInProgressInfo, error) {
+	info := ZeroDowntimeSwitchInProgressInfo{}
 	key := ReplicationID{User: user, Bucket: bucket}.SwitchKey()
-	err = s.client.HMGet(ctx, key, "multipartTTL", "lastStatus", "replicationID").Scan(&info)
+	err := s.client.HMGet(ctx, key, "multipartTTL", "lastStatus", "replicationID").Scan(&info)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return info, false, nil
+			return info, dom.ErrNotFound
 		}
-		return info, false, fmt.Errorf("unable to get zero downtime switch info: %w", err)
+		return info, err
 	}
 	if info.MultipartTTL == 0 {
 		// no multipart TTL means it is not zero downtime switch
-		return info, false, nil
+		return info, dom.ErrNotFound
 	}
 	if info.Status != StatusInProgress {
 		// only in progress switches are considered
-		return info, false, nil
+		return info, dom.ErrNotFound
 	}
 	if _, err = info.ReplicationID(); err != nil {
-		return info, false, fmt.Errorf("unable to get replication ID: %w", err)
+		return info, fmt.Errorf("unable to get replication ID: %w", err)
 	}
-	return info, true, nil
+	return info, nil
 }
 
 // UpdateDowntimeSwitchStatus handles downtime switch status transitions
