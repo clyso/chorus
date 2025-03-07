@@ -6,16 +6,26 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
-
-func strPtr(s string) *string {
-	return &s
-}
 
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
+}
+
+func uint32Ptr(u uint32) *uint32 {
+	return &u
 }
 
 func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
@@ -48,7 +58,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name: "all empty - start now",
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron:    strPtr(""),
+					Cron:    stringPtr(""),
 					StartAt: timePtr(time.Time{}),
 				},
 				LastStartedAt: nil,
@@ -60,7 +70,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name: "error - both cron and startAt set",
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron:    strPtr("0 * * * *"),
+					Cron:    stringPtr("0 * * * *"),
 					StartAt: timePtr(time.Now()),
 				},
 				LastStartedAt: nil,
@@ -72,7 +82,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			name: "error - both cron and startAt set",
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron:    strPtr("0 * * * *"),
+					Cron:    stringPtr("0 * * * *"),
 					StartAt: timePtr(time.Now()),
 				},
 				LastStartedAt: nil,
@@ -111,7 +121,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			currentTime: time.Date(2021, 1, 1, 0, 59, 0, 0, time.UTC), // 00:59
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron: strPtr("0 * * * *"), // every hour
+					Cron: stringPtr("0 * * * *"), // every hour
 				},
 				// first start
 				LastStartedAt: nil,
@@ -125,7 +135,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			currentTime: time.Date(2021, 1, 1, 1, 0, 0, 0, time.UTC), // 01:00
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron: strPtr("0 * * * *"), // every hour
+					Cron: stringPtr("0 * * * *"), // every hour
 				},
 				// first start
 				LastStartedAt: nil,
@@ -139,7 +149,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			currentTime: time.Date(2021, 1, 1, 0, 59, 0, 0, time.UTC), // 00:59
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron: strPtr("0 * * * *"), // every hour
+					Cron: stringPtr("0 * * * *"), // every hour
 				},
 				// first start
 				LastStartedAt: timePtr(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)), // 00:00
@@ -153,7 +163,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 			currentTime: time.Date(2021, 1, 1, 1, 1, 0, 0, time.UTC), // 01:01
 			fields: fields{
 				Window: SwitchDowntimeOpts{
-					Cron: strPtr("0 * * * *"), // every hour
+					Cron: stringPtr("0 * * * *"), // every hour
 				},
 				// first start
 				LastStartedAt: timePtr(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)), // 00:00
@@ -329,14 +339,125 @@ func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
 	}
 }
 
-func stringPtr(s string) *string {
-	return &s
-}
+func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
+	db := miniredis.RunT(t)
+	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	ctx := context.TODO()
 
-func durationPtr(d time.Duration) *time.Duration {
-	return &d
-}
+	svc := NewService(c)
+	replID := ReplicationID{
+		User:   "u",
+		Bucket: "b",
+		From:   "f",
+		To:     "t",
+	}
+	validSwitch := &SwitchDowntimeOpts{
+		StartOnInitDone:     false,
+		Cron:                stringPtr("0 0 * * *"),
+		StartAt:             nil,
+		MaxDuration:         durationPtr(3 * time.Hour),
+		MaxEventLag:         uint32Ptr(100),
+		SkipBucketCheck:     true,
+		ContinueReplication: true,
+	}
+	//setup time mock
+	testTime := time.Now()
+	timeNow = func() time.Time {
+		return testTime
+	}
+	defer func() {
+		timeNow = time.Now
+	}()
 
-func uint32Ptr(u uint32) *uint32 {
-	return &u
+	t.Run("create new", func(t *testing.T) {
+
+		t.Run("validate against replication policy", func(t *testing.T) {
+			r := require.New(t)
+			// cleanup redis
+			r.NoError(c.FlushAll(ctx).Err())
+
+			// canot create switch for non-existing replication
+			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.Error(err, "replication not exists")
+
+			// create replication but to wrong destination
+			r.NoError(svc.addBucketRoutingPolicy(ctx, replID.User, replID.Bucket, replID.From, true))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, "asdf", replID.ToBucket, tasks.Priority2, nil))
+			// try again
+			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.Error(err, "replication not exists")
+			_, err = svc.GetReplicationSwitchInfo(ctx, replID)
+			r.Error(err, "switch was not created")
+
+			//create replication but now there are 2 destinations which is not allowed
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket, tasks.Priority2, nil))
+			// try again
+			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.Error(err, "only one destination allowed")
+			_, err = svc.GetReplicationSwitchInfo(ctx, replID)
+			r.Error(err, "switch was not created")
+
+			// delete first replication and check that it works
+			r.NoError(svc.DeleteReplication(ctx, replID.User, replID.Bucket, replID.From, "asdf", replID.ToBucket))
+			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.NoError(err, "success")
+		})
+		t.Run("err: replication using agent", func(t *testing.T) {
+			r := require.New(t)
+			// cleanup redis
+			r.NoError(c.FlushAll(ctx).Err())
+
+			//create replication with agent which is not allowed
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket, tasks.Priority2, stringPtr("http://example.com")))
+			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.Error(err, "replication using agent")
+			_, err = svc.GetReplicationSwitchInfo(ctx, replID)
+			r.Error(err, "switch was not created")
+
+			// check that similar replication without agent works
+			r.NoError(svc.DeleteReplication(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket, tasks.Priority2, nil))
+			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.NoError(err, "success")
+		})
+		t.Run("err: init replication not done for immediate switch", func(t *testing.T) {
+			r := require.New(t)
+			// cleanup redis
+			r.NoError(c.FlushAll(ctx).Err())
+			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.Error(err, "replication not exists")
+
+			// create replication with init not done
+			r.NoError(svc.addBucketRoutingPolicy(ctx, replID.User, replID.Bucket, replID.From, true))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket, tasks.Priority2, nil))
+
+			// create switch with immediate start
+			immediateSwitch := &SwitchDowntimeOpts{}
+			err = svc.SetDowntimeReplicationSwitch(ctx, replID, immediateSwitch)
+			r.Error(err, "init replication not done")
+		})
+		t.Run("success", func(t *testing.T) {
+			r := require.New(t)
+			// cleanup redis
+			r.NoError(c.FlushAll(ctx).Err())
+
+			// create replication
+			r.NoError(svc.addBucketRoutingPolicy(ctx, replID.User, replID.Bucket, replID.From, true))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket, tasks.Priority2, nil))
+
+			// create switch
+			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
+			r.NoError(err)
+			got, err := svc.GetReplicationSwitchInfo(ctx, replID)
+			r.NoError(err)
+			r.True(testTime.Equal(got.CreatedAt))
+			gotID, err := got.ReplicationID()
+			r.NoError(err)
+			r.Equal(replID.String(), gotID.String())
+			r.Equal(StatusNotStarted, got.LastStatus)
+			r.EqualValues(validSwitch, got.SwitchDowntimeOpts)
+		})
+
+	})
+
 }

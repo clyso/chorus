@@ -45,7 +45,7 @@ const (
 
 	TypeApiCostEstimation     = "api:cost_estimation"
 	TypeApiCostEstimationList = "api:cost_estimation:list"
-	TypeApiReplicationSwitch  = "api:replication_switch"
+	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 )
 
@@ -154,9 +154,10 @@ type CostEstimationPayload struct {
 	Sync
 }
 
-type FinishReplicationSwitchPayload struct {
-	User   string
+type ZeroDowntimeReplicationSwitchPayload struct {
+	Sync
 	Bucket string
+	User   string
 }
 
 type CostEstimationListPayload struct {
@@ -243,7 +244,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
-	CostEstimationPayload | CostEstimationListPayload | FinishReplicationSwitchPayload | SwitchWithDowntimePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
+	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -261,9 +262,9 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	taskType := ""
 	var optionList []asynq.Option
 	switch p := any(payload).(type) {
-	case FinishReplicationSwitchPayload:
-		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(fmt.Sprintf("api:rs:%s:%s", p.User, p.Bucket))}
-		taskType = TypeApiReplicationSwitch
+	case ZeroDowntimeReplicationSwitchPayload:
+		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(fmt.Sprintf("api:zdrs:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket))}
+		taskType = TypeApiZeroDowntimeSwitch
 	case CostEstimationPayload:
 		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.Retention(costEstimationTaskRetention), asynq.TaskID(fmt.Sprintf("api:ce:%s:%s", p.FromStorage, p.ToStorage))}
 		taskType = TypeApiCostEstimation
@@ -282,7 +283,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue()), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
 	case SwitchWithDowntimePayload:
-		id := fmt.Sprintf("api:sd:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
+		id := fmt.Sprintf("api:sd:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket)
 		if p.ToBucket != nil {
 			id += ":" + *p.ToBucket
 		}

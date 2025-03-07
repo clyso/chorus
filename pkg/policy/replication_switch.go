@@ -78,8 +78,8 @@ type SwitchInfo struct {
 	SwitchZeroDowntimeOpts
 	ReplicationIDStr string                   `redis:"replicationID"`
 	CreatedAt        time.Time                `redis:"createdAt"`
-	LastStatus       SwitchWithDowntimeStatus `redis:"lastStatus"`
-	LastStartedAt    *time.Time               `redis:"startedAt"`
+	LastStatus       SwitchWithDowntimeStatus `redis:"lastStatus,omitempty"`
+	LastStartedAt    *time.Time               `redis:"startedAt,omitempty"`
 	DoneAt           *time.Time               `redis:"doneAt,omitempty"`
 	History          []string                 `redis:"-"`
 }
@@ -136,6 +136,15 @@ func (s *SwitchInfo) IsTimeToStart() (bool, error) {
 }
 
 type SwitchWithDowntimeStatus string
+
+func (s *SwitchWithDowntimeStatus) UnmarshalBinary(data []byte) error {
+	*s = SwitchWithDowntimeStatus(data)
+	return nil
+}
+
+func (s SwitchWithDowntimeStatus) MarshalBinary() (data []byte, err error) {
+	return []byte(s), nil
+}
 
 const (
 	// StatusNotStarted means that switch donwntime is not started yet
@@ -204,9 +213,13 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 	if opts != nil {
 		info.SwitchDowntimeOpts = *opts
 	}
-	err = s.client.HSet(ctx, replID.SwitchKey(), info).Err()
-	if err != nil {
-		return fmt.Errorf("unable to create downtime switch: %w", err)
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, replID.SwitchKey(), info)
+	if opts != nil {
+		pipe.HSet(ctx, replID.SwitchKey(), *opts)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("unable to set downtime switch: %w", err)
 	}
 	return nil
 }
@@ -242,10 +255,8 @@ func (s *policySvc) updateDowntimeSwitchOpts(ctx context.Context, replID Replica
 			pipe.HDel(ctx, key, redisTag)
 		} else if fieldVal.CanInterface() {
 			if field.Type.Kind() == reflect.Ptr {
-				fmt.Println("setting", field.Name, key, redisTag, fieldVal.Elem().Interface())
 				pipe.HSet(ctx, key, redisTag, fieldVal.Elem().Interface())
 			} else {
-				fmt.Println("setting", field.Name, key, redisTag, fieldVal.Interface())
 				pipe.HSet(ctx, key, redisTag, fieldVal.Interface())
 			}
 		} else {
@@ -350,9 +361,18 @@ func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID Replica
 	var info SwitchInfo
 	res := s.client.HGetAll(ctx, replID.SwitchKey())
 	if res.Err() != nil {
+		if errors.Is(res.Err(), redis.Nil) {
+			return info, dom.ErrNotFound
+		}
 		return info, fmt.Errorf("unable to get replication switch info: %w", res.Err())
 	}
+	if len(res.Val()) == 0 {
+		return info, dom.ErrNotFound
+	}
 	if err := res.Scan(&info); err != nil {
+		if errors.Is(res.Err(), redis.Nil) {
+			return info, dom.ErrNotFound
+		}
 		return info, fmt.Errorf("unable to scan replication switch info: %w", err)
 	}
 	if err := res.Scan(&info.SwitchDowntimeOpts); err != nil {

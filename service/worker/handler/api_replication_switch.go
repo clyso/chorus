@@ -21,45 +21,70 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
-func (s *svc) FinishReplicationSwitch(ctx context.Context, t *asynq.Task) error {
-	var p tasks.FinishReplicationSwitchPayload
+func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.Task) error {
+	var p tasks.ZeroDowntimeReplicationSwitchPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("FinishReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
+		return fmt.Errorf("ZeroDowntimeReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
-	logger := zerolog.Ctx(ctx)
 
-	replSwitch, err := s.policySvc.GetReplicationSwitch(ctx, p.User, p.Bucket)
+	policyID := policy.ReplicationID{
+		User:     p.User,
+		Bucket:   p.Bucket,
+		From:     p.FromStorage,
+		To:       p.ToStorage,
+		ToBucket: p.ToBucket,
+	}
+
+	// acquire exclusive lock to switch task:
+	release, refresh, err := s.locker.Lock(ctx, lock.StringKey(policyID.String()))
 	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			logger.Warn().Msg("unable to finish replication switch task: not found")
-			return nil
-		}
 		return err
 	}
-	if replSwitch.IsDone {
-		logger.Info().Msg("skip finish replication switch task: already done")
-		return nil
-	}
-
-	for oldFollower := range replSwitch.GetOldFollowers() {
-		oldRepl, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, replSwitch.OldMain, string(oldFollower), nil)
+	defer release()
+	return lock.WithRefresh(ctx, func() error {
+		// get latest replication and switch state and execute switch state machine:
+		replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
-				continue
+				zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
+				return nil
 			}
 			return err
 		}
-		if oldRepl.EventsDone < oldRepl.Events {
+		if replStatus.IsPaused {
+			// replication is paused - retry later
+			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
+		}
+		switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, policyID)
+		if err != nil {
+			if errors.Is(err, dom.ErrNotFound) {
+				zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: switch metadata was deleted")
+				return nil
+			}
+			return err
+		}
+		if !switchPolicy.IsZeroDowntime() {
+			// wrong switch type - drop task
+			// should never happen
+			zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch is not switch with downtime")
+			return nil
+		}
+		// check if replication switch can be finished:
+		if replStatus.EventsDone < replStatus.Events {
+			// events queue is not drained yet - retry later
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 		}
 		existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.User, p.Bucket)
@@ -67,13 +92,11 @@ func (s *svc) FinishReplicationSwitch(ctx context.Context, t *asynq.Task) error 
 			return err
 		}
 		if existsUploads {
+			// there are pending multipart uploads - retry later
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 		}
-	}
-	err = s.policySvc.ReplicationSwitchDone(ctx, p.User, p.Bucket)
-	if err != nil {
-		return err
-	}
-	logger.Info().Msg("replication switch is done")
-	return nil
+		// all good - finish zero downtime replication switch:
+
+		return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, policyID)
+	}, refresh, time.Second*2)
 }

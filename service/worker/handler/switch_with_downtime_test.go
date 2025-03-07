@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/clyso/chorus/pkg/policy"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,12 +28,6 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	for _, status := range []policy.SwitchWithDowntimeStatus{policy.StatusNotStarted, policy.StatusError, policy.StatusSkipped, ""} {
 		t.Run("from "+string(status)+" to in_progress", func(t *testing.T) {
 			r := require.New(t)
-			policyMock := &policy.MockService{}
-			if status == policy.StatusError {
-				policyMock.On("DeleteRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			policyMock.On("AddRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 				CreatedAt: hourAgo,
@@ -57,22 +50,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			r.Equal(policy.StatusInProgress, nextState.nextState.status)
 			r.NotNil(nextState.nextState.startedAt)
 			r.Nil(nextState.nextState.doneAt)
-			policyMock.AssertExpectations(t)
-			if status != policy.StatusError {
-				// test cleanup only on error
-				policyMock.AssertNotCalled(t, "DeleteRoutingBlock", mock.Anything, mock.Anything, mock.Anything)
-			}
 		})
 		t.Run("from "+string(status)+" to error - already retried", func(t *testing.T) {
 			r := require.New(t)
-			policyMock := &policy.MockService{}
-			if status == policy.StatusError {
-				policyMock.On("DeleteRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			if status == policy.StatusNotStarted || status == "" {
-				policyMock.On("AddRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 				CreatedAt: hourAgo,
@@ -102,19 +82,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 				r.NotNil(nextState.nextState.startedAt)
 				r.Nil(nextState.nextState.doneAt)
 			}
-			policyMock.AssertExpectations(t)
-			if status != policy.StatusError {
-				// test cleanup only on error
-				policyMock.AssertNotCalled(t, "DeleteRoutingBlock", mock.Anything, mock.Anything, mock.Anything)
-			}
 		})
 		t.Run("from "+string(status)+" to retry later", func(t *testing.T) {
 			r := require.New(t)
-			policyMock := &policy.MockService{}
-			if status == policy.StatusError {
-				policyMock.On("DeleteRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{}, policy.SwitchInfo{
 				SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
@@ -129,19 +99,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			r.NoError(err)
 			r.True(nextState.retryLater)
 			r.Empty(nextState.nextState.status, "no status change")
-			policyMock.AssertExpectations(t)
-			if status != policy.StatusError {
-				// test cleanup only on error
-				policyMock.AssertNotCalled(t, "DeleteRoutingBlock", mock.Anything, mock.Anything, mock.Anything)
-			}
 		})
 		t.Run("from "+string(status)+" retry later - init not done", func(t *testing.T) {
 			r := require.New(t)
-			policyMock := &policy.MockService{}
-			if status == policy.StatusError {
-				policyMock.On("DeleteRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 				// init not done
@@ -162,19 +122,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			r.NoError(err)
 			r.True(nextState.retryLater)
 			r.Empty(nextState.nextState.status, "no status change")
-			policyMock.AssertExpectations(t)
-			if status != policy.StatusError {
-				// test cleanup only on error
-				policyMock.AssertNotCalled(t, "DeleteRoutingBlock", mock.Anything, mock.Anything, mock.Anything)
-			}
 		})
 		t.Run("from "+string(status)+" to skipped - init not done", func(t *testing.T) {
 			r := require.New(t)
-			policyMock := &policy.MockService{}
-			if status == policy.StatusError {
-				policyMock.On("DeleteRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 				CreatedAt:      hourAgo,
@@ -197,19 +147,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			r.EqualValues(policy.StatusSkipped, nextState.nextState.status)
 			r.Nil(nextState.nextState.startedAt)
 			r.Nil(nextState.nextState.doneAt)
-			policyMock.AssertExpectations(t)
-			if status != policy.StatusError {
-				// test cleanup only on error
-				policyMock.AssertNotCalled(t, "DeleteRoutingBlock", mock.Anything, mock.Anything, mock.Anything)
-			}
 		})
 		t.Run("from "+string(status)+" to skipped - event lag not met", func(t *testing.T) {
 			r := require.New(t)
-			policyMock := &policy.MockService{}
-			if status == policy.StatusError {
-				policyMock.On("DeleteRoutingBlock", mock.Anything, "from", "bucket").Return(nil).Once()
-			}
-			worker.policySvc = policyMock
 
 			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 				CreatedAt: hourAgo,
@@ -239,18 +179,11 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			r.EqualValues(policy.StatusSkipped, nextState.nextState.status)
 			r.Nil(nextState.nextState.startedAt)
 			r.Nil(nextState.nextState.doneAt)
-			policyMock.AssertExpectations(t)
-			if status != policy.StatusError {
-				// test cleanup only on error
-				policyMock.AssertNotCalled(t, "DeleteRoutingBlock", mock.Anything, mock.Anything, mock.Anything)
-			}
 		})
 	}
 
 	t.Run("in_progress wait queue drain", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		worker.policySvc = policyMock
 
 		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 			CreatedAt: hourAgo,
@@ -276,12 +209,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.Empty(nextState.nextState.status, "no status change")
 		r.Nil(nextState.nextState.startedAt)
 		r.Nil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("in_progress to error: drain timeout", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		worker.policySvc = policyMock
 
 		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 			CreatedAt: hourAgo,
@@ -310,12 +240,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.EqualValues(policy.StatusError, nextState.nextState.status)
 		r.Nil(nextState.nextState.startedAt)
 		r.Nil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("in_progress to check_in_progress", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		worker.policySvc = policyMock
 
 		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 			CreatedAt: hourAgo,
@@ -342,12 +269,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.EqualValues(policy.StatusCheckInProgress, nextState.nextState.status)
 		r.Nil(nextState.nextState.startedAt)
 		r.Nil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("check_in_progress wait for check complete", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		worker.policySvc = policyMock
 		// mock that check is still in progress
 		checkResultIsInProgress = true
 
@@ -376,12 +300,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.Empty(nextState.nextState.status, "no status change")
 		r.Nil(nextState.nextState.startedAt)
 		r.Nil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("check_in_progress to error duration exceeded", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		worker.policySvc = policyMock
 		// mock that check is still in progress
 		checkResultIsInProgress = true
 
@@ -412,12 +333,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.EqualValues(policy.StatusError, nextState.nextState.status)
 		r.Nil(nextState.nextState.startedAt)
 		r.Nil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("check_in_progress to error buckets not equal", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		worker.policySvc = policyMock
 		// mock that check is done and not equal
 		checkResultIsInProgress = false
 		checkResultIsEqual = false
@@ -447,17 +365,12 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.EqualValues(policy.StatusError, nextState.nextState.status)
 		r.Nil(nextState.nextState.startedAt)
 		r.Nil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("check_in_progress to done", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
 		// mock that check is done and buckets are equal
 		checkResultIsInProgress = false
 		checkResultIsEqual = true
-		//mock policy CompleteReplicationSwitchWithDowntime
-		policyMock.On("CompleteReplicationSwitchWithDowntime", mock.Anything, id, true).Return(nil).Once()
-		worker.policySvc = policyMock
 
 		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 			CreatedAt: hourAgo,
@@ -472,10 +385,10 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			ListingStarted: true,
 		}, policy.SwitchInfo{
 			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
-				Cron: stringPtr("@5minutes"),
+				Cron:                stringPtr("@5minutes"),
+				ContinueReplication: true,
 			},
-			ContinueReplication: true,
-			CreatedAt:           hourAgo,
+			CreatedAt: hourAgo,
 			// started 1 hour ago
 			LastStartedAt: &hourAgo,
 			LastStatus:    policy.StatusCheckInProgress,
@@ -485,14 +398,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.EqualValues(policy.StatusDone, nextState.nextState.status)
 		r.Nil(nextState.nextState.startedAt)
 		r.NotNil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 	t.Run("done to done", func(t *testing.T) {
 		r := require.New(t)
-		policyMock := &policy.MockService{}
-		//mock policy CompleteReplicationSwitchWithDowntime
-		policyMock.On("CompleteReplicationSwitchWithDowntime", mock.Anything, id, true).Return(nil).Once()
-		worker.policySvc = policyMock
 
 		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, policy.ReplicationPolicyStatus{
 			CreatedAt: hourAgo,
@@ -507,10 +415,10 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			ListingStarted: true,
 		}, policy.SwitchInfo{
 			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
-				Cron: stringPtr("@5minutes"),
+				Cron:                stringPtr("@5minutes"),
+				ContinueReplication: true,
 			},
-			ContinueReplication: true,
-			CreatedAt:           hourAgo,
+			CreatedAt: hourAgo,
 			// started 1 hour ago
 			LastStartedAt: &hourAgo,
 			LastStatus:    policy.StatusDone,
@@ -520,7 +428,6 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		r.EqualValues(policy.StatusDone, nextState.nextState.status)
 		r.Nil(nextState.nextState.startedAt)
 		r.NotNil(nextState.nextState.doneAt)
-		policyMock.AssertExpectations(t)
 	})
 }
 

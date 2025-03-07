@@ -139,12 +139,52 @@ func ReplicationIDFromStr(s string) (ReplicationID, error) {
 	return res, nil
 }
 
+// TODO: refactor Service interface to use ReplicationID instead of separate user, bucket, from, to, toBucket arguments
 type ReplicationID struct {
 	User     string
 	Bucket   string
 	From     string
 	To       string
 	ToBucket *string
+}
+
+func (r ReplicationID) Validate() error {
+	if r.User == "" {
+		return fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	if r.Bucket == "" {
+		return fmt.Errorf("%w: bucket is required", dom.ErrInvalidArg)
+	}
+	if r.From == "" {
+		return fmt.Errorf("%w: from is required", dom.ErrInvalidArg)
+	}
+	if r.To == "" {
+		return fmt.Errorf("%w: to is required", dom.ErrInvalidArg)
+	}
+	if r.ToBucket != nil && *r.ToBucket == "" {
+		return fmt.Errorf("%w: toBucket cannot be empty", dom.ErrInvalidArg)
+	}
+	if r.ToBucket != nil && r.Bucket == *r.ToBucket {
+		return fmt.Errorf("%w: toBucket should be different from bucket", dom.ErrInvalidArg)
+	}
+	//check that fields do not contain ":"
+	if strings.ContainsAny(r.User, ":") {
+		return fmt.Errorf("%w: user cannot contain ':'", dom.ErrInvalidArg)
+
+	}
+	if strings.ContainsAny(r.Bucket, ":") {
+		return fmt.Errorf("%w: bucket cannot contain ':'", dom.ErrInvalidArg)
+	}
+	if strings.ContainsAny(r.From, ":") {
+		return fmt.Errorf("%w: from cannot contain ':'", dom.ErrInvalidArg)
+	}
+	if strings.ContainsAny(r.To, ":") {
+		return fmt.Errorf("%w: to cannot contain ':'", dom.ErrInvalidArg)
+	}
+	if r.ToBucket != nil && strings.ContainsAny(*r.ToBucket, ":") {
+		return fmt.Errorf("%w: toBucket cannot contain ':'", dom.ErrInvalidArg)
+	}
+	return nil
 }
 
 func (r ReplicationID) String() string {
@@ -170,7 +210,7 @@ func (r ReplicationID) RoutingKey() string {
 	return fmt.Sprintf("p:route:%s:%s", r.User, r.Bucket)
 }
 
-//go:generate go tool mockery --name=Service --filename=service_mock.go --inpackage --structname=MockService
+// // go:generate go tool mockery --name=Service --filename=service_mock.go --inpackage --structname=MockService
 type Service interface {
 	// -------------- Routing policy related methods: --------------
 
@@ -460,24 +500,15 @@ func (s *policySvc) GetReplicationPolicyInfo(ctx context.Context, user, bucket, 
 		// custom dest bucket makes sense only if different from src bucket
 		toBucket = nil
 	}
-	if user == "" {
-		return ReplicationPolicyStatus{}, fmt.Errorf("%w: user is required to get replication policy status", dom.ErrInvalidArg)
-	}
-	if bucket == "" {
-		return ReplicationPolicyStatus{}, fmt.Errorf("%w: bucket is required to get replication policy status", dom.ErrInvalidArg)
-	}
-	if from == "" {
-		return ReplicationPolicyStatus{}, fmt.Errorf("%w: from is required to get replication policy status", dom.ErrInvalidArg)
-	}
-	if to == "" {
-		return ReplicationPolicyStatus{}, fmt.Errorf("%w: to is required to get replication policy status", dom.ErrInvalidArg)
-	}
 	replID := ReplicationID{
 		User:     user,
 		Bucket:   bucket,
 		From:     from,
 		To:       to,
 		ToBucket: toBucket,
+	}
+	if err := replID.Validate(); err != nil {
+		return ReplicationPolicyStatus{}, err
 	}
 
 	fKey := replID.StatusKey()
