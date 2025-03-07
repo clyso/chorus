@@ -244,7 +244,7 @@ type Service interface {
 	GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error)
 	// GetInProgressZeroDowntimeSwitchInfo shortcut method for chorus proxy to get required information
 	// to adjust route only when zero downtime switch is in progress.
-	GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user, bucket string) (info ZeroDowntimeSwitchInProgressInfo, exists bool, err error)
+	GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user, bucket string) (ZeroDowntimeSwitchInProgressInfo, error)
 
 	// -------------- Replication policy related methods: --------------
 
