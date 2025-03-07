@@ -104,6 +104,7 @@ func (r *ReplicationSwitch) SetOldFollowers(f map[ReplicationPolicyDest]tasks.Pr
 type ReplicationPolicyStatus struct {
 	CreatedAt       time.Time `redis:"created_at"`
 	IsPaused        bool      `redis:"paused"`
+	IsArchived      bool      `redis:"archived"`
 	InitObjListed   int64     `redis:"obj_listed"`
 	InitObjDone     int64     `redis:"obj_done"`
 	InitBytesListed int64     `redis:"bytes_listed"`
@@ -115,6 +116,7 @@ type ReplicationPolicyStatus struct {
 	InitDoneAt      *time.Time `redis:"init_done_at,omitempty"`
 	LastEmittedAt   *time.Time `redis:"last_emitted_at,omitempty"`
 	LastProcessedAt *time.Time `redis:"last_processed_at,omitempty"`
+	ArchivedAt      *time.Time `redis:"archived_at,omitempty"`
 
 	ListingStarted bool `redis:"listing_started"`
 
@@ -192,6 +194,10 @@ func (r ReplicationID) String() string {
 	return fmt.Sprintf("%s:%s:%s:%s", r.User, r.Bucket, r.From, r.To)
 }
 
+func (r ReplicationID) StatusKey() string {
+	return "p:repl_st:" + r.String()
+}
+
 func (r ReplicationID) SwitchKey() string {
 	return fmt.Sprintf("p:switch:%s:%s", r.User, r.Bucket)
 }
@@ -206,6 +212,8 @@ func (r ReplicationID) RoutingKey() string {
 
 //go:generate go tool mockery --name=Service --filename=service_mock.go --inpackage --structname=MockService
 type Service interface {
+	// -------------- Routing policy related methods: --------------
+
 	// GetRoutingPolicy returns destination storage name.
 	// Errors:
 	//   dom.ErrRoutingBlock - if access to bucket should be blocked because bucket is used as replication destination.
@@ -215,25 +223,30 @@ type Service interface {
 	AddRoutingBlock(ctx context.Context, storage, bucket string) error
 	DeleteRoutingBlock(ctx context.Context, storage, bucket string) error
 	getBucketRoutingPolicy(ctx context.Context, user, bucket string) (string, error)
-	addBucketRoutingPolicy(ctx context.Context, user, bucket, toStorage string) error
+	addBucketRoutingPolicy(ctx context.Context, user, bucket, toStorage string, replace bool) error
 	GetUserRoutingPolicy(ctx context.Context, user string) (string, error)
 	AddUserRoutingPolicy(ctx context.Context, user, toStorage string) error
 
-	// Deprecated
-	IsReplicationSwitchInProgress(ctx context.Context, user, bucket string) (bool, error)
-	// Deprecated
-	GetReplicationSwitch(ctx context.Context, user, bucket string) (ReplicationSwitch, error)
-	// Deprecated
-	DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error
-	// Deprecated
-	ReplicationSwitchDone(ctx context.Context, user, bucket string) error
+	// -------------- Replication switch related methods: --------------
 
+	// Upsert downtime replication switch. If switch already exists and not in progress, it will be updated.
 	SetDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchDowntimeOpts) error
-	SetZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error
-	DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
-	GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error)
-	CompleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
+	// Change downtime replication switch status. Makes required adjustments to routing and replication policies.
+	// According to switch status and configured options.
 	UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt, doneAt *time.Time) error
+	// Creates new zero downtime replication switch.
+	AddZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error
+	// Completes zero downtime replication switch.
+	CompleteZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID) error
+	// Deletes any replication switch if exists and reverts routing policy if switch was not done.
+	DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
+	// Returns replication switch config and status information.
+	GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error)
+	// GetInProgressZeroDowntimeSwitchInfo shortcut method for chorus proxy to get required information
+	// to adjust route only when zero downtime switch is in progress.
+	GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user, bucket string) (info ZeroDowntimeSwitchInProgressInfo, exists bool, err error)
+
+	// -------------- Replication policy related methods: --------------
 
 	GetBucketReplicationPolicies(ctx context.Context, user, bucket string) (ReplicationPolicies, error)
 	GetUserReplicationPolicies(ctx context.Context, user string) (ReplicationPolicies, error)
@@ -254,6 +267,9 @@ type Service interface {
 	PauseReplication(ctx context.Context, user, bucket, from string, to string, toBucket *string) error
 	ResumeReplication(ctx context.Context, user, bucket, from string, to string, toBucket *string) error
 	DeleteReplication(ctx context.Context, user, bucket, from string, to string, toBucket *string) error
+	// Archive replication. Will stop generating new events for this replication.
+	// Existing events will be processed and replication status metadata will be kept.
+	ArchiveReplication(ctx context.Context, replID ReplicationID) error
 	DeleteBucketReplicationsByUser(ctx context.Context, user, from string, to string) ([]string, error)
 }
 
@@ -321,11 +337,19 @@ func routingBlockSetKey(storage string) string {
 }
 
 func (s *policySvc) AddRoutingBlock(ctx context.Context, storage, bucket string) error {
-	return s.client.SAdd(ctx, routingBlockSetKey(storage), bucket).Err()
+	return addRoutingBlockWithClient(ctx, s.client, storage, bucket)
+}
+
+func addRoutingBlockWithClient(ctx context.Context, client redis.Cmdable, storage, bucket string) error {
+	return client.SAdd(ctx, routingBlockSetKey(storage), bucket).Err()
 }
 
 func (s *policySvc) DeleteRoutingBlock(ctx context.Context, storage, bucket string) error {
-	err := s.client.SRem(ctx, routingBlockSetKey(storage), bucket).Err()
+	return deleteRoutingBlockWithClient(ctx, s.client, storage, bucket)
+}
+
+func deleteRoutingBlockWithClient(ctx context.Context, client redis.Cmdable, storage, bucket string) error {
+	err := client.SRem(ctx, routingBlockSetKey(storage), bucket).Err()
 	if errors.Is(err, redis.Nil) {
 		return nil
 	}
@@ -387,7 +411,11 @@ func (s *policySvc) AddUserRoutingPolicy(ctx context.Context, user, toStorage st
 	return nil
 }
 
-func (s *policySvc) addBucketRoutingPolicy(ctx context.Context, user, bucket, toStorage string) error {
+func (s *policySvc) addBucketRoutingPolicy(ctx context.Context, user, bucket, toStorage string, replace bool) error {
+	return addBucketRoutingPolicyWithClient(ctx, s.client, user, bucket, toStorage, replace)
+}
+
+func addBucketRoutingPolicyWithClient(ctx context.Context, client redis.Cmdable, user, bucket, toStorage string, replace bool) error {
 	if user == "" {
 		return fmt.Errorf("%w: user is required to add bucket routing policy", dom.ErrInvalidArg)
 	}
@@ -398,7 +426,11 @@ func (s *policySvc) addBucketRoutingPolicy(ctx context.Context, user, bucket, to
 		return fmt.Errorf("%w: toStorage is required to add bucket routing policy", dom.ErrInvalidArg)
 	}
 	key := fmt.Sprintf("p:route:%s:%s", user, bucket)
-	set, err := s.client.SetNX(ctx, key, toStorage, 0).Result()
+	if replace {
+		return client.Set(ctx, key, toStorage, 0).Err()
+	}
+	// set only if not exists
+	set, err := client.SetNX(ctx, key, toStorage, 0).Result()
 	if err != nil {
 		return err
 	}
@@ -1144,6 +1176,37 @@ func (s *policySvc) DeleteReplication(ctx context.Context, user, bucket, fromSto
 	return err
 }
 
+func (s *policySvc) ArchiveReplication(ctx context.Context, replID ReplicationID) error {
+	pipe := s.client.Pipeline()
+	if err := archiveReplicationWithClient(ctx, pipe, replID); err != nil {
+		return err
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func archiveReplicationWithClient(ctx context.Context, client redis.Cmdable, replID ReplicationID) error {
+	if replID.ToBucket != nil && (*replID.ToBucket == "" || *replID.ToBucket == replID.Bucket) {
+		// custom dest bucket makes sense only if different from src bucket
+		replID.ToBucket = nil
+	}
+	key := fmt.Sprintf("p:repl:%s:%s", replID.User, replID.Bucket)
+	// build composite destination if custom destination bucket set
+	dest := replID.To
+	if replID.ToBucket != nil {
+		dest += ":" + *replID.ToBucket
+	}
+	val := fmt.Sprintf("%s:%s", replID.From, dest)
+	statusKey := replID.StatusKey()
+
+	client.ZRem(ctx, key, val)
+	luaHSetEx.Run(ctx, client, []string{statusKey}, "archived", true)
+	luaHSetEx.Run(ctx, client, []string{statusKey}, "archived_at", time.Now().UTC())
+	return nil
+}
+
 func (s *policySvc) DoReplicationSwitch(ctx context.Context, user, bucket, newMain string) error {
 	_, err := s.GetReplicationSwitch(ctx, user, bucket)
 	if !errors.Is(err, dom.ErrNotFound) {
@@ -1167,7 +1230,6 @@ func (s *policySvc) DoReplicationSwitch(ctx context.Context, user, bucket, newMa
 	for prevFollower := range replPolicies.To {
 		if _, toBucket := prevFollower.Parse(); toBucket != nil {
 			return fmt.Errorf("%w: switch is not supported if replication policy have custom destination bucket name", dom.ErrInvalidArg)
-
 		}
 		prevReplication, err := s.GetReplicationPolicyInfo(ctx, user, bucket, prevMain, string(prevFollower), nil)
 		if err != nil {
