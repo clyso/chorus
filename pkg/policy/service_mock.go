@@ -88,17 +88,53 @@ func (_m *MockService) AddUserRoutingPolicy(ctx context.Context, user string, to
 	return r0
 }
 
-// CompleteReplicationSwitchWithDowntime provides a mock function with given fields: ctx, replID, continueReplication
-func (_m *MockService) CompleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, continueReplication bool) error {
-	ret := _m.Called(ctx, replID, continueReplication)
+// AddZeroDowntimeReplicationSwitch provides a mock function with given fields: ctx, replID, opts
+func (_m *MockService) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error {
+	ret := _m.Called(ctx, replID, opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CompleteReplicationSwitchWithDowntime")
+		panic("no return value specified for AddZeroDowntimeReplicationSwitch")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID, bool) error); ok {
-		r0 = rf(ctx, replID, continueReplication)
+	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID, *SwitchZeroDowntimeOpts) error); ok {
+		r0 = rf(ctx, replID, opts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ArchiveReplication provides a mock function with given fields: ctx, replID
+func (_m *MockService) ArchiveReplication(ctx context.Context, replID ReplicationID) error {
+	ret := _m.Called(ctx, replID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ArchiveReplication")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID) error); ok {
+		r0 = rf(ctx, replID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// CompleteZeroDowntimeReplicationSwitch provides a mock function with given fields: ctx, replID
+func (_m *MockService) CompleteZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID) error {
+	ret := _m.Called(ctx, replID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CompleteZeroDowntimeReplicationSwitch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID) error); ok {
+		r0 = rf(ctx, replID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -154,12 +190,12 @@ func (_m *MockService) DeleteReplication(ctx context.Context, user string, bucke
 	return r0
 }
 
-// DeleteReplicationSwitchWithDowntime provides a mock function with given fields: ctx, replID
-func (_m *MockService) DeleteReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) error {
+// DeleteReplicationSwitch provides a mock function with given fields: ctx, replID
+func (_m *MockService) DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error {
 	ret := _m.Called(ctx, replID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteReplicationSwitchWithDowntime")
+		panic("no return value specified for DeleteReplicationSwitch")
 	}
 
 	var r0 error
@@ -208,24 +244,6 @@ func (_m *MockService) DeleteUserReplication(ctx context.Context, user string, f
 	return r0
 }
 
-// DoReplicationSwitch provides a mock function with given fields: ctx, user, bucket, newMain
-func (_m *MockService) DoReplicationSwitch(ctx context.Context, user string, bucket string, newMain string) error {
-	ret := _m.Called(ctx, user, bucket, newMain)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DoReplicationSwitch")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, user, bucket, newMain)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // GetBucketReplicationPolicies provides a mock function with given fields: ctx, user, bucket
 func (_m *MockService) GetBucketReplicationPolicies(ctx context.Context, user string, bucket string) (ReplicationPolicies, error) {
 	ret := _m.Called(ctx, user, bucket)
@@ -252,6 +270,41 @@ func (_m *MockService) GetBucketReplicationPolicies(ctx context.Context, user st
 	}
 
 	return r0, r1
+}
+
+// GetInProgressZeroDowntimeSwitchInfo provides a mock function with given fields: ctx, user, bucket
+func (_m *MockService) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user string, bucket string) (ZeroDowntimeSwitchInProgressInfo, bool, error) {
+	ret := _m.Called(ctx, user, bucket)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInProgressZeroDowntimeSwitchInfo")
+	}
+
+	var r0 ZeroDowntimeSwitchInProgressInfo
+	var r1 bool
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (ZeroDowntimeSwitchInProgressInfo, bool, error)); ok {
+		return rf(ctx, user, bucket)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ZeroDowntimeSwitchInProgressInfo); ok {
+		r0 = rf(ctx, user, bucket)
+	} else {
+		r0 = ret.Get(0).(ZeroDowntimeSwitchInProgressInfo)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) bool); ok {
+		r1 = rf(ctx, user, bucket)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, string) error); ok {
+		r2 = rf(ctx, user, bucket)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetReplicationPolicyInfo provides a mock function with given fields: ctx, user, bucket, from, to, toBucket
@@ -282,40 +335,12 @@ func (_m *MockService) GetReplicationPolicyInfo(ctx context.Context, user string
 	return r0, r1
 }
 
-// GetReplicationSwitch provides a mock function with given fields: ctx, user, bucket
-func (_m *MockService) GetReplicationSwitch(ctx context.Context, user string, bucket string) (ReplicationSwitch, error) {
-	ret := _m.Called(ctx, user, bucket)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetReplicationSwitch")
-	}
-
-	var r0 ReplicationSwitch
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (ReplicationSwitch, error)); ok {
-		return rf(ctx, user, bucket)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) ReplicationSwitch); ok {
-		r0 = rf(ctx, user, bucket)
-	} else {
-		r0 = ret.Get(0).(ReplicationSwitch)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, user, bucket)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetReplicationSwitchWithDowntime provides a mock function with given fields: ctx, replID
-func (_m *MockService) GetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID) (SwitchInfo, error) {
+// GetReplicationSwitchInfo provides a mock function with given fields: ctx, replID
+func (_m *MockService) GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error) {
 	ret := _m.Called(ctx, replID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetReplicationSwitchWithDowntime")
+		panic("no return value specified for GetReplicationSwitchInfo")
 	}
 
 	var r0 SwitchInfo
@@ -550,34 +575,6 @@ func (_m *MockService) IsReplicationPolicyPaused(ctx context.Context, user strin
 	return r0, r1
 }
 
-// IsReplicationSwitchInProgress provides a mock function with given fields: ctx, user, bucket
-func (_m *MockService) IsReplicationSwitchInProgress(ctx context.Context, user string, bucket string) (bool, error) {
-	ret := _m.Called(ctx, user, bucket)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsReplicationSwitchInProgress")
-	}
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return rf(ctx, user, bucket)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = rf(ctx, user, bucket)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, user, bucket)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ListReplicationPolicyInfo provides a mock function with given fields: ctx
 func (_m *MockService) ListReplicationPolicyInfo(ctx context.Context) ([]ReplicationPolicyStatusExtended, error) {
 	ret := _m.Called(ctx)
@@ -644,24 +641,6 @@ func (_m *MockService) PauseReplication(ctx context.Context, user string, bucket
 	return r0
 }
 
-// ReplicationSwitchDone provides a mock function with given fields: ctx, user, bucket
-func (_m *MockService) ReplicationSwitchDone(ctx context.Context, user string, bucket string) error {
-	ret := _m.Called(ctx, user, bucket)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ReplicationSwitchDone")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, user, bucket)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // ResumeReplication provides a mock function with given fields: ctx, user, bucket, from, to, toBucket
 func (_m *MockService) ResumeReplication(ctx context.Context, user string, bucket string, from string, to string, toBucket *string) error {
 	ret := _m.Called(ctx, user, bucket, from, to, toBucket)
@@ -680,17 +659,17 @@ func (_m *MockService) ResumeReplication(ctx context.Context, user string, bucke
 	return r0
 }
 
-// SetReplicationSwitchWithDowntime provides a mock function with given fields: ctx, replID, downtimeWindow
-func (_m *MockService) SetReplicationSwitchWithDowntime(ctx context.Context, replID ReplicationID, downtimeWindow *SwitchDowntimeOpts) error {
-	ret := _m.Called(ctx, replID, downtimeWindow)
+// SetDowntimeReplicationSwitch provides a mock function with given fields: ctx, replID, opts
+func (_m *MockService) SetDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchDowntimeOpts) error {
+	ret := _m.Called(ctx, replID, opts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetReplicationSwitchWithDowntime")
+		panic("no return value specified for SetDowntimeReplicationSwitch")
 	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, ReplicationID, *SwitchDowntimeOpts) error); ok {
-		r0 = rf(ctx, replID, downtimeWindow)
+		r0 = rf(ctx, replID, opts)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -698,12 +677,12 @@ func (_m *MockService) SetReplicationSwitchWithDowntime(ctx context.Context, rep
 	return r0
 }
 
-// UpdateSwitchWithDowntimeStatus provides a mock function with given fields: ctx, replID, newStatus, description, startedAt, doneAt
-func (_m *MockService) UpdateSwitchWithDowntimeStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt *time.Time, doneAt *time.Time) error {
+// UpdateDowntimeSwitchStatus provides a mock function with given fields: ctx, replID, newStatus, description, startedAt, doneAt
+func (_m *MockService) UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt *time.Time, doneAt *time.Time) error {
 	ret := _m.Called(ctx, replID, newStatus, description, startedAt, doneAt)
 
 	if len(ret) == 0 {
-		panic("no return value specified for UpdateSwitchWithDowntimeStatus")
+		panic("no return value specified for UpdateDowntimeSwitchStatus")
 	}
 
 	var r0 error
@@ -716,17 +695,17 @@ func (_m *MockService) UpdateSwitchWithDowntimeStatus(ctx context.Context, replI
 	return r0
 }
 
-// addBucketRoutingPolicy provides a mock function with given fields: ctx, user, bucket, toStorage
-func (_m *MockService) addBucketRoutingPolicy(ctx context.Context, user string, bucket string, toStorage string) error {
-	ret := _m.Called(ctx, user, bucket, toStorage)
+// addBucketRoutingPolicy provides a mock function with given fields: ctx, user, bucket, toStorage, replace
+func (_m *MockService) addBucketRoutingPolicy(ctx context.Context, user string, bucket string, toStorage string, replace bool) error {
+	ret := _m.Called(ctx, user, bucket, toStorage, replace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for addBucketRoutingPolicy")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, user, bucket, toStorage)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) error); ok {
+		r0 = rf(ctx, user, bucket, toStorage, replace)
 	} else {
 		r0 = ret.Error(0)
 	}
