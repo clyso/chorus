@@ -48,12 +48,12 @@ func getTestObj(name, bucket string) testObj {
 
 func listObjects(c *mclient.Client, bucket string, prefix string) ([]string, error) {
 	var res []string
-	objCh := c.ListObjects(tstCtx, bucket, mclient.ListObjectsOptions{Prefix: prefix})
+	objCh := c.ListObjects(tstCtx, bucket, mclient.ListObjectsOptions{Prefix: prefix, Recursive: true})
 	for obj := range objCh {
 		if obj.Err != nil {
 			return nil, obj.Err
 		}
-		if obj.Size == 0 {
+		if obj.Size == 0 && obj.Key != prefix {
 			subRes, err := listObjects(c, bucket, obj.Key)
 			if err != nil {
 				return nil, err
