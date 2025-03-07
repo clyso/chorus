@@ -230,7 +230,7 @@ func (s *svc) HandleConsistencyCheckReadiness(ctx context.Context, t *asynq.Task
 	}
 
 	if scheduledCounter != completedCounter {
-		return &dom.ErrRateLimitExceeded{RetryIn: util.DurationJitter(time.Second, time.Second*5)}
+		return &dom.ErrRateLimitExceeded{RetryIn: util.DurationJitter(time.Second, time.Second*2)}
 	}
 
 	if err := s.storageSvc.SetConsistencyCheckReadiness(ctx, readinessPayload.ID, true); err != nil {
