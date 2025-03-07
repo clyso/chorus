@@ -61,3 +61,39 @@ func Test_api_list_replications(t *testing.T) {
 	r.EqualValues("main", res.Replications[0].From)
 	r.EqualValues("f1", res.Replications[0].To)
 }
+
+func Test_api_get_replication_status(t *testing.T) {
+	r := require.New(t)
+	err := proxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
+	r.NoError(err)
+	defer func() {
+		proxyClient.RemoveBucket(tstCtx, "replications")
+	}()
+	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		User:            user,
+		From:            "main",
+		To:              "f1",
+		Buckets:         []string{"replications"},
+		IsForAllBuckets: false,
+	})
+	r.NoError(err)
+	defer func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			From:   "main",
+			To:     "f1",
+			Bucket: "replications",
+		})
+	}()
+	res, err := apiClient.GetReplicationStatus(tstCtx, &pb.ReplicationRequest{
+		User:   user,
+		From:   "main",
+		To:     "f1",
+		Bucket: "replications",
+	})
+	r.NoError(err)
+	r.EqualValues("replications", res.Bucket)
+	r.EqualValues(user, res.User)
+	r.EqualValues("main", res.From)
+	r.EqualValues("f1", res.To)
+}

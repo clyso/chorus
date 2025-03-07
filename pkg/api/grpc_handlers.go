@@ -635,3 +635,20 @@ func (h *handlers) createAgentBucketNotification(ctx context.Context, user, from
 	}
 	return nil
 }
+
+func (h *handlers) GetReplicationStatus(ctx context.Context, req *pb.ReplicationRequest) (*pb.Replication, error) {
+	ctx = log.WithUser(ctx, req.User)
+	status, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
+	if err != nil {
+		return nil, err
+	}
+	// Convert the status to the protobuf representation and return it
+	return replicationToPb(policy.ReplicationPolicyStatusExtended{
+		ReplicationPolicyStatus: status,
+		User:                    req.User,
+		Bucket:                  req.Bucket,
+		From:                    req.From,
+		To:                      req.To,
+		ToBucket:                req.ToBucket,
+	}), nil
+}
