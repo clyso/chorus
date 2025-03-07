@@ -217,11 +217,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
 	mux.HandleFunc(tasks.TypeApiCostEstimation, workerSvc.CostsEstimation)
 	mux.HandleFunc(tasks.TypeApiCostEstimationList, workerSvc.CostsEstimationList)
-	mux.HandleFunc(tasks.TypeApiReplicationSwitch, workerSvc.FinishReplicationSwitch)
 	mux.HandleFunc(tasks.TypeConsistencyCheck, workerSvc.HandleConsistencyCheck)
 	mux.HandleFunc(tasks.TypeConsistencyCheckList, workerSvc.HandleConsistencyCheckList)
 	mux.HandleFunc(tasks.TypeConsistencyCheckReadiness, workerSvc.HandleConsistencyCheckReadiness)
 	mux.HandleFunc(tasks.TypeConsistencyCheckResult, workerSvc.HandleConsistencyCheckDelete)
+	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, workerSvc.HandleZeroDowntimeReplicationSwitch)
+	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, workerSvc.HandleSwitchWithDowntime)
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {

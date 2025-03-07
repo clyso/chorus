@@ -22,11 +22,10 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
-	"github.com/stretchr/testify/require"
-
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_policySvc_UserRoutingPolicy(t *testing.T) {
@@ -931,4 +930,181 @@ func Test_CustomDestBucket(t *testing.T) {
 	route, err = svc.GetRoutingPolicy(ctx, user, dstBuck)
 	r.NoError(err, "routing block removed")
 	r.EqualValues(stor, route)
+}
+
+func TestReplicationID(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      ReplicationID
+		wantErr bool
+	}{
+		// Valid cases
+		{
+			name: "Valid basic replication ID",
+			in: ReplicationID{
+				User:   "user1",
+				Bucket: "bucket1",
+				From:   "source1",
+				To:     "dest1",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid with ToBucket",
+			in: ReplicationID{
+				User:     "user2",
+				Bucket:   "bucket2",
+				From:     "source2",
+				To:       "dest2",
+				ToBucket: stringPtr("target2"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid with special characters (no colons)",
+			in: ReplicationID{
+				User:   "user-3_special",
+				Bucket: "bucket.3-special",
+				From:   "src_3",
+				To:     "dst-3",
+			},
+			wantErr: false,
+		},
+
+		// Error cases: Missing required fields
+		{
+			name: "Empty User",
+			in: ReplicationID{
+				Bucket: "bucket",
+				From:   "from",
+				To:     "to",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Empty Bucket",
+			in: ReplicationID{
+				User: "user",
+				From: "from",
+				To:   "to",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Empty From",
+			in: ReplicationID{
+				User:   "user",
+				Bucket: "bucket",
+				To:     "to",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Empty To",
+			in: ReplicationID{
+				User:   "user",
+				Bucket: "bucket",
+				From:   "from",
+			},
+			wantErr: true,
+		},
+
+		// Error cases: ToBucket validation
+		{
+			name: "Empty ToBucket",
+			in: ReplicationID{
+				User:     "user",
+				Bucket:   "bucket",
+				From:     "from",
+				To:       "to",
+				ToBucket: stringPtr(""),
+			},
+			wantErr: true,
+		},
+		{
+			name: "ToBucket same as Bucket",
+			in: ReplicationID{
+				User:     "user",
+				Bucket:   "bucket",
+				From:     "from",
+				To:       "to",
+				ToBucket: stringPtr("bucket"),
+			},
+			wantErr: true,
+		},
+
+		// Error cases: Colon in fields
+		{
+			name: "Colon in User",
+			in: ReplicationID{
+				User:   "user:1",
+				Bucket: "bucket",
+				From:   "from",
+				To:     "to",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Colon in Bucket",
+			in: ReplicationID{
+				User:   "user",
+				Bucket: "bucket:1",
+				From:   "from",
+				To:     "to",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Colon in From",
+			in: ReplicationID{
+				User:   "user",
+				Bucket: "bucket",
+				From:   "from:1",
+				To:     "to",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Colon in To",
+			in: ReplicationID{
+				User:   "user",
+				Bucket: "bucket",
+				From:   "from",
+				To:     "to:1",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Colon in ToBucket",
+			in: ReplicationID{
+				User:     "user",
+				Bucket:   "bucket",
+				From:     "from",
+				To:       "to",
+				ToBucket: stringPtr("target:1"),
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+
+			err := tt.in.Validate()
+			if tt.wantErr {
+				r.Error(err)
+				return
+			} else {
+				r.NoError(err)
+			}
+			got, err := ReplicationIDFromStr(tt.in.String())
+			r.NoError(err)
+			r.EqualValues(tt.in, got)
+			r.EqualValues(tt.in.String(), got.String())
+			r.EqualValues(tt.in.StatusKey(), got.StatusKey())
+			r.EqualValues(tt.in.RoutingKey(), got.RoutingKey())
+			r.EqualValues(tt.in.SwitchKey(), got.SwitchKey())
+			r.EqualValues(tt.in.SwitchHistoryKey(), got.SwitchHistoryKey())
+		})
+	}
 }

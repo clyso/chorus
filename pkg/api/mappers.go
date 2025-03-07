@@ -57,17 +57,6 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 	}
 }
 
-func switchStatusToPb(status policy.SwitchStatus) pb.Replication_SwitchEnum {
-	switch status {
-	case policy.InProgress:
-		return pb.Replication_InProgress
-	case policy.Done:
-		return pb.Replication_Done
-	default:
-		return pb.Replication_NotStarted
-	}
-}
-
 func strPtr(s string) *string {
 	if s == "" {
 		return nil

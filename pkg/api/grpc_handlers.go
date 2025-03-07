@@ -856,17 +856,12 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
 	}
 	req.ReplicationId.ToBucket = nil
-	// todo: move to SetReplicationSwitchWithDowntime
-	policies, err := h.policySvc.GetBucketReplicationPolicies(ctx, req.ReplicationId.User, req.ReplicationId.Bucket)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get replication policy: %w", err)
-	}
-	if len(policies.To) != 1 {
-		return nil, fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
-	}
 
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
+	if err := policyID.Validate(); err != nil {
+		return nil, err
+	}
 	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
 	if err != nil {
 		return nil, err
@@ -926,6 +921,10 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
+	if err := policyID.Validate(); err != nil {
+		return nil, err
+	}
+
 	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
 	if err != nil {
 		return nil, err
@@ -940,15 +939,20 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 			opts.MultipartTTL = req.MultipartTtl.AsDuration()
 		}
 
-		err = h.policySvc.SetZeroDowntimeReplicationSwitch(ctx, policyID, opts)
+		err = h.policySvc.AddZeroDowntimeReplicationSwitch(ctx, policyID, opts)
 		if err != nil {
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}
 		// create switch task
-		// TODO: refactor switch task to use replicationID
-		task, err := tasks.NewTask(ctx, tasks.FinishReplicationSwitchPayload{
-			User:   req.ReplicationId.User,
+		task, err := tasks.NewTask(ctx, tasks.ZeroDowntimeReplicationSwitchPayload{
+			Sync: tasks.Sync{
+				FromStorage: req.ReplicationId.From,
+				ToStorage:   req.ReplicationId.To,
+				ToBucket:    req.ReplicationId.ToBucket,
+				CreatedAt:   time.Now(),
+			},
 			Bucket: req.ReplicationId.Bucket,
+			User:   req.ReplicationId.User,
 		})
 		if err != nil {
 			return err
@@ -972,6 +976,9 @@ func (h *handlers) DeleteBucketSwitch(ctx context.Context, req *pb.ReplicationRe
 	}
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req)
+	if err := policyID.Validate(); err != nil {
+		return nil, err
+	}
 	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
 	if err != nil {
 		return nil, err
