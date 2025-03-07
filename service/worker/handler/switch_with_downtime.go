@@ -20,7 +20,7 @@ var (
 	checkResultIsEqual, checkResultIsInProgress = true, false
 )
 
-func (s *svc) SwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
+func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
 	var p tasks.SwitchWithDowntimePayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwitchWithDowntimePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
@@ -200,7 +200,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			}, nil
 		}
 		// queue is drained, initiate bucket contents check:
-		_, _, err := s.checkBuckets(ctx, id, switchStatus.SwitchDowntimeOpts.SkipBucketCheck)
+		_, _, err := s.checkBuckets(ctx, id, switchStatus.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}
@@ -218,7 +218,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			// should never happen
 			return switchResult{}, fmt.Errorf("switch with downtime started at is nil")
 		}
-		isEqual, isInProgress, err := s.checkBuckets(ctx, id, switchStatus.SwitchDowntimeOpts.SkipBucketCheck)
+		isEqual, isInProgress, err := s.checkBuckets(ctx, id, switchStatus.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}
