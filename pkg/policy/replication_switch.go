@@ -10,6 +10,8 @@ import (
 
 	"github.com/adhocore/gronx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -58,6 +60,17 @@ func (w *SwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 		return *w.MaxDuration, true
 	}
 	return 0, false
+}
+
+// Reduced replication switch info for in progress zero downtime switch
+type ZeroDowntimeSwitchInProgressInfo struct {
+	ReplicationIDStr string                   `redis:"replicationID"`
+	Status           SwitchWithDowntimeStatus `redis:"lastStatus"`
+	MultipartTTL     time.Duration            `redis:"MultipartTTL"`
+}
+
+func (s *ZeroDowntimeSwitchInProgressInfo) ReplicationID() (ReplicationID, error) {
+	return ReplicationIDFromStr(s.ReplicationIDStr)
 }
 
 type SwitchInfo struct {
@@ -207,7 +220,7 @@ func (s *policySvc) updateDowntimeSwitchOpts(ctx context.Context, replID Replica
 		opts = &SwitchDowntimeOpts{}
 	}
 	key := replID.SwitchKey()
-	pipe := s.client.Pipeline()
+	pipe := s.client.TxPipeline()
 
 	val := reflect.ValueOf(*opts)
 	typ := val.Type()
@@ -245,7 +258,7 @@ func (s *policySvc) updateDowntimeSwitchOpts(ctx context.Context, replID Replica
 	return nil
 }
 
-func (s *policySvc) SetZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error {
+func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error {
 	_, err := s.GetReplicationSwitchInfo(ctx, replID)
 	if err != nil {
 		if !errors.Is(err, dom.ErrNotFound) {
@@ -281,7 +294,7 @@ func (s *policySvc) SetZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	}
 
 	now := timeNow()
-	pipe := s.client.Pipeline()
+	pipe := s.client.TxPipeline()
 	// switch routing
 	pipe.Set(ctx, replID.RoutingKey(), replID.To, 0)
 	// create switch metadata
@@ -294,7 +307,10 @@ func (s *policySvc) SetZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		LastStatus:       StatusInProgress,
 		LastStartedAt:    &now,
 	})
-	// TODO: delete routing policy from p:repl:user:bucket?
+	// archive replication
+	if err = archiveReplicationWithClient(ctx, pipe, replID); err != nil {
+		return fmt.Errorf("unable to archive replication: %w", err)
+	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to create zero downtime switch: %w", err)
 	}
@@ -302,11 +318,32 @@ func (s *policySvc) SetZeroDowntimeReplicationSwitch(ctx context.Context, replID
 }
 
 func (s *policySvc) DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error {
-	panic("unimplemented")
-}
-
-func (s *policySvc) CompleteReplicationSwitch(ctx context.Context, replID ReplicationID) error {
-	panic("unimplemented")
+	existing, err := s.GetReplicationSwitchInfo(ctx, replID)
+	if err != nil {
+		return err
+	}
+	pipe := s.client.TxPipeline()
+	if existing.IsZeroDowntime() {
+		if existing.LastStatus != StatusDone {
+			//revert routing idempotently
+			if err = addBucketRoutingPolicyWithClient(ctx, pipe, replID.User, replID.Bucket, replID.From, true); err != nil {
+				return fmt.Errorf("unable to revert bucket routing policy: %w", err)
+			}
+		}
+	} else {
+		// delete routing block idempotently
+		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+			return fmt.Errorf("unable to delete routing block: %w", err)
+		}
+	}
+	//delete switch metadata
+	pipe.Del(ctx, replID.SwitchKey())
+	// delete switch history
+	pipe.Del(ctx, replID.SwitchHistoryKey())
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("unable to delete replication switch: %w", err)
+	}
+	return nil
 }
 
 func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error) {
@@ -325,7 +362,7 @@ func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID Replica
 		return info, fmt.Errorf("unable to scan replication switch info zero downtime opts: %w", err)
 	}
 	if info.ReplicationIDStr != replID.String() {
-		return info, fmt.Errorf("replication ID mismatch: %w", dom.ErrNotFound)
+		return info, fmt.Errorf("%w: replication ID mismatch: expected %s, got %s", dom.ErrInvalidArg, replID.String(), info.ReplicationIDStr)
 	}
 
 	history, err := s.client.LRange(ctx, replID.SwitchHistoryKey(), 0, -1).Result()
@@ -336,6 +373,31 @@ func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID Replica
 	return info, nil
 }
 
+func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user string, bucket string) (info ZeroDowntimeSwitchInProgressInfo, exists bool, err error) {
+	key := ReplicationID{User: user, Bucket: bucket}.SwitchKey()
+	err = s.client.HMGet(ctx, key, "multipartTTL", "lastStatus", "replicationID").Scan(&info)
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return info, false, nil
+		}
+		return info, false, fmt.Errorf("unable to get zero downtime switch info: %w", err)
+	}
+	if info.MultipartTTL == 0 {
+		// no multipart TTL means it is not zero downtime switch
+		return info, false, nil
+	}
+	if info.Status != StatusInProgress {
+		// only in progress switches are considered
+		return info, false, nil
+	}
+	if _, err = info.ReplicationID(); err != nil {
+		return info, false, fmt.Errorf("unable to get replication ID: %w", err)
+	}
+	return info, true, nil
+}
+
+// UpdateDowntimeSwitchStatus handles downtime switch status transitions
+// and performs corresponding idempotent operations with replication and routing policies
 func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt *time.Time, doneAt *time.Time) error {
 	// validate input
 	if newStatus == "" {
@@ -358,9 +420,6 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 	if err != nil {
 		return err
 	}
-	if replID.String() != existing.ReplicationIDStr {
-		return fmt.Errorf("replication ID mismatch: %w", dom.ErrInvalidArg)
-	}
 	switch existing.LastStatus {
 	case "", StatusNotStarted, StatusError, StatusSkipped:
 		// from starting status, only allowed transitions are to in progress, error or skipped
@@ -382,8 +441,49 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 		}
 	}
 
-	// update downtime switch status
-	pipe := s.client.Pipeline()
+	// update downtime switch status along with routing and replication policies in one transaction:
+	pipe := s.client.TxPipeline()
+	switch newStatus {
+	// if switch in progress set routing block idempotently
+	case StatusInProgress, StatusCheckInProgress:
+		if err = addRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+			return fmt.Errorf("unable to add routing block: %w", err)
+		}
+	// if error, delete routing block idempotently
+	case StatusError:
+		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+			return fmt.Errorf("unable to delete routing block: %w", err)
+		}
+	// if done, switch routing and replication to new bucket idempotently
+	case StatusDone:
+		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+			return fmt.Errorf("unable to delete routing block: %w", err)
+		}
+		if err = addBucketRoutingPolicyWithClient(ctx, pipe, replID.User, replID.Bucket, replID.To, true); err != nil {
+			return fmt.Errorf("unable to add bucket routing policy: %w", err)
+		}
+		if err = archiveReplicationWithClient(ctx, pipe, replID); err != nil {
+			return fmt.Errorf("unable to archive replication: %w", err)
+		}
+		if existing.ContinueReplication {
+			// create backwards replication policy
+			key := fmt.Sprintf("p:repl:%s:%s", replID.User, replID.Bucket)
+			val := fmt.Sprintf("%s:%s", replID.To, replID.From)
+			pipe.ZAddNX(ctx, key, redis.Z{Member: val, Score: float64(tasks.PriorityDefault1)})
+			replBackID := replID
+			replBackID.From, replBackID.To = replID.To, replID.From
+
+			now := timeNow()
+			statusKey := replBackID.StatusKey()
+			res := ReplicationPolicyStatus{
+				CreatedAt:      time.Now().UTC(),
+				ListingStarted: true,
+				InitDoneAt:     &now,
+			}
+			pipe.HSet(ctx, statusKey, res)
+		}
+	}
+	// update switch status:
 	pipe.HSet(ctx, replID.SwitchKey(), "lastStatus", string(newStatus))
 	if startedAt != nil {
 		pipe.HSet(ctx, replID.SwitchKey(), "startedAt", startedAt)
@@ -396,6 +496,30 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 	pipe.LPush(ctx, replID.SwitchHistoryKey(), history)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to update downtime switch status: %w", err)
+	}
+	return nil
+}
+
+func (s *policySvc) CompleteZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID) error {
+	info, err := s.GetReplicationSwitchInfo(ctx, replID)
+	if err != nil {
+		return err
+	}
+	if !info.IsZeroDowntime() {
+		return fmt.Errorf("cannot complete zero downtime switch: switch is not zero downtime")
+	}
+	if info.LastStatus != StatusInProgress {
+		return fmt.Errorf("cannot complete zero downtime switch: switch is not in progress")
+	}
+	now := timeNow()
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, replID.SwitchKey(), "lastStatus", string(StatusDone))
+	pipe.HSet(ctx, replID.SwitchKey(), "doneAt", now)
+	// update downtime switch status history
+	history := fmt.Sprintf("%s | %s -> %s: complete zero downtime switch", now.Format(time.RFC3339), info.LastStatus, StatusDone)
+	pipe.LPush(ctx, replID.SwitchHistoryKey(), history)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("unable to update zero downtime switch status: %w", err)
 	}
 	return nil
 }

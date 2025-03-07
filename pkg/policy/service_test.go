@@ -73,16 +73,16 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 		err = svc.AddUserRoutingPolicy(ctx, "", "a")
 		r.ErrorIs(err, dom.ErrInvalidArg)
 
-		err = svc.addBucketRoutingPolicy(ctx, "", "", "")
+		err = svc.addBucketRoutingPolicy(ctx, "", "", "", false)
 		r.ErrorIs(err, dom.ErrInvalidArg)
 
-		err = svc.addBucketRoutingPolicy(ctx, "a", "a", "")
+		err = svc.addBucketRoutingPolicy(ctx, "a", "a", "", false)
 		r.ErrorIs(err, dom.ErrInvalidArg)
 
-		err = svc.addBucketRoutingPolicy(ctx, "a", "", "a")
+		err = svc.addBucketRoutingPolicy(ctx, "a", "", "a", false)
 		r.ErrorIs(err, dom.ErrInvalidArg)
 
-		err = svc.addBucketRoutingPolicy(ctx, "", "a", "a")
+		err = svc.addBucketRoutingPolicy(ctx, "", "a", "a", false)
 		r.ErrorIs(err, dom.ErrInvalidArg)
 	})
 
@@ -108,9 +108,9 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 			}
 		}
 
-		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s3)
+		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s3, false)
 		r.NoError(err)
-		err = svc.addBucketRoutingPolicy(ctx, u2, b2, s4)
+		err = svc.addBucketRoutingPolicy(ctx, u2, b2, s4, false)
 		r.NoError(err)
 
 		res, err = svc.GetUserRoutingPolicy(ctx, u1)
@@ -136,9 +136,9 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 		r.ErrorIs(err, dom.ErrAlreadyExists)
 		err = svc.AddUserRoutingPolicy(ctx, u2, s2)
 		r.ErrorIs(err, dom.ErrAlreadyExists)
-		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s3)
+		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s3, false)
 		r.ErrorIs(err, dom.ErrAlreadyExists)
-		err = svc.addBucketRoutingPolicy(ctx, u2, b2, s4)
+		err = svc.addBucketRoutingPolicy(ctx, u2, b2, s4, false)
 		r.ErrorIs(err, dom.ErrAlreadyExists)
 	})
 
@@ -146,9 +146,9 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
 
-		err := svc.addBucketRoutingPolicy(ctx, u1, b1, s3)
+		err := svc.addBucketRoutingPolicy(ctx, u1, b1, s3, false)
 		r.NoError(err)
-		err = svc.addBucketRoutingPolicy(ctx, u2, b2, s4)
+		err = svc.addBucketRoutingPolicy(ctx, u2, b2, s4, false)
 		r.NoError(err)
 
 		_, err = svc.GetUserRoutingPolicy(ctx, u1)
@@ -172,9 +172,9 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
 
-		err := svc.addBucketRoutingPolicy(ctx, u1, b1, s3)
+		err := svc.addBucketRoutingPolicy(ctx, u1, b1, s3, false)
 		r.NoError(err)
-		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s3)
+		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s3, false)
 		r.ErrorIs(err, dom.ErrAlreadyExists)
 
 		err = svc.AddUserRoutingPolicy(ctx, u1, s1)
@@ -804,7 +804,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		_, err = svc.GetReplicationPolicyInfo(ctx, u1, b1, s1, s2, nil)
 		r.ErrorIs(err, dom.ErrNotFound)
 
-		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s1)
+		err = svc.addBucketRoutingPolicy(ctx, u1, b1, s1, false)
 		r.NoError(err)
 		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, nil, tasks.Priority3, nil)
 		r.NoError(err)
