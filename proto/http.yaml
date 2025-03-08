@@ -60,6 +60,8 @@ http:
     - selector: chorus.Chorus.GetBucketSwitchStatus
       post: /replication/switch/status
       body: "*"
+    - selector: chorus.Chorus.ListReplicationSwitches
+      get: /replication/switch
     - selector: chorus.Chorus.AddBucketReplication
       post: /v2/replication/add
       body: "*"

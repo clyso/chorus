@@ -467,6 +467,27 @@
       }
     },
     "/replication/switch": {
+      "get": {
+        "summary": "returns list of all switches",
+        "operationId": "Chorus_ListReplicationSwitches",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListSwitchResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Chorus"
+        ]
+      },
       "post": {
         "summary": "Switch main\u003c-\u003efollower for selected replication with downtime.\nThis method Can also be used to update existing switch if it has not started yet.\nWorkflow: stops write requests to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.\n  - switch is successfully finished\n  - replication is to different bucket name. Will be supported later.",
         "operationId": "Chorus_SwitchBucket",
@@ -737,15 +758,6 @@
     }
   },
   "definitions": {
-    "ReplicationSwitchEnum": {
-      "type": "string",
-      "enum": [
-        "NotStarted",
-        "InProgress",
-        "Done"
-      ],
-      "default": "NotStarted"
-    },
     "StorageProvider": {
       "type": "string",
       "enum": [
@@ -1046,6 +1058,9 @@
             "type": "string"
           },
           "title": "History of switch status changes"
+        },
+        "replicationId": {
+          "$ref": "#/definitions/chorusReplicationRequest"
         }
       }
     },
@@ -1171,6 +1186,18 @@
         }
       }
     },
+    "chorusListSwitchResponse": {
+      "type": "object",
+      "properties": {
+        "switches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusGetBucketSwitchStatusResponse"
+          }
+        }
+      }
+    },
     "chorusListUserReplicationsResponse": {
       "type": "object",
       "properties": {
@@ -1257,15 +1284,16 @@
         "agentUrl": {
           "type": "string"
         },
-        "switchStatus": {
-          "$ref": "#/definitions/ReplicationSwitchEnum"
-        },
         "toBucket": {
           "type": "string"
         },
         "initDoneAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "hasSwitch": {
+          "type": "boolean",
+          "description": "true if given replication has associated replication switch with it."
         }
       }
     },

@@ -36,6 +36,7 @@ const (
 	Chorus_SwitchBucket_FullMethodName                     = "/chorus.Chorus/SwitchBucket"
 	Chorus_DeleteBucketSwitch_FullMethodName               = "/chorus.Chorus/DeleteBucketSwitch"
 	Chorus_GetBucketSwitchStatus_FullMethodName            = "/chorus.Chorus/GetBucketSwitchStatus"
+	Chorus_ListReplicationSwitches_FullMethodName          = "/chorus.Chorus/ListReplicationSwitches"
 	Chorus_CompareBucket_FullMethodName                    = "/chorus.Chorus/CompareBucket"
 	Chorus_GetAgents_FullMethodName                        = "/chorus.Chorus/GetAgents"
 	Chorus_AddBucketReplication_FullMethodName             = "/chorus.Chorus/AddBucketReplication"
@@ -104,6 +105,8 @@ type ChorusClient interface {
 	DeleteBucketSwitch(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Returns Switch status
 	GetBucketSwitchStatus(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*GetBucketSwitchStatusResponse, error)
+	// returns list of all switches
+	ListReplicationSwitches(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListSwitchResponse, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
 	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
@@ -293,6 +296,16 @@ func (c *chorusClient) GetBucketSwitchStatus(ctx context.Context, in *Replicatio
 	return out, nil
 }
 
+func (c *chorusClient) ListReplicationSwitches(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListSwitchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSwitchResponse)
+	err := c.cc.Invoke(ctx, Chorus_ListReplicationSwitches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chorusClient) CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CompareBucketResponse)
@@ -440,6 +453,8 @@ type ChorusServer interface {
 	DeleteBucketSwitch(context.Context, *ReplicationRequest) (*emptypb.Empty, error)
 	// Returns Switch status
 	GetBucketSwitchStatus(context.Context, *ReplicationRequest) (*GetBucketSwitchStatusResponse, error)
+	// returns list of all switches
+	ListReplicationSwitches(context.Context, *emptypb.Empty) (*ListSwitchResponse, error)
 	// Compares contents of given bucket in given storages
 	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)
 	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
@@ -506,6 +521,9 @@ func (UnimplementedChorusServer) DeleteBucketSwitch(context.Context, *Replicatio
 }
 func (UnimplementedChorusServer) GetBucketSwitchStatus(context.Context, *ReplicationRequest) (*GetBucketSwitchStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBucketSwitchStatus not implemented")
+}
+func (UnimplementedChorusServer) ListReplicationSwitches(context.Context, *emptypb.Empty) (*ListSwitchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListReplicationSwitches not implemented")
 }
 func (UnimplementedChorusServer) CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CompareBucket not implemented")
@@ -835,6 +853,24 @@ func _Chorus_GetBucketSwitchStatus_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Chorus_ListReplicationSwitches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).ListReplicationSwitches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_ListReplicationSwitches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).ListReplicationSwitches(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Chorus_CompareBucket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CompareBucketRequest)
 	if err := dec(in); err != nil {
@@ -1063,6 +1099,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBucketSwitchStatus",
 			Handler:    _Chorus_GetBucketSwitchStatus_Handler,
+		},
+		{
+			MethodName: "ListReplicationSwitches",
+			Handler:    _Chorus_ListReplicationSwitches_Handler,
 		},
 		{
 			MethodName: "CompareBucket",
