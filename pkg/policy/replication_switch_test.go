@@ -243,6 +243,28 @@ func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "update existing data with non-empty opts",
+			before: &SwitchDowntimeOpts{
+				StartOnInitDone:     true,
+				Cron:                stringPtr("0 0 * * *"),
+				StartAt:             timePtr(time.Now()),
+				MaxDuration:         (10 * time.Second),
+				MaxEventLag:         uint32Ptr(100),
+				SkipBucketCheck:     true,
+				ContinueReplication: true,
+			},
+			opts: &SwitchDowntimeOpts{
+				StartOnInitDone:     false,
+				Cron:                stringPtr("1 1 * * *"),
+				StartAt:             timePtr(time.Now().Add(1 * time.Hour)),
+				MaxDuration:         (18 * time.Second),
+				MaxEventLag:         uint32Ptr(123),
+				SkipBucketCheck:     false,
+				ContinueReplication: false,
+			},
+			wantErr: false,
+		},
+		{
 			name: "update existing data with empty opts",
 			before: &SwitchDowntimeOpts{
 				StartOnInitDone:     true,
@@ -367,7 +389,6 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 	}()
 
 	t.Run("create new", func(t *testing.T) {
-
 		t.Run("validate against replication policy", func(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
@@ -435,7 +456,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, immediateSwitch)
 			r.Error(err, "init replication not done")
 		})
-		t.Run("success", func(t *testing.T) {
+		t.Run("success crud", func(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
@@ -457,6 +478,8 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.Equal(replID.String(), gotID.String())
 			r.Equal(StatusNotStarted, got.LastStatus)
 			r.EqualValues(*validSwitch, got.SwitchDowntimeOpts)
+			_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
+			r.ErrorIs(err, dom.ErrNotFound, "no in progress zero downtime switch")
 			// check that routing policy was not changed
 			routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
 			r.NoError(err)
@@ -468,6 +491,20 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
 			_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
 			r.ErrorIs(err, dom.ErrNotFound, "no in progress switch zero downtime")
+
+			//delete switch
+			r.NoError(svc.DeleteReplicationSwitch(ctx, replID))
+			_, err = svc.GetReplicationSwitchInfo(ctx, replID)
+			r.ErrorIs(err, dom.ErrNotFound, "switch was deleted")
+			// check that routing policy was not changed
+			routeToStorage, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+			r.NoError(err)
+			r.Equal(replID.From, routeToStorage, "routing policy was not changed")
+			// check that replication policy was not changed
+			replications, err = svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+			r.NoError(err)
+			r.Len(replications.To, 1)
+			r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
 		})
 	})
 	t.Run("update existing", func(t *testing.T) {
@@ -551,11 +588,54 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.NoError(err)
 			r.True(got.IsZeroDowntime())
 		})
-		t.Run("err: cannot update if existing switch is in progress or done", func(t *testing.T) {
-			r := require.New(t)
-			// cleanup redis
-			r.NoError(c.FlushAll(ctx).Err())
-			t.Error("TODO: implement")
+		t.Run("update switch in status", func(t *testing.T) {
+			allStatuses := []SwitchWithDowntimeStatus{
+				StatusNotStarted,
+				StatusInProgress,
+				StatusCheckInProgress,
+				StatusDone,
+				StatusSkipped,
+				StatusError,
+			}
+			inHour := time.Now().Add(1 * time.Hour)
+			updated := &SwitchDowntimeOpts{
+				StartOnInitDone:     true,
+				Cron:                nil,
+				StartAt:             &inHour,
+				MaxDuration:         7 * time.Minute,
+				MaxEventLag:         uint32Ptr(200),
+				SkipBucketCheck:     false,
+				ContinueReplication: true,
+			}
+			for _, status := range allStatuses {
+				t.Run(string(status), func(t *testing.T) {
+					r := require.New(t)
+					r.NoError(c.FlushAll(ctx).Err())
+					setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+					if status == StatusInProgress || status == StatusCheckInProgress || status == StatusDone {
+						// update not allowed
+						err := svc.SetDowntimeReplicationSwitch(ctx, replID, updated)
+						r.Error(err)
+					} else {
+						// update allowed
+						err := svc.SetDowntimeReplicationSwitch(ctx, replID, updated)
+						r.NoError(err)
+
+						got, err := svc.GetReplicationSwitchInfo(ctx, replID)
+						r.NoError(err)
+						r.False(got.IsZeroDowntime())
+						r.Equal(status, got.LastStatus)
+						// compare StartAt time separately:
+						r.NotNil(got.StartAt, got) //fails skip and err
+						r.True(inHour.Equal(*got.StartAt))
+						r.True(updated.StartAt.Equal(*got.StartAt))
+						got.StartAt = nil
+						updCopy := *updated
+						updCopy.StartAt = nil
+						r.EqualValues(updCopy, got.SwitchDowntimeOpts)
+					}
+				})
+			}
 		})
 	})
 }
@@ -628,7 +708,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
 		r.Error(err, "cannot update existing switch")
 	})
-	t.Run("success", func(t *testing.T) {
+	t.Run("success crud", func(t *testing.T) {
 		r := require.New(t)
 		// cleanup redis
 		r.NoError(c.FlushAll(ctx).Err())
@@ -767,4 +847,366 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.NoError(err)
 		r.Equal(replID.To, routeToStorage, "routing policy was not changed back")
 	})
+}
+
+func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
+	db := miniredis.RunT(t)
+	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	ctx := context.TODO()
+
+	svc := NewService(c)
+	replID := ReplicationID{
+		User:   "u",
+		Bucket: "b",
+		From:   "f",
+		To:     "t",
+	}
+	validSwitch := &SwitchDowntimeOpts{
+		StartOnInitDone:     false,
+		Cron:                stringPtr("0 0 * * *"),
+		StartAt:             nil,
+		MaxDuration:         (3 * time.Hour),
+		MaxEventLag:         uint32Ptr(100),
+		SkipBucketCheck:     true,
+		ContinueReplication: true,
+	}
+	//setup time mock
+	testTime := time.Now()
+	timeNow = func() time.Time {
+		return testTime
+	}
+	defer func() {
+		timeNow = time.Now
+	}()
+	statuses := []SwitchWithDowntimeStatus{
+		StatusNotStarted,
+		StatusInProgress,
+		StatusCheckInProgress,
+		StatusDone,
+		StatusSkipped,
+		StatusError,
+	}
+	t.Run("to not_started", func(t *testing.T) {
+		// check all switch transition to not started
+		for _, status := range statuses {
+			t.Run("from "+string(status), func(t *testing.T) {
+				r := require.New(t)
+				// cleanup redis
+				r.NoError(c.FlushAll(ctx).Err())
+				// create switch in status
+				setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+				// transition to not started not allowed for any status
+				r.ErrorIs(svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusNotStarted, "test", nil, nil), dom.ErrInvalidArg, "transition not allowed")
+			})
+		}
+	})
+	t.Run("to in_progress", func(t *testing.T) {
+		for _, status := range statuses {
+			t.Run("from "+string(status), func(t *testing.T) {
+				r := require.New(t)
+				// cleanup redis
+				r.NoError(c.FlushAll(ctx).Err())
+				// create switch in status
+				setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+				now := timeNow()
+
+				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusInProgress, "test", &now, nil)
+				if status == StatusNotStarted || status == StatusSkipped || status == StatusError {
+					r.NoError(err, "transition is allowed")
+
+					// validate switch state
+					info, err := svc.GetReplicationSwitchInfo(ctx, replID)
+					r.NoError(err)
+					r.Equal(StatusInProgress, info.LastStatus)
+					r.NotNil(info.LastStartedAt)
+					r.Nil(info.DoneAt)
+					r.True(now.Equal(*info.LastStartedAt))
+					r.NotEmpty(info.History)
+					_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrNotFound, "no zero downtime switch in progress")
+					// check that routing is blocked
+					_, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrRoutingBlock, "routing is blocked")
+					// check that replication remains the same
+					replications, err := svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Len(replications.To, 1)
+					r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+
+				} else {
+					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
+				}
+			})
+		}
+	})
+	t.Run("to check_in_progress", func(t *testing.T) {
+		for _, status := range statuses {
+			t.Run("from "+string(status), func(t *testing.T) {
+				r := require.New(t)
+				// cleanup redis
+				r.NoError(c.FlushAll(ctx).Err())
+				// create switch in status
+				setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+
+				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusCheckInProgress, "test", nil, nil)
+				if status == StatusInProgress {
+					r.NoError(err, "transition is allowed")
+
+					// validate switch state
+					info, err := svc.GetReplicationSwitchInfo(ctx, replID)
+					r.NoError(err)
+					r.Equal(StatusCheckInProgress, info.LastStatus)
+					r.Nil(info.DoneAt)
+					r.NotNil(info.LastStartedAt)
+					r.NotEmpty(info.History)
+					_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrNotFound, "no zero downtime switch in progress")
+					// check that routing is blocked
+					_, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrRoutingBlock, "routing is blocked")
+					// check that replication remains the same
+					replications, err := svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Len(replications.To, 1)
+					r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+				} else {
+					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
+				}
+			})
+		}
+	})
+	t.Run("to done", func(t *testing.T) {
+		for _, status := range statuses {
+			t.Run("from "+string(status), func(t *testing.T) {
+				r := require.New(t)
+				// cleanup redis
+				r.NoError(c.FlushAll(ctx).Err())
+				// create switch in status
+				setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+				now := timeNow()
+
+				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusDone, "test", nil, &now)
+				if status == StatusCheckInProgress || status == StatusDone {
+					r.NoError(err, "transition is allowed")
+
+					// validate switch state
+					info, err := svc.GetReplicationSwitchInfo(ctx, replID)
+					r.NoError(err)
+					r.Equal(StatusDone, info.LastStatus)
+					r.NotNil(info.DoneAt)
+					r.NotNil(info.LastStartedAt)
+					r.NotEmpty(info.History)
+					_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrNotFound, "no zero downtime switch in progress")
+					// check that routing is switched
+					routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Equal(replID.To, routeToStorage, "routing is switched")
+				} else {
+					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
+				}
+			})
+		}
+	})
+	t.Run("to skipped", func(t *testing.T) {
+		for _, status := range statuses {
+			t.Run("from "+string(status), func(t *testing.T) {
+				r := require.New(t)
+				// cleanup redis
+				r.NoError(c.FlushAll(ctx).Err())
+				// create switch in status
+				setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+
+				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusSkipped, "test", nil, nil)
+				if status == StatusNotStarted || status == StatusSkipped || status == StatusError {
+					r.NoError(err, "transition is allowed")
+					// validate switch state
+					info, err := svc.GetReplicationSwitchInfo(ctx, replID)
+					r.NoError(err)
+					r.Equal(StatusSkipped, info.LastStatus)
+					r.Nil(info.DoneAt)
+					r.NotEmpty(info.History)
+					_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrNotFound, "no zero downtime switch in progress")
+					// check that routing to old bucket
+					routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Equal(replID.From, routeToStorage, "routing is to old bucket")
+					// check that replication remains the same
+					replications, err := svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Len(replications.To, 1)
+					r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+				} else {
+					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
+				}
+			})
+		}
+	})
+	t.Run("to error", func(t *testing.T) {
+		for _, status := range statuses {
+			t.Run("from "+string(status), func(t *testing.T) {
+				r := require.New(t)
+				// cleanup redis
+				r.NoError(c.FlushAll(ctx).Err())
+				// create switch in status
+				setupDiwntimeSwitchState(t, svc, replID, validSwitch, status)
+
+				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusError, "test", nil, nil)
+				// transition to error allowed from all except done
+				if status == StatusDone {
+					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
+				} else {
+					r.NoError(err, "transition is allowed")
+					// validate switch state
+					info, err := svc.GetReplicationSwitchInfo(ctx, replID)
+					r.NoError(err)
+					r.Equal(StatusError, info.LastStatus)
+					r.Nil(info.DoneAt)
+					r.NotEmpty(info.History)
+					_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, replID.User, replID.Bucket)
+					r.ErrorIs(err, dom.ErrNotFound, "no zero downtime switch in progress")
+					// check that routing to old bucket
+					routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Equal(replID.From, routeToStorage, "routing is to old bucket")
+					// check that replication remains the same
+					replications, err := svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+					r.NoError(err)
+					r.Len(replications.To, 1)
+					r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+				}
+			})
+		}
+	})
+
+}
+
+func setupDiwntimeSwitchState(t *testing.T, svc Service, replID ReplicationID, opts *SwitchDowntimeOpts, status SwitchWithDowntimeStatus) {
+	t.Helper()
+	ctx := context.TODO()
+	r := require.New(t)
+
+	// create routing and replication
+	r.NoError(svc.addBucketRoutingPolicy(ctx, replID.User, replID.Bucket, replID.From, true))
+	r.NoError(svc.AddBucketReplicationPolicy(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket, tasks.Priority2, nil))
+	// create switch
+	err := svc.SetDowntimeReplicationSwitch(ctx, replID, opts)
+	r.NoError(err)
+	// check that switch was created in NOT_STARTED status
+	got, err := svc.GetReplicationSwitchInfo(ctx, replID)
+	r.NoError(err)
+	r.False(got.IsZeroDowntime())
+	r.Equal(replID.String(), got.ReplicationIDStr)
+	r.Equal(StatusNotStarted, got.LastStatus)
+	r.Nil(got.LastStartedAt)
+	// check that routing policy was not changed
+	routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+	r.NoError(err)
+	r.Equal(replID.From, routeToStorage, "routing policy was not changed")
+	// check that replication policy was not changed
+	replications, err := svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	r.NoError(err)
+	r.Len(replications.To, 1)
+	r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+
+	if status == StatusNotStarted {
+		return
+	}
+	if status == StatusSkipped || status == StatusError {
+		r.NoError(svc.UpdateDowntimeSwitchStatus(ctx, replID, status, "test", nil, nil))
+		// check that switch was changed
+		got, err := svc.GetReplicationSwitchInfo(ctx, replID)
+		r.NoError(err)
+		r.False(got.IsZeroDowntime())
+		r.Equal(replID.String(), got.ReplicationIDStr)
+		r.Equal(status, got.LastStatus)
+		r.Nil(got.LastStartedAt)
+		// check that routing policy was not changed
+		routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+		r.NoError(err)
+		r.Equal(replID.From, routeToStorage, "routing policy was not changed")
+		// check that replication policy was not changed
+		replications, err := svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+		r.NoError(err)
+		r.Len(replications.To, 1)
+		r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+		return
+	}
+
+	// move to in progress
+	now := timeNow()
+	r.NoError(svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusInProgress, "test", &now, nil))
+	// check that switch was changed
+	got, err = svc.GetReplicationSwitchInfo(ctx, replID)
+	r.NoError(err)
+	r.False(got.IsZeroDowntime())
+	r.Equal(replID.String(), got.ReplicationIDStr)
+	r.Equal(StatusInProgress, got.LastStatus)
+	r.NotNil(got.LastStartedAt)
+	// check that routing was blocked
+	_, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+	r.ErrorIs(err, dom.ErrRoutingBlock)
+	// check that replication policy was not changed
+	replications, err = svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	r.NoError(err)
+	r.Len(replications.To, 1)
+	r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+	if status == StatusInProgress {
+		return
+	}
+	// move to check in progress
+	r.NoError(svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusCheckInProgress, "test", nil, nil))
+	// check that switch was changed
+	got, err = svc.GetReplicationSwitchInfo(ctx, replID)
+	r.NoError(err)
+	r.False(got.IsZeroDowntime())
+	r.Equal(replID.String(), got.ReplicationIDStr)
+	r.Equal(StatusCheckInProgress, got.LastStatus)
+	r.NotNil(got.LastStartedAt)
+	r.Nil(got.DoneAt)
+	// check that routing was blocked
+	_, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+	r.ErrorIs(err, dom.ErrRoutingBlock)
+	// check that replication policy was not changed
+	replications, err = svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	r.NoError(err)
+	r.Len(replications.To, 1)
+	r.Equal(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.To)])
+	if status == StatusCheckInProgress {
+		return
+	}
+	// move to done
+	r.NoError(svc.UpdateDowntimeSwitchStatus(ctx, replID, StatusDone, "test", nil, &now))
+	// check that switch was changed
+	got, err = svc.GetReplicationSwitchInfo(ctx, replID)
+	r.NoError(err)
+	r.False(got.IsZeroDowntime())
+	r.Equal(replID.String(), got.ReplicationIDStr)
+	r.Equal(StatusDone, got.LastStatus)
+	r.NotNil(got.LastStartedAt)
+	r.NotNil(got.DoneAt)
+	// check that routing switched
+	routeToStorage, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
+	r.NoError(err)
+	r.Equal(replID.To, routeToStorage, "routing policy was changed")
+	// check that replication policy was archived
+	repl, err := svc.GetReplicationPolicyInfo(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket)
+	r.NoError(err)
+	r.True(repl.IsArchived)
+	r.NotNil(repl.ArchivedAt)
+	replications, err = svc.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	if opts != nil && opts.ContinueReplication {
+		r.NoError(err)
+		r.Equal(replID.To, replications.From)
+
+		repl, err := svc.GetReplicationPolicyInfo(ctx, replID.User, replID.Bucket, replID.To, replID.From, replID.ToBucket)
+		r.NoError(err)
+		r.False(repl.IsArchived)
+		r.True(repl.InitDone())
+	} else {
+		r.ErrorIs(err, dom.ErrNotFound)
+	}
+	// we covered all status. return for status done
+	r.Equal(StatusDone, status)
 }

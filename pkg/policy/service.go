@@ -1110,12 +1110,10 @@ func (s *policySvc) DeleteReplication(ctx context.Context, user, bucket, fromSto
 	}
 	val := fmt.Sprintf("%s:%s", fromStor, dest)
 	statusKey := fmt.Sprintf("p:repl_st:%s:%s:%s:%s", user, bucket, fromStor, dest)
-	switchKey := fmt.Sprintf("p:switch:%s:%s", user, bucket)
 
 	_, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.ZRem(ctx, key, val)
 		pipe.Del(ctx, statusKey)
-		pipe.Del(ctx, switchKey)
 		if toBucket != nil {
 			pipe.SRem(ctx, routingBlockSetKey(toStor), *toBucket)
 		}
@@ -1153,7 +1151,7 @@ func archiveReplicationWithClient(ctx context.Context, client redis.Cmdable, rep
 	statusKey := replID.StatusKey()
 
 	client.ZRem(ctx, key, val)
-	luaHSetEx.Run(ctx, client, []string{statusKey}, "archived", true)
-	luaHSetEx.Run(ctx, client, []string{statusKey}, "archived_at", time.Now().UTC())
+	client.HSet(ctx, statusKey, "archived", true)
+	client.HSet(ctx, statusKey, "archived_at", time.Now())
 	return nil
 }
