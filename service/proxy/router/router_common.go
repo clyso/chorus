@@ -82,13 +82,15 @@ func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage st
 
 // adjustObjReadRoute adjust routing policy for read requests during switch process if old storage still has most recent obj version
 func (r *router) adjustObjReadRoute(ctx context.Context, prevStorage, user, bucket string) (string, error) {
-	switchInProgress, err := r.policySvc.IsReplicationSwitchInProgress(ctx, user, bucket)
+	_, err := r.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, user, bucket)
 	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			// no zero-downtime switch in progress
+			return prevStorage, nil
+		}
 		return "", err
 	}
-	if !switchInProgress {
-		return prevStorage, nil
-	}
+	// since switch is in progress, we need to check if the object version is higher in other storage
 	objMeta, err := r.getVersion(ctx)
 	if err != nil {
 		return "", err
