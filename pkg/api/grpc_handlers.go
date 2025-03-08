@@ -1002,5 +1002,9 @@ func (h *handlers) GetBucketSwitchStatus(ctx context.Context, req *pb.Replicatio
 	if err != nil {
 		return nil, err
 	}
-	return toPbSwitchStatus(res), nil
+	return toPbSwitchStatus(res)
+}
+
+func (h *handlers) ListReplicationSwitches(context.Context, *emptypb.Empty) (*pb.ListSwitchResponse, error) {
+	panic("unimplemented")
 }
