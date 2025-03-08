@@ -21,6 +21,7 @@ import (
 	"context"
 	"io"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -28,12 +29,14 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-func TestApi_switch_e2e(t *testing.T) {
+func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	const (
 		waitInterval  = 15 * time.Second
 		retryInterval = 100 * time.Millisecond
@@ -102,23 +105,6 @@ func TestApi_switch_e2e(t *testing.T) {
 		})
 	})
 
-	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f2",
-		Buckets:         []string{bucket},
-		IsForAllBuckets: false,
-	})
-	r.NoError(err)
-	t.Cleanup(func() {
-		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f2",
-		})
-	})
-
 	// wait until repl started
 	r.Eventually(func() bool {
 		repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -127,7 +113,7 @@ func TestApi_switch_e2e(t *testing.T) {
 		}
 		started := false
 		for _, repl := range repls.Replications {
-			if repl.To == "f1" || repl.To == "f2" {
+			if repl.To == "f1" {
 				started = started || (repl.InitObjListed > 0)
 			}
 		}
@@ -156,14 +142,12 @@ func TestApi_switch_e2e(t *testing.T) {
 	// check that storages are in sync
 	r.Eventually(func() bool {
 		f1e, _ := f1Client.BucketExists(tstCtx, bucket)
-		f2e, _ := f2Client.BucketExists(tstCtx, bucket)
-		return f1e && f2e
+		return f1e
 	}, waitInterval, retryInterval)
 
 	r.Eventually(func() bool {
 		obsf1, _ := listObjects(f1Client, bucket, "")
-		obsf2, _ := listObjects(f2Client, bucket, "")
-		return len(obsf1) == len(obsf2) && len(objects) == len(obsf2)
+		return len(objects) == len(obsf1)
 	}, waitInterval, retryInterval)
 
 	r.Eventually(func() bool {
@@ -177,38 +161,29 @@ func TestApi_switch_e2e(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		if !diff.IsMatch {
-			return false
-		}
-		diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Bucket:    bucket,
-			From:      "main",
-			To:        "f2",
-			ShowMatch: false,
-			User:      user,
-		})
-		if err != nil {
-			return false
-		}
 		return diff.IsMatch
-	}, waitInterval, retryInterval)
+	}, waitInterval, time.Second)
 
 	var repl *pb.Replication
 	repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
 	for i, rr := range repls.Replications {
 		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
 			repl = repls.Replications[i]
 			break
 		}
 	}
+	t.Log("repl len", len(repls.Replications))
+	t.Log("repl events", repl.Events, repl.EventsDone)
 	r.NotNil(repl)
-	r.EqualValues(pb.Replication_NotStarted, repl.SwitchStatus)
+	r.False(repl.HasSwitch)
+	r.True(repl.IsInitDone)
 
 	writeCtx, cancel := context.WithCancel(tstCtx)
 	defer cancel()
 	go func() {
 		defer cancel()
-		t.Log("start write")
+		t.Log("start write", time.Now())
 		for n := 0; n < 500; n++ {
 			select {
 			case <-writeCtx.Done():
@@ -224,7 +199,7 @@ func TestApi_switch_e2e(t *testing.T) {
 				objects[i].data = nil
 			case 1:
 				// upload
-				objects[i] = getTestObj(objects[i].name, objects[i].bucket)
+				objects[i] = getTestObj2(objects[i].name, objects[i].bucket, strconv.Itoa(n))
 				_, err := proxyClient.PutObject(writeCtx, objects[i].bucket, objects[i].name, bytes.NewReader(objects[i].data), int64(len(objects[i].data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
 				r.NoError(err)
 			case 2:
@@ -288,18 +263,56 @@ func TestApi_switch_e2e(t *testing.T) {
 				r.NoError(err)
 			}
 		}
-		t.Log("end write")
+		t.Log("end write", time.Now())
 	}()
 	time.Sleep(666 * time.Millisecond)
-	_, err = apiClient.SwitchMainBucket(tstCtx, &pb.SwitchMainBucketRequest{
-		User:    user,
-		Bucket:  bucket,
-		NewMain: "f1",
+	replID := &pb.ReplicationRequest{
+		User:   user,
+		Bucket: bucket,
+		From:   "main",
+		To:     "f1",
+	}
+	_, err = apiClient.SwitchBucketZeroDowntime(tstCtx, &pb.SwitchBucketZeroDowntimeRequest{
+		ReplicationId: replID,
+		MultipartTtl:  durationpb.New(time.Minute),
 	})
 	r.NoError(err)
-	t.Log("switch done")
+	t.Log("switch created", time.Now())
+
 	repl = nil
 	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	for i, rr := range repls.Replications {
+		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
+			repl = repls.Replications[i]
+			break
+		}
+	}
+	t.Log("repl -len", len(repls.Replications))
+	r.NotNil(repl)
+	r.True(repl.HasSwitch)
+
+	switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
+	r.NoError(err)
+	r.EqualValues(pb.GetBucketSwitchStatusResponse_InProgress, switchInfo.LastStatus)
+	r.Nil(switchInfo.DowntimeOpts)
+	r.NotNil(switchInfo.LastStartedAt)
+	r.EqualValues(time.Minute, switchInfo.MultipartTtl.AsDuration())
+	r.True(proto.Equal(replID, switchInfo.ReplicationId))
+	r.True(switchInfo.ZeroDowntime)
+	<-writeCtx.Done()
+
+	r.Eventually(func() bool {
+		switchInfo, err = apiClient.GetBucketSwitchStatus(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+	}, waitInterval, time.Second)
+
+	repl = nil
+	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
 	for i, rr := range repls.Replications {
 		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
 			repl = repls.Replications[i]
@@ -307,22 +320,10 @@ func TestApi_switch_e2e(t *testing.T) {
 		}
 	}
 	r.NotNil(repl)
-	r.EqualValues(pb.Replication_InProgress, repl.SwitchStatus)
-	<-writeCtx.Done()
-
-	r.Eventually(func() bool {
-		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Bucket:    bucket,
-			From:      "f1",
-			To:        "f2",
-			ShowMatch: true,
-			User:      user,
-		})
-		if err != nil {
-			return false
-		}
-		return diff.IsMatch
-	}, waitInterval, retryInterval)
+	r.True(repl.HasSwitch)
+	r.True(repl.IsInitDone)
+	r.EqualValues(repl.Events, repl.EventsDone)
+	t.Log("switch done", repl.Events, repl.EventsDone)
 
 	//r.Eventually(func() bool {
 	//	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -361,13 +362,26 @@ func TestApi_switch_e2e(t *testing.T) {
 		r.NoError(err, object.name)
 		objBytes, err := io.ReadAll(objData)
 		r.NoError(err, object.name)
-		r.True(bytes.Equal(object.data, objBytes), object.name)
+		// r.True(bytes.Equal(object.data, objBytes), object.name)
+		r.EqualValues(string(object.data), string(objBytes), object.name)
 		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
 		r.NoError(err, object.name)
 		objBytes, err = io.ReadAll(objData)
 		r.NoError(err, object.name)
-		r.True(bytes.Equal(object.data, objBytes), object.name)
+		r.EqualValues(string(object.data), string(objBytes), object.name)
+		// r.True(bytes.Equal(object.data, objBytes), object.name)
 	}
+
+	switchInfo, err = apiClient.GetBucketSwitchStatus(tstCtx, replID)
+	r.NoError(err)
+	r.EqualValues(pb.GetBucketSwitchStatusResponse_Done, switchInfo.LastStatus)
+	r.Nil(switchInfo.DowntimeOpts)
+	r.NotNil(switchInfo.LastStartedAt)
+	r.NotNil(switchInfo.DoneAt)
+	r.EqualValues(time.Minute, switchInfo.MultipartTtl.AsDuration())
+	r.True(proto.Equal(replID, switchInfo.ReplicationId))
+	r.True(switchInfo.ZeroDowntime)
+	r.NotEmpty(switchInfo.History)
 }
 
 func TestApi_switch_multipart(t *testing.T) {
@@ -433,23 +447,6 @@ func TestApi_switch_multipart(t *testing.T) {
 		})
 	})
 
-	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f2",
-		Buckets:         []string{bucket},
-		IsForAllBuckets: false,
-	})
-	r.NoError(err)
-	t.Cleanup(func() {
-		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f2",
-		})
-	})
-
 	// wait until repl started
 	r.Eventually(func() bool {
 		repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -458,7 +455,7 @@ func TestApi_switch_multipart(t *testing.T) {
 		}
 		started := false
 		for _, repl := range repls.Replications {
-			if repl.To == "f1" || repl.To == "f2" {
+			if repl.To == "f1" {
 				started = started || (repl.InitObjListed > 0)
 			}
 		}
@@ -479,8 +476,7 @@ func TestApi_switch_multipart(t *testing.T) {
 	// check that storages are in sync
 	r.Eventually(func() bool {
 		f1e, _ := f1Client.BucketExists(tstCtx, bucket)
-		f2e, _ := f2Client.BucketExists(tstCtx, bucket)
-		return f1e && f2e
+		return f1e
 	}, waitInterval, retryInterval)
 
 	f1Stream, err := apiClient.StreamBucketReplication(tstCtx, &pb.ReplicationRequest{
@@ -498,40 +494,12 @@ func TestApi_switch_multipart(t *testing.T) {
 		}
 		return m.IsInitDone
 	}, waitInterval, retryInterval)
-	f2Stream, err := apiClient.StreamBucketReplication(tstCtx, &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f2",
-	})
-	r.NoError(err)
-	defer f2Stream.CloseSend()
-	r.Eventually(func() bool {
-		m, err := f2Stream.Recv()
-		if err != nil {
-			return false
-		}
-		return m.IsInitDone
-	}, waitInterval, retryInterval)
 
 	r.Eventually(func() bool {
 		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucket,
 			From:      "main",
 			To:        "f1",
-			ShowMatch: false,
-			User:      user,
-		})
-		if err != nil {
-			return false
-		}
-		if !diff.IsMatch {
-			return false
-		}
-		diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Bucket:    bucket,
-			From:      "main",
-			To:        "f2",
 			ShowMatch: false,
 			User:      user,
 		})
@@ -562,17 +530,22 @@ func TestApi_switch_multipart(t *testing.T) {
 	if pn < 3 {
 		panic("increase multipart obj size or decrease part size")
 	}
+	replID := &pb.ReplicationRequest{
+		User:   user,
+		Bucket: bucket,
+		From:   "main",
+		To:     "f1",
+	}
 
 	parts := make([]*aws_s3.CompletedPart, pn)
 	for n := len(partBuf); n >= len(partBuf); {
 		if (partID - 1) == pn/2 {
-			_, err = apiClient.SwitchMainBucket(tstCtx, &pb.SwitchMainBucketRequest{
-				User:    user,
-				Bucket:  bucket,
-				NewMain: "f1",
+			_, err = apiClient.SwitchBucketZeroDowntime(tstCtx, &pb.SwitchBucketZeroDowntimeRequest{
+				ReplicationId: replID,
+				MultipartTtl:  durationpb.New(time.Minute),
 			})
 			r.NoError(err)
-			t.Log("switch done", partID)
+			t.Log("switch started", partID)
 		}
 
 		n, _ = objReader.Read(partBuf)
@@ -608,8 +581,8 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.Eventually(func() bool {
 		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucket,
-			From:      "f1",
-			To:        "f2",
+			From:      "main",
+			To:        "f1",
 			ShowMatch: true,
 			User:      user,
 		})

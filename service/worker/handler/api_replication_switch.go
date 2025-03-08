@@ -68,10 +68,13 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 			// replication is paused - retry later
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 		}
+		if !replStatus.IsArchived {
+			zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
+		}
 		switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, policyID)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
-				zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: switch metadata was deleted")
+				zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
 				return nil
 			}
 			return err
