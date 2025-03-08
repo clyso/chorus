@@ -431,20 +431,34 @@ func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, use
 // and performs corresponding idempotent operations with replication and routing policies
 func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt *time.Time, doneAt *time.Time) error {
 	// validate input
-	if newStatus == "" {
-		return fmt.Errorf("status cannot be empty: %w", dom.ErrInvalidArg)
-	}
-	if newStatus == StatusNotStarted {
-		return fmt.Errorf("new status cannot be not_started: %w", dom.ErrInvalidArg)
+	if newStatus == "" || newStatus == StatusNotStarted {
+		return fmt.Errorf("status cannot be %s: %w", newStatus, dom.ErrInvalidArg)
 	}
 	if startedAt != nil && doneAt != nil {
 		return fmt.Errorf("cannot set both startedAt and doneAt: %w", dom.ErrInvalidArg)
 	}
-	if newStatus == StatusDone && doneAt == nil {
-		return fmt.Errorf("doneAt is required for status done: %w", dom.ErrInvalidArg)
-	}
-	if newStatus == StatusInProgress && startedAt == nil {
-		return fmt.Errorf("startedAt is required for status in progress: %w", dom.ErrInvalidArg)
+	switch newStatus {
+	case StatusError, StatusSkipped, StatusCheckInProgress:
+		if startedAt != nil {
+			return fmt.Errorf("cannot set startedAt for status %s: %w", newStatus, dom.ErrInvalidArg)
+		}
+		if doneAt != nil {
+			return fmt.Errorf("cannot set doneAt for status %s: %w", newStatus, dom.ErrInvalidArg)
+		}
+	case StatusInProgress:
+		if startedAt == nil {
+			return fmt.Errorf("startedAt is required for status in progress: %w", dom.ErrInvalidArg)
+		}
+		if doneAt != nil {
+			return fmt.Errorf("cannot set doneAt for status in progress: %w", dom.ErrInvalidArg)
+		}
+	case StatusDone:
+		if doneAt == nil {
+			return fmt.Errorf("doneAt is required for status done: %w", dom.ErrInvalidArg)
+		}
+		if startedAt != nil {
+			return fmt.Errorf("cannot set startedAt for status done: %w", dom.ErrInvalidArg)
+		}
 	}
 	// validate status transition
 	existing, err := s.GetReplicationSwitchInfo(ctx, replID)
@@ -507,20 +521,22 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 			now := timeNow()
 			statusKey := replBackID.StatusKey()
 			res := ReplicationPolicyStatus{
-				CreatedAt:      time.Now().UTC(),
+				CreatedAt:      time.Now(),
 				ListingStarted: true,
-				InitDoneAt:     &now,
+				//InitDoneAt:     &now,
 			}
 			pipe.HSet(ctx, statusKey, res)
+			// set time separately because of go-redis bug with *time.Time
+			pipe.HSet(ctx, statusKey, "init_done_at", now)
 		}
 	}
 	// update switch status:
 	pipe.HSet(ctx, replID.SwitchKey(), "lastStatus", string(newStatus))
 	if startedAt != nil {
-		pipe.HSet(ctx, replID.SwitchKey(), "startedAt", startedAt)
+		pipe.HSet(ctx, replID.SwitchKey(), "startedAt", *startedAt)
 	}
 	if doneAt != nil {
-		pipe.HSet(ctx, replID.SwitchKey(), "doneAt", doneAt)
+		pipe.HSet(ctx, replID.SwitchKey(), "doneAt", *doneAt)
 	}
 	// update downtime switch status history
 	history := fmt.Sprintf("%s | %s -> %s: %s", timeNow().Format(time.RFC3339), existing.LastStatus, newStatus, description)
