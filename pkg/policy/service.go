@@ -233,7 +233,7 @@ type Service interface {
 	SetDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchDowntimeOpts) error
 	// Change downtime replication switch status. Makes required adjustments to routing and replication policies.
 	// According to switch status and configured options.
-	UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt, doneAt *time.Time) error
+	UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchStatus, description string, startedAt, doneAt *time.Time) error
 	// Creates new zero downtime replication switch.
 	AddZeroDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchZeroDowntimeOpts) error
 	// Completes zero downtime replication switch.

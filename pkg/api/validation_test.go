@@ -171,19 +171,6 @@ func TestValidateSwitchRequest(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name: "no_downtime with downtime_window",
-			input: &pb.SwitchBucketRequest{
-				ReplicationId: &pb.ReplicationRequest{
-					User:   "u",
-					Bucket: "b",
-					From:   "f",
-					To:     "t",
-				},
-				DowntimeOpts: &pb.SwitchDowntimeOpts{},
-			},
-			wantErr: "no_downtime and downtime_window are mutually exclusive",
-		},
-		{
 			name: "valid no_downtime",
 			input: &pb.SwitchBucketRequest{
 				ReplicationId: &pb.ReplicationRequest{

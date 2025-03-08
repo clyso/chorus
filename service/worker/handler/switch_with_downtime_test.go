@@ -25,7 +25,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		ToBucket: stringPtr("toBucket"),
 	}
 
-	for _, status := range []policy.SwitchWithDowntimeStatus{policy.StatusNotStarted, policy.StatusError, policy.StatusSkipped, ""} {
+	for _, status := range []policy.SwitchStatus{policy.StatusNotStarted, policy.StatusError, policy.StatusSkipped, ""} {
 		t.Run("from "+string(status)+" to in_progress", func(t *testing.T) {
 			r := require.New(t)
 
@@ -228,7 +228,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 				// max duration is 59 minutes
-				MaxDuration: durationPtr(time.Minute * 59),
+				MaxDuration: (time.Minute * 59),
 			},
 			CreatedAt: hourAgo,
 			// started 1 hour ago
@@ -321,7 +321,7 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 			SwitchDowntimeOpts: policy.SwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
 				// max duration is 59 minutes
-				MaxDuration: durationPtr(time.Minute * 59),
+				MaxDuration: (time.Minute * 59),
 			},
 			CreatedAt: hourAgo,
 			// started 1 hour ago
@@ -437,8 +437,4 @@ func stringPtr(s string) *string {
 
 func uint32Ptr(i uint32) *uint32 {
 	return &i
-}
-
-func durationPtr(d time.Duration) *time.Duration {
-	return &d
 }
