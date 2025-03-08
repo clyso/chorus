@@ -92,7 +92,7 @@ type switchResult struct {
 }
 
 type state struct {
-	status    policy.SwitchWithDowntimeStatus
+	status    policy.SwitchStatus
 	message   string
 	startedAt *time.Time
 	doneAt    *time.Time

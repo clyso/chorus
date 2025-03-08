@@ -224,35 +224,40 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 }
 
 func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[policy.ReplicationPolicyDest]tasks.Priority, error) {
-	policy, err := s.getReplicationPolicy(ctx, task)
+	replPolicy, err := s.getReplicationPolicy(ctx, task)
 	if err != nil {
 		return nil, err
 	}
-	if policy.From == task.GetFrom() {
-		return policy.To, nil
+	if replPolicy.From == task.GetFrom() {
+		return replPolicy.To, nil
 	}
 	// Policy source storage is different from task source storage.
 	// This only possible if switch is in progress, and we got CompleteMultipartUpload request.
 	if _, ok := task.(*tasks.ObjectSyncPayload); !ok || (xctx.GetMethod(ctx) != s3.UndefinedMethod && xctx.GetMethod(ctx) != s3.CompleteMultipartUpload) {
-		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", policy.From, task.GetFrom())
+		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", replPolicy.From, task.GetFrom())
 	}
 
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	replSwitch, err := s.policySvc.GetReplicationSwitch(ctx, user, bucket)
-	if err != nil {
-		return nil, fmt.Errorf("%w: no replication switch for replication task with invalid from storage", err)
-	}
-	if replSwitch.OldMain != task.GetFrom() {
-		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, replSwitch.OldMain, task.GetFrom())
-	}
 
-	return replSwitch.GetOldFollowers(), nil
+	// construct previous replication destination based on switch info:
+	replSwitch, err := s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, user, bucket)
+	if err != nil {
+		return nil, fmt.Errorf("%w: no in-progress zero-downtime switch for replication task with invalid from storage", err)
+	}
+	switchReplicationID, err := replSwitch.ReplicationID()
+	if err != nil {
+		return nil, fmt.Errorf("%w: unable to get replication ID from switch: %w", dom.ErrInternal, err)
+	}
+	if switchReplicationID.From != task.GetFrom() {
+		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, switchReplicationID.From, task.GetFrom())
+	}
+	return map[policy.ReplicationPolicyDest]tasks.Priority{
+		policy.ReplicationPolicyDest(switchReplicationID.To): tasks.Priority(replSwitch.ReplicationPriority),
+	}, nil
 }
 
 func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (policy.ReplicationPolicies, error) {
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	// TODO: handle refactored zero-downtime switch
-	// either filter poliys with active switch here or inside GetBucketReplicationPolicies
 	bucketPolicy, err := s.policySvc.GetBucketReplicationPolicies(ctx, user, bucket)
 	if err == nil {
 		return bucketPolicy, nil

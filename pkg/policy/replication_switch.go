@@ -62,26 +62,40 @@ func (w *SwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 	return 0, false
 }
 
-// Reduced replication switch info for in progress zero downtime switch
+// Reduced replication switch info for in progress zero downtime switch.
+// Subset of SwitchInfo fields.
+// Used by proxy to route requests to correct bucket during zero downtime switch.
 type ZeroDowntimeSwitchInProgressInfo struct {
-	ReplicationIDStr string                   `redis:"replicationID"`
-	Status           SwitchWithDowntimeStatus `redis:"lastStatus"`
-	MultipartTTL     time.Duration            `redis:"multipartTTL"`
+	ReplicationIDStr    string        `redis:"replicationID"`
+	Status              SwitchStatus  `redis:"lastStatus"`
+	MultipartTTL        time.Duration `redis:"multipartTTL"`
+	ReplicationPriority uint8         `redis:"replPriority,omitempty"`
 }
 
 func (s *ZeroDowntimeSwitchInProgressInfo) ReplicationID() (ReplicationID, error) {
 	return ReplicationIDFromStr(s.ReplicationIDStr)
 }
 
+// Contains all information about replication switch including its configuration and current status.
 type SwitchInfo struct {
+	// Options for downtime switch
 	SwitchDowntimeOpts
+	// Options for zero downtime switch
 	SwitchZeroDowntimeOpts
-	ReplicationIDStr string                   `redis:"replicationID"`
-	CreatedAt        time.Time                `redis:"createdAt"`
-	LastStatus       SwitchWithDowntimeStatus `redis:"lastStatus,omitempty"`
-	LastStartedAt    *time.Time               `redis:"startedAt,omitempty"`
-	DoneAt           *time.Time               `redis:"doneAt,omitempty"`
-	History          []string                 `redis:"-"`
+	// Task priority of replication policy of this switch
+	ReplicationPriority uint8 `redis:"replPriority,omitempty"`
+	// ID of replication policy of this switch
+	ReplicationIDStr string `redis:"replicationID"`
+	// Time of switch creation
+	CreatedAt time.Time `redis:"createdAt"`
+	// Last status of switch
+	LastStatus SwitchStatus `redis:"lastStatus,omitempty"`
+	// Time of last switch was in progress
+	LastStartedAt *time.Time `redis:"startedAt,omitempty"`
+	// Time of last switch was done
+	DoneAt *time.Time `redis:"doneAt,omitempty"`
+	// History of switch status changes
+	History []string `redis:"-"`
 }
 
 func (s *SwitchInfo) ReplicationID() (ReplicationID, error) {
@@ -135,31 +149,35 @@ func (s *SwitchInfo) IsTimeToStart() (bool, error) {
 	return nextTick.Compare(timeNow()) <= 0, nil
 }
 
-type SwitchWithDowntimeStatus string
-
-func (s *SwitchWithDowntimeStatus) UnmarshalBinary(data []byte) error {
-	*s = SwitchWithDowntimeStatus(data)
-	return nil
-}
-
-func (s SwitchWithDowntimeStatus) MarshalBinary() (data []byte, err error) {
-	return []byte(s), nil
-}
+type SwitchStatus string
 
 const (
 	// StatusNotStarted means that switch donwntime is not started yet
-	StatusNotStarted SwitchWithDowntimeStatus = "not_started"
+	// Relevant only for downtime switches
+	StatusNotStarted SwitchStatus = "not_started"
 	// StatusInProgress means that downtime is started, bucket is blocked until task queue is drained or timeout
-	StatusInProgress SwitchWithDowntimeStatus = "in_progress"
+	StatusInProgress SwitchStatus = "in_progress"
 	// StatusCheckInProgress means that task queue is drained and bucket is blocked until src and dst bucket contents will be checked
-	StatusCheckInProgress SwitchWithDowntimeStatus = "check_in_progress"
+	// Relevant only for downtime switches
+	StatusCheckInProgress SwitchStatus = "check_in_progress"
 	// StatusDone means that switch is successfully finished and data is routed to new bucket.
-	StatusDone SwitchWithDowntimeStatus = "done"
+	StatusDone SwitchStatus = "done"
 	// StatusError means that switch was aborted due to error
-	StatusError SwitchWithDowntimeStatus = "error"
+	// Relevant only for downtime switches
+	StatusError SwitchStatus = "error"
 	// StatusSkipped means that switch attempt was skipped because conditions were not met
-	StatusSkipped SwitchWithDowntimeStatus = "skipped"
+	// Relevant only for downtime switches
+	StatusSkipped SwitchStatus = "skipped"
 )
+
+func (s *SwitchStatus) UnmarshalBinary(data []byte) error {
+	*s = SwitchStatus(data)
+	return nil
+}
+
+func (s SwitchStatus) MarshalBinary() (data []byte, err error) {
+	return []byte(s), nil
+}
 
 func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID ReplicationID, opts *SwitchDowntimeOpts) error {
 	// check if switch already exists
@@ -205,10 +223,20 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 	if len(policies.To) != 1 {
 		return fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
 	}
+	var dest ReplicationPolicyDest
+	var prio tasks.Priority
+	for d, p := range policies.To {
+		dest = d
+		prio = p
+	}
+	if string(dest) != replID.To {
+		return fmt.Errorf("cannot create downtime switch: given replication is not routed to destination")
+	}
 	info := &SwitchInfo{
-		CreatedAt:        timeNow(),
-		ReplicationIDStr: replID.String(),
-		LastStatus:       StatusNotStarted,
+		CreatedAt:           timeNow(),
+		ReplicationIDStr:    replID.String(),
+		LastStatus:          StatusNotStarted,
+		ReplicationPriority: uint8(prio),
 	}
 	if opts != nil {
 		info.SwitchDowntimeOpts = *opts
@@ -301,6 +329,15 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	if len(policies.To) != 1 {
 		return fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
 	}
+	var dest ReplicationPolicyDest
+	var prio tasks.Priority
+	for d, p := range policies.To {
+		dest = d
+		prio = p
+	}
+	if string(dest) != replID.To {
+		return fmt.Errorf("cannot create zero-downtime switch: given replication is not routed to destination")
+	}
 
 	// validate routing policy
 	toStorage, err := s.getRoutingPolicy(ctx, replID.User, replID.Bucket)
@@ -317,9 +354,10 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	pipe.Set(ctx, replID.RoutingKey(), replID.To, 0)
 	// create switch metadata
 	pipe.HSet(ctx, replID.SwitchKey(), SwitchInfo{
-		ReplicationIDStr: replID.String(),
-		CreatedAt:        now,
-		LastStatus:       StatusInProgress,
+		ReplicationIDStr:    replID.String(),
+		CreatedAt:           now,
+		LastStatus:          StatusInProgress,
+		ReplicationPriority: uint8(prio),
 		// LastStartedAt:    &now,
 	})
 	// set time separately because of go-redis bug with *time.Time
@@ -406,7 +444,7 @@ func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID Replica
 func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user string, bucket string) (ZeroDowntimeSwitchInProgressInfo, error) {
 	info := ZeroDowntimeSwitchInProgressInfo{}
 	key := ReplicationID{User: user, Bucket: bucket}.SwitchKey()
-	err := s.client.HMGet(ctx, key, "multipartTTL", "lastStatus", "replicationID").Scan(&info)
+	err := s.client.HMGet(ctx, key, "multipartTTL", "lastStatus", "replicationID", "replPriority").Scan(&info)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return info, dom.ErrNotFound
@@ -429,7 +467,7 @@ func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, use
 
 // UpdateDowntimeSwitchStatus handles downtime switch status transitions
 // and performs corresponding idempotent operations with replication and routing policies
-func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchWithDowntimeStatus, description string, startedAt *time.Time, doneAt *time.Time) error {
+func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID ReplicationID, newStatus SwitchStatus, description string, startedAt *time.Time, doneAt *time.Time) error {
 	// validate input
 	if newStatus == "" || newStatus == StatusNotStarted {
 		return fmt.Errorf("status cannot be %s: %w", newStatus, dom.ErrInvalidArg)
@@ -514,7 +552,7 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 			// create backwards replication policy
 			key := fmt.Sprintf("p:repl:%s:%s", replID.User, replID.Bucket)
 			val := fmt.Sprintf("%s:%s", replID.To, replID.From)
-			pipe.ZAddNX(ctx, key, redis.Z{Member: val, Score: float64(tasks.PriorityDefault1)})
+			pipe.ZAddNX(ctx, key, redis.Z{Member: val, Score: float64(existing.ReplicationPriority)})
 			replBackID := replID
 			replBackID.From, replBackID.To = replID.To, replID.From
 

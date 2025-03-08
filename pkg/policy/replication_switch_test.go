@@ -28,7 +28,7 @@ func uint32Ptr(u uint32) *uint32 {
 func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 	type fields struct {
 		Window        SwitchDowntimeOpts
-		LastStatus    SwitchWithDowntimeStatus
+		LastStatus    SwitchStatus
 		CreatedAt     time.Time
 		LastStartedAt *time.Time
 	}
@@ -589,7 +589,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.True(got.IsZeroDowntime())
 		})
 		t.Run("update switch in status", func(t *testing.T) {
-			allStatuses := []SwitchWithDowntimeStatus{
+			allStatuses := []SwitchStatus{
 				StatusNotStarted,
 				StatusInProgress,
 				StatusCheckInProgress,
@@ -732,6 +732,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.EqualValues(validSwitch.MultipartTTL, info.MultipartTTL)
 		r.EqualValues(replID.String(), info.ReplicationIDStr)
 		r.EqualValues(StatusInProgress, info.Status)
+		r.EqualValues(tasks.Priority2, info.ReplicationPriority)
 
 		got, err := svc.GetReplicationSwitchInfo(ctx, replID)
 		r.NoError(err, "switch was created")
@@ -746,6 +747,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.True(got.IsZeroDowntime())
 		r.NotNil(got.LastStartedAt)
 		r.True(testTime.Equal(*got.LastStartedAt))
+		r.EqualValues(tasks.Priority2, got.ReplicationPriority)
 
 		// check that routing policy was changed
 		routeToStorage, err := svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
@@ -878,7 +880,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 	defer func() {
 		timeNow = time.Now
 	}()
-	statuses := []SwitchWithDowntimeStatus{
+	statuses := []SwitchStatus{
 		StatusNotStarted,
 		StatusInProgress,
 		StatusCheckInProgress,
@@ -1082,7 +1084,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 
 }
 
-func setupDiwntimeSwitchState(t *testing.T, svc Service, replID ReplicationID, opts *SwitchDowntimeOpts, status SwitchWithDowntimeStatus) {
+func setupDiwntimeSwitchState(t *testing.T, svc Service, replID ReplicationID, opts *SwitchDowntimeOpts, status SwitchStatus) {
 	t.Helper()
 	ctx := context.TODO()
 	r := require.New(t)
@@ -1165,6 +1167,7 @@ func setupDiwntimeSwitchState(t *testing.T, svc Service, replID ReplicationID, o
 	r.Equal(StatusCheckInProgress, got.LastStatus)
 	r.NotNil(got.LastStartedAt)
 	r.Nil(got.DoneAt)
+	r.EqualValues(tasks.Priority2, got.ReplicationPriority)
 	// check that routing was blocked
 	_, err = svc.GetRoutingPolicy(ctx, replID.User, replID.Bucket)
 	r.ErrorIs(err, dom.ErrRoutingBlock)
@@ -1199,6 +1202,7 @@ func setupDiwntimeSwitchState(t *testing.T, svc Service, replID ReplicationID, o
 	if opts != nil && opts.ContinueReplication {
 		r.NoError(err)
 		r.Equal(replID.To, replications.From)
+		r.EqualValues(tasks.Priority2, replications.To[ReplicationPolicyDest(replID.From)])
 
 		repl, err := svc.GetReplicationPolicyInfo(ctx, replID.User, replID.Bucket, replID.To, replID.From, replID.ToBucket)
 		r.NoError(err)

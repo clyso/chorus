@@ -131,7 +131,7 @@ func toPbSwitchStatus(in policy.SwitchInfo) (*pb.GetBucketSwitchStatusResponse, 
 	return res, nil
 }
 
-func toPbSwitchWithDowntimeStatus(in policy.SwitchWithDowntimeStatus) pb.GetBucketSwitchStatusResponse_Status {
+func toPbSwitchWithDowntimeStatus(in policy.SwitchStatus) pb.GetBucketSwitchStatusResponse_Status {
 	switch in {
 	case policy.StatusInProgress:
 		return pb.GetBucketSwitchStatusResponse_InProgress
