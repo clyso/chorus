@@ -53,7 +53,7 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		LastEmittedAt:   tsToPb(in.LastEmittedAt),
 		LastProcessedAt: tsToPb(in.LastProcessedAt),
 		AgentUrl:        strPtr(in.AgentURL),
-		SwitchStatus:    switchStatusToPb(in.SwitchStatus),
+		HasSwitch:       in.HasSwitch,
 	}
 }
 
@@ -97,28 +97,38 @@ func pbToTs(in *timestamppb.Timestamp) *time.Time {
 	return &ts
 }
 
-func pbToDuration(in *durationpb.Duration) *time.Duration {
+func pbToDuration(in *durationpb.Duration) time.Duration {
 	if in == nil {
-		return nil
+		return 0
 	}
-	d := in.AsDuration()
-	return &d
+	return in.AsDuration()
 }
 
-func toPbSwitchStatus(in policy.SwitchInfo) *pb.GetBucketSwitchStatusResponse {
+func toPbSwitchStatus(in policy.SwitchInfo) (*pb.GetBucketSwitchStatusResponse, error) {
+	id, err := in.ReplicationID()
+	if err != nil {
+		return nil, err
+	}
 	res := &pb.GetBucketSwitchStatusResponse{
 		LastStatus:    toPbSwitchWithDowntimeStatus(in.LastStatus),
 		ZeroDowntime:  in.IsZeroDowntime(),
 		LastStartedAt: tsToPb(in.LastStartedAt),
 		DoneAt:        tsToPb(in.DoneAt),
 		History:       in.History,
+		ReplicationId: &pb.ReplicationRequest{
+			User:     id.User,
+			Bucket:   id.Bucket,
+			From:     id.From,
+			To:       id.To,
+			ToBucket: id.ToBucket,
+		},
 	}
 	if in.IsZeroDowntime() {
-		res.MultipartTtl = durationToPb(&in.MultipartTTL)
+		res.MultipartTtl = durationToPb(in.MultipartTTL)
 	} else {
 		res.DowntimeOpts = toPbDowntimeOpts(in.SwitchDowntimeOpts)
 	}
-	return res
+	return res, nil
 }
 
 func toPbSwitchWithDowntimeStatus(in policy.SwitchWithDowntimeStatus) pb.GetBucketSwitchStatusResponse_Status {
@@ -138,11 +148,11 @@ func toPbSwitchWithDowntimeStatus(in policy.SwitchWithDowntimeStatus) pb.GetBuck
 	}
 }
 
-func durationToPb(in *time.Duration) *durationpb.Duration {
-	if in == nil {
+func durationToPb(in time.Duration) *durationpb.Duration {
+	if in == 0 {
 		return nil
 	}
-	return durationpb.New(*in)
+	return durationpb.New(in)
 }
 
 func toPbDowntimeOpts(in policy.SwitchDowntimeOpts) *pb.SwitchDowntimeOpts {

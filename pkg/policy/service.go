@@ -88,7 +88,7 @@ type ReplicationPolicyStatus struct {
 
 	ListingStarted bool `redis:"listing_started"`
 
-	SwitchStatus SwitchWithDowntimeStatus `redis:"-"`
+	HasSwitch bool `redis:"-"`
 }
 
 func (r *ReplicationPolicyStatus) InitDone() bool {
@@ -536,12 +536,11 @@ func (s *policySvc) GetReplicationPolicyInfo(ctx context.Context, user, bucket, 
 		if !errors.Is(switchStatus.Err(), redis.Nil) {
 			return ReplicationPolicyStatus{}, err
 		}
-		res.SwitchStatus = ""
 	} else {
 		// switch exists
 		status := switchStatus.String()
 		if status != "" {
-			res.SwitchStatus = SwitchWithDowntimeStatus(status)
+			res.HasSwitch = true
 		}
 	}
 
