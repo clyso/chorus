@@ -35,14 +35,6 @@ type testObj struct {
 
 const tstObjSize = 4096
 
-func getTestObj2(name, bucket, data string) testObj {
-	to := testObj{
-		name:   name,
-		data:   []byte(data),
-		bucket: bucket,
-	}
-	return to
-}
 func getTestObj(name, bucket string) testObj {
 	rndLen := rand.Intn(200) - 100
 	to := testObj{

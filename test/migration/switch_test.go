@@ -21,7 +21,6 @@ import (
 	"context"
 	"io"
 	"math/rand"
-	"strconv"
 	"testing"
 	"time"
 
@@ -162,7 +161,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			return false
 		}
 		return diff.IsMatch
-	}, waitInterval, time.Second)
+	}, waitInterval, retryInterval)
 
 	var repl *pb.Replication
 	repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -173,7 +172,6 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			break
 		}
 	}
-	t.Log("repl len", len(repls.Replications))
 	t.Log("repl events", repl.Events, repl.EventsDone)
 	r.NotNil(repl)
 	r.False(repl.HasSwitch)
@@ -199,7 +197,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 				objects[i].data = nil
 			case 1:
 				// upload
-				objects[i] = getTestObj2(objects[i].name, objects[i].bucket, strconv.Itoa(n))
+				objects[i] = getTestObj(objects[i].name, objects[i].bucket)
 				_, err := proxyClient.PutObject(writeCtx, objects[i].bucket, objects[i].name, bytes.NewReader(objects[i].data), int64(len(objects[i].data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
 				r.NoError(err)
 			case 2:
@@ -288,7 +286,6 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			break
 		}
 	}
-	t.Log("repl -len", len(repls.Replications))
 	r.NotNil(repl)
 	r.True(repl.HasSwitch)
 
@@ -362,14 +359,12 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		r.NoError(err, object.name)
 		objBytes, err := io.ReadAll(objData)
 		r.NoError(err, object.name)
-		// r.True(bytes.Equal(object.data, objBytes), object.name)
-		r.EqualValues(string(object.data), string(objBytes), object.name)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
 		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
 		r.NoError(err, object.name)
 		objBytes, err = io.ReadAll(objData)
 		r.NoError(err, object.name)
-		r.EqualValues(string(object.data), string(objBytes), object.name)
-		// r.True(bytes.Equal(object.data, objBytes), object.name)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
 	}
 
 	switchInfo, err = apiClient.GetBucketSwitchStatus(tstCtx, replID)
