@@ -242,6 +242,7 @@ type Service interface {
 	DeleteReplicationSwitch(ctx context.Context, replID ReplicationID) error
 	// Returns replication switch config and status information.
 	GetReplicationSwitchInfo(ctx context.Context, replID ReplicationID) (SwitchInfo, error)
+	ListReplicationSwitchInfo(ctx context.Context) ([]SwitchInfo, error)
 	// GetInProgressZeroDowntimeSwitchInfo shortcut method for chorus proxy to get required information
 	// to adjust route only when zero downtime switch is in progress.
 	GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user, bucket string) (ZeroDowntimeSwitchInProgressInfo, error)

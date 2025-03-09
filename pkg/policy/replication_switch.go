@@ -608,3 +608,46 @@ func (s *policySvc) CompleteZeroDowntimeReplicationSwitch(ctx context.Context, r
 	}
 	return nil
 }
+
+func (s *policySvc) ListReplicationSwitchInfo(ctx context.Context) ([]SwitchInfo, error) {
+	keys, err := s.client.Keys(ctx, "p:switch:*").Result()
+	if err != nil {
+		return nil, fmt.Errorf("unable to list replication switches: %w", err)
+	}
+
+	if len(keys) == 0 {
+		return []SwitchInfo{}, nil
+	}
+
+	pipe := s.client.Pipeline()
+	infoCmds := make([]*redis.MapStringStringCmd, len(keys))
+	histCmds := make([]*redis.StringSliceCmd, len(keys))
+
+	for i, key := range keys {
+		infoCmds[i] = pipe.HGetAll(ctx, key)
+		histCmds[i] = pipe.LRange(ctx, strings.Replace(key, "p:switch:", "p:switch-hist:", 1), 0, -1)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, fmt.Errorf("failed to execute pipeline: %w", err)
+	}
+	res := make([]SwitchInfo, len(keys))
+	for i, key := range keys {
+		if err := infoCmds[i].Scan(&res[i]); err != nil {
+			return nil, fmt.Errorf("unable to scan replication switch info %s: %w", key, err)
+		}
+		if err := infoCmds[i].Scan(&res[i].SwitchDowntimeOpts); err != nil {
+			return nil, fmt.Errorf("unable to scan replication switch info downtime opts %s: %w", key, err)
+		}
+		if err := infoCmds[i].Scan(&res[i].SwitchZeroDowntimeOpts); err != nil {
+			return nil, fmt.Errorf("unable to scan replication switch info zero downtime opts %s: %w", key, err)
+		}
+		res[i].History, err = histCmds[i].Result()
+		if err != nil {
+			if errors.Is(err, redis.Nil) {
+				continue
+			}
+			return nil, fmt.Errorf("unable to get replication switch history %s: %w", key, err)
+		}
+	}
+	return res, nil
+}

@@ -1005,6 +1005,18 @@ func (h *handlers) GetBucketSwitchStatus(ctx context.Context, req *pb.Replicatio
 	return toPbSwitchStatus(res)
 }
 
-func (h *handlers) ListReplicationSwitches(context.Context, *emptypb.Empty) (*pb.ListSwitchResponse, error) {
-	panic("unimplemented")
+func (h *handlers) ListReplicationSwitches(ctx context.Context, _ *emptypb.Empty) (*pb.ListSwitchResponse, error) {
+	switches, err := h.policySvc.ListReplicationSwitchInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*pb.GetBucketSwitchStatusResponse, len(switches))
+	for i, sw := range switches {
+		pb, err := toPbSwitchStatus(sw)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = pb
+	}
+	return &pb.ListSwitchResponse{Switches: res}, nil
 }
