@@ -73,9 +73,9 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		return err
 	}
 	if len(replTo) == 0 {
-		// should be not possible
-		zerolog.Ctx(ctx).Warn().Err(err).Msg("skip Replicate: followers are empty")
-		return nil
+		// no followers and no error means that zero-downtime switch is in progress
+		// update obj version metadata without creating replication tasks
+		zerolog.Ctx(ctx).Debug().Msg("zero-downtime switch in progress, skipping replication tasks")
 	}
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 
@@ -265,6 +265,15 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 	if !errors.Is(err, dom.ErrNotFound) {
 		return policy.ReplicationPolicies{}, err
 	}
+	// if zero-downtime switch is in progress return empty replication policy
+	// to update obj version metadata and avoid creating replication tasks
+	_, err = s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, user, bucket)
+	if err == nil {
+		return policy.ReplicationPolicies{
+			From: task.GetFrom(),
+		}, nil
+	}
+
 	// policy not found. Create new bucket policy from user policy only for CreateBucket method
 	if _, ok := task.(*tasks.BucketCreatePayload); !ok {
 		return policy.ReplicationPolicies{}, fmt.Errorf("%w: replication policy not configured: %w", dom.ErrPolicy, err)

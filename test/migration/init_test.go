@@ -85,7 +85,8 @@ func TestMain(m *testing.M) {
 	workerConf.Features.ACL = false
 	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"
-	workerConf.Worker.SwitchRetryInterval = 500 * time.Millisecond
+	workerConf.Worker.SwitchRetryInterval = time.Second
+	workerConf.Worker.PauseRetryInterval = time.Second
 
 	proxyConf, err = proxy.GetConfig()
 	if err != nil {
