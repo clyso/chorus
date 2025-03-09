@@ -34,9 +34,7 @@ func Test_api_list_replications(t *testing.T) {
 	r := require.New(t)
 	err := proxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
 	r.NoError(err)
-	defer func() {
-		proxyClient.RemoveBucket(tstCtx, "replications")
-	}()
+	defer cleanup("replications")
 	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		User:            user,
 		From:            "main",

@@ -595,6 +595,488 @@ func TestApi_switch_multipart(t *testing.T) {
 	}
 }
 
+func TestApi_scheduled_switch(t *testing.T) {
+	const (
+		waitInterval  = 15 * time.Second
+		retryInterval = 100 * time.Millisecond
+		bucket        = "switch-bucket-scheduled"
+	)
+
+	r := require.New(t)
+	exists, err := mainClient.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = f1Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = f2Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+
+	// fill main bucket with init data
+	err = mainClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{})
+	r.NoError(err)
+	defer cleanup(bucket)
+
+	obj1 := getTestObj("obj1", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj1.bucket, obj1.name, bytes.NewReader(obj1.data), int64(len(obj1.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+	obj2 := getTestObj("photo/sept/obj2", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj2.bucket, obj2.name, bytes.NewReader(obj2.data), int64(len(obj2.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+	obj3 := getTestObj("photo/obj3", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj3.bucket, obj3.name, bytes.NewReader(obj3.data), int64(len(obj3.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+	obj4 := getTestObj("obj4", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+
+	exists, err = mainClient.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.True(exists)
+	exists, err = f1Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = f2Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+
+	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		User:            user,
+		From:            "main",
+		To:              "f1",
+		Buckets:         []string{bucket},
+		IsForAllBuckets: false,
+	})
+	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "main",
+			To:     "f1",
+		})
+	})
+	var repl *pb.Replication
+	repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(repls.Replications, 1)
+	repl = repls.Replications[0]
+	r.False(repl.HasSwitch)
+	r.False(repl.IsArchived)
+
+	// wait until repl started
+	r.Eventually(func() bool {
+		repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		if err != nil {
+			return false
+		}
+		started := false
+		for _, repl := range repls.Replications {
+			if repl.To == "f1" {
+				started = started || (repl.InitObjListed > 0)
+			}
+		}
+		return started
+	}, waitInterval, retryInterval)
+
+	// perform updates after migration started
+	obj7 := getTestObj("photo/sept/obj7", bucket)
+	_, err = proxyClient.PutObject(tstCtx, obj7.bucket, obj7.name, bytes.NewReader(obj7.data), int64(len(obj7.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+
+	obj4 = getTestObj(obj4.name, obj4.bucket)
+	_, err = proxyClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+
+	// start scheduled switch on init done:
+	replID := &pb.ReplicationRequest{
+		User:   user,
+		Bucket: bucket,
+		From:   "main",
+		To:     "f1",
+	}
+	_, err = apiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
+		ReplicationId: replID,
+		DowntimeOpts: &pb.SwitchDowntimeOpts{
+			StartOnInitDone:     true,
+			SkipBucketCheck:     true,
+			ContinueReplication: false,
+		},
+	})
+	r.NoError(err)
+
+	// check that replication policy now has linked switch
+	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(repls.Replications, 1)
+	repl = repls.Replications[0]
+	r.True(repl.HasSwitch)
+	r.False(repl.IsArchived)
+
+	// wait until switch is in progress
+	r.Eventually(func() bool {
+		switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
+	}, waitInterval, retryInterval)
+
+	//check that bucket is blocked
+	_, err = proxyClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.Error(err)
+
+	// wait for switch to be done
+	r.Eventually(func() bool {
+		switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+	}, waitInterval, retryInterval)
+	// check that data is in sync
+	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Bucket:    bucket,
+		From:      "main",
+		To:        "f1",
+		ShowMatch: false,
+		User:      user,
+	})
+	r.NoError(err)
+	r.True(diff.IsMatch)
+
+	var objects = []testObj{obj1, obj2, obj3, obj4, obj7}
+	for _, object := range objects {
+		// f1 equal to actual data
+		objData, err := proxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err := io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err = io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+	}
+
+	//check that writes unblocked and now routed to f1
+	// update obj1
+	obj1 = getTestObj(obj1.name, obj1.bucket)
+	_, err = proxyClient.PutObject(tstCtx, obj1.bucket, obj1.name, bytes.NewReader(obj1.data), int64(len(obj1.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+	objects[0] = obj1
+
+	// now updates only in f1:
+	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Bucket:    bucket,
+		From:      "main",
+		To:        "f1",
+		ShowMatch: false,
+		User:      user,
+	})
+	r.NoError(err)
+	r.False(diff.IsMatch)
+	// obj1 is different
+	r.Len(diff.Differ, 1)
+	r.Equal(obj1.name, diff.Differ[0])
+	r.Empty(diff.MissTo)
+	r.Empty(diff.MissFrom)
+	r.Empty(diff.Error)
+
+	for _, object := range objects {
+		// check against source
+		objData, err := proxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err := io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err = io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+		// in main obj1 is old
+		objData, err = mainClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err = io.ReadAll(objData)
+		r.NoError(err)
+		if object.name == obj1.name {
+			r.False(bytes.Equal(object.data, objBytes), object.name)
+		} else {
+			r.True(bytes.Equal(object.data, objBytes), object.name)
+		}
+	}
+
+	// check that replication is archived
+	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(repls.Replications, 1)
+	repl = repls.Replications[0]
+	r.True(repl.HasSwitch)
+	r.True(repl.IsInitDone)
+	r.True(repl.IsArchived)
+	r.EqualValues(repl.Events, repl.EventsDone)
+
+}
+
+func TestApi_scheduled_switch_continue_replication(t *testing.T) {
+	const (
+		waitInterval  = 15 * time.Second
+		retryInterval = 100 * time.Millisecond
+		bucket        = "switch-bucket-scheduled-continue"
+	)
+
+	r := require.New(t)
+	exists, err := mainClient.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = f1Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = f2Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+
+	// fill main bucket with init data
+	err = mainClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{})
+	r.NoError(err)
+	defer cleanup(bucket)
+
+	obj1 := getTestObj("obj1", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj1.bucket, obj1.name, bytes.NewReader(obj1.data), int64(len(obj1.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+	obj2 := getTestObj("photo/sept/obj2", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj2.bucket, obj2.name, bytes.NewReader(obj2.data), int64(len(obj2.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+	obj3 := getTestObj("photo/obj3", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj3.bucket, obj3.name, bytes.NewReader(obj3.data), int64(len(obj3.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+	obj4 := getTestObj("obj4", bucket)
+	_, err = mainClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+
+	exists, err = mainClient.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.True(exists)
+	exists, err = f1Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = f2Client.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.False(exists)
+
+	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		User:            user,
+		From:            "main",
+		To:              "f1",
+		Buckets:         []string{bucket},
+		IsForAllBuckets: false,
+	})
+	r.NoError(err)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "main",
+			To:     "f1",
+		})
+	})
+	var repl *pb.Replication
+	repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(repls.Replications, 1)
+	repl = repls.Replications[0]
+	r.False(repl.HasSwitch)
+	r.False(repl.IsArchived)
+
+	// wait until repl started
+	r.Eventually(func() bool {
+		repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		if err != nil {
+			return false
+		}
+		started := false
+		for _, repl := range repls.Replications {
+			if repl.To == "f1" {
+				started = started || (repl.InitObjListed > 0)
+			}
+		}
+		return started
+	}, waitInterval, retryInterval)
+
+	// perform updates after migration started
+	obj7 := getTestObj("photo/sept/obj7", bucket)
+	_, err = proxyClient.PutObject(tstCtx, obj7.bucket, obj7.name, bytes.NewReader(obj7.data), int64(len(obj7.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+
+	obj4 = getTestObj(obj4.name, obj4.bucket)
+	_, err = proxyClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+
+	// start scheduled switch on init done with continue replication:
+	replID := &pb.ReplicationRequest{
+		User:   user,
+		Bucket: bucket,
+		From:   "main",
+		To:     "f1",
+	}
+	_, err = apiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
+		ReplicationId: replID,
+		DowntimeOpts: &pb.SwitchDowntimeOpts{
+			StartOnInitDone:     true,
+			SkipBucketCheck:     true,
+			ContinueReplication: true, // continue replication after switch
+		},
+	})
+	r.NoError(err)
+
+	// check that replication policy now has linked switch
+	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(repls.Replications, 1)
+	repl = repls.Replications[0]
+	r.True(repl.HasSwitch)
+	r.False(repl.IsArchived)
+
+	// wait until switch is in progress
+	r.Eventually(func() bool {
+		switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
+	}, waitInterval, retryInterval)
+
+	//check that bucket is blocked
+	_, err = proxyClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.Error(err)
+
+	// wait for switch to be done
+	r.Eventually(func() bool {
+		switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+	}, waitInterval, retryInterval)
+	t.Cleanup(func() {
+		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+			User:   user,
+			Bucket: bucket,
+			From:   "f1",
+			To:     "main",
+		})
+	})
+	// check that data is in sync
+	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Bucket:    bucket,
+		From:      "main",
+		To:        "f1",
+		ShowMatch: false,
+		User:      user,
+	})
+	r.NoError(err)
+	r.True(diff.IsMatch)
+
+	var objects = []testObj{obj1, obj2, obj3, obj4, obj7}
+	for _, object := range objects {
+		// f1 equal to actual data
+		objData, err := proxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err := io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err = io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+	}
+
+	//check that writes unblocked and now routed to f1
+	// update obj1
+	obj1 = getTestObj(obj1.name, obj1.bucket)
+	_, err = proxyClient.PutObject(tstCtx, obj1.bucket, obj1.name, bytes.NewReader(obj1.data), int64(len(obj1.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+	objects[0] = obj1
+
+	// check that there is new replication to previous main
+	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(repls.Replications, 2)
+
+	replPrev, replNew := repls.Replications[0], repls.Replications[1]
+	if !replPrev.IsArchived {
+		replPrev, replNew = replNew, replPrev
+	}
+	// validate prev replication
+	r.True(replPrev.IsArchived)
+	r.NotNil(replPrev.ArchivedAt)
+	r.True(replPrev.HasSwitch)
+	r.True(replPrev.IsInitDone)
+	r.EqualValues(replPrev.Events, replPrev.EventsDone)
+	r.EqualValues(replPrev.From, "main")
+	r.EqualValues(replPrev.To, "f1")
+	r.EqualValues(replPrev.Bucket, bucket)
+	r.EqualValues(replPrev.User, user)
+	// validate new replication
+	r.False(replNew.IsArchived)
+	r.True(replNew.IsInitDone)
+	r.False(replNew.HasSwitch)
+	r.EqualValues(replNew.From, "f1")
+	r.EqualValues(replNew.To, "main")
+	r.EqualValues(replNew.Bucket, bucket)
+	r.EqualValues(replNew.User, user)
+
+	// wait until new replication catch up
+	r.Eventually(func() bool {
+		repls, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		if err != nil {
+			return false
+		}
+		for _, rr := range repls.Replications {
+			if rr.IsArchived {
+				continue
+			}
+			return rr.Events == rr.EventsDone && rr.Events > 0
+		}
+		return false
+	}, waitInterval, retryInterval)
+
+	// now f1 and main are in sync again
+	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Bucket:    bucket,
+		From:      "main",
+		To:        "f1",
+		ShowMatch: false,
+		User:      user,
+	})
+	r.NoError(err)
+	r.True(diff.IsMatch)
+
+	for _, object := range objects {
+		// check against source
+		objData, err := proxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err := io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+		objData, err = f1Client.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err = io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+		// in main obj1 is old
+		objData, err = mainClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
+		r.NoError(err, object.name)
+		objBytes, err = io.ReadAll(objData)
+		r.NoError(err)
+		r.True(bytes.Equal(object.data, objBytes), object.name)
+	}
+}
+
 func sPtr(in string) *string {
 	return &in
 }

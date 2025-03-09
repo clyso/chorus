@@ -516,10 +516,10 @@ func (s *policySvc) GetReplicationPolicyInfo(ctx context.Context, user, bucket, 
 
 	res := ReplicationPolicyStatus{}
 	var getRes *redis.MapStringStringCmd
-	var switchStatus *redis.StringCmd
+	var switchReplID *redis.StringCmd
 	_, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		getRes = pipe.HGetAll(ctx, fKey)
-		switchStatus = s.client.HGet(ctx, switchKey, "lastStatus")
+		switchReplID = s.client.HGet(ctx, switchKey, "replicationID")
 		return nil
 	})
 	if err != nil {
@@ -532,16 +532,13 @@ func (s *policySvc) GetReplicationPolicyInfo(ctx context.Context, user, bucket, 
 	if res.CreatedAt.IsZero() {
 		return ReplicationPolicyStatus{}, fmt.Errorf("%w: no replication policy status for user %q, bucket %q, from %q, to %q", dom.ErrNotFound, user, bucket, from, to)
 	}
-	if switchStatus.Err() != nil {
-		if !errors.Is(switchStatus.Err(), redis.Nil) {
+	if switchReplID.Err() != nil {
+		if !errors.Is(switchReplID.Err(), redis.Nil) {
 			return ReplicationPolicyStatus{}, err
 		}
 	} else {
 		// switch exists
-		status := switchStatus.String()
-		if status != "" {
-			res.HasSwitch = true
-		}
+		res.HasSwitch = replID.String() == switchReplID.Val()
 	}
 
 	return res, nil

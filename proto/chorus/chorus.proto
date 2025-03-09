@@ -252,6 +252,11 @@ message Replication {
 
   // true if given replication has associated replication switch with it.
   bool has_switch = 19;
+  // true if replication is archived. Archived replication will not generate or sync new events.
+  // The main purpose of archived replication is to keep replication metadata for future reference.
+  // Archived replication can be safely deleted.
+  bool is_archived = 20;
+  google.protobuf.Timestamp archived_at = 21;
 }
 
 message ReplicationRequest {
