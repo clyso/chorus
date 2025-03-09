@@ -308,7 +308,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
-	}, waitInterval, time.Second)
+	}, waitInterval, retryInterval)
 
 	repl = nil
 	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -579,17 +579,11 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.NoError(err)
 
 	r.Eventually(func() bool {
-		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Bucket:    bucket,
-			From:      "main",
-			To:        "f1",
-			ShowMatch: true,
-			User:      user,
-		})
+		switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return diff.IsMatch
+		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
 	}, waitInterval, retryInterval)
 
 	for _, object := range objects {
