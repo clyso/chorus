@@ -54,6 +54,8 @@ func replicationToPb(in policy.ReplicationPolicyStatusExtended) *pb.Replication 
 		LastProcessedAt: tsToPb(in.LastProcessedAt),
 		AgentUrl:        strPtr(in.AgentURL),
 		HasSwitch:       in.HasSwitch,
+		IsArchived:      in.IsArchived,
+		ArchivedAt:      tsToPb(in.ArchivedAt),
 	}
 }
 

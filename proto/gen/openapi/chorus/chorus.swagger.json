@@ -1294,6 +1294,14 @@
         "hasSwitch": {
           "type": "boolean",
           "description": "true if given replication has associated replication switch with it."
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "true if replication is archived. Archived replication will not generate or sync new events.\nThe main purpose of archived replication is to keep replication metadata for future reference.\nArchived replication can be safely deleted."
+        },
+        "archivedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
