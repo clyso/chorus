@@ -1214,3 +1214,82 @@ func setupDiwntimeSwitchState(t *testing.T, svc Service, replID ReplicationID, o
 	// we covered all status. return for status done
 	r.Equal(StatusDone, status)
 }
+
+func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
+	db := miniredis.RunT(t)
+	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	ctx := context.TODO()
+
+	svc := NewService(c)
+
+	r := require.New(t)
+	list, err := svc.ListReplicationSwitchInfo(ctx)
+	r.NoError(err)
+	r.Empty(list)
+	// create downtime switch
+	replID := ReplicationID{
+		User:   "u",
+		Bucket: "b",
+		From:   "f",
+		To:     "t",
+	}
+	validSwitch := &SwitchDowntimeOpts{
+		StartOnInitDone:     false,
+		Cron:                stringPtr("0 0 * * *"),
+		StartAt:             nil,
+		MaxDuration:         (3 * time.Hour),
+		MaxEventLag:         uint32Ptr(100),
+		SkipBucketCheck:     true,
+		ContinueReplication: true,
+	}
+	setupDiwntimeSwitchState(t, svc, replID, validSwitch, StatusDone)
+
+	list, err = svc.ListReplicationSwitchInfo(ctx)
+	r.NoError(err)
+	r.Len(list, 1)
+	r.Equal(replID.String(), list[0].ReplicationIDStr)
+	r.False(list[0].IsZeroDowntime())
+	info, err := svc.GetReplicationSwitchInfo(ctx, replID)
+	r.NoError(err)
+	r.EqualValues(info, list[0])
+
+	// create zero downtime switch
+	replIDZero := ReplicationID{
+		User:   "zu",
+		Bucket: "zb",
+		From:   "zf",
+		To:     "zt",
+	}
+	validSwitchZero := &SwitchZeroDowntimeOpts{
+		MultipartTTL: 15*time.Minute + 30*time.Second,
+	}
+	// create routing and replication for zero downtime switch
+	r.NoError(svc.addBucketRoutingPolicy(ctx, replIDZero.User, replIDZero.Bucket, replIDZero.From, true))
+	r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDZero.User, replIDZero.Bucket, replIDZero.From, replIDZero.To, replIDZero.ToBucket, tasks.Priority2, nil))
+	// finish init replication
+	r.NoError(svc.ObjListStarted(ctx, replIDZero.User, replIDZero.Bucket, replIDZero.From, replIDZero.To, replIDZero.ToBucket))
+	r.NoError(svc.IncReplInitObjListed(ctx, replIDZero.User, replIDZero.Bucket, replIDZero.From, replIDZero.To, replIDZero.ToBucket, 0, time.Now()))
+	r.NoError(svc.IncReplInitObjDone(ctx, replIDZero.User, replIDZero.Bucket, replIDZero.From, replIDZero.To, replIDZero.ToBucket, 0, time.Now()))
+	// create switch
+	err = svc.AddZeroDowntimeReplicationSwitch(ctx, replIDZero, validSwitchZero)
+	r.NoError(err)
+
+	list, err = svc.ListReplicationSwitchInfo(ctx)
+	r.NoError(err)
+	r.Len(list, 2)
+	dwt, zeroDwt := list[0], list[1]
+	if dwt.IsZeroDowntime() {
+		dwt, zeroDwt = zeroDwt, dwt
+	}
+	r.Equal(replID.String(), dwt.ReplicationIDStr)
+	r.Equal(replIDZero.String(), zeroDwt.ReplicationIDStr)
+	r.NotEqual(dwt.ReplicationIDStr, zeroDwt.ReplicationIDStr)
+	r.False(dwt.IsZeroDowntime())
+	r.True(zeroDwt.IsZeroDowntime())
+	info, err = svc.GetReplicationSwitchInfo(ctx, replID)
+	r.NoError(err)
+	r.EqualValues(info, dwt)
+	info, err = svc.GetReplicationSwitchInfo(ctx, replIDZero)
+	r.NoError(err)
+	r.EqualValues(info, zeroDwt)
+}

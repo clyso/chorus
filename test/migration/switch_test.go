@@ -275,6 +275,9 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		MultipartTtl:  durationpb.New(time.Minute),
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		_, _ = apiClient.DeleteBucketSwitch(tstCtx, replID)
+	})
 	t.Log("switch created", time.Now())
 
 	repl = nil
@@ -541,6 +544,9 @@ func TestApi_switch_multipart(t *testing.T) {
 			})
 			r.NoError(err)
 			t.Log("switch started", partID)
+			t.Cleanup(func() {
+				_, _ = apiClient.DeleteBucketSwitch(tstCtx, replID)
+			})
 		}
 
 		n, _ = objReader.Read(partBuf)
@@ -705,6 +711,9 @@ func TestApi_scheduled_switch(t *testing.T) {
 		},
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		_, _ = apiClient.DeleteBucketSwitch(tstCtx, replID)
+	})
 
 	// check that replication policy now has linked switch
 	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -931,6 +940,9 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 		},
 	})
 	r.NoError(err)
+	t.Cleanup(func() {
+		_, _ = apiClient.DeleteBucketSwitch(tstCtx, replID)
+	})
 
 	// check that replication policy now has linked switch
 	repls, err = apiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -1075,6 +1087,17 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 		r.NoError(err)
 		r.True(bytes.Equal(object.data, objBytes), object.name)
 	}
+	// get switch info with List api method
+	switches, err := apiClient.ListReplicationSwitches(tstCtx, &emptypb.Empty{})
+	r.NoError(err)
+	r.Len(switches.Switches, 1)
+	info := switches.Switches[0]
+	r.True(proto.Equal(replID, info.ReplicationId))
+	r.EqualValues(pb.GetBucketSwitchStatusResponse_Done, info.LastStatus)
+
+	switchInfo, err := apiClient.GetBucketSwitchStatus(tstCtx, replID)
+	r.NoError(err)
+	r.True(proto.Equal(switchInfo, info))
 }
 
 func sPtr(in string) *string {
