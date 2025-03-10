@@ -229,7 +229,7 @@ func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
 		return true
 	}, ConsistencyWait, ConsistencyRetryIn)
 
-	r.Equal(len(getCheckResponse.Entries), 1)
+	r.Len(getCheckResponse.Entries, 1)
 	r.NotContains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage1)
 	r.Contains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage2)
 	r.Equal(getCheckResponse.Entries[0].Object, ConsistencyCheckObject3)
@@ -254,7 +254,9 @@ func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
 	consistencyCheckSetup2Storages(ctx, r)
 	defer consistencyCheckTeardown2Storages(ctx, r, locations)
 
-	err := mainClient.RemoveObject(ctx, ConsistencyCheckBucket1, "/path/to", minio.RemoveObjectOptions{ForceDelete: true})
+	err := mainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject1, minio.RemoveObjectOptions{ForceDelete: true})
+	r.NoError(err)
+	err = mainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject2, minio.RemoveObjectOptions{ForceDelete: true})
 	r.NoError(err)
 
 	checkRequest := &pb.StartConsistencyCheckRequest{
@@ -283,13 +285,16 @@ func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
 		return true
 	}, ConsistencyWait, ConsistencyRetryIn)
 
-	r.Equal(len(getCheckResponse.Entries), 2)
+	r.Len(getCheckResponse.Entries, 3)
 	r.NotContains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage1)
 	r.NotContains(getCheckResponse.Entries[1].Storages, ConsistencyCheckStorage1)
+	r.NotContains(getCheckResponse.Entries[2].Storages, ConsistencyCheckStorage1)
 	r.Contains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage2)
 	r.Contains(getCheckResponse.Entries[1].Storages, ConsistencyCheckStorage2)
-	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2}, getCheckResponse.Entries[0].Object)
-	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2}, getCheckResponse.Entries[1].Object)
+	r.Contains(getCheckResponse.Entries[2].Storages, ConsistencyCheckStorage2)
+	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2, "path/to/"}, getCheckResponse.Entries[0].Object)
+	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2, "path/to/"}, getCheckResponse.Entries[1].Object)
+	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2, "path/to/"}, getCheckResponse.Entries[2].Object)
 }
 
 func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
@@ -340,9 +345,11 @@ func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
 		return true
 	}, ConsistencyWait, ConsistencyRetryIn)
 
-	r.Equal(len(getCheckResponse.Entries), 1)
+	r.Len(getCheckResponse.Entries, 2)
 	r.NotContains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage1)
 	r.Contains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage2)
+	r.NotContains(getCheckResponse.Entries[1].Storages, ConsistencyCheckStorage1)
+	r.Contains(getCheckResponse.Entries[1].Storages, ConsistencyCheckStorage2)
 }
 
 func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
@@ -398,6 +405,10 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 		return true
 	}, ConsistencyWait, ConsistencyRetryIn)
 
-	r.Equal(len(getCheckResponse.Entries), 1)
-	r.Contains(getCheckResponse.Entries[0].Storages, ConsistencyCheckStorage1)
+	r.Equal(len(getCheckResponse.Entries), 2)
+	r.Equal(getCheckResponse.Entries[0].Object, getCheckResponse.Entries[1].Object)
+	r.NotEqual(getCheckResponse.Entries[0].Etag, getCheckResponse.Entries[1].Etag)
+	r.Len(getCheckResponse.Entries[0].Storages, 1)
+	r.Len(getCheckResponse.Entries[1].Storages, 1)
+	r.NotEqual(getCheckResponse.Entries[0].Storages[0], getCheckResponse.Entries[1].Storages[0])
 }
