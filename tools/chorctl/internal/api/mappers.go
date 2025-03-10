@@ -142,7 +142,7 @@ func DurationToStr(age time.Duration) string {
 }
 
 func ConsistencyCheckHeader() string {
-	return "ID\tREADY\tQUEUED\tCOMPLETED\tSTORAGES"
+	return "READY\tQUEUED\tCOMPLETED\tSTORAGES"
 }
 
 func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
@@ -150,7 +150,7 @@ func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
 	for _, location := range in.Locations {
 		storageLocations = append(storageLocations, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
 	}
-	return fmt.Sprintf("%s\t%t\t%d\t%d\t%s", in.Id, in.Ready, in.Queued, in.Completed, strings.Join(storageLocations, ", "))
+	return fmt.Sprintf("%t\t%d\t%d\t%s", in.Ready, in.Queued, in.Completed, strings.Join(storageLocations, ", "))
 }
 
 func ConsistencyCheckReportBrief(in *pb.ConsistencyCheck, hasErrors bool) string {
