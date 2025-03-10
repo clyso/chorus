@@ -357,11 +357,11 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckList
 	case ConsistencyCheckReadinessPayload:
-		id := fmt.Sprintf("cc:c:%s", p.ID)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id), asynq.ProcessIn(5 * time.Second)}
+		id := fmt.Sprintf("cc:r:%s", p.ID)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckReadiness
 	case ConsistencyCheckDeletePayload:
-		id := fmt.Sprintf("cc:r:%s", p.ID)
+		id := fmt.Sprintf("cc:d:%s", p.ID)
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckResult
 	default:

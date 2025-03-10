@@ -42,6 +42,7 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/storage"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/worker"
@@ -62,6 +63,8 @@ var (
 
 	workerConf *worker.Config
 	proxyConf  *proxy.Config
+
+	storageSvc storage.Service
 
 	urlHttpApi string
 )
@@ -92,6 +95,7 @@ func TestMain(m *testing.M) {
 	proxyConf.Features.Tagging = false
 	proxyConf.Log.Level = "warn"
 
+	var redisClient *redis.Client
 	if os.Getenv("EXT_REDIS") != "true" {
 		fmt.Println("using embedded redis")
 		redisSvc, err := miniredis.Run()
@@ -100,18 +104,22 @@ func TestMain(m *testing.M) {
 		}
 		proxyConf.Redis.Address = redisSvc.Addr()
 		workerConf.Redis.Address = redisSvc.Addr()
+		redisClient = redis.NewClient(&redis.Options{
+			Addr: redisSvc.Addr(),
+		})
 	} else {
 		if url := os.Getenv("EXT_REDIS_URL"); url != "" {
 			proxyConf.Redis.Address = url
 			workerConf.Redis.Address = url
 		}
-		client := redis.NewClient(&redis.Options{Addr: proxyConf.Redis.Address})
-		err = client.FlushAll(context.TODO()).Err()
+		redisClient = redis.NewClient(&redis.Options{Addr: proxyConf.Redis.Address})
+		err = redisClient.FlushAll(context.TODO()).Err()
 		if err != nil {
 			panic(err)
 		}
 	}
 	fmt.Println("redis url", proxyConf.Redis.Address)
+	storageSvc = storage.New(redisClient)
 
 	mainBackend := s3mem.New()
 	mainFaker := gofakes3.New(mainBackend)

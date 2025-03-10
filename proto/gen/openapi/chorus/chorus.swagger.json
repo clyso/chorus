@@ -110,14 +110,6 @@
             }
           }
         },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
         "tags": [
           "Chorus"
         ]
@@ -824,8 +816,12 @@
     "chorusDeleteConsistencyCheckReportRequest": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
         }
       }
     },

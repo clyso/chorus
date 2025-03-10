@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/sirupsen/logrus"
@@ -31,13 +32,27 @@ import (
 )
 
 var consistencyReportCmd = &cobra.Command{
-	Use:   "consistency report",
+	Use:   "consistency report <storage_1>:<bucket_1> <storage_2>:<bucket_2>",
 	Short: "list consistency checks",
 	Long: `Example:
-chorctl consistency report `,
+chorctl consistency report oldstorage:bucket newstorage:altbucket`,
+	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		locations := make([]*pb.MigrateLocation, 0, len(args))
+		for _, arg := range args {
+			storage, bucket, found := strings.Cut(arg, ":")
+			if !found {
+				logrus.WithField("arg", arg).Fatal("unable to get storage and bucket parts")
+			}
+			locations = append(locations, &pb.MigrateLocation{
+				Storage: storage,
+				Bucket:  bucket,
+				User:    consistencyCheckUser,
+			})
+		}
 
 		conn, err := api.Connect(ctx, address)
 		if err != nil {
@@ -46,7 +61,7 @@ chorctl consistency report `,
 		defer conn.Close()
 
 		client := pb.NewChorusClient(conn)
-		res, err := client.GetConsistencyCheckReport(ctx, &pb.GetConsistencyCheckReportRequest{Id: args[0]})
+		res, err := client.GetConsistencyCheckReport(ctx, &pb.GetConsistencyCheckReportRequest{Locations: locations})
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency check report")
 		}

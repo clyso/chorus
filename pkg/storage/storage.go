@@ -422,19 +422,16 @@ func (s *svc) FindConsistencyCheckSets(ctx context.Context, id string) ([]Consis
 		}
 
 		for _, key := range keys {
-			parts := strings.Split(key, ":")
-			if len(parts) != 5 {
-				return nil, errors.New("unexpected count of key parts")
-			}
-
 			storages, err := s.client.SMembers(ctx, key).Result()
 			if err != nil {
 				return nil, fmt.Errorf("unable to read set members: %w", err)
 			}
 
+			parts := strings.Split(key, ":")
+			partsCount := len(parts)
 			result := ConsistencyCheckResultEntry{
-				Object:   parts[3],
-				ETag:     parts[4],
+				Object:   parts[partsCount-2],
+				ETag:     parts[partsCount-1],
 				Storages: storages,
 			}
 			results = append(results, result)
