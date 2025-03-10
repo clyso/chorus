@@ -14,6 +14,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+var 
+(
+	rgFrom  string
+	rgTo    string
+	rgUser  string
+	rgBucket string
+)
+
 var getReplicationStatusCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get replication status",
@@ -30,13 +38,10 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 		client := pb.NewChorusClient(conn)
 
 		req := &pb.ReplicationRequest{
-			User:   rdUser,
-			Bucket: rdBucket,
-			From:   rdFrom,
-			To:     rdTo,
-		}
-		if rpToBucket != "" {
-			req.ToBucket = &rpToBucket
+			User:   rgUser,
+			Bucket: rgTo,
+			From:   rgUser,
+			To:     rgBucket,
 		}
 		res, err := client.FetchReplicationStatus(ctx, req)
 		if err != nil {
@@ -84,10 +89,10 @@ func derefString(s *string) string {
 
 func init() {
 	replCmd.AddCommand(getReplicationStatusCmd)
-	getReplicationStatusCmd.Flags().StringVarP(&rpFrom, "from", "f", "", "from storage")
-	getReplicationStatusCmd.Flags().StringVarP(&rpTo, "to", "t", "", "to storage")
-	getReplicationStatusCmd.Flags().StringVarP(&rpUser, "user", "u", "", "storage user")
-	getReplicationStatusCmd.Flags().StringVarP(&rpBucket, "bucket", "b", "", "bucket name")
+	getReplicationStatusCmd.Flags().StringVarP(&rgFrom, "from", "f", "", "from storage")
+	getReplicationStatusCmd.Flags().StringVarP(&rgTo, "to", "t", "", "to storage")
+	getReplicationStatusCmd.Flags().StringVarP(&rgUser, "user", "u", "", "storage user")
+	getReplicationStatusCmd.Flags().StringVarP(&rgBucket, "bucket", "b", "", "bucket name")
 	err := getReplicationStatusCmd.MarkFlagRequired("from")
 	if err != nil {
 		logrus.WithError(err).Fatal()
