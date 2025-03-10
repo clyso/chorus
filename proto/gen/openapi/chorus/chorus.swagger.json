@@ -286,9 +286,9 @@
         ]
       }
     },
-    "/replication/status": {
-      "get": {
-        "operationId": "Chorus_GetReplicationStatus",
+    "/replication/status/fetch": {
+      "post": {
+        "operationId": "Chorus_FetchReplicationStatus",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -305,34 +305,12 @@
         },
         "parameters": [
           {
-            "name": "user",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "bucket",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "toBucket",
-            "in": "query",
-            "required": false,
-            "type": "string"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
+            }
           }
         ],
         "tags": [

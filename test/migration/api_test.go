@@ -62,7 +62,7 @@ func Test_api_list_replications(t *testing.T) {
 	r.EqualValues("f1", res.Replications[0].To)
 }
 
-func Test_api_get_replication_status(t *testing.T) {
+func Test_api_fetch_replication_status(t *testing.T) {
 	r := require.New(t)
 	err := proxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
 	r.NoError(err)
@@ -85,7 +85,7 @@ func Test_api_get_replication_status(t *testing.T) {
 			Bucket: "replications",
 		})
 	}()
-	res, err := apiClient.GetReplicationStatus(tstCtx, &pb.ReplicationRequest{
+	res, err := apiClient.FetchReplicationStatus(tstCtx, &pb.ReplicationRequest{
 		User:   user,
 		From:   "main",
 		To:     "f1",
