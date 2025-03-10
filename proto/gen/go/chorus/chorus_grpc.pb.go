@@ -36,7 +36,7 @@ const (
 	Chorus_CompareBucket_FullMethodName             = "/chorus.Chorus/CompareBucket"
 	Chorus_GetAgents_FullMethodName                 = "/chorus.Chorus/GetAgents"
 	Chorus_AddBucketReplication_FullMethodName      = "/chorus.Chorus/AddBucketReplication"
-	Chorus_GetReplicationStatus_FullMethodName      = "/chorus.Chorus/GetReplicationStatus"
+	Chorus_FetchReplicationStatus_FullMethodName    = "/chorus.Chorus/FetchReplicationStatus"
 )
 
 // ChorusClient is the client API for Chorus service.
@@ -69,7 +69,7 @@ type ChorusClient interface {
 	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
 	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
 	AddBucketReplication(ctx context.Context, in *AddBucketReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetReplicationStatus(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error)
+	FetchReplicationStatus(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error)
 }
 
 type chorusClient struct {
@@ -249,10 +249,10 @@ func (c *chorusClient) AddBucketReplication(ctx context.Context, in *AddBucketRe
 	return out, nil
 }
 
-func (c *chorusClient) GetReplicationStatus(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error) {
+func (c *chorusClient) FetchReplicationStatus(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Replication)
-	err := c.cc.Invoke(ctx, Chorus_GetReplicationStatus_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Chorus_FetchReplicationStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ type ChorusServer interface {
 	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)
 	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
 	AddBucketReplication(context.Context, *AddBucketReplicationRequest) (*emptypb.Empty, error)
-	GetReplicationStatus(context.Context, *ReplicationRequest) (*Replication, error)
+	FetchReplicationStatus(context.Context, *ReplicationRequest) (*Replication, error)
 }
 
 // UnimplementedChorusServer should be embedded to have
@@ -347,8 +347,8 @@ func (UnimplementedChorusServer) GetAgents(context.Context, *emptypb.Empty) (*Ge
 func (UnimplementedChorusServer) AddBucketReplication(context.Context, *AddBucketReplicationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddBucketReplication not implemented")
 }
-func (UnimplementedChorusServer) GetReplicationStatus(context.Context, *ReplicationRequest) (*Replication, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetReplicationStatus not implemented")
+func (UnimplementedChorusServer) FetchReplicationStatus(context.Context, *ReplicationRequest) (*Replication, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchReplicationStatus not implemented")
 }
 func (UnimplementedChorusServer) testEmbeddedByValue() {}
 
@@ -651,20 +651,20 @@ func _Chorus_AddBucketReplication_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Chorus_GetReplicationStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Chorus_FetchReplicationStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReplicationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChorusServer).GetReplicationStatus(ctx, in)
+		return srv.(ChorusServer).FetchReplicationStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Chorus_GetReplicationStatus_FullMethodName,
+		FullMethod: Chorus_FetchReplicationStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChorusServer).GetReplicationStatus(ctx, req.(*ReplicationRequest))
+		return srv.(ChorusServer).FetchReplicationStatus(ctx, req.(*ReplicationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -737,8 +737,8 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Chorus_AddBucketReplication_Handler,
 		},
 		{
-			MethodName: "GetReplicationStatus",
-			Handler:    _Chorus_GetReplicationStatus_Handler,
+			MethodName: "FetchReplicationStatus",
+			Handler:    _Chorus_FetchReplicationStatus_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

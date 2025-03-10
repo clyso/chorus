@@ -636,7 +636,7 @@ func (h *handlers) createAgentBucketNotification(ctx context.Context, user, from
 	return nil
 }
 
-func (h *handlers) GetReplicationStatus(ctx context.Context, req *pb.ReplicationRequest) (*pb.Replication, error) {
+func (h *handlers) FetchReplicationStatus(ctx context.Context, req *pb.ReplicationRequest) (*pb.Replication, error) {
 	ctx = log.WithUser(ctx, req.User)
 	status, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
 	if err != nil {
