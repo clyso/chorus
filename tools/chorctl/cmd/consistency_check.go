@@ -37,17 +37,11 @@ var consistencyCheckCmd = &cobra.Command{
 	Use:   "consistency check <storage_1>:<bucket_1> <storage_2>:<bucket_2> --user user  ...",
 	Short: "start consistency check",
 	Long: `Example:
-chorctl consistency check oldstorage:bucket newstorage:altbucket`,
+chorctl consistency check oldstorage:bucket newstorage:altbucket --user username`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		conn, err := api.Connect(ctx, address)
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
-		}
-		defer conn.Close()
 
 		locations := make([]*pb.MigrateLocation, 0, len(args))
 		for _, arg := range args {
@@ -61,6 +55,12 @@ chorctl consistency check oldstorage:bucket newstorage:altbucket`,
 				User:    consistencyCheckUser,
 			})
 		}
+
+		conn, err := api.Connect(ctx, address)
+		if err != nil {
+			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
+		}
+		defer conn.Close()
 
 		client := pb.NewChorusClient(conn)
 		res, err := client.StartConsistencyCheck(ctx, &pb.StartConsistencyCheckRequest{Locations: locations})

@@ -265,7 +265,7 @@ func (s *svc) HandleConsistencyCheckDelete(ctx context.Context, t *asynq.Task) (
 		return fmt.Errorf("unable to delete consistency check storages: %w", err)
 	}
 	if err := s.storageSvc.DeleteConsistencyCheckReadiness(ctx, payload.ID); err != nil {
-		return fmt.Errorf("unable tp delete consistency check readiness flag: %w", err)
+		return fmt.Errorf("unable to delete consistency check readiness flag: %w", err)
 	}
 
 	return nil

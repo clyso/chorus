@@ -79,7 +79,7 @@ message ListConsistencyChecksResponse {
 }
 
 message GetConsistencyCheckReportRequest {
-  string id = 1;
+  repeated MigrateLocation locations = 1;
 }
 
 message ConsistencyCheckReportEntry {
@@ -94,7 +94,7 @@ message GetConsistencyCheckReportResponse {
 }
 
 message DeleteConsistencyCheckReportRequest {
-  string id = 1;
+  repeated MigrateLocation locations = 1;
 }
 
 message GetAppVersionResponse {

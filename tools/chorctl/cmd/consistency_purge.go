@@ -19,6 +19,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -29,13 +30,27 @@ import (
 )
 
 var consistencyPurgeCmd = &cobra.Command{
-	Use:   "consistency purge",
+	Use:   "consistency purge <storage_1>:<bucket_1> <storage_2>:<bucket_2>",
 	Short: "deletes result of consistency check",
 	Long: `Example:
-chorctl consistency purge 87009fd62551da208508`,
+chorctl consistency purge oldstorage:bucket newstorage:altbucket`,
+	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		locations := make([]*pb.MigrateLocation, 0, len(args))
+		for _, arg := range args {
+			storage, bucket, found := strings.Cut(arg, ":")
+			if !found {
+				logrus.WithField("arg", arg).Fatal("unable to get storage and bucket parts")
+			}
+			locations = append(locations, &pb.MigrateLocation{
+				Storage: storage,
+				Bucket:  bucket,
+				User:    consistencyCheckUser,
+			})
+		}
 
 		conn, err := api.Connect(ctx, address)
 		if err != nil {
@@ -44,9 +59,8 @@ chorctl consistency purge 87009fd62551da208508`,
 		defer conn.Close()
 
 		client := pb.NewChorusClient(conn)
-
 		for _, id := range args {
-			_, err := client.DeleteConsistencyCheckReport(ctx, &pb.DeleteConsistencyCheckReportRequest{Id: id})
+			_, err := client.DeleteConsistencyCheckReport(ctx, &pb.DeleteConsistencyCheckReportRequest{Locations: locations})
 			if err != nil {
 				logrus.WithError(err).WithField("address", address).Fatal("unable to delete consistency check", id)
 			} else {
