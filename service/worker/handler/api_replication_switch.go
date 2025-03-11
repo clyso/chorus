@@ -55,51 +55,55 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 	}
 	defer release()
 	return lock.WithRefresh(ctx, func() error {
-		// get latest replication and switch state and execute switch state machine:
-		replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-		if err != nil {
-			if errors.Is(err, dom.ErrNotFound) {
-				zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
-				return nil
-			}
-			return err
-		}
-		if replStatus.IsPaused {
-			// replication is paused - retry later
-			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-		}
-		if !replStatus.IsArchived {
-			zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
-		}
-		switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, policyID)
-		if err != nil {
-			if errors.Is(err, dom.ErrNotFound) {
-				zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
-				return nil
-			}
-			return err
-		}
-		if !switchPolicy.IsZeroDowntime() {
-			// wrong switch type - drop task
-			// should never happen
-			zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch is not switch with downtime")
+		return s.handleZeroDowntimeReplicationSwitch(ctx, policyID, p)
+	}, refresh, time.Second*2)
+}
+
+func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID policy.ReplicationID, p tasks.ZeroDowntimeReplicationSwitchPayload) error {
+	// get latest replication and switch state and execute switch state machine:
+	replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
 			return nil
 		}
-		// check if replication switch can be finished:
-		if replStatus.EventsDone < replStatus.Events {
-			// events queue is not drained yet - retry later
-			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+		return err
+	}
+	if replStatus.IsPaused {
+		// replication is paused - retry later
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
+	}
+	if !replStatus.IsArchived {
+		zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
+	}
+	switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, policyID)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
+			return nil
 		}
-		existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.User, p.Bucket)
-		if err != nil {
-			return err
-		}
-		if existsUploads {
-			// there are pending multipart uploads - retry later
-			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
-		}
-		// all good - finish zero downtime replication switch:
+		return err
+	}
+	if !switchPolicy.IsZeroDowntime() {
+		// wrong switch type - drop task
+		// should never happen
+		zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch is not switch with downtime")
+		return nil
+	}
+	// check if replication switch can be finished:
+	if replStatus.EventsDone < replStatus.Events {
+		// events queue is not drained yet - retry later
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+	}
+	existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.User, p.Bucket)
+	if err != nil {
+		return err
+	}
+	if existsUploads {
+		// there are pending multipart uploads - retry later
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+	}
+	// all good - finish zero downtime replication switch:
 
-		return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, policyID)
-	}, refresh, time.Second*2)
+	return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, policyID)
 }
