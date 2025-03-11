@@ -269,6 +269,8 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 	// to update obj version metadata and avoid creating replication tasks
 	_, err = s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, user, bucket)
 	if err == nil {
+		// no-error means that zero-downtime switch in progress.
+		// return replication policy without destinations
 		return policy.ReplicationPolicies{
 			From: task.GetFrom(),
 		}, nil
