@@ -44,7 +44,7 @@ service Chorus {
 
   rpc AddBucketReplication(AddBucketReplicationRequest) returns (google.protobuf.Empty);
 
-  rpc FetchReplicationStatus(ReplicationRequest) returns (Replication);
+  rpc GetReplicationStatus(ReplicationRequest) returns (Replication);
 }
 
 message GetAppVersionResponse {

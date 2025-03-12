@@ -185,6 +185,38 @@
         ]
       }
     },
+    "/replication/get": {
+      "post": {
+        "operationId": "Chorus_GetReplicationStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusReplication"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/replication/list-buckets": {
       "post": {
         "summary": "Returns list of buckets to configure new replication.",
@@ -262,38 +294,6 @@
             "schema": {
               "type": "object",
               "properties": {}
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Chorus"
-        ]
-      }
-    },
-    "/replication/status/fetch": {
-      "post": {
-        "operationId": "Chorus_FetchReplicationStatus",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/chorusReplication"
             }
           },
           "default": {
