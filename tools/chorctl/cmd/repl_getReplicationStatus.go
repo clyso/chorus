@@ -43,7 +43,7 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 			From:   rgUser,
 			To:     rgBucket,
 		}
-		res, err := client.FetchReplicationStatus(ctx, req)
+		res, err := client.GetReplicationStatus(ctx, req)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to add replication")
 		}

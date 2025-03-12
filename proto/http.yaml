@@ -42,6 +42,6 @@ http:
     - selector: chorus.Chorus.AddBucketReplication
       post: /v2/replication/add
       body: "*"
-    - selector: chorus.Chorus.FetchReplicationStatus
-      post: /replication/status/fetch
+    - selector: chorus.Chorus.GetReplicationStatus
+      post: /replication/get
       body: "*"
