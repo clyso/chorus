@@ -187,7 +187,7 @@
     },
     "/replication/get": {
       "post": {
-        "operationId": "Chorus_GetReplicationStatus",
+        "operationId": "Chorus_GetReplication",
         "responses": {
           "200": {
             "description": "A successful response.",
