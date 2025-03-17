@@ -98,6 +98,7 @@ type Service interface {
 	ListConsistencyCheckIDs(ctx context.Context) ([]string, error)
 	AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyCheckRecord) error
 	FindConsistencyCheckSets(ctx context.Context, id string) ([]ConsistencyCheckResultEntry, error)
+	HasConsistencyCheckSets(ctx context.Context, id string) (bool, error)
 	DeleteAllConsistencyCheckSets(ctx context.Context, id string) error
 	SetConsistencyCheckReadiness(ctx context.Context, id string, ready bool) error
 	GetConsistencyCheckReadiness(ctx context.Context, id string) (bool, error)
@@ -264,6 +265,7 @@ func (s *svc) DeleteLastListedConsistencyCheckObj(ctx context.Context, obj *Cons
 
 func (s *svc) DeleteAllLastListedConsistencyCheckObj(ctx context.Context, id string) error {
 	keyPattern := fmt.Sprintf("ccv:l:%s:*", id)
+	pipe := s.client.Pipeline()
 	var cursor uint64
 
 	for {
@@ -273,7 +275,7 @@ func (s *svc) DeleteAllLastListedConsistencyCheckObj(ctx context.Context, id str
 		}
 
 		for _, key := range keys {
-			s.client.Unlink(ctx, key)
+			_ = pipe.Unlink(ctx, key)
 		}
 
 		if nextCursor == 0 {
@@ -281,6 +283,10 @@ func (s *svc) DeleteAllLastListedConsistencyCheckObj(ctx context.Context, id str
 		}
 
 		cursor = nextCursor
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("unable to pipe unlink commands: %w", err)
 	}
 
 	return nil
@@ -457,8 +463,24 @@ func (s *svc) FindConsistencyCheckSets(ctx context.Context, id string) ([]Consis
 	return results, nil
 }
 
+func (s *svc) HasConsistencyCheckSets(ctx context.Context, id string) (bool, error) {
+	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+
+	keys, _, err := s.client.Scan(ctx, 0, keyPattern, 1).Result()
+	if err != nil {
+		return false, fmt.Errorf("unable to scan keys: %w", err)
+	}
+
+	if len(keys) != 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 func (s *svc) DeleteAllConsistencyCheckSets(ctx context.Context, id string) error {
 	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+	pipe := s.client.Pipeline()
 	var cursor uint64
 
 	for {
@@ -468,7 +490,7 @@ func (s *svc) DeleteAllConsistencyCheckSets(ctx context.Context, id string) erro
 		}
 
 		for _, key := range keys {
-			s.client.Unlink(ctx, key)
+			pipe.Unlink(ctx, key)
 		}
 
 		if nextCursor == 0 {
@@ -476,6 +498,10 @@ func (s *svc) DeleteAllConsistencyCheckSets(ctx context.Context, id string) erro
 		}
 
 		cursor = nextCursor
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("unable to pipe unlink commands: %w", err)
 	}
 
 	return nil
