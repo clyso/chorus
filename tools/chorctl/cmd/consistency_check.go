@@ -63,11 +63,10 @@ chorctl consistency check oldstorage:bucket newstorage:altbucket --user username
 		defer conn.Close()
 
 		client := pb.NewChorusClient(conn)
-		res, err := client.StartConsistencyCheck(ctx, &pb.StartConsistencyCheckRequest{Locations: locations})
-		if err != nil {
+		if _, err = client.StartConsistencyCheck(ctx, &pb.ConsistencyCheckRequest{Locations: locations}); err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}
-		fmt.Println("Consistency check", res.Id, "has been created.")
+		fmt.Println("Consistency check has been created.")
 	},
 }
 

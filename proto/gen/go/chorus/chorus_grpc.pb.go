@@ -57,6 +57,27 @@ const (
 	Chorus_ListConsistencyChecks_FullMethodName        = "/chorus.Chorus/ListConsistencyChecks"
 	Chorus_GetConsistencyCheckReport_FullMethodName    = "/chorus.Chorus/GetConsistencyCheckReport"
 	Chorus_DeleteConsistencyCheckReport_FullMethodName = "/chorus.Chorus/DeleteConsistencyCheckReport"
+	Chorus_GetAppVersion_FullMethodName                    = "/chorus.Chorus/GetAppVersion"
+	Chorus_GetStorages_FullMethodName                      = "/chorus.Chorus/GetStorages"
+	Chorus_GetProxyCredentials_FullMethodName              = "/chorus.Chorus/GetProxyCredentials"
+	Chorus_ListBucketsForReplication_FullMethodName        = "/chorus.Chorus/ListBucketsForReplication"
+	Chorus_AddReplication_FullMethodName                   = "/chorus.Chorus/AddReplication"
+	Chorus_ListReplications_FullMethodName                 = "/chorus.Chorus/ListReplications"
+	Chorus_ListUserReplications_FullMethodName             = "/chorus.Chorus/ListUserReplications"
+	Chorus_StreamBucketReplication_FullMethodName          = "/chorus.Chorus/StreamBucketReplication"
+	Chorus_PauseReplication_FullMethodName                 = "/chorus.Chorus/PauseReplication"
+	Chorus_ResumeReplication_FullMethodName                = "/chorus.Chorus/ResumeReplication"
+	Chorus_DeleteReplication_FullMethodName                = "/chorus.Chorus/DeleteReplication"
+	Chorus_DeleteUserReplication_FullMethodName            = "/chorus.Chorus/DeleteUserReplication"
+	Chorus_SwitchMainBucket_FullMethodName                 = "/chorus.Chorus/SwitchMainBucket"
+	Chorus_CompareBucket_FullMethodName                    = "/chorus.Chorus/CompareBucket"
+	Chorus_GetAgents_FullMethodName                        = "/chorus.Chorus/GetAgents"
+	Chorus_AddBucketReplication_FullMethodName             = "/chorus.Chorus/AddBucketReplication"
+	Chorus_StartConsistencyCheck_FullMethodName            = "/chorus.Chorus/StartConsistencyCheck"
+	Chorus_ListConsistencyChecks_FullMethodName            = "/chorus.Chorus/ListConsistencyChecks"
+	Chorus_GetConsistencyCheckReport_FullMethodName        = "/chorus.Chorus/GetConsistencyCheckReport"
+	Chorus_GetConsistencyCheckReportEntries_FullMethodName = "/chorus.Chorus/GetConsistencyCheckReportEntries"
+	Chorus_DeleteConsistencyCheckReport_FullMethodName     = "/chorus.Chorus/DeleteConsistencyCheckReport"
 )
 
 // ChorusClient is the client API for Chorus service.
@@ -91,9 +112,11 @@ type ChorusClient interface {
 	AddBucketReplication(ctx context.Context, in *AddBucketReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetReplication(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error)
 	StartConsistencyCheck(ctx context.Context, in *StartConsistencyCheckRequest, opts ...grpc.CallOption) (*StartConsistencyCheckResponse, error)
+	StartConsistencyCheck(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListConsistencyChecks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListConsistencyChecksResponse, error)
-	GetConsistencyCheckReport(ctx context.Context, in *GetConsistencyCheckReportRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportResponse, error)
-	DeleteConsistencyCheckReport(ctx context.Context, in *DeleteConsistencyCheckReportRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetConsistencyCheckReport(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportResponse, error)
+	GetConsistencyCheckReportEntries(ctx context.Context, in *GetConsistencyCheckReportEntriesRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportEntriesResponse, error)
+	DeleteConsistencyCheckReport(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type chorusClient struct {
@@ -283,9 +306,9 @@ func (c *chorusClient) GetReplication(ctx context.Context, in *ReplicationReques
 	return out, nil
 }
 
-func (c *chorusClient) StartConsistencyCheck(ctx context.Context, in *StartConsistencyCheckRequest, opts ...grpc.CallOption) (*StartConsistencyCheckResponse, error) {
+func (c *chorusClient) StartConsistencyCheck(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartConsistencyCheckResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Chorus_StartConsistencyCheck_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -303,7 +326,7 @@ func (c *chorusClient) ListConsistencyChecks(ctx context.Context, in *emptypb.Em
 	return out, nil
 }
 
-func (c *chorusClient) GetConsistencyCheckReport(ctx context.Context, in *GetConsistencyCheckReportRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportResponse, error) {
+func (c *chorusClient) GetConsistencyCheckReport(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetConsistencyCheckReportResponse)
 	err := c.cc.Invoke(ctx, Chorus_GetConsistencyCheckReport_FullMethodName, in, out, cOpts...)
@@ -313,7 +336,17 @@ func (c *chorusClient) GetConsistencyCheckReport(ctx context.Context, in *GetCon
 	return out, nil
 }
 
-func (c *chorusClient) DeleteConsistencyCheckReport(ctx context.Context, in *DeleteConsistencyCheckReportRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *chorusClient) GetConsistencyCheckReportEntries(ctx context.Context, in *GetConsistencyCheckReportEntriesRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportEntriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetConsistencyCheckReportEntriesResponse)
+	err := c.cc.Invoke(ctx, Chorus_GetConsistencyCheckReportEntries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chorusClient) DeleteConsistencyCheckReport(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Chorus_DeleteConsistencyCheckReport_FullMethodName, in, out, cOpts...)
@@ -355,9 +388,11 @@ type ChorusServer interface {
 	AddBucketReplication(context.Context, *AddBucketReplicationRequest) (*emptypb.Empty, error)
 	GetReplication(context.Context, *ReplicationRequest) (*Replication, error)
 	StartConsistencyCheck(context.Context, *StartConsistencyCheckRequest) (*StartConsistencyCheckResponse, error)
+	StartConsistencyCheck(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error)
 	ListConsistencyChecks(context.Context, *emptypb.Empty) (*ListConsistencyChecksResponse, error)
-	GetConsistencyCheckReport(context.Context, *GetConsistencyCheckReportRequest) (*GetConsistencyCheckReportResponse, error)
-	DeleteConsistencyCheckReport(context.Context, *DeleteConsistencyCheckReportRequest) (*emptypb.Empty, error)
+	GetConsistencyCheckReport(context.Context, *ConsistencyCheckRequest) (*GetConsistencyCheckReportResponse, error)
+	GetConsistencyCheckReportEntries(context.Context, *GetConsistencyCheckReportEntriesRequest) (*GetConsistencyCheckReportEntriesResponse, error)
+	DeleteConsistencyCheckReport(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error)
 }
 
 // UnimplementedChorusServer should be embedded to have
@@ -419,15 +454,19 @@ func (UnimplementedChorusServer) GetReplication(context.Context, *ReplicationReq
 	return nil, status.Errorf(codes.Unimplemented, "method GetReplication not implemented")
 }
 func (UnimplementedChorusServer) StartConsistencyCheck(context.Context, *StartConsistencyCheckRequest) (*StartConsistencyCheckResponse, error) {
+func (UnimplementedChorusServer) StartConsistencyCheck(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartConsistencyCheck not implemented")
 }
 func (UnimplementedChorusServer) ListConsistencyChecks(context.Context, *emptypb.Empty) (*ListConsistencyChecksResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListConsistencyChecks not implemented")
 }
-func (UnimplementedChorusServer) GetConsistencyCheckReport(context.Context, *GetConsistencyCheckReportRequest) (*GetConsistencyCheckReportResponse, error) {
+func (UnimplementedChorusServer) GetConsistencyCheckReport(context.Context, *ConsistencyCheckRequest) (*GetConsistencyCheckReportResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConsistencyCheckReport not implemented")
 }
-func (UnimplementedChorusServer) DeleteConsistencyCheckReport(context.Context, *DeleteConsistencyCheckReportRequest) (*emptypb.Empty, error) {
+func (UnimplementedChorusServer) GetConsistencyCheckReportEntries(context.Context, *GetConsistencyCheckReportEntriesRequest) (*GetConsistencyCheckReportEntriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetConsistencyCheckReportEntries not implemented")
+}
+func (UnimplementedChorusServer) DeleteConsistencyCheckReport(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteConsistencyCheckReport not implemented")
 }
 func (UnimplementedChorusServer) testEmbeddedByValue() {}
@@ -750,7 +789,7 @@ func _Chorus_GetReplication_Handler(srv interface{}, ctx context.Context, dec fu
 }
 
 func _Chorus_StartConsistencyCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartConsistencyCheckRequest)
+	in := new(ConsistencyCheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -762,7 +801,7 @@ func _Chorus_StartConsistencyCheck_Handler(srv interface{}, ctx context.Context,
 		FullMethod: Chorus_StartConsistencyCheck_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChorusServer).StartConsistencyCheck(ctx, req.(*StartConsistencyCheckRequest))
+		return srv.(ChorusServer).StartConsistencyCheck(ctx, req.(*ConsistencyCheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -786,7 +825,7 @@ func _Chorus_ListConsistencyChecks_Handler(srv interface{}, ctx context.Context,
 }
 
 func _Chorus_GetConsistencyCheckReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetConsistencyCheckReportRequest)
+	in := new(ConsistencyCheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -798,13 +837,31 @@ func _Chorus_GetConsistencyCheckReport_Handler(srv interface{}, ctx context.Cont
 		FullMethod: Chorus_GetConsistencyCheckReport_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChorusServer).GetConsistencyCheckReport(ctx, req.(*GetConsistencyCheckReportRequest))
+		return srv.(ChorusServer).GetConsistencyCheckReport(ctx, req.(*ConsistencyCheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chorus_GetConsistencyCheckReportEntries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConsistencyCheckReportEntriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).GetConsistencyCheckReportEntries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_GetConsistencyCheckReportEntries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).GetConsistencyCheckReportEntries(ctx, req.(*GetConsistencyCheckReportEntriesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Chorus_DeleteConsistencyCheckReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteConsistencyCheckReportRequest)
+	in := new(ConsistencyCheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -816,7 +873,7 @@ func _Chorus_DeleteConsistencyCheckReport_Handler(srv interface{}, ctx context.C
 		FullMethod: Chorus_DeleteConsistencyCheckReport_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChorusServer).DeleteConsistencyCheckReport(ctx, req.(*DeleteConsistencyCheckReportRequest))
+		return srv.(ChorusServer).DeleteConsistencyCheckReport(ctx, req.(*ConsistencyCheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -903,6 +960,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetConsistencyCheckReport",
 			Handler:    _Chorus_GetConsistencyCheckReport_Handler,
+		},
+		{
+			MethodName: "GetConsistencyCheckReportEntries",
+			Handler:    _Chorus_GetConsistencyCheckReportEntries_Handler,
 		},
 		{
 			MethodName: "DeleteConsistencyCheckReport",

@@ -62,7 +62,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusDeleteConsistencyCheckReportRequest"
+              "$ref": "#/definitions/chorusConsistencyCheckRequest"
             }
           }
         ],
@@ -115,6 +115,44 @@
         ]
       }
     },
+    "/consistency/report-entries": {
+      "get": {
+        "operationId": "Chorus_GetConsistencyCheckReportEntries",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusGetConsistencyCheckReportEntriesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Cursor",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "uint64"
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/consistency/start": {
       "post": {
         "operationId": "Chorus_StartConsistencyCheck",
@@ -122,7 +160,8 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusStartConsistencyCheckResponse"
+              "type": "object",
+              "properties": {}
             }
           },
           "default": {
@@ -138,7 +177,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusStartConsistencyCheckRequest"
+              "$ref": "#/definitions/chorusConsistencyCheckRequest"
             }
           }
         ],
@@ -802,6 +841,18 @@
         }
       }
     },
+    "chorusConsistencyCheckRequest": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        }
+      }
+    },
     "chorusCredential": {
       "type": "object",
       "properties": {
@@ -813,18 +864,6 @@
         },
         "secretKey": {
           "type": "string"
-        }
-      }
-    },
-    "chorusDeleteConsistencyCheckReportRequest": {
-      "type": "object",
-      "properties": {
-        "locations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/chorusMigrateLocation"
-          }
         }
       }
     },
@@ -871,18 +910,27 @@
         }
       }
     },
-    "chorusGetConsistencyCheckReportResponse": {
+    "chorusGetConsistencyCheckReportEntriesResponse": {
       "type": "object",
       "properties": {
-        "check": {
-          "$ref": "#/definitions/chorusConsistencyCheck"
-        },
         "entries": {
           "type": "array",
           "items": {
             "type": "object",
             "$ref": "#/definitions/chorusConsistencyCheckReportEntry"
           }
+        },
+        "Cursor": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
+    "chorusGetConsistencyCheckReportResponse": {
+      "type": "object",
+      "properties": {
+        "check": {
+          "$ref": "#/definitions/chorusConsistencyCheck"
         }
       }
     },
@@ -1085,26 +1133,6 @@
           "type": "string"
         },
         "toBucket": {
-          "type": "string"
-        }
-      }
-    },
-    "chorusStartConsistencyCheckRequest": {
-      "type": "object",
-      "properties": {
-        "locations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/chorusMigrateLocation"
-          }
-        }
-      }
-    },
-    "chorusStartConsistencyCheckResponse": {
-      "type": "object",
-      "properties": {
-        "id": {
           "type": "string"
         }
       }

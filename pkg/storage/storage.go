@@ -70,6 +70,11 @@ type ConsistencyCheckResultEntry struct {
 	Storages []string
 }
 
+type ConsistencyCheckResultPage struct {
+	Entries []ConsistencyCheckResultEntry
+	Cursor  uint64
+}
+
 type Service interface {
 	GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error)
 	SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error
@@ -98,6 +103,7 @@ type Service interface {
 	ListConsistencyCheckIDs(ctx context.Context) ([]string, error)
 	AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyCheckRecord) error
 	FindConsistencyCheckSets(ctx context.Context, id string) ([]ConsistencyCheckResultEntry, error)
+	FindConsistencyCheckSetsPageable(ctx context.Context, id string, cursor uint64, pageSize int64) (*ConsistencyCheckResultPage, error)
 	HasConsistencyCheckSets(ctx context.Context, id string) (bool, error)
 	DeleteAllConsistencyCheckSets(ctx context.Context, id string) error
 	SetConsistencyCheckReadiness(ctx context.Context, id string, ready bool) error
@@ -461,6 +467,37 @@ func (s *svc) FindConsistencyCheckSets(ctx context.Context, id string) ([]Consis
 	})
 
 	return results, nil
+}
+
+func (s *svc) FindConsistencyCheckSetsPageable(ctx context.Context, id string, cursor uint64, pageSize int64) (*ConsistencyCheckResultPage, error) {
+	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+	results := make([]ConsistencyCheckResultEntry, 0, pageSize)
+
+	keys, nextCursor, err := s.client.Scan(ctx, cursor, keyPattern, pageSize).Result()
+	if err != nil {
+		return nil, fmt.Errorf("unable to scan keys: %w", err)
+	}
+
+	for _, key := range keys {
+		storages, err := s.client.SMembers(ctx, key).Result()
+		if err != nil {
+			return nil, fmt.Errorf("unable to read set members: %w", err)
+		}
+
+		parts := strings.Split(key, ":")
+		partsCount := len(parts)
+		result := ConsistencyCheckResultEntry{
+			Object:   parts[partsCount-2],
+			ETag:     parts[partsCount-1],
+			Storages: storages,
+		}
+		results = append(results, result)
+	}
+
+	return &ConsistencyCheckResultPage{
+		Entries: results,
+		Cursor:  nextCursor,
+	}, nil
 }
 
 func (s *svc) HasConsistencyCheckSets(ctx context.Context, id string) (bool, error) {
