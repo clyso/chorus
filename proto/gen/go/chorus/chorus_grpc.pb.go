@@ -20,43 +20,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Chorus_GetAppVersion_FullMethodName             = "/chorus.Chorus/GetAppVersion"
-	Chorus_GetStorages_FullMethodName               = "/chorus.Chorus/GetStorages"
-	Chorus_GetProxyCredentials_FullMethodName       = "/chorus.Chorus/GetProxyCredentials"
-	Chorus_ListBucketsForReplication_FullMethodName = "/chorus.Chorus/ListBucketsForReplication"
-	Chorus_AddReplication_FullMethodName            = "/chorus.Chorus/AddReplication"
-	Chorus_ListReplications_FullMethodName          = "/chorus.Chorus/ListReplications"
-	Chorus_ListUserReplications_FullMethodName      = "/chorus.Chorus/ListUserReplications"
-	Chorus_StreamBucketReplication_FullMethodName   = "/chorus.Chorus/StreamBucketReplication"
-	Chorus_PauseReplication_FullMethodName          = "/chorus.Chorus/PauseReplication"
-	Chorus_ResumeReplication_FullMethodName         = "/chorus.Chorus/ResumeReplication"
-	Chorus_DeleteReplication_FullMethodName         = "/chorus.Chorus/DeleteReplication"
-	Chorus_DeleteUserReplication_FullMethodName     = "/chorus.Chorus/DeleteUserReplication"
-	Chorus_SwitchMainBucket_FullMethodName          = "/chorus.Chorus/SwitchMainBucket"
-	Chorus_CompareBucket_FullMethodName             = "/chorus.Chorus/CompareBucket"
-	Chorus_GetAgents_FullMethodName                 = "/chorus.Chorus/GetAgents"
-	Chorus_AddBucketReplication_FullMethodName      = "/chorus.Chorus/AddBucketReplication"
-	Chorus_GetReplication_FullMethodName            = "/chorus.Chorus/GetReplication"
-	Chorus_GetAppVersion_FullMethodName                = "/chorus.Chorus/GetAppVersion"
-	Chorus_GetStorages_FullMethodName                  = "/chorus.Chorus/GetStorages"
-	Chorus_GetProxyCredentials_FullMethodName          = "/chorus.Chorus/GetProxyCredentials"
-	Chorus_ListBucketsForReplication_FullMethodName    = "/chorus.Chorus/ListBucketsForReplication"
-	Chorus_AddReplication_FullMethodName               = "/chorus.Chorus/AddReplication"
-	Chorus_ListReplications_FullMethodName             = "/chorus.Chorus/ListReplications"
-	Chorus_ListUserReplications_FullMethodName         = "/chorus.Chorus/ListUserReplications"
-	Chorus_StreamBucketReplication_FullMethodName      = "/chorus.Chorus/StreamBucketReplication"
-	Chorus_PauseReplication_FullMethodName             = "/chorus.Chorus/PauseReplication"
-	Chorus_ResumeReplication_FullMethodName            = "/chorus.Chorus/ResumeReplication"
-	Chorus_DeleteReplication_FullMethodName            = "/chorus.Chorus/DeleteReplication"
-	Chorus_DeleteUserReplication_FullMethodName        = "/chorus.Chorus/DeleteUserReplication"
-	Chorus_SwitchMainBucket_FullMethodName             = "/chorus.Chorus/SwitchMainBucket"
-	Chorus_CompareBucket_FullMethodName                = "/chorus.Chorus/CompareBucket"
-	Chorus_GetAgents_FullMethodName                    = "/chorus.Chorus/GetAgents"
-	Chorus_AddBucketReplication_FullMethodName         = "/chorus.Chorus/AddBucketReplication"
-	Chorus_StartConsistencyCheck_FullMethodName        = "/chorus.Chorus/StartConsistencyCheck"
-	Chorus_ListConsistencyChecks_FullMethodName        = "/chorus.Chorus/ListConsistencyChecks"
-	Chorus_GetConsistencyCheckReport_FullMethodName    = "/chorus.Chorus/GetConsistencyCheckReport"
-	Chorus_DeleteConsistencyCheckReport_FullMethodName = "/chorus.Chorus/DeleteConsistencyCheckReport"
 	Chorus_GetAppVersion_FullMethodName                    = "/chorus.Chorus/GetAppVersion"
 	Chorus_GetStorages_FullMethodName                      = "/chorus.Chorus/GetStorages"
 	Chorus_GetProxyCredentials_FullMethodName              = "/chorus.Chorus/GetProxyCredentials"
@@ -73,6 +36,7 @@ const (
 	Chorus_CompareBucket_FullMethodName                    = "/chorus.Chorus/CompareBucket"
 	Chorus_GetAgents_FullMethodName                        = "/chorus.Chorus/GetAgents"
 	Chorus_AddBucketReplication_FullMethodName             = "/chorus.Chorus/AddBucketReplication"
+	Chorus_GetReplication_FullMethodName                   = "/chorus.Chorus/GetReplication"
 	Chorus_StartConsistencyCheck_FullMethodName            = "/chorus.Chorus/StartConsistencyCheck"
 	Chorus_ListConsistencyChecks_FullMethodName            = "/chorus.Chorus/ListConsistencyChecks"
 	Chorus_GetConsistencyCheckReport_FullMethodName        = "/chorus.Chorus/GetConsistencyCheckReport"
@@ -111,7 +75,6 @@ type ChorusClient interface {
 	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
 	AddBucketReplication(ctx context.Context, in *AddBucketReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetReplication(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error)
-	StartConsistencyCheck(ctx context.Context, in *StartConsistencyCheckRequest, opts ...grpc.CallOption) (*StartConsistencyCheckResponse, error)
 	StartConsistencyCheck(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListConsistencyChecks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListConsistencyChecksResponse, error)
 	GetConsistencyCheckReport(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportResponse, error)
@@ -387,7 +350,6 @@ type ChorusServer interface {
 	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
 	AddBucketReplication(context.Context, *AddBucketReplicationRequest) (*emptypb.Empty, error)
 	GetReplication(context.Context, *ReplicationRequest) (*Replication, error)
-	StartConsistencyCheck(context.Context, *StartConsistencyCheckRequest) (*StartConsistencyCheckResponse, error)
 	StartConsistencyCheck(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error)
 	ListConsistencyChecks(context.Context, *emptypb.Empty) (*ListConsistencyChecksResponse, error)
 	GetConsistencyCheckReport(context.Context, *ConsistencyCheckRequest) (*GetConsistencyCheckReportResponse, error)
@@ -453,7 +415,6 @@ func (UnimplementedChorusServer) AddBucketReplication(context.Context, *AddBucke
 func (UnimplementedChorusServer) GetReplication(context.Context, *ReplicationRequest) (*Replication, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetReplication not implemented")
 }
-func (UnimplementedChorusServer) StartConsistencyCheck(context.Context, *StartConsistencyCheckRequest) (*StartConsistencyCheckResponse, error) {
 func (UnimplementedChorusServer) StartConsistencyCheck(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartConsistencyCheck not implemented")
 }
