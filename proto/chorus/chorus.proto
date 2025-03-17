@@ -72,6 +72,7 @@ message ConsistencyCheck {
   uint64 queued = 3;
   uint64 completed = 4;
   bool ready = 5;
+  bool consistent = 6;
 }
 
 message ListConsistencyChecksResponse {

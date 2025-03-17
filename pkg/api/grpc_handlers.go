@@ -166,12 +166,25 @@ func (h *handlers) constructConsistencyCheck(ctx context.Context, id string) (*p
 		})
 	}
 
-	return &pb.ConsistencyCheck{
+	consistencyCheck := &pb.ConsistencyCheck{
 		Queued:    scheduledCounter,
 		Completed: completedCounter,
 		Locations: migrateLocations,
 		Ready:     ready,
-	}, nil
+	}
+
+	if !ready {
+		return consistencyCheck, nil
+	}
+
+	hasSets, err := h.storageSvc.HasConsistencyCheckSets(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check whether consistency check sets are present: %w", err)
+	}
+
+	consistencyCheck.Consistent = !hasSets
+
+	return consistencyCheck, nil
 }
 
 func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.GetConsistencyCheckReportRequest) (*pb.GetConsistencyCheckReportResponse, error) {

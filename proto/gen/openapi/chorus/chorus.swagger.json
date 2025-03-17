@@ -779,6 +779,9 @@
         },
         "ready": {
           "type": "boolean"
+        },
+        "consistent": {
+          "type": "boolean"
         }
       }
     },
