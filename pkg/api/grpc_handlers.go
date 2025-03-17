@@ -66,7 +66,7 @@ type handlers struct {
 	appInfo         *dom.AppInfo
 }
 
-func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsistencyCheckRequest) (*pb.StartConsistencyCheckResponse, error) {
+func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
 	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
 
 	locations := make([]tasks.MigrateLocation, 0, len(req.Locations))
@@ -91,9 +91,7 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)
 	}
 
-	return &pb.StartConsistencyCheckResponse{
-		Id: consistencyCheckID,
-	}, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (h *handlers) ListConsistencyChecks(ctx context.Context, _ *emptypb.Empty) (*pb.ListConsistencyChecksResponse, error) {
@@ -187,7 +185,7 @@ func (h *handlers) constructConsistencyCheck(ctx context.Context, id string) (*p
 	return consistencyCheck, nil
 }
 
-func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.GetConsistencyCheckReportRequest) (*pb.GetConsistencyCheckReportResponse, error) {
+func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*pb.GetConsistencyCheckReportResponse, error) {
 	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
 	consistencyCheck, err := h.constructConsistencyCheck(ctx, consistencyCheckID)
 	if err != nil {
@@ -199,27 +197,34 @@ func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.GetCon
 		}, nil
 	}
 
-	checkSets, err := h.storageSvc.FindConsistencyCheckSets(ctx, consistencyCheckID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get consistency check sets: %w", err)
-	}
-
-	reportEntries := make([]*pb.ConsistencyCheckReportEntry, 0, len(checkSets))
-	for _, checkSet := range checkSets {
-		reportEntries = append(reportEntries, &pb.ConsistencyCheckReportEntry{
-			Object:   checkSet.Object,
-			Etag:     checkSet.ETag,
-			Storages: checkSet.Storages,
-		})
-	}
-
 	return &pb.GetConsistencyCheckReportResponse{
-		Check:   consistencyCheck,
-		Entries: reportEntries,
+		Check: consistencyCheck,
 	}, nil
 }
 
-func (h *handlers) DeleteConsistencyCheckReport(ctx context.Context, req *pb.DeleteConsistencyCheckReportRequest) (*emptypb.Empty, error) {
+func (h *handlers) GetConsistencyCheckReportEntries(ctx context.Context, req *pb.GetConsistencyCheckReportEntriesRequest) (*pb.GetConsistencyCheckReportEntriesResponse, error) {
+	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
+	page, err := h.storageSvc.FindConsistencyCheckSetsPageable(ctx, consistencyCheckID, req.Cursor, req.PageSize)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get consistency sets page: %w", err)
+	}
+
+	entries := make([]*pb.ConsistencyCheckReportEntry, 0, len(page.Entries))
+	for _, storageEntry := range page.Entries {
+		entries = append(entries, &pb.ConsistencyCheckReportEntry{
+			Object:   storageEntry.Object,
+			Etag:     storageEntry.ETag,
+			Storages: storageEntry.Storages,
+		})
+	}
+
+	return &pb.GetConsistencyCheckReportEntriesResponse{
+		Entries: entries,
+		Cursor:  page.Cursor,
+	}, nil
+}
+
+func (h *handlers) DeleteConsistencyCheckReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
 	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
 	deleteConsistencyCheckReportTask := tasks.ConsistencyCheckDeletePayload{
 		ID: consistencyCheckID,

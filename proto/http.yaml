@@ -10,6 +10,8 @@ http:
       get: /consistency/list
     - selector: chorus.Chorus.GetConsistencyCheckReport
       get: /consistency/report
+    - selector: chorus.Chorus.GetConsistencyCheckReportEntries
+      get: /consistency/report-entries
     - selector: chorus.Chorus.DeleteConsistencyCheckReport
       put: /consistency/delete
       body: "*"

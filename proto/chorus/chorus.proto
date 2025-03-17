@@ -46,10 +46,11 @@ service Chorus {
 
   rpc GetReplication(ReplicationRequest) returns (Replication);
 
-  rpc StartConsistencyCheck(StartConsistencyCheckRequest) returns (StartConsistencyCheckResponse);
+  rpc StartConsistencyCheck(ConsistencyCheckRequest) returns (google.protobuf.Empty);
   rpc ListConsistencyChecks(google.protobuf.Empty) returns (ListConsistencyChecksResponse);
-  rpc GetConsistencyCheckReport(GetConsistencyCheckReportRequest) returns (GetConsistencyCheckReportResponse);
-  rpc DeleteConsistencyCheckReport(DeleteConsistencyCheckReportRequest) returns (google.protobuf.Empty);
+  rpc GetConsistencyCheckReport(ConsistencyCheckRequest) returns (GetConsistencyCheckReportResponse);
+  rpc GetConsistencyCheckReportEntries(GetConsistencyCheckReportEntriesRequest) returns (GetConsistencyCheckReportEntriesResponse);
+  rpc DeleteConsistencyCheckReport(ConsistencyCheckRequest) returns (google.protobuf.Empty);
 }
 
 message MigrateLocation {
@@ -58,12 +59,8 @@ message MigrateLocation {
   string user = 3;
 }
 
-message StartConsistencyCheckRequest {
+message ConsistencyCheckRequest {
   repeated MigrateLocation locations = 1;
-}
-
-message StartConsistencyCheckResponse {
-  string id = 1;
 }
 
 message ConsistencyCheck {
@@ -83,19 +80,25 @@ message GetConsistencyCheckReportRequest {
   repeated MigrateLocation locations = 1;
 }
 
+message GetConsistencyCheckReportResponse {
+  ConsistencyCheck check = 1;
+}
+
 message ConsistencyCheckReportEntry {
   string object = 1;
   string etag = 2;
   repeated string storages = 3;
 }
 
-message GetConsistencyCheckReportResponse {
-  ConsistencyCheck check = 1;
-  repeated ConsistencyCheckReportEntry entries = 2;
+message GetConsistencyCheckReportEntriesRequest {
+  repeated MigrateLocation locations = 1;
+  uint64 Cursor = 2;
+  int64 PageSize = 3;
 }
 
-message DeleteConsistencyCheckReportRequest {
-  repeated MigrateLocation locations = 1;
+message GetConsistencyCheckReportEntriesResponse {
+  repeated ConsistencyCheckReportEntry entries = 1;
+  uint64 Cursor = 2;
 }
 
 message GetAppVersionResponse {
