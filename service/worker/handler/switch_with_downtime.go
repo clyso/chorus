@@ -30,7 +30,7 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 		Bucket:   p.Bucket,
 		From:     p.FromStorage,
 		To:       p.ToStorage,
-		ToBucket: p.ToBucket,
+		ToBucket: nil,
 	}
 
 	// acquire exclusive lock to switch task:
@@ -41,7 +41,7 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 	defer release()
 	return lock.WithRefresh(ctx, func() error {
 		// get latest replication and switch state and execute switch state machine:
-		replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+		replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, p.FromStorage, p.ToStorage, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
 				zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
