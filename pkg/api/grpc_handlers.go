@@ -875,14 +875,11 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 		}
 		// create switch task
 		task, err := tasks.NewTask(ctx, tasks.SwitchWithDowntimePayload{
-			Sync: tasks.Sync{
-				FromStorage: req.ReplicationId.From,
-				ToStorage:   req.ReplicationId.To,
-				ToBucket:    req.ReplicationId.ToBucket,
-				CreatedAt:   time.Now(),
-			},
-			Bucket: req.ReplicationId.Bucket,
-			User:   req.ReplicationId.User,
+			FromStorage: req.ReplicationId.From,
+			ToStorage:   req.ReplicationId.To,
+			User:        req.ReplicationId.User,
+			Bucket:      req.ReplicationId.Bucket,
+			CreatedAt:   time.Now(),
 		})
 		if err != nil {
 			return err

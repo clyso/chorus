@@ -272,9 +272,11 @@ type ConsistencyCheckDeletePayload struct {
 }
 
 type SwitchWithDowntimePayload struct {
-	Sync
-	Bucket string
-	User   string
+	FromStorage string
+	ToStorage   string
+	User        string
+	Bucket      string
+	CreatedAt   time.Time
 }
 
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
@@ -322,9 +324,6 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		taskType = TypeBucketCreate
 	case SwitchWithDowntimePayload:
 		id := fmt.Sprintf("api:sd:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket)
-		if p.ToBucket != nil {
-			id += ":" + *p.ToBucket
-		}
 		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(id)}
 		taskType = TypeApiSwitchWithDowntime
 	case BucketDeletePayload:

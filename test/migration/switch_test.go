@@ -229,6 +229,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 					dd := make([]byte, nn)
 					copy(dd, partBuf[:nn])
 					partIDCopy := partID
+					uplID := *uploadID.UploadId
 					g.Go(func() error {
 						partReader := bytes.NewReader(dd)
 						part, err := proxyAwsClient.UploadPart(&aws_s3.UploadPartInput{
@@ -237,7 +238,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 							ContentLength: iPtr(int64(len(dd))),
 							Key:           sPtr(objects[i].name),
 							PartNumber:    iPtr(int64(partIDCopy)),
-							UploadId:      uploadID.UploadId,
+							UploadId:      &uplID,
 						})
 
 						if err != nil {
