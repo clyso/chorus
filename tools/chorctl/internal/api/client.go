@@ -19,8 +19,11 @@ package api
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func Connect(ctx context.Context, url string) (*grpc.ClientConn, error) {
@@ -29,4 +32,39 @@ func Connect(ctx context.Context, url string) (*grpc.ClientConn, error) {
 		//grpc.WithConnectParams(grpc.ConnectParams{Backoff: backoff.Config{MaxDelay: time.Second}}),
 		//grpc.WithInsecure(),
 	)
+}
+
+func PrintGrpcError(err error) {
+	if err == nil {
+		return
+	}
+	// Extract the status from the error
+	st, ok := status.FromError(err)
+	if !ok {
+		logrus.WithError(err).Fatal("error from server")
+	}
+
+	log := logrus.WithError(err).
+		WithField("code", st.Code())
+
+	msg := ""
+
+	// Iterate over the details
+	for _, detail := range st.Details() {
+		switch d := detail.(type) {
+		case *errdetails.RequestInfo:
+			log = log.WithField("request_id", d.RequestId)
+		case *errdetails.ErrorInfo:
+			msg += d.Reason
+		case *errdetails.RetryInfo:
+			if d.RetryDelay != nil {
+				log = log.WithField("retry_delay", d.RetryDelay.AsDuration())
+			}
+		default:
+		}
+	}
+	if msg == "" {
+		msg = "error from server: " + st.Message()
+	}
+	log.Fatal(msg)
 }

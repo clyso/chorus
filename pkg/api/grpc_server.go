@@ -205,6 +205,9 @@ func convertApiError(ctx context.Context, err error) error {
 	case errors.Is(err, dom.ErrNotFound):
 		code = codes.NotFound
 		mappedErr = dom.ErrNotFound
+		details = append(details, &errdetails.ErrorInfo{
+			Reason: err.Error(),
+		})
 	case errors.As(err, &retryErr):
 		code = codes.ResourceExhausted
 		mappedErr = &dom.ErrRateLimitExceeded{}
