@@ -51,9 +51,9 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 
-		fmt.Fprintln(w, "USER\tBUCKET\tFROM\tTO\tCREATED AT\tPAUSED\tINIT DONE\tEVENTS\tLAST EMITTED AT\tLAST PROCESSED AT\tAGENT URL\tSWITCH STATUS\tTO BUCKET\tINIT DONE AT")
+		fmt.Fprintln(w, "USER\tBUCKET\tFROM\tTO\tCREATED AT\tPAUSED\tINIT DONE\tEVENTS\tLAST EMITTED AT\tLAST PROCESSED AT\tAGENT URL\tHAS SWITCH\tTO BUCKET\tINIT DONE AT")
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%t\t%t\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%t\t%t\t%d\t%s\t%s\t%s\t%v\t%s\t%s\n",
 			res.User,
 			res.Bucket,
 			res.From,
@@ -65,7 +65,7 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 			formatTimestamp(res.LastEmittedAt),
 			formatTimestamp(res.LastProcessedAt),
 			derefString(res.AgentUrl),
-			res.SwitchStatus.String(),
+			res.HasSwitch,
 			derefString(res.ToBucket),
 			formatTimestamp(res.InitDoneAt),
 		)

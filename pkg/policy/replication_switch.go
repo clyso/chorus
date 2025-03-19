@@ -191,13 +191,13 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 	} else {
 		// already exists:
 		if existing.IsZeroDowntime() {
-			return fmt.Errorf("cannot update donwntime switch: there is existing zero downtime switch for given replication")
+			return fmt.Errorf("%w: cannot update donwntime switch: there is existing zero downtime switch for given replication", dom.ErrAlreadyExists)
 		}
 		if existing.LastStatus == StatusInProgress || existing.LastStatus == StatusCheckInProgress {
-			return fmt.Errorf("cannot update downtime switch: switch is already in progress")
+			return fmt.Errorf("%w: cannot update downtime switch: switch is already in progress", dom.ErrInvalidArg)
 		}
 		if existing.LastStatus == StatusDone {
-			return fmt.Errorf("cannot update downtime switch: switch is already completed")
+			return fmt.Errorf("%w: cannot update downtime switch: switch is already completed", dom.ErrInvalidArg)
 		}
 		// all good, update existing switch options:
 		return s.updateDowntimeSwitchOpts(ctx, replID, opts)
@@ -210,11 +210,11 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 		return fmt.Errorf("unable to get replication policy: %w", err)
 	}
 	if policy.AgentURL != "" {
-		return fmt.Errorf("cannot create downtime switch: given replication is agent based")
+		return fmt.Errorf("%w: cannot create downtime switch: given replication is agent based", dom.ErrInvalidArg)
 	}
 	forceStartNow := opts == nil || (opts.StartAt == nil && opts.Cron == nil && !opts.StartOnInitDone)
 	if forceStartNow && !policy.InitDone() {
-		return fmt.Errorf("cannot create downtime switch: init replication is not done")
+		return fmt.Errorf("%w: cannot create downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
 
 	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
@@ -222,7 +222,7 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 		return fmt.Errorf("unable to get replication policies: %w", err)
 	}
 	if len(policies.To) != 1 {
-		return fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
+		return fmt.Errorf("%w: cannot create switch: existing bucket replication should have a single destination", dom.ErrInvalidArg)
 	}
 	var dest ReplicationPolicyDest
 	var prio tasks.Priority
@@ -231,7 +231,7 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 		prio = p
 	}
 	if string(dest) != replID.To {
-		return fmt.Errorf("cannot create downtime switch: given replication is not routed to destination")
+		return fmt.Errorf("%w: cannot create downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
 	info := &SwitchInfo{
 		CreatedAt:           timeNow(),
@@ -315,20 +315,20 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		return fmt.Errorf("unable to get replication policy: %w", err)
 	}
 	if policy.AgentURL != "" {
-		return fmt.Errorf("cannot create zero-downtime switch: given replication is agent based")
+		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is agent based", dom.ErrInvalidArg)
 	}
 	if !policy.InitDone() {
-		return fmt.Errorf("cannot create zero-downtime switch: init replication is not done")
+		return fmt.Errorf("%w: cannot create zero-downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
 	if policy.IsPaused {
-		return fmt.Errorf("cannot create zero-downtime switch: replication is paused")
+		return fmt.Errorf("%w: cannot create zero-downtime switch: replication is paused", dom.ErrInvalidArg)
 	}
 	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policies: %w", err)
 	}
 	if len(policies.To) != 1 {
-		return fmt.Errorf("cannot create switch: existing bucket replication should have a single destination")
+		return fmt.Errorf("%w: cannot create switch: existing bucket replication should have a single destination", dom.ErrInvalidArg)
 	}
 	var dest ReplicationPolicyDest
 	var prio tasks.Priority
@@ -337,7 +337,7 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		prio = p
 	}
 	if string(dest) != replID.To {
-		return fmt.Errorf("cannot create zero-downtime switch: given replication is not routed to destination")
+		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
 
 	// validate routing policy
@@ -346,7 +346,7 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		return fmt.Errorf("unable to get routing policy: %w", err)
 	}
 	if toStorage != replID.From {
-		return fmt.Errorf("cannot create zero-downtime switch: given replication is not routed to destination")
+		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
 
 	now := timeNow()
@@ -592,10 +592,10 @@ func (s *policySvc) CompleteZeroDowntimeReplicationSwitch(ctx context.Context, r
 		return err
 	}
 	if !info.IsZeroDowntime() {
-		return fmt.Errorf("cannot complete zero downtime switch: switch is not zero downtime")
+		return fmt.Errorf("%w: cannot complete zero downtime switch: switch is not zero downtime", dom.ErrInvalidArg)
 	}
 	if info.LastStatus != StatusInProgress {
-		return fmt.Errorf("cannot complete zero downtime switch: switch is not in progress")
+		return fmt.Errorf("%w: cannot complete zero downtime switch: switch is not in progress", dom.ErrInvalidArg)
 	}
 	now := timeNow()
 	pipe := s.client.TxPipeline()
