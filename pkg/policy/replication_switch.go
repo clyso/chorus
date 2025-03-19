@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/adhocore/gronx"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/redis/go-redis/v9"
 )
 
 var (
