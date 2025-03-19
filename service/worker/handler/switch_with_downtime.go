@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 )
 
 // check mock values:

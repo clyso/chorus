@@ -73,7 +73,7 @@ chorctl consistency check oldstorage:bucket newstorage:altbucket --user username
 func init() {
 	consistencyCmd.AddCommand(consistencyCheckCmd)
 	consistencyCheckCmd.Flags().StringVarP(&consistencyCheckUser, "user", "u", "", "storage user")
-	err := addCmd.MarkFlagRequired("user")
+	err := consistencyCheckCmd.MarkFlagRequired("user")
 	if err != nil {
 		logrus.WithError(err).Fatal()
 	}

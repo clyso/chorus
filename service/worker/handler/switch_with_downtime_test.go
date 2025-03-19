@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/policy"
 )
 
 func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
