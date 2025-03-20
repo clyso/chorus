@@ -62,37 +62,31 @@ chorctl repl switch`,
 		api.PrintGrpcError(err)
 
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, "USER\tBUCKET\tFROM\tTO\tSTATUS\tLAST_STARTED\tDONE")
+		fmt.Fprintln(w, api.SwitchHeader())
 		for _, switchStatus := range resp.Switches {
-			if switchCmdBucket != "" && switchStatus.ReplicationId.Bucket != switchCmdBucket {
+			if !shouldPrint(switchStatus.ReplicationId) {
 				continue
 			}
-			if switchCmdFrom != "" && switchStatus.ReplicationId.From != switchCmdFrom {
-				continue
-			}
-			if switchCmdTo != "" && switchStatus.ReplicationId.To != switchCmdTo {
-				continue
-			}
-			if switchCmdUser != "" && switchStatus.ReplicationId.User != switchCmdUser {
-				continue
-			}
-
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				switchStatus.ReplicationId.User,
-				switchStatus.ReplicationId.Bucket,
-				switchStatus.ReplicationId.From,
-				switchStatus.ReplicationId.To,
-				switchStatus.LastStatus,
-				api.DateToAge(switchStatus.LastStartedAt),
-				api.DateToAge(switchStatus.DoneAt))
-			if switchCmdWide {
-				for _, hist := range switchStatus.History {
-					fmt.Fprintf(w, "\t\t\t\t\t\t%s\n", hist)
-				}
-			}
+			api.PrintSwitchRow(w, switchStatus, switchCmdWide)
 		}
 		w.Flush()
 	},
+}
+
+func shouldPrint(in *pb.ReplicationRequest) bool {
+	if switchCmdBucket != "" && in.Bucket != switchCmdBucket {
+		return false
+	}
+	if switchCmdFrom != "" && in.From != switchCmdFrom {
+		return false
+	}
+	if switchCmdTo != "" && in.To != switchCmdTo {
+		return false
+	}
+	if switchCmdUser != "" && in.User != switchCmdUser {
+		return false
+	}
+	return true
 }
 
 // create zero-downtime switch command:

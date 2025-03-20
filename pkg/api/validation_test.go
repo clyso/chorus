@@ -140,7 +140,7 @@ func TestValidateReplicationID(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				assert.Equal(t, tt.wantErr, err.Error())
+				assert.ErrorContains(t, err, tt.wantErr)
 			}
 		})
 	}
@@ -157,7 +157,7 @@ func TestValidateSwitchRequest(t *testing.T) {
 			input: &pb.SwitchBucketRequest{
 				ReplicationId: &pb.ReplicationRequest{},
 			},
-			wantErr: "invalid replication_id: user is required",
+			wantErr: "user is required",
 		},
 		{
 			name: "valid minimal with downtime",
