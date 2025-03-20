@@ -18,6 +18,7 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -44,7 +45,7 @@ func StorageRow(in *pb.Storage) string {
 }
 
 func ReplHeader() string {
-	return "NAME\tPROGRESS\tSIZE\tOBJECTS\tEVENTS\tPAUSED\tLAG\tAGE"
+	return "NAME\tPROGRESS\tSIZE\tOBJECTS\tEVENTS\tPAUSED\tLAG\tAGE\tHAS_SWITCH"
 }
 
 func ReplRow(in *pb.Replication) string {
@@ -59,7 +60,10 @@ func ReplRow(in *pb.Replication) string {
 	if in.LastEmittedAt != nil && in.LastProcessedAt != nil {
 		lag = in.LastEmittedAt.AsTime().Sub(in.LastProcessedAt.AsTime()).String()
 	}
-	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%s", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, lag, DateToAge(in.CreatedAt))
+	if in.ToBucket != nil && *in.ToBucket != "" {
+		in.To += ":" + *in.ToBucket
+	}
+	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%s\t%v", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, lag, DateToAge(in.CreatedAt), in.HasSwitch)
 }
 
 func ToPercentage(in float64) string {
@@ -176,4 +180,24 @@ func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckRepo
 		}
 	}
 	return fmt.Sprintf("%s\t%s%s", entry.Object, entry.Etag, storageMarkers)
+}
+
+func SwitchHeader() string {
+	return "USER\tBUCKET\tFROM\tTO\tSTATUS\tLAST_STARTED\tDONE"
+}
+
+func PrintSwitchRow(w io.Writer, in *pb.GetBucketSwitchStatusResponse, wide bool) {
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		in.ReplicationId.User,
+		in.ReplicationId.Bucket,
+		in.ReplicationId.From,
+		in.ReplicationId.To,
+		in.LastStatus.String(),
+		DateToAge(in.LastStartedAt),
+		DateToAge(in.DoneAt))
+	if wide {
+		for _, hist := range in.History {
+			fmt.Fprintf(w, "\t\t\t\t\t\t%s\n", hist)
+		}
+	}
 }

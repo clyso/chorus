@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	rgFrom   string
-	rgTo     string
-	rgUser   string
-	rgBucket string
+	rgFrom     string
+	rgTo       string
+	rgUser     string
+	rgBucket   string
+	rgToBucket string
 )
 
 var getReplicationStatusCmd = &cobra.Command{
@@ -43,6 +44,10 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 			From:   rgUser,
 			To:     rgBucket,
 		}
+		if cmd.Flags().Lookup("to-bucket").Changed {
+			req.ToBucket = &rgToBucket
+		}
+
 		res, err := client.GetReplication(ctx, req)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to add replication")
@@ -50,25 +55,8 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-
-		fmt.Fprintln(w, "USER\tBUCKET\tFROM\tTO\tCREATED AT\tPAUSED\tINIT DONE\tEVENTS\tLAST EMITTED AT\tLAST PROCESSED AT\tAGENT URL\tHAS SWITCH\tTO BUCKET\tINIT DONE AT")
-
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%t\t%t\t%d\t%s\t%s\t%s\t%v\t%s\t%s\n",
-			res.User,
-			res.Bucket,
-			res.From,
-			res.To,
-			formatTimestamp(res.CreatedAt),
-			res.IsPaused,
-			res.IsInitDone,
-			res.Events,
-			formatTimestamp(res.LastEmittedAt),
-			formatTimestamp(res.LastProcessedAt),
-			derefString(res.AgentUrl),
-			res.HasSwitch,
-			derefString(res.ToBucket),
-			formatTimestamp(res.InitDoneAt),
-		)
+		fmt.Fprintln(w, api.ReplHeader())
+		fmt.Fprintln(w, api.ReplRow(res))
 		w.Flush()
 	},
 }
@@ -93,6 +81,7 @@ func init() {
 	getReplicationStatusCmd.Flags().StringVarP(&rgTo, "to", "t", "", "to storage")
 	getReplicationStatusCmd.Flags().StringVarP(&rgUser, "user", "u", "", "storage user")
 	getReplicationStatusCmd.Flags().StringVarP(&rgBucket, "bucket", "b", "", "bucket name")
+	getReplicationStatusCmd.Flags().StringVar(&rgToBucket, "to-bucket", "", "to bueckt name")
 	err := getReplicationStatusCmd.MarkFlagRequired("from")
 	if err != nil {
 		logrus.WithError(err).Fatal()
