@@ -7,7 +7,7 @@ Standalone version does not have persistence, so it cannot be used for productio
 
 For installation options see main [README](../../README.md#installation).
 
-Install standalone binary or run from source with go:
+Install standalone binary or run from source with `go run`:
 ```shell
 % go run ./cmd/chorus
 _________ .__
@@ -42,17 +42,16 @@ access_key = testKey1
 secret_key = testSecretKey1
 EOF
 ```
-Create bucket in Chorus S3 Proxy:
+Create bucket with name `test` in Chorus S3 Proxy:
 ```bash
 s3cmd mb s3://test -c proxy.s3cmd
 ```
 
-To get actual yaml config used by standalone binary run:
+To get full yaml config used by standalone binary run:
 ```shell
 go run ./cmd/chorus print-config > chorus.yaml
 ```
-Open `chorus.yaml` and check the configuration. Edit config to use your own S3 credentials or change other settings.
-Run standalone binary with edited custom config:
+Open `chorus.yaml` and check the configuration. Edit config to use your own S3 endpoints instead of fake ones or change other settings. Then run standalone binary with edited custom config:
 ```shell
 go run ./cmd/chorus -config chorus.yaml
 ```

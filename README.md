@@ -42,7 +42,6 @@ Documentation available at [docs.clyso.com](https://docs.clyso.com/docs/products
 
 To get **the best** understanding of how to deploy, configure and use Chorus, start with the [docker-compose](./docker-compose) example. It is a good way to start with Chorus for people who are familiar with Docker and S3. Along with README with step-by-step instructions, it contains examples of working configurations which can be used as a reference for your own setup.
 
-
 If using containers is not an option, try to run [standalone](./service/standalone) binary. It runs all docker-compose services in a single binary. So it is also possible to follow steps from docker-compose README but without Docker.
 
 ## Installation
@@ -98,52 +97,21 @@ Additionally, Multi-platform Docker images are built from [Dockerfile](./Dockerf
 - `harbor.clyso.com/chorus/agent`
 - `harbor.clyso.com/chorus/web-ui`UI is built from [ui/Dockerfile](./ui/Dockerfile)
 
-
-
-Each Chorus component binary is published binaries for Linux, Windows, and MacOS to the [GitHub releases]
-For deployment please refer to the documentation. Currently supported deployment methods:
-- [docker-compose](./docker-compose) - local deployment with Docker compose. A good way to start with Chorus for peo
-- Deploy the Chorus to K8s with Helm chart from the OCI registry:
-    ```shell
-    helm install <release name> oci://harbor.clyso.com/chorus/chorus
-    ```
-    See: [deploy/chorus](./deploy/chorus)
-
-
-### From source
-**REQUIREMENTS:**
-- Go <https://go.dev/doc/install>
-
-Run all-in-one [standalone binry](./service/standalone) from Go:
+Here is an example of how to run Chorus Worker with Docker:
 ```shell
-go run ./cmd/chorus
+# runs chorus worker with custom config
+docker run -v /path/to/worker.yaml:/bin/config/config.yaml harbor.clyso.com/chorus/worker
 ```
 
-Or run each service separately:
-
-**REQUIREMENTS:**
-- Go <https://go.dev/doc/install>
-- Redis <https://github.com/redis/redis>
-
+To deploy Chorus to Kubernetes use Helm chart from the OCI registry:
 ```shell
-# run chorus worker
-go run ./cmd/worker
-
-# run chorus worker with a custom YAML config file
-go run ./cmd/worker -config <path to worker yaml config>
-
-# run chorus proxy with a custom YAML config file
-go run ./cmd/proxy -config <path to proxy yaml config>
-
-# run chorus agent with a custom YAML config file
-go run ./cmd/agent -config <path to agent yaml config>
+helm install <release name> oci://harbor.clyso.com/chorus/chorus
 ```
-
+The chart source is located in [deploy/chorus](./deploy/chorus).
 
 ## Develop
 
 Chorus is written in Go and Go is the only required dependency to build, run, and test the project.
-
 
 ### Test
 [Test](./test) package contains e2e tests for replications between S3 storages.
