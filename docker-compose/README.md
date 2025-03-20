@@ -66,7 +66,7 @@ To run chorus with docker compose:
     ERROR: Bucket 'test' does not exist
     ERROR: S3 error: 404 (NoSuchBucket): The specified bucket does not exist
     ```
-6. See `test` bucket avaiable for replication:
+6. See `test` bucket available for replication:
     ```shell
     % chorctl repl buckets -u user1 -f main -t follower
     BUCKET
@@ -115,7 +115,7 @@ Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) with yo
 docker-compose -f ./docker-compose/docker-compose.yml --profile proxy up
 ```
 
-Or try a setup with [chorus-agent](../service/agent) instead of proxy. Unlike `chorus-proxy`, `chorus-agent` dont't need to intercept s3 requests to propagate a new cahges. Instead, it is capturing changes from [S3 bucket notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html)
+Or try a setup with [chorus-agent](../service/agent) instead of proxy. Unlike `chorus-proxy`, `chorus-agent` don't need to intercept S3 requests to propagate a new changes. Instead, it is capturing changes from [S3 bucket notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html)
 ```shell
 docker-compose -f ./docker-compose/docker-compose.yml --profile agent up
 ```
