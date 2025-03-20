@@ -6,14 +6,13 @@
 # Chorus
 ![chorus.png](./docs/media/banner.png)
 
-Chorus is distributed vendor-agnostic S3-compatible backup, migration, and routing software. 
-Once configured it can:
- - utilize multiple machines to speed up data transfer between S3 storages
- - checkpoint data transfer progress and resume it in case of failure
- - sync existing buckets and objects from source S3 to destination S3 along with metadata like ACLs
- - capture live bucket/object changes from source S3 and propagate them to destination S3
- - route S3 requests to different S3 storages based on the user's configuration
- - reduce downtime up to zero for switching to different S3 provider
+Chorus is a distributed, vendor-agnostic, S3-compatible tool for backup, migration, and routing. It enables:
+ - Faster data transfers between S3 storages using multiple machines.
+ - Resumable transfers with checkpointing on failure.
+ - Syncing of existing buckets, objects, and metadata (e.g., ACLs) from source to destination S3.
+ - Real-time capture and propagation of bucket/object changes.
+ - Routing of S3 requests to different storages based on user-defined rules.
+ - Reduce downtime up to zero for switching to different S3 provider.
 
 Listed features can be configured per S3 user and per bucket with [management CLI](./tools/chorctl), [REST](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/clyso/chorus/refs/heads/main/proto/gen/openapi/chorus/chorus.swagger.json)/[gRPC](./proto/chorus/chorus.proto) API, or [WebUI](./ui/).
 
@@ -40,70 +39,68 @@ Documentation available at [docs.clyso.com](https://docs.clyso.com/docs/products
 
 ## Quick start
 
-To get **the best** understanding of how to deploy, configure and use Chorus, start with the [docker-compose](./docker-compose) example. It is a good way to start with Chorus for people who are familiar with Docker and S3. Along with README with step-by-step instructions, it contains examples of working configurations which can be used as a reference for your own setup.
+For a hands-on introduction, use the [docker-compose](./docker-compose) example. It includes a step-by-step README and sample configurations—ideal if you’re familiar with Docker and S3.
 
-If using containers is not an option, try to run [standalone](./service/standalone) binary. It runs all docker-compose services in a single binary. So it is also possible to follow steps from docker-compose README but without Docker.
+If using containers is not an option, try to run [standalone](./service/standalone) binary. It bundles all docker-compose services into one executable, letting you follow the same steps without containers.
 
 ## Installation
 
-To build and run Chorus component from source [install Go language](https://go.dev/doc/install) and use the following commands:
+### From source
+
+Requires [Go language](https://go.dev/doc/install). Clone and build with:
 ```shell
-# clone the repository
 git clone https://github.com/clyso/chorus.git && cd chorus
 
-# run chorus worker
+# Run worker
 go run ./cmd/worker
 
-# build chorus worker binary
+# Build worker binary
 go build ./cmd/worker
-# run chorus worker binary
 ./worker
 
-# run chorus worker with a custom YAML config file
-go run ./cmd/worker -config <path to worker yaml config>
-
-# run chorus proxy with a custom YAML config file
-go run ./cmd/proxy -config <path to proxy yaml config>
-
-# run chorus agent with a custom YAML config file
-go run ./cmd/agent -config <path to agent yaml config>
+# Run with custom config
+go run ./cmd/worker -config <path-to-worker.yaml>
+go run ./cmd/proxy -config <path-to-proxy.yaml>
+go run ./cmd/agent -config <path-to-agent.yaml>
 ```
 
-Alternatively, all binaries can be installed with `go install`:
-- [install Go language](https://go.dev/doc/install)
-- make sure that `$GOPATH/bin` is in your `$PATH`: `export PATH=$PATH:$GOPATH/bin`
-- use following commands to install and run binaries:
-    ```shell
-    # install chorus worker
-    go install github.com/clyso/chorus/cmd/worker@latest
+Or install globally:
+```shell
+# Ensure $GOPATH/bin is in $PATH
+export PATH=$PATH:$GOPATH/bin
 
-    # run chorus worker
-    worker
+# Install binaries
+go install github.com/clyso/chorus/cmd/worker@latest
+go install github.com/clyso/chorus/cmd/proxy@latest
+go install github.com/clyso/chorus/cmd/agent@latest
+go install github.com/clyso/chorus/cmd/chorus@latest
 
-    # run chorus worker with a custom YAML config file
-    worker -config <path to worker yaml config>
+# Run with config
+worker -config <path-to-worker.yaml>
+```
 
-    # install other binaries
-    go install github.com/clyso/chorus/cmd/proxy@latest
-    go install github.com/clyso/chorus/cmd/agent@latest
-    go install github.com/clyso/chorus/cmd/chorus@latest
-    ```
+### Prebuilt Binaries
+Download binaries for Linux, Windows, and macOS from [GitHub releases](https://github.com/clyso/chorus/releases) page.
 
-Component binaries for Linux, Windows, and MacOS are also published to the [GitHub releases](https://github.com/clyso/chorus/releases) page.
+### Docker
 
-Additionally, Multi-platform Docker images are built from [Dockerfile](./Dockerfile), published to the OCI registry, and tagged with release version and `latest`:
+Multi-platform images are available at:
 - `harbor.clyso.com/chorus/proxy`
 - `harbor.clyso.com/chorus/worker`
 - `harbor.clyso.com/chorus/agent`
-- `harbor.clyso.com/chorus/web-ui`UI is built from [ui/Dockerfile](./ui/Dockerfile)
+- `harbor.clyso.com/chorus/web-ui`
 
-Here is an example of how to run Chorus Worker with Docker:
+Example:
 ```shell
-# runs chorus worker with custom config
 docker run -v /path/to/worker.yaml:/bin/config/config.yaml harbor.clyso.com/chorus/worker
 ```
 
-To deploy Chorus to Kubernetes use Helm chart from the OCI registry:
+Built from [Dockerfile](./Dockerfile) and [ui/Dockerfile](./ui/Dockerfile).
+
+See also [docker-compose](./docker-compose) example.
+
+### Kubernetes
+Deploy with Helm:
 ```shell
 helm install <release name> oci://harbor.clyso.com/chorus/chorus
 ```
@@ -111,7 +108,7 @@ The chart source is located in [deploy/chorus](./deploy/chorus).
 
 ## Develop
 
-Chorus is written in Go and Go is the only required dependency to build, run, and test the project.
+Chorus is written in Go—no other dependencies are required to build, run, or test.
 
 ### Test
 [Test](./test) package contains e2e tests for replications between S3 storages.
