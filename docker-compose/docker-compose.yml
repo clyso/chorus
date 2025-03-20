@@ -1,8 +1,12 @@
 volumes:
+  # Volume to preserve chorus data between restarts
   redis-data:
 services:
+  # Redis - required component to run chorus
+  # Redis is used by all chorus components to store metadata
+  # and coordinate work between them
   redis:
-    image: 'redis'
+    image: "redis"
     command: ["redis-server", "--appendonly", "yes"]
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
@@ -11,6 +15,8 @@ services:
       - 6379
     volumes:
       - redis-data:/data
+  # Chorus components
+  # Chorus worker - main component that processes data
   worker:
     depends_on:
       - redis
@@ -19,15 +25,21 @@ services:
       args:
         SERVICE: worker
     volumes:
-    - type: bind
-      source: ./worker-conf.yaml
-      target: /bin/config/config.yaml
-    - type: bind
-      source: ./s3-credentials.yaml
-      target: /bin/config/override.yaml
+      - type: bind
+        # worker-specific config
+        source: ./worker-conf.yaml
+        target: /bin/config/config.yaml
+      - type: bind
+        # common config: s3 credentials
+        source: ./s3-credentials.yaml
+        target: /bin/config/override.yaml
     ports:
       - "9671:9671" # expose REST api for web UI
       - "9670:9670" # expose grpc management API for CLI
+  # Chorus S3 proxy
+  # Can be used capture data change and backup it with worker to another S3.
+  # Can be used to migrate to another S3 by bucket. Before migration it will route all requests to old S3.
+  # After migration it will route all requests to new S3.
   proxy:
     # To enable run with proxy profile: "docker-compose up --profile proxy up". See https://docs.docker.com/compose/profiles/
     profiles:
@@ -39,16 +51,18 @@ services:
       args:
         SERVICE: proxy
     volumes:
-    # proxy config
-    - type: bind
-      source: ./proxy-conf.yaml
-      target: /bin/config/config.yaml
-    # common config: s3 credentials
-    - type: bind
-      source: ./s3-credentials.yaml
-      target: /bin/config/override.yaml
+      # proxy config
+      - type: bind
+        source: ./proxy-conf.yaml
+        target: /bin/config/config.yaml
+      # common config: s3 credentials
+      - type: bind
+        source: ./s3-credentials.yaml
+        target: /bin/config/override.yaml
     ports:
       - "9669:9669" # expose proxy s3 api
+  # Chorus agent is alternative to proxy. It can be used to capture data change and backup it with worker to another S3.
+  # Source S3 should support bucket notifications.
   agent:
     # To enable run with agent profile: "docker-compose up --profile agent up". See https://docs.docker.com/compose/profiles/
     profiles:
@@ -60,12 +74,14 @@ services:
       args:
         SERVICE: agent
     volumes:
-    # agent config
-    - type: bind
-      source: ./agent-conf.yaml
-      target: /bin/config/config.yaml
+      # agent config
+      - type: bind
+        source: ./agent-conf.yaml
+        target: /bin/config/config.yaml
     ports:
       - "9673:9673" # expose agent bucket notifications webhook
+  # Chorus web UI
+  # Access UI on http://localhost:8080
   web-ui:
     depends_on:
       - worker
@@ -75,8 +91,9 @@ services:
     ports:
       - "8080:80"
     environment:
+      # URL to worker REST API
       - "BACKEND_URL=http://worker:9671"
-  # start fake in-memory s3 endpoint. To enable run with fake profile: "docker-compose up --profile fake up"
+  # start fake in-memory s3 endpoints. To enable run with fake profile: "docker-compose up --profile fake up"
   fake-s3-main:
     profiles:
       - "fake"

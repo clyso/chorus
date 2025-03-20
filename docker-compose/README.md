@@ -1,5 +1,8 @@
 # Docker-compose
-**REQUIREMENTS:**
+
+## Before start
+
+**Requirements:**
 - Docker
 - S3 client (e.g. [s3cmd](https://github.com/s3tools/s3cmd))
     ```shell
@@ -9,6 +12,25 @@
     ```shell
     brew install clyso/tap/chorctl
     ```
+**Structure:**
+```
+├── docker-compose
+│   ├── agent-conf.yaml       # example config for chorus-agent
+│   ├── docker-compose.yml    # docker-compose file
+│   ├── FakeS3Dockerfile      # Dockerfile for in-memory S3 endpoint
+│   ├── proxy-conf.yaml       # example config for chorus-proxy
+│   ├── README.md
+│   ├── s3cmd-follower.conf   # s3cmd credentials for follower storage
+│   ├── s3cmd-main.conf       # s3cmd credentials for main storage
+│   ├── s3cmd-proxy.conf      # s3cmd credentials for proxy storage
+│   ├── s3-credentials.yaml   # chorus common config with S3 credentials
+│   └── worker-conf.yaml      # example config for chorus-worker
+```
+
+Please also review [docker-compose.yml](./docker-compose.yml) file. It contains comments about services and their configuration.
+
+## Bucket replication example
+
 To run chorus with docker compose:
 1. Clone repo:
     ```shell 
@@ -69,6 +91,25 @@ To run chorus with docker compose:
 11. List main and follower contents again to see that the file was removed from both. Feel free to play around with storages using `s3cmd` and preconfigured configs [s3cmd-main.conf](./s3cmd-main.conf) [s3cmd-follower.conf](./s3cmd-follower.conf) [s3cmd-proxy.conf](./s3cmd-proxy.conf).
 
 ## Where to go next
+Try to add more worker instances to speed up replication process and observe how they are balancing the load. To do this, duplicate existing `worker` service in [docker-compose.yml](./docker-compose.yml) with omitted ports to avoid conflicts:
+```yaml
+  worker2:
+    depends_on:
+      - redis
+    build:
+      context: ../
+      args:
+        SERVICE: worker
+    volumes:
+    - type: bind
+      source: ./worker-conf.yaml
+      target: /bin/config/config.yaml
+    - type: bind
+      source: ./s3-credentials.yaml
+      target: /bin/config/override.yaml
+```
+The same can be done for `worker3`, `worker4`, etc. And for `proxy` service.
+
 Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) with your own s3 storages and start docker-compose without fake backends:
 ```shell
 docker-compose -f ./docker-compose/docker-compose.yml --profile proxy up
@@ -80,6 +121,8 @@ docker-compose -f ./docker-compose/docker-compose.yml --profile agent up
 ```
 > [!NOTE]  
 > Chorus agent will not work with fake S3 backend because bucket notifications are not supported by fake S3 backend.
+
+Explore more features with [chorctl](../tools/chorctl) and [WebUI](../ui).
 
 ## How-to
 To tear-down:
@@ -109,5 +152,5 @@ to:
   worker:
     image: "harbor.clyso.com/chorus/worker:latest" 
 ```
-And similar for `agent` and `proxy`.
+And similar for `agent`, `web-ui`, and `proxy`.
 
