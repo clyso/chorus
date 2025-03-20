@@ -69,7 +69,7 @@ go run ./cmd/proxy -config <path to proxy yaml config>
 go run ./cmd/agent -config <path to agent yaml config>
 ```
 
-Alternatively, all binaries can be with `go install`:
+Alternatively, all binaries can be installed with `go install`:
 - [install Go language](https://go.dev/doc/install)
 - make sure that `$GOPATH/bin` is in your `$PATH`: `export PATH=$PATH:$GOPATH/bin`
 - use following commands to install and run binaries:
