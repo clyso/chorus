@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +34,7 @@ var (
 	ErrAuth                 = errors.New("AuthError")
 	ErrPolicy               = errors.New("PolicyError")
 	ErrRoutingBlock         = errors.New("RoutingBlockedError")
+	ErrDestinationConflict  = errors.New("DestinationConflict")
 )
 
 func ErrCode(err error) int {

@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -199,6 +200,12 @@ func convertApiError(ctx context.Context, err error) error {
 	case errors.Is(err, dom.ErrAlreadyExists):
 		code = codes.AlreadyExists
 		mappedErr = dom.ErrAlreadyExists
+		details = append(details, &errdetails.ErrorInfo{
+			Reason: err.Error(),
+		})
+	case errors.Is(err, dom.ErrDestinationConflict):
+		code = codes.FailedPrecondition
+		mappedErr = dom.ErrDestinationConflict
 		details = append(details, &errdetails.ErrorInfo{
 			Reason: err.Error(),
 		})
