@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -193,7 +194,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	u1, u2 := "u1", "u2"
 	users := []string{u1, u2}
-	b1, b2 := "b1", "b2"
+	b1, b2, b3 := "b1", "b2", "b3"
 	buckets := []string{b1, b2}
 	s1, s2, s3, s4 := "s1", "s2", "s3", "s4"
 
@@ -789,6 +790,45 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		exists, err = svc.IsReplicationPolicyExists(ctx, u2, b1, s1, s3, nil)
 		r.NoError(err)
 		r.True(exists)
+	})
+
+	t.Run("bucket replication policy conflict", func(t *testing.T) {
+		r := require.New(t)
+		db.FlushAll()
+		// add routing policy
+		err := svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, nil, tasks.Priority4, nil)
+		r.NoError(err)
+		// old already-exists check is still in place
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, nil, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrAlreadyExists)
+		// old already-exists check has higher priority than conflict check
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b1, tasks.Priority3, nil)
+		r.ErrorIs(err, dom.ErrAlreadyExists)
+		// adding a new policy with a different source and the same destination is a conflict
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b2, s1, s2, &b1, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+
+		// adding a new policy with the same source and a different destination is allowed
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b3, tasks.Priority4, nil)
+		r.NoError(err)
+		// old already-exists check has higher priority than conflict check
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b3, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrAlreadyExists)
+		// adding a new policy with a different source and the same destination is a conflict
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b2, s1, s2, &b3, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+		// adding a new policy with a different source and the same implicit destination is a conflict
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b3, s1, s2, nil, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+
+		// adding a new policy with a implicit destination succeeds after deleting the conflicting explicit one
+		err = svc.DeleteReplication(ctx, u1, b1, s1, s2, &b3)
+		r.NoError(err)
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b3, s1, s2, nil, tasks.Priority4, nil)
+		r.NoError(err)
+		// re-adding the conflicting explicit one fails
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b3, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
 	})
 }
 
