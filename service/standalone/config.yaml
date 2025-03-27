@@ -47,4 +47,6 @@ rclone:
     limit: 3
     retryMin: 2s
     retryMax: 20s
-
+worker:
+  pauseRetryInterval: 5s
+  switchRetryInterval: 5s

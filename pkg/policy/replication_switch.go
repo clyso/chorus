@@ -579,7 +579,7 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 	}
 	// update downtime switch status history
 	history := fmt.Sprintf("%s | %s -> %s: %s", timeNow().Format(time.RFC3339), existing.LastStatus, newStatus, description)
-	pipe.LPush(ctx, replID.SwitchHistoryKey(), history)
+	pipe.RPush(ctx, replID.SwitchHistoryKey(), history)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to update downtime switch status: %w", err)
 	}
@@ -603,7 +603,7 @@ func (s *policySvc) CompleteZeroDowntimeReplicationSwitch(ctx context.Context, r
 	pipe.HSet(ctx, replID.SwitchKey(), "doneAt", now)
 	// update downtime switch status history
 	history := fmt.Sprintf("%s | %s -> %s: complete zero downtime switch", now.Format(time.RFC3339), info.LastStatus, StatusDone)
-	pipe.LPush(ctx, replID.SwitchHistoryKey(), history)
+	pipe.RPush(ctx, replID.SwitchHistoryKey(), history)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to update zero downtime switch status: %w", err)
 	}

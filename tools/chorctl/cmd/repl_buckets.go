@@ -65,7 +65,6 @@ chorctl repl buckets -f main -t follower -u admin`,
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, "BUCKET")
 		for _, m := range res.Buckets {
 			fmt.Fprintln(w, m)
 		}
