@@ -35,7 +35,8 @@ For more details, see:
 
 ## Documentation
 
-Documentation available at [docs.clyso.com](https://docs.clyso.com/docs/products/chorus/overview).
+- Documentation available at [docs.clyso.com](https://docs.clyso.com/docs/products/chorus/overview).
+- Project [Blog](https://docs.clyso.com/blog/tags/chorus/).
 
 ## Quick start
 

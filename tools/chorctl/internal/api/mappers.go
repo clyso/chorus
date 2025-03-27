@@ -45,7 +45,7 @@ func StorageRow(in *pb.Storage) string {
 }
 
 func ReplHeader() string {
-	return "NAME\tPROGRESS\tSIZE\tOBJECTS\tEVENTS\tPAUSED\tLAG\tAGE\tHAS_SWITCH"
+	return "NAME\tPROGRESS\tSIZE\tOBJECTS\tEVENTS\tPAUSED\tAGE\tHAS_SWITCH"
 }
 
 func ReplRow(in *pb.Replication) string {
@@ -56,14 +56,10 @@ func ReplRow(in *pb.Replication) string {
 	bytes := fmt.Sprintf("%s/%s", ByteCountIEC(in.InitBytesDone), ByteCountIEC(in.InitBytesListed))
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
-	lag := "?"
-	if in.LastEmittedAt != nil && in.LastProcessedAt != nil {
-		lag = in.LastEmittedAt.AsTime().Sub(in.LastProcessedAt.AsTime()).String()
-	}
 	if in.ToBucket != nil && *in.ToBucket != "" {
 		in.To += ":" + *in.ToBucket
 	}
-	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%s\t%v", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, lag, DateToAge(in.CreatedAt), in.HasSwitch)
+	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, DateToAge(in.CreatedAt), in.HasSwitch)
 }
 
 func ToPercentage(in float64) string {
@@ -197,7 +193,7 @@ func PrintSwitchRow(w io.Writer, in *pb.GetBucketSwitchStatusResponse, wide bool
 		DateToAge(in.DoneAt))
 	if wide {
 		for _, hist := range in.History {
-			fmt.Fprintf(w, "\t\t\t\t\t\t%s\n", hist)
+			fmt.Fprintf(w, "\t\t%s\n", hist)
 		}
 	}
 }
