@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -182,10 +183,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return err
 	}
 
+	_, useFakeStorageCreds := fake[conf.Proxy.Auth.UseStorage]
+
 	fmt.Printf(connectInfo,
 		uiURL,
 		proxyURL,
-		printCreds(conf),
+		printCreds(conf, useFakeStorageCreds),
 		localhost(conf.Api.GrpcPort),
 		httpLocalhost(conf.Api.HttpPort),
 		redisSvc.Addr(),
@@ -203,7 +206,7 @@ func localhost(port int) string {
 	return fmt.Sprintf("127.0.0.1:%d", port)
 }
 
-func printCreds(conf *Config) string {
+func printCreds(conf *Config, printSecrets bool) string {
 	if !conf.Proxy.Enabled {
 		return ""
 	}
@@ -218,7 +221,11 @@ func printCreds(conf *Config) string {
 	}
 	res := make([]string, 0, len(creds))
 	for s, v4 := range creds {
-		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, v4.SecretAccessKey))
+		secret := "<hidden>"
+		if printSecrets {
+			secret = v4.SecretAccessKey
+		}
+		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, secret))
 	}
 	return strings.Join(res, "\n")
 }
