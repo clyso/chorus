@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -218,7 +219,11 @@ func printCreds(conf *Config) string {
 	}
 	res := make([]string, 0, len(creds))
 	for s, v4 := range creds {
-		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, v4.SecretAccessKey))
+		secret := "<hidden>"
+		if conf.PrintSecrets {
+			secret = v4.SecretAccessKey
+		}
+		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, secret))
 	}
 	return strings.Join(res, "\n")
 }

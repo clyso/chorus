@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,11 +37,12 @@ import (
 var configFile embed.FS
 
 type Common struct {
-	Log      *log.Config      `yaml:"log,omitempty"`
-	Trace    *trace.Config    `yaml:"trace,omitempty"`
-	Metrics  *metrics.Config  `yaml:"metrics,omitempty"`
-	Redis    *Redis           `yaml:"redis,omitempty"`
-	Features *features.Config `yaml:"features,omitempty"`
+	Log          *log.Config      `yaml:"log,omitempty"`
+	Trace        *trace.Config    `yaml:"trace,omitempty"`
+	Metrics      *metrics.Config  `yaml:"metrics,omitempty"`
+	Redis        *Redis           `yaml:"redis,omitempty"`
+	Features     *features.Config `yaml:"features,omitempty"`
+	PrintSecrets bool             `yaml:"printSecret,omitempty"`
 }
 
 type Redis struct {
