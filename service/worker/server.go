@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -243,7 +244,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	if conf.Api.Enabled {
 		handlers := api.GrpcHandlers(conf.Storage, s3Clients, taskClient, rc, policySvc, versionSvc, storageSvc, locker, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), &app)
-		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, app)
+		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, conf.Api, app)
 		if err != nil {
 			return err
 		}
@@ -251,20 +252,25 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		if err != nil {
 			return err
 		}
-		start, stop, err = api.GRPCGateway(ctx, conf.Api, func(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) error {
-			err = pb.RegisterChorusHandlerFromEndpoint(ctx, mux, endpoint, opts)
+		if conf.Api.Secure {
+			logger.Info().Msg("http gateway for tls grpc api is currently not supported")
+		} else {
+			start, stop, err = api.GRPCGateway(ctx, conf.Api, func(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) error {
+				err = pb.RegisterChorusHandlerFromEndpoint(ctx, mux, endpoint, opts)
+				if err != nil {
+					return err
+				}
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			return nil
-		})
-		if err != nil {
-			return err
+			err = server.Add("http_api", start, stop)
+			if err != nil {
+				return err
+			}
 		}
-		err = server.Add("http_api", start, stop)
-		if err != nil {
-			return err
-		}
+
 		logger.Info().Msg("management api created")
 	}
 

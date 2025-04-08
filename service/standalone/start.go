@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -182,12 +183,16 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return err
 	}
 
+	httpPort := httpLocalhost(conf.Api.HttpPort)
+	if conf.Api.Secure {
+		httpPort = "disabled due to grpc TLS"
+	}
 	fmt.Printf(connectInfo,
 		uiURL,
 		proxyURL,
 		printCreds(conf),
 		localhost(conf.Api.GrpcPort),
-		httpLocalhost(conf.Api.HttpPort),
+		httpPort,
 		redisSvc.Addr(),
 		printStorages(fake, conf.Storage),
 	)
