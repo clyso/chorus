@@ -183,12 +183,16 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return err
 	}
 
+	httpPort := httpLocalhost(conf.Api.HttpPort)
+	if conf.Api.Secure {
+		httpPort = "disabled due to grpc TLS"
+	}
 	fmt.Printf(connectInfo,
 		uiURL,
 		proxyURL,
 		printCreds(conf),
 		localhost(conf.Api.GrpcPort),
-		httpLocalhost(conf.Api.HttpPort),
+		httpPort,
 		redisSvc.Addr(),
 		printStorages(fake, conf.Storage),
 	)
