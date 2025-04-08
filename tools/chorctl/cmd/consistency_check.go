@@ -1,5 +1,6 @@
 /*
  * Copyright © 2025 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,13 +57,17 @@ chorctl consistency check oldstorage:bucket newstorage:altbucket --user username
 			})
 		}
 
-		conn, err := api.Connect(ctx, address)
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-
 		client := pb.NewChorusClient(conn)
+
 		if _, err = client.StartConsistencyCheck(ctx, &pb.ConsistencyCheckRequest{Locations: locations}); err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}

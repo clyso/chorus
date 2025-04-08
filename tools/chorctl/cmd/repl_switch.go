@@ -50,12 +50,16 @@ chorctl repl switch`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-
 		client := pb.NewChorusClient(conn)
 
 		resp, err := client.ListReplicationSwitches(ctx, &emptypb.Empty{})
@@ -128,13 +132,18 @@ chorctl repl switch zero-downtime -f main -t follower -u admin -b bucket1
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-
 		client := pb.NewChorusClient(conn)
+
 		req := &pb.SwitchBucketZeroDowntimeRequest{
 			ReplicationId: &pb.ReplicationRequest{
 				User:   switchZeroDowntimeCmdUser,
@@ -226,13 +235,18 @@ chorctl repl switch scheduled -f main -t follower -u admin -b bucket1 \
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-
 		client := pb.NewChorusClient(conn)
+
 		req := &pb.SwitchBucketRequest{
 			ReplicationId: &pb.ReplicationRequest{
 				User:   switchScheduledCmdUser,
@@ -306,13 +320,18 @@ chorctl repl switch delete -f main -t follower -u admin -b bucket1
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-
 		client := pb.NewChorusClient(conn)
+
 		req := &pb.ReplicationRequest{
 			User:   switchDeleteCmdUser,
 			Bucket: switchDeleteCmdBucket,

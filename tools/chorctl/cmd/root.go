@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,8 @@
 package cmd
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"strings"
@@ -24,14 +27,60 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var cfgFile string
 var (
 	// flags:
-	address = ""
-	user    = ""
+	address             = ""
+	user                = ""
+	useTLS              = false
+	tlsSkipVerify       = false
+	tlsAdditionalRootCA = ""
+	tlsClientCert       = ""
+	tlsClientKey        = ""
 )
+
+func getTLSOptions() (grpc.DialOption, error) {
+	if !useTLS {
+		return grpc.WithTransportCredentials(insecure.NewCredentials()), nil
+	}
+
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get system cert pool: %v", err)
+	}
+	if tlsAdditionalRootCA != "" {
+		ca, err := os.ReadFile(tlsAdditionalRootCA)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read additional root CA: %v", err)
+		}
+		ok := certPool.AppendCertsFromPEM(ca)
+		if !ok {
+			return nil, fmt.Errorf("failed to append additional root CA")
+		}
+	}
+
+	var certificate tls.Certificate
+	if tlsClientCert != "" || tlsClientKey != "" {
+		if tlsClientCert == "" || tlsClientKey == "" {
+			return nil, fmt.Errorf("both --tls-client-cert and --tls-client-key must be set")
+		}
+		certificate, err = tls.LoadX509KeyPair(tlsClientCert, tlsClientKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %v", err)
+		}
+	}
+
+	return grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+		RootCAs:            certPool,
+		Certificates:       []tls.Certificate{certificate},
+		InsecureSkipVerify: tlsSkipVerify,
+	})), nil
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -73,6 +122,18 @@ func init() {
 	} else {
 		logrus.SetLevel(logrus.WarnLevel)
 	}
+
+	rootCmd.PersistentFlags().BoolVar(&useTLS, "tls", false, "use TLS for connection")
+	rootCmd.PersistentFlags().BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "skip TLS certificate verification")
+	rootCmd.PersistentFlags().StringVar(&tlsAdditionalRootCA, "tls-root-ca", "", "additional root CA certificate")
+	rootCmd.PersistentFlags().StringVar(&tlsClientCert, "tls-client-cert", "", "client certificate")
+	rootCmd.PersistentFlags().StringVar(&tlsClientKey, "tls-client-key", "", "client key")
+	_ = viper.BindPFlag("tls", rootCmd.PersistentFlags().Lookup("tls"))
+	_ = viper.BindPFlag("tls-skip-verify", rootCmd.PersistentFlags().Lookup("tls-skip-verify"))
+	_ = viper.BindPFlag("tls-root-ca", rootCmd.PersistentFlags().Lookup("tls-root-ca"))
+	_ = viper.BindPFlag("tls-client-cert", rootCmd.PersistentFlags().Lookup("tls-client-cert"))
+	_ = viper.BindPFlag("tls-client-key", rootCmd.PersistentFlags().Lookup("tls-client-key"))
+
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -99,4 +160,9 @@ func initConfig() {
 		logrus.Info("Using config file:", viper.ConfigFileUsed())
 	}
 	address = viper.GetString("address")
+	useTLS = viper.GetBool("tls")
+	tlsSkipVerify = viper.GetBool("tls-skip-verify")
+	tlsAdditionalRootCA = viper.GetString("tls-root-ca")
+	tlsClientCert = viper.GetString("tls-client-cert")
+	tlsClientKey = viper.GetString("tls-client-key")
 }

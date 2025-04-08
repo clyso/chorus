@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,16 +23,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
-func Connect(ctx context.Context, url string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, url,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		//grpc.WithConnectParams(grpc.ConnectParams{Backoff: backoff.Config{MaxDelay: time.Second}}),
-		//grpc.WithInsecure(),
-	)
+func Connect(ctx context.Context, url string, tlsOption grpc.DialOption) (*grpc.ClientConn, error) {
+	return grpc.DialContext(ctx, url, tlsOption)
 }
 
 func PrintGrpcError(err error) {
