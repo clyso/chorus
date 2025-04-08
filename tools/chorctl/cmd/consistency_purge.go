@@ -1,5 +1,6 @@
 /*
  * Copyright © 2025 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,13 +53,17 @@ chorctl consistency purge oldstorage:bucket newstorage:altbucket`,
 			})
 		}
 
-		conn, err := api.Connect(ctx, address)
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-
 		client := pb.NewChorusClient(conn)
+
 		for _, id := range args {
 			_, err := client.DeleteConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			if err != nil {
