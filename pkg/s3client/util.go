@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +25,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/signer"
 
 	"github.com/clyso/chorus/pkg/s3"
 )
@@ -232,17 +233,23 @@ func ExtractRespBody(r *http.Response, body any) error {
 }
 
 // Internal function called for different service types.
-func signV4(req http.Request, accessKeyID, secretAccessKey, sessionToken, location string) (*http.Request, error) {
-	var res *http.Request
-	prevCL := req.Header.Get("Content-Length")
-	if prevCL == "0" {
-		req.Header.Del("Content-Length")
-		defer func() {
-			res.Header.Set("Content-Length", prevCL)
-		}()
+func signV4(req *http.Request, accessKeyID, secretAccessKey, location string) *http.Request {
+	res := *req
+
+	now := time.Now().UTC()
+
+	res.Header.Set(s3.AmzDate, now.Format(s3.TimeIso8601Format))
+	signedHeaders := getSignedHeaders(req)
+	signature, scope := s3.ComputeSignatureV4(req, accessKeyID, secretAccessKey, location, now, signedHeaders)
+
+	parts := []string{
+		s3.SignV4Algorithm + " Credential=" + accessKeyID + "/" + scope,
+		"SignedHeaders=" + s3.GetSignedV4Headers(signedHeaders),
+		"Signature=" + signature,
 	}
-	res = signer.SignV4(req, accessKeyID, secretAccessKey, sessionToken, location)
-	return res, nil
+	res.Header.Set(s3.Authorization, strings.Join(parts, ", "))
+
+	return &res
 }
 
 var ignoreInSignature = map[string]struct{}{
@@ -253,46 +260,40 @@ var ignoreInSignature = map[string]struct{}{
 	"x-forwarded-server": {},
 	"connection":         {},
 	"x-real-ip":          {},
+	"authorization":      {},
+	"user-agent":         {},
+	"accept-encoding":    {},
 }
 
-// processHeaders decides which orginal headers should be copied to forwarded request.
-func processHeaders(origin http.Header) (toSign http.Header, notToSign http.Header) {
-	// get a set of headers from origin signature if it was V4
-	var origSigned map[string]struct{}
-	if len(origin[s3.Authorization]) == 1 {
-		res, err := s3.ParseSignV4(origin[s3.Authorization][0])
-		if err == nil {
-			origSigned = make(map[string]struct{}, len(res.SignedHeaders))
-			for _, v := range res.SignedHeaders {
-				origSigned[strings.ToLower(v)] = struct{}{}
-			}
+func getSignedHeaders(req *http.Request) http.Header {
+	headers := http.Header{}
+	hostHeader := false
+	for h, v := range req.Header {
+		cmp := strings.ToLower(h)
+		if _, ok := ignoreInSignature[cmp]; ok {
+			continue
+		}
+		if req.Method == "DELETE" && cmp == "content-length" {
+			/*
+			 * Never sign Content-Length for DELETE requests. This avoids incompaible
+			 * signatures with AWS, as they sign a possible "Content-Length: 0" as
+			 * "content-length:" instead of the canonical "content-length:0".
+			 */
+			continue
+		}
+		if cmp == "host" {
+			hostHeader = true
+		}
+		for _, val := range v {
+			headers.Add(cmp, val)
 		}
 	}
-
-	// process headers
-	toSign, notToSign = http.Header{}, http.Header{}
-	for name, vals := range origin {
-		if name == "Authorization" || name == "X-Amz-Date" {
-			// remove from request
-			continue
-		}
-		if _, ok := ignoreInSignature[strings.ToLower(name)]; ok {
-			notToSign[name] = vals
-			continue
-		}
-
-		if len(origSigned) == 0 {
-			// sign all if there no signedHeaders in origin
-			toSign[name] = vals
-			continue
-		}
-
-		// sign only from origin signature
-		if _, ok := origSigned[strings.ToLower(name)]; ok {
-			toSign[name] = vals
+	if !hostHeader {
+		if req.Host != "" {
+			headers.Set("host", req.Host)
 		} else {
-			notToSign[name] = vals
+			headers.Set("host", req.URL.Host)
 		}
 	}
-	return
+	return headers
 }

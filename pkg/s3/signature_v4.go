@@ -34,7 +34,7 @@ func IsRequestSignatureV4(r *http.Request) bool {
 	return strings.HasPrefix(r.Header.Get(Authorization), SignV4Algorithm)
 }
 
-func ComputeSignatureV4(req *http.Request, accessKeyID, secretAccessKey, region string, date time.Time, extractedSignedHeaders http.Header) string {
+func ComputeSignatureV4(req *http.Request, accessKeyID, secretAccessKey, region string, date time.Time, extractedSignedHeaders http.Header) (string, string) {
 	hashedPayload := getContentSha256Cksum(req)
 	queryStr := req.URL.Query().Encode()
 	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
@@ -46,7 +46,7 @@ func ComputeSignatureV4(req *http.Request, accessKeyID, secretAccessKey, region 
 	}, "/")
 	stringToSign := getV4StringToSign(canonicalRequest, date, scope)
 	signingKey := getV4SigningKey(secretAccessKey, date, region)
-	return getV4Signature(signingKey, stringToSign)
+	return getV4Signature(signingKey, stringToSign), scope
 }
 
 func getCanonicalV4Request(extractedSignedHeaders http.Header, payload, queryStr, urlPath, method string) string {
@@ -57,7 +57,7 @@ func getCanonicalV4Request(extractedSignedHeaders http.Header, payload, queryStr
 		encodedPath,
 		rawQuery,
 		getCanonicalV4Headers(extractedSignedHeaders),
-		getSignedV4Headers(extractedSignedHeaders),
+		GetSignedV4Headers(extractedSignedHeaders),
 		payload,
 	}, "\n")
 	return canonicalRequest
@@ -90,7 +90,7 @@ func signV4TrimAll(input string) string {
 	return strings.Join(strings.Fields(input), " ")
 }
 
-func getSignedV4Headers(signedHeaders http.Header) string {
+func GetSignedV4Headers(signedHeaders http.Header) string {
 	headers := make([]string, 0, len(signedHeaders))
 	for k := range signedHeaders {
 		headers = append(headers, strings.ToLower(k))

@@ -65,7 +65,7 @@ func (m *middleware) doesSignatureV4Match(r *http.Request) (string, error) {
 		return "", fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
 	}
 
-	newSignature := s3.ComputeSignatureV4(r, credInfo.cred.AccessKeyID, credInfo.cred.SecretAccessKey,
+	newSignature, _ := s3.ComputeSignatureV4(r, credInfo.cred.AccessKeyID, credInfo.cred.SecretAccessKey,
 		signV4Values.Credential.Scope.Region, t, extractedSignedHeaders)
 	if err != nil {
 		return "", err
