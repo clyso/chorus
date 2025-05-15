@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,19 +22,36 @@ import (
 	"strings"
 )
 
-func ParseReq(r *http.Request) (bucket string, object string, method Method) {
+func ParseReq(r *http.Request, conf *StorageConfig) (bucket string, object string, method Method) {
 	var (
 		path  = strings.Trim(r.URL.Path, "/")
-		parts = strings.SplitN(path, "/", 2)
 		query = r.URL.Query()
 	)
-	bucket = parts[0]
-	if bucket == "" {
-		bucket = r.Header.Get("x-amz-bucket")
+
+	// check for bucket in hostname ("virtual host")
+	hostParts := strings.SplitN(r.Host, ".", 2)
+	bucketHostname := false
+	for _, storage := range conf.Storages {
+		for _, dom := range storage.Domains {
+			if hostParts[1] == dom.Value() {
+				bucketHostname = true
+				bucket = hostParts[0]
+				object = path
+				break
+			}
+		}
 	}
 
-	if len(parts) == 2 {
-		object = parts[1]
+	if !bucketHostname {
+		parts := strings.SplitN(path, "/", 2)
+		bucket = parts[0]
+		if bucket == "" {
+			bucket = r.Header.Get("x-amz-bucket")
+		}
+
+		if len(parts) == 2 {
+			object = parts[1]
+		}
 	}
 
 	switch {

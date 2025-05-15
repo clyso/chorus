@@ -42,6 +42,7 @@ type StorageConfig struct {
 
 type Storage struct {
 	Address             ConfAddr                 `yaml:"address"`
+	Domains             []ConfAddr               `yaml:"domains"`
 	Credentials         map[string]CredentialsV4 `yaml:"credentials"`
 	Provider            string                   `yaml:"provider"`
 	IsMain              bool                     `yaml:"isMain"`

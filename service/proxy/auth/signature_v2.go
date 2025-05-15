@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,7 +82,7 @@ func isRequestSignatureV2(r *http.Request) bool {
 		strings.HasPrefix(r.Header.Get(s3.Authorization), signV2Algorithm)
 }
 
-func (m *middleware) doesSignatureV2Match(r *http.Request) (string, error) {
+func (m *middleware) doesSignatureV2Match(r *http.Request, domains []string) (string, error) {
 	accessKey, err := getReqAccessKeyV2(r)
 	if err != nil {
 		return "", err
@@ -104,7 +105,7 @@ func (m *middleware) doesSignatureV2Match(r *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	encodedResource, err = getResource(encodedResource, r.Host, nil)
+	encodedResource, err = getResource(encodedResource, r.Host, domains)
 	if err != nil {
 		return "", err
 	}
@@ -275,12 +276,17 @@ func unescapeQueries(encodedQuery string) (unescapedQueries []string, err error)
 }
 
 // Returns "/bucketName/objectName" for path-style or virtual-host-style requests.
-func getResource(path string, _ string, domains []string) (string, error) {
-	if len(domains) == 0 {
-		return path, nil
+func getResource(path string, host string, domains []string) (string, error) {
+	hostParts := strings.SplitN(host, ".", 2)
+	for _, domain := range domains {
+		if domain == host {
+			return path, nil
+		}
+		if hostParts[1] == domain {
+			bucket := hostParts[0]
+			return "/" + bucket + path, nil
+		}
 	}
 
-	// If virtual-host-style is enabled construct the "resource" properly.
-	// todo: support virtual host
 	return path, nil
 }

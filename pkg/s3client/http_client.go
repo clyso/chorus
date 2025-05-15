@@ -186,6 +186,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 			}
 		}
 	}()
+
 	var (
 		path   = strings.Trim(req.URL.Path, "/")
 		parts  = strings.SplitN(path, "/", 2)
@@ -197,10 +198,20 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	if len(parts) == 2 {
 		object = parts[1]
 	}
+
 	url := *req.URL
-	// todo: support virtual host
-	// see: github.com/minio/minio-go/v7@v7.0.52/api.go:890
-	url.Host = c.conf.Address.Value()
+	bucketHostname := false
+	hostParts := strings.SplitN(req.Host, ".", 2)
+	for _, dom := range c.conf.Domains {
+		if hostParts[1] == dom.Value() {
+			bucketHostname = true
+			url.Host = hostParts[0] + "." + c.conf.Address.Value()
+			break
+		}
+	}
+	if !bucketHostname {
+		url.Host = c.conf.Address.Value()
+	}
 	url.Scheme = "http"
 	if c.conf.IsSecure {
 		url.Scheme = "https"

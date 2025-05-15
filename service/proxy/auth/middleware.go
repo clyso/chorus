@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +48,7 @@ func Middleware(conf *Config, storages map[string]s3.Storage) *middleware {
 	return &middleware{
 		allowV2:     conf.AllowV2Signature,
 		credentials: credentials,
+		storage:     storages[conf.UseStorage],
 	}
 }
 
@@ -70,6 +72,7 @@ type credMeta struct {
 type middleware struct {
 	allowV2     bool
 	credentials map[string]credMeta
+	storage     s3.Storage
 }
 
 func (m *middleware) Wrap(next http.Handler) http.Handler {
@@ -103,7 +106,11 @@ func (m *middleware) isReqAuthenticated(r *http.Request) (string, error) {
 		sha256sum := getContentSha256Cksum(r)
 		return m.doesSignatureV4Match(sha256sum, r)
 	} else if m.allowV2 && isRequestSignatureV2(r) {
-		return m.doesSignatureV2Match(r)
+		domains := make([]string, len(m.storage.Domains))
+		for i, dom := range m.storage.Domains {
+			domains[i] = dom.Value()
+		}
+		return m.doesSignatureV2Match(r, domains)
 	}
 	return "", mclient.ErrorResponse{
 		XMLName:    xml.Name{},

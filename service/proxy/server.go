@@ -113,7 +113,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		handler = metrics.ProxyMiddleware(handler)
 	}
 	handler = trace.HttpMiddleware(tp, handler)
-	handler = router.Middleware(handler)
+	handler = router.Middleware(conf.Storage, handler)
 	handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, handler)
 	handler = cors.HttpMiddleware(conf.Cors, handler)
 

@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +27,9 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func Middleware(next http.Handler) http.Handler {
+func Middleware(conf *s3.StorageConfig, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bucket, object, method := s3.ParseReq(r)
+		bucket, object, method := s3.ParseReq(r, conf)
 		ctx := log.WithBucket(r.Context(), bucket)
 		ctx = log.WithObjName(ctx, object)
 		ctx = log.WithMethod(ctx, method)
