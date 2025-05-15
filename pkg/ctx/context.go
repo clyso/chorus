@@ -33,6 +33,7 @@ type storageKey struct{}
 type flowKey struct{}
 type traceKey struct{}
 type userKey struct{}
+type accKey struct{}
 
 type Flow string
 
@@ -153,4 +154,21 @@ func SetUser(ctx context.Context, u string) context.Context {
 func GetUser(ctx context.Context) string {
 	k, _ := ctx.Value(userKey{}).(string)
 	return k
+}
+
+func GetAccount(ctx context.Context) string {
+	k, _ := ctx.Value(accKey{}).(string)
+	return k
+}
+
+func SetAccount(ctx context.Context, acc string) context.Context {
+	if acc == "" {
+		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty account to ctx")
+		return ctx
+	}
+	if prev := GetAccount(ctx); prev != "" {
+		zerolog.Ctx(ctx).Warn().Msgf("cannot set account %s, ctx already contains account %s", acc, prev)
+		return ctx
+	}
+	return context.WithValue(ctx, accKey{}, acc)
 }
