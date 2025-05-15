@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +21,6 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
@@ -41,7 +41,7 @@ type StorageConfig struct {
 }
 
 type Storage struct {
-	Address             string                   `yaml:"address"`
+	Address             ConfAddr                 `yaml:"address"`
 	Credentials         map[string]CredentialsV4 `yaml:"credentials"`
 	Provider            string                   `yaml:"provider"`
 	IsMain              bool                     `yaml:"isMain"`
@@ -150,23 +150,24 @@ func (s *StorageConfig) Init() error {
 		if storage.Provider == "" {
 			return fmt.Errorf("app config: storage provider required")
 		}
-		if storage.Address == "" {
+		if !storage.Address.IsSet() {
 			return fmt.Errorf("app config: storage address required")
 		}
-		if !strings.HasPrefix(storage.Address, "http") {
+		if storage.Address.Protocol() == "" {
 			if storage.IsSecure {
-				storage.Address = "https://" + storage.Address
+				storage.Address.SetProtocol("https")
 			} else {
-				storage.Address = "http://" + storage.Address
+				storage.Address.SetProtocol("http")
 			}
 		}
-		if storage.IsSecure && !strings.HasPrefix(storage.Address, "https://") {
+		proto := storage.Address.Protocol()
+		if storage.IsSecure && proto != "https" {
 			return fmt.Errorf("%w: invalid storage address schema for secure connection", dom.ErrInvalidStorageConfig)
 		}
-		if !storage.IsSecure && !strings.HasPrefix(storage.Address, "http://") {
+		if !storage.IsSecure && proto != "http" {
 			return fmt.Errorf("%w: invalid storage address schema for insecure connection", dom.ErrInvalidStorageConfig)
 		}
-		if _, err := url.ParseRequestURI(storage.Address); err != nil {
+		if _, err := url.ParseRequestURI(storage.Address.ValueWithProtocol()); err != nil {
 			return fmt.Errorf("%w: invalid storage address", err)
 		}
 		s.Storages[name] = storage

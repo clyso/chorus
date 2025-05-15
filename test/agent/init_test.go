@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -62,11 +61,11 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	workerConf.Redis.Address = redisSvc.Addr()
-	agentConf.Redis.Address = redisSvc.Addr()
+	workerConf.Redis.Address = s3.NewConfAddr(redisSvc.Addr())
+	agentConf.Redis.Address = s3.NewConfAddr(redisSvc.Addr())
 	agentConf.Features.ACL = false
 
-	fmt.Println("redis url", agentConf.Redis.Address)
+	fmt.Println("redis url", agentConf.Redis.Address.ValueWithProtocol())
 
 	//f1Backend := s3mem.New()
 	//f1Faker := gofakes3.New(f1Backend)
@@ -140,9 +139,7 @@ func TestMain(m *testing.M) {
 }
 
 func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
-	addr := strings.TrimPrefix(c.Address, "http://")
-	addr = strings.TrimPrefix(addr, "https://")
-	mc, err := mclient.New(addr, &mclient.Options{
+	mc, err := mclient.New(c.Address.Value(), &mclient.Options{
 		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
 		Secure: c.IsSecure,
 	})
@@ -163,10 +160,10 @@ func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
 		ready = !mc.IsOffline()
 	}
 	if !ready {
-		panic("client " + addr + " is not ready")
+		panic("client " + c.Address.Value() + " is not ready")
 	}
 
-	core, err := mclient.NewCore(addr, &mclient.Options{
+	core, err := mclient.NewCore(c.Address.Value(), &mclient.Options{
 		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
 		Secure: c.IsSecure,
 	})

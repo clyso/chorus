@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +90,7 @@ func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mam
 				"env_auth":          false,
 				"access_key_id":     cred.AccessKeyID,
 				"secret_access_key": cred.SecretAccessKey,
-				"endpoint":          stor.Address,
+				"endpoint":          stor.Address.ValueWithProtocol(),
 				"provider":          stor.Provider,
 			}
 			for k, v := range keyValues {

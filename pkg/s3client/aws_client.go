@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +20,6 @@ package s3client
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -40,15 +40,7 @@ func newAWSClient(conf s3.Storage, name, user string, metricsSvc metrics.S3Servi
 		SecretAccessKey: conf.Credentials[user].SecretAccessKey,
 	}})
 
-	endpoint := conf.Address
-	if !strings.HasPrefix(endpoint, "http") {
-		if conf.IsSecure {
-			endpoint = "https://" + endpoint
-		} else {
-			endpoint = "http://" + endpoint
-		}
-	}
-
+	endpoint := conf.Address.GetEndpoint(conf.IsSecure)
 	awsConfig := aws.NewConfig().
 		WithMaxRetries(3).
 		WithCredentials(cred).

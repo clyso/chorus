@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,7 +129,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("proxy created")
 
 	err = server.Add("proxy_request_reply", func(ctx context.Context) error {
-		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address, conf.Auth.Custom, conf.Storage.Storages[conf.Auth.UseStorage].Credentials))
+		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address.Value(), conf.Auth.Custom, conf.Storage.Storages[conf.Auth.UseStorage].Credentials))
 	}, func(ctx context.Context) error { return nil })
 	if err != nil {
 		return err

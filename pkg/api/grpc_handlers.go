@@ -313,7 +313,7 @@ func (h *handlers) GetStorages(_ context.Context, _ *emptypb.Empty) (*pb.GetStor
 		})
 		res = append(res, &pb.Storage{
 			Name:        name,
-			Address:     stor.Address,
+			Address:     stor.Address.ValueWithProtocol(),
 			Provider:    pb.Storage_Provider(pb.Storage_Provider_value[stor.Provider]),
 			Credentials: creds,
 			IsMain:      stor.IsMain,

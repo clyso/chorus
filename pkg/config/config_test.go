@@ -53,7 +53,7 @@ func TestOverride2(t *testing.T) {
 	r.EqualValues(true, conf.Log.Json)
 	r.NotEmpty(conf.Redis.Address)
 	r.Empty(conf.Redis.Addresses)
-	r.EqualValues([]string{conf.Redis.Address}, conf.Redis.GetAddresses())
+	r.EqualValues([]string{conf.Redis.Address.ValueWithProtocol()}, conf.Redis.GetAddresses())
 }
 
 func TestOverrideEnv(t *testing.T) {
@@ -71,7 +71,7 @@ func TestOverrideEnv(t *testing.T) {
 	r.EqualValues(true, conf.Log.Json)
 	r.EqualValues("secret", conf.Redis.Password)
 	r.NotEmpty(conf.Redis.Address)
-	r.EqualValues([]string{"a", "b", "c"}, conf.Redis.Addresses, "redis addresses set from env")
+	r.EqualValues(s3.NewConfAddrs("a", "b", "c"), conf.Redis.Addresses, "redis addresses set from env")
 	r.EqualValues([]string{"a", "b", "c"}, conf.Redis.GetAddresses(), "address is ignored")
 }
 
@@ -115,8 +115,8 @@ func TestStorageConfig_RateLimitConf(t *testing.T) {
 
 func TestRedis_validate(t *testing.T) {
 	type fields struct {
-		Address   string
-		Addresses []string
+		Address   s3.ConfAddr
+		Addresses []s3.ConfAddr
 		Sentinel  RedisSentinel
 		User      string
 		Password  string
@@ -134,39 +134,39 @@ func TestRedis_validate(t *testing.T) {
 		{
 			name: "invalid: no address set",
 			fields: fields{
-				Address:   "",
-				Addresses: []string{},
+				Address:   s3.NewConfAddr(""),
+				Addresses: s3.NewConfAddrs(),
 			},
 			wantErr: true,
 		},
 		{
 			name: "valid: both addresses set",
 			fields: fields{
-				Address:   "addr",
-				Addresses: []string{"addr"},
+				Address:   s3.NewConfAddr("addr"),
+				Addresses: s3.NewConfAddrs("addr"),
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid: only address set",
 			fields: fields{
-				Address:   "addr",
-				Addresses: []string{},
+				Address:   s3.NewConfAddr("addr"),
+				Addresses: s3.NewConfAddrs(),
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid: only addresses set",
 			fields: fields{
-				Address:   "",
-				Addresses: []string{"addr"},
+				Address:   s3.NewConfAddr(""),
+				Addresses: s3.NewConfAddrs("addr"),
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid: addresses is nil",
 			fields: fields{
-				Address: "addr",
+				Address: s3.NewConfAddr("addr"),
 			},
 			wantErr: false,
 		},
@@ -193,8 +193,8 @@ func TestRedis_validate(t *testing.T) {
 
 func TestRedis_GetAddresses(t *testing.T) {
 	type fields struct {
-		Address   string
-		Addresses []string
+		Address   s3.ConfAddr
+		Addresses []s3.ConfAddr
 	}
 	tests := []struct {
 		name   string
@@ -204,24 +204,24 @@ func TestRedis_GetAddresses(t *testing.T) {
 		{
 			name: "only address is set",
 			fields: fields{
-				Address:   "a",
-				Addresses: []string{},
+				Address:   s3.NewConfAddr("a"),
+				Addresses: s3.NewConfAddrs(),
 			},
 			want: []string{"a"},
 		},
 		{
 			name: "only addresses are set",
 			fields: fields{
-				Address:   "",
-				Addresses: []string{"a", "b"},
+				Address:   s3.NewConfAddr(""),
+				Addresses: s3.NewConfAddrs("a", "b"),
 			},
 			want: []string{"a", "b"},
 		},
 		{
 			name: "address is ignored when addresses set",
 			fields: fields{
-				Address:   "a",
-				Addresses: []string{"b", "c"},
+				Address:   s3.NewConfAddr("a"),
+				Addresses: s3.NewConfAddrs("b", "c"),
 			},
 			want: []string{"b", "c"},
 		},

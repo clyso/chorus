@@ -45,6 +45,7 @@ require (
 require (
 	github.com/adhocore/gronx v1.19.5
 	github.com/go-redis/redismock/v9 v9.2.0
+	github.com/mitchellh/mapstructure v1.5.0
 )
 
 require github.com/vektra/mockery/v2 v2.52.1 // indirect
@@ -91,7 +92,6 @@ require (
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/ncw/swift/v2 v2.0.2 // indirect

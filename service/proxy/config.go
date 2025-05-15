@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +45,7 @@ type Config struct {
 	Storage *s3.StorageConfig `yaml:"storage,omitempty"`
 	Auth    *auth.Config      `yaml:"auth,omitempty"`
 	Port    int               `yaml:"port"`
-	Address string            `yaml:"address"`
+	Address s3.ConfAddr       `yaml:"address"`
 	Cors    *cors.Config      `yaml:"cors"`
 }
 
@@ -85,6 +86,7 @@ func (c *Config) Validate() error {
 	if c.Port <= 0 {
 		return fmt.Errorf("proxy config: Port must be positive: %d", c.Port)
 	}
+
 	return nil
 }
 

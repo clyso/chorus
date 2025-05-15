@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -222,7 +223,7 @@ func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.C
 	_, tp, _ := trace.NewTracerProvider(&trace.Config{}, dom.AppInfo{})
 	clients, err := s3client.New(newCtx, &s3.StorageConfig{Storages: map[string]s3.Storage{
 		"proxy": {
-			Address: "chorus-dev.clyso.cloud",
+			Address: s3.NewConfAddr("chorus-dev.clyso.cloud"),
 			Credentials: map[string]s3.CredentialsV4{user: {
 				AccessKeyID:     conf.AccessKey,
 				SecretAccessKey: conf.SecretKey,
@@ -234,7 +235,7 @@ func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.C
 			IsSecure:            true,
 		},
 		"main": {
-			Address: "s3.clyso.com",
+			Address: s3.NewConfAddr("s3.clyso.com"),
 			Credentials: map[string]s3.CredentialsV4{user: {
 				AccessKeyID:     conf.AccessKey,
 				SecretAccessKey: conf.SecretKey,
