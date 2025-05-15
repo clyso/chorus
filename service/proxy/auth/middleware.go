@@ -18,8 +18,6 @@
 package auth
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/xml"
 	"net/http"
 
@@ -102,7 +100,7 @@ func (m *middleware) getCred(accessKey string) (credMeta, error) {
 }
 
 func (m *middleware) isReqAuthenticated(r *http.Request) (string, error) {
-	if isRequestSignatureV4(r) {
+	if s3.IsRequestSignatureV4(r) {
 		return m.doesSignatureV4Match(r)
 	} else if m.allowV2 && s3.IsRequestSignatureV2(r) {
 		domains := make([]string, len(m.storage.Domains))
@@ -119,31 +117,4 @@ func (m *middleware) isReqAuthenticated(r *http.Request) (string, error) {
 		Key:        xctx.GetObject(r.Context()),
 		StatusCode: http.StatusBadRequest,
 	}
-}
-
-func getContentSha256Cksum(r *http.Request) string {
-	var (
-		defaultSha256Cksum string
-		v                  []string
-		ok                 bool
-	)
-	defaultSha256Cksum = emptySHA256
-	v, ok = r.Header[s3.AmzContentSha256]
-	if ok {
-		return v[0]
-	}
-	return defaultSha256Cksum
-}
-
-// Streaming AWS Signature Version '4' constants.
-const (
-	emptySHA256            = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-	unsignedPayload        = "UNSIGNED-PAYLOAD"
-	unsignedPayloadTrailer = "STREAMING-UNSIGNED-PAYLOAD-TRAILER"
-)
-
-func sumHMAC(key []byte, data []byte) []byte {
-	hash := hmac.New(sha256.New, key)
-	hash.Write(data)
-	return hash.Sum(nil)
 }

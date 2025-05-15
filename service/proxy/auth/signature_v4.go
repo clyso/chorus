@@ -18,30 +18,18 @@
 package auth
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/xml"
 	"fmt"
 	"net/http"
-	"sort"
-	"strings"
 	"time"
 
 	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/s3utils"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
 )
-
-const ()
-
-func isRequestSignatureV4(r *http.Request) bool {
-	return strings.HasPrefix(r.Header.Get(s3.Authorization), s3.SignV4Algorithm)
-}
 
 func compareSignatureV4(sig1, sig2 string) bool {
 	return subtle.ConstantTimeCompare([]byte(sig1), []byte(sig2)) == 1
@@ -77,7 +65,7 @@ func (m *middleware) doesSignatureV4Match(r *http.Request) (string, error) {
 		return "", fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
 	}
 
-	newSignature := computeSignatureV4(r, credInfo.cred.AccessKeyID, credInfo.cred.SecretAccessKey,
+	newSignature := s3.ComputeSignatureV4(r, credInfo.cred.AccessKeyID, credInfo.cred.SecretAccessKey,
 		signV4Values.Credential.Scope.Region, t, extractedSignedHeaders)
 	if err != nil {
 		return "", err
@@ -95,89 +83,4 @@ func (m *middleware) doesSignatureV4Match(r *http.Request) (string, error) {
 	}
 
 	return credInfo.user, nil
-}
-
-func computeSignatureV4(req *http.Request, accessKeyID, secretAccessKey, region string, date time.Time, extractedSignedHeaders http.Header) string {
-	hashedPayload := getContentSha256Cksum(req)
-	queryStr := req.URL.Query().Encode()
-	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
-	scope := strings.Join([]string{
-		date.Format(s3.TimeYyyymmdd),
-		region,
-		"s3",
-		"aws4_request",
-	}, "/")
-	stringToSign := getV4StringToSign(canonicalRequest, date, scope)
-	signingKey := getV4SigningKey(secretAccessKey, date, region)
-	return getV4Signature(signingKey, stringToSign)
-}
-
-func getCanonicalV4Request(extractedSignedHeaders http.Header, payload, queryStr, urlPath, method string) string {
-	rawQuery := strings.ReplaceAll(queryStr, "+", "%20")
-	encodedPath := s3utils.EncodePath(urlPath)
-	canonicalRequest := strings.Join([]string{
-		method,
-		encodedPath,
-		rawQuery,
-		getCanonicalV4Headers(extractedSignedHeaders),
-		getSignedV4Headers(extractedSignedHeaders),
-		payload,
-	}, "\n")
-	return canonicalRequest
-}
-
-func getCanonicalV4Headers(signedHeaders http.Header) string {
-	headers := make([]string, 0, len(signedHeaders))
-	vals := make(http.Header)
-	for k, vv := range signedHeaders {
-		headers = append(headers, strings.ToLower(k))
-		vals[strings.ToLower(k)] = vv
-	}
-	sort.Strings(headers)
-
-	var buf bytes.Buffer
-	for _, k := range headers {
-		buf.WriteString(k)
-		buf.WriteByte(':')
-		for idx, v := range vals[k] {
-			if idx > 0 {
-				buf.WriteByte(',')
-			}
-			buf.WriteString(signV4TrimAll(v))
-		}
-		buf.WriteByte('\n')
-	}
-	return buf.String()
-}
-func signV4TrimAll(input string) string {
-	return strings.Join(strings.Fields(input), " ")
-}
-
-func getSignedV4Headers(signedHeaders http.Header) string {
-	headers := make([]string, 0, len(signedHeaders))
-	for k := range signedHeaders {
-		headers = append(headers, strings.ToLower(k))
-	}
-	sort.Strings(headers)
-	return strings.Join(headers, ";")
-}
-
-func getV4StringToSign(canonicalRequest string, t time.Time, scope string) string {
-	stringToSign := s3.SignV4Algorithm + "\n" + t.Format(s3.TimeIso8601Format) + "\n"
-	stringToSign += scope + "\n"
-	canonicalRequestBytes := sha256.Sum256([]byte(canonicalRequest))
-	stringToSign += hex.EncodeToString(canonicalRequestBytes[:])
-	return stringToSign
-}
-
-func getV4SigningKey(secretKey string, t time.Time, region string) []byte {
-	date := sumHMAC([]byte("AWS4"+secretKey), []byte(t.Format(s3.TimeYyyymmdd)))
-	regionBytes := sumHMAC(date, []byte(region))
-	service := sumHMAC(regionBytes, []byte("s3"))
-	signingKey := sumHMAC(service, []byte("aws4_request"))
-	return signingKey
-}
-
-func getV4Signature(signingKey []byte, stringToSign string) string {
-	return hex.EncodeToString(sumHMAC(signingKey, []byte(stringToSign)))
 }
