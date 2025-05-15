@@ -105,7 +105,7 @@ func (m *middleware) isReqAuthenticated(r *http.Request) (string, error) {
 	if isRequestSignatureV4(r) {
 		sha256sum := getContentSha256Cksum(r)
 		return m.doesSignatureV4Match(sha256sum, r)
-	} else if m.allowV2 && isRequestSignatureV2(r) {
+	} else if m.allowV2 && s3.IsRequestSignatureV2(r) {
 		domains := make([]string, len(m.storage.Domains))
 		for i, dom := range m.storage.Domains {
 			domains[i] = dom.Value()
