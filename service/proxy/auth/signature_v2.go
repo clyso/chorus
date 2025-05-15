@@ -86,8 +86,33 @@ func (m *middleware) doesSignatureV2Match(r *http.Request, domains []string) (st
 	if err != nil {
 		return "", err
 	}
-	cred := credInfo.cred
 
+	expectedAuth, err := computeSignatureV2(r, credInfo.cred.SecretAccessKey, domains)
+	if err != nil {
+		return "", err
+	}
+
+	v2Auth := r.Header.Get(s3.Authorization)
+	prefix := fmt.Sprintf("%s %s:", s3.SignV2Algorithm, credInfo.cred.AccessKeyID)
+	if !strings.HasPrefix(v2Auth, prefix) {
+		return "", fmt.Errorf("%w: unsupported sign alhorithm", dom.ErrAuth)
+	}
+	v2Auth = v2Auth[len(prefix):]
+
+	if !compareSignatureV2(v2Auth, expectedAuth) {
+		return "", mclient.ErrorResponse{
+			XMLName:    xml.Name{},
+			Code:       "SignatureDoesNotMatch",
+			Message:    "The request signature that the server calculated does not match the signature that you provided. Check your AWS secret access key and signing method. For more information, see REST Authentication and SOAP Authentication.",
+			BucketName: xctx.GetBucket(r.Context()),
+			Key:        xctx.GetObject(r.Context()),
+			StatusCode: http.StatusForbidden,
+		}
+	}
+	return credInfo.user, nil
+}
+
+func computeSignatureV2(r *http.Request, secretAccessKey string, domains []string) (string, error) {
 	// r.RequestURI will have raw encoded URI as sent by the client.
 	tokens := strings.SplitN(r.RequestURI, "?", 2)
 	encodedResource := tokens[0]
@@ -104,25 +129,8 @@ func (m *middleware) doesSignatureV2Match(r *http.Request, domains []string) (st
 	if err != nil {
 		return "", err
 	}
-	expectedAuth := signatureV2(cred, r.Method, encodedResource, strings.Join(unescapedQueries, "&"), r.Header)
 
-	v2Auth := r.Header.Get(s3.Authorization)
-	prefix := fmt.Sprintf("%s %s:", s3.SignV2Algorithm, cred.AccessKeyID)
-	if !strings.HasPrefix(v2Auth, prefix) {
-		return "", fmt.Errorf("%w: unsupported sign alhorithm", dom.ErrAuth)
-	}
-	v2Auth = v2Auth[len(prefix):]
-	if !compareSignatureV2(v2Auth, expectedAuth) {
-		return "", mclient.ErrorResponse{
-			XMLName:    xml.Name{},
-			Code:       "SignatureDoesNotMatch",
-			Message:    "The request signature that the server calculated does not match the signature that you provided. Check your AWS secret access key and signing method. For more information, see REST Authentication and SOAP Authentication.",
-			BucketName: xctx.GetBucket(r.Context()),
-			Key:        xctx.GetObject(r.Context()),
-			StatusCode: http.StatusForbidden,
-		}
-	}
-	return credInfo.user, nil
+	return signatureV2(secretAccessKey, r.Method, encodedResource, strings.Join(unescapedQueries, "&"), r.Header), nil
 }
 
 func getReqAccessKeyV2(r *http.Request) (string, error) {
@@ -163,9 +171,9 @@ func calculateSignatureV2(stringToSign string, secret string) string {
 }
 
 // Return the signature v2 of a given request.
-func signatureV2(cred s3.CredentialsV4, method string, encodedResource string, encodedQuery string, headers http.Header) string {
+func signatureV2(secretAccessKey, method, encodedResource, encodedQuery string, headers http.Header) string {
 	stringToSign := getStringToSignV2(method, encodedResource, encodedQuery, headers, "")
-	signature := calculateSignatureV2(stringToSign, cred.SecretAccessKey)
+	signature := calculateSignatureV2(stringToSign, secretAccessKey)
 	return signature
 }
 
