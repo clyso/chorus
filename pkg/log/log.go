@@ -30,6 +30,7 @@ const (
 	Method     = "method"
 	storType   = "stor_type"
 	user       = "user"
+	account    = "account"
 	TraceID    = "trace_id"
 	httpPath   = "http_path"
 	grpcMethod = "grpc_method"

@@ -36,6 +36,7 @@ func ParseReq(r *http.Request) (account string, container string, object string,
 		// invalid request
 		return "", "", "", UndefinedMethod
 	}
+	account = strings.TrimPrefix(account, "AUTH_")
 	return account, container, object, method
 }
 
