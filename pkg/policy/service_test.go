@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +19,15 @@ package policy
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
+
+	"github.com/go-redis/redismock/v9"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -193,7 +197,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	u1, u2 := "u1", "u2"
 	users := []string{u1, u2}
-	b1, b2 := "b1", "b2"
+	b1, b2, b3 := "b1", "b2", "b3"
 	buckets := []string{b1, b2}
 	s1, s2, s3, s4 := "s1", "s2", "s3", "s4"
 
@@ -790,6 +794,45 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.True(exists)
 	})
+
+	t.Run("bucket replication policy conflict", func(t *testing.T) {
+		r := require.New(t)
+		db.FlushAll()
+		// add routing policy
+		err := svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, nil, tasks.Priority4, nil)
+		r.NoError(err)
+		// old already-exists check is still in place
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, nil, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrAlreadyExists)
+		// old already-exists check has higher priority than conflict check
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b1, tasks.Priority3, nil)
+		r.ErrorIs(err, dom.ErrAlreadyExists)
+		// adding a new policy with a different source and the same destination is a conflict
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b2, s1, s2, &b1, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+
+		// adding a new policy with the same source and a different destination is allowed
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b3, tasks.Priority4, nil)
+		r.NoError(err)
+		// old already-exists check has higher priority than conflict check
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b3, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrAlreadyExists)
+		// adding a new policy with a different source and the same destination is a conflict
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b2, s1, s2, &b3, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+		// adding a new policy with a different source and the same implicit destination is a conflict
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b3, s1, s2, nil, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+
+		// adding a new policy with a implicit destination succeeds after deleting the conflicting explicit one
+		err = svc.DeleteReplication(ctx, u1, b1, s1, s2, &b3)
+		r.NoError(err)
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b3, s1, s2, nil, tasks.Priority4, nil)
+		r.NoError(err)
+		// re-adding the conflicting explicit one fails
+		err = svc.AddBucketReplicationPolicy(ctx, u1, b1, s1, s2, &b3, tasks.Priority4, nil)
+		r.ErrorIs(err, dom.ErrDestinationConflict)
+	})
 }
 
 func Test_CustomDestBucket(t *testing.T) {
@@ -1108,4 +1151,119 @@ func TestReplicationID(t *testing.T) {
 			r.EqualValues(tt.in.SwitchHistoryKey(), got.SwitchHistoryKey())
 		})
 	}
+}
+
+func TestGetBucketReplicationPolicyDest(t *testing.T) {
+	client, mock := redismock.NewClientMock()
+	service := NewService(client)
+
+	user := "testUser"
+	from := "sourceStorage"
+	bucket := "testBucket"
+	dest := "destinationStorage"
+	customBucket := "customBucket"
+
+	ctx := context.Background()
+	r := require.New(t)
+
+	t.Run("successful default destination retrieval", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + dest}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.NoError(err)
+		r.Equal(ReplicationPolicyDest(dest+":"+bucket), result)
+
+		storage, parsedBucket := result.Parse()
+		r.Equal(dest, storage)
+		r.Equal(*parsedBucket, bucket)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("no keys found", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.ErrorIs(err, dom.ErrUnknownDestination)
+		r.Empty(result)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("multiple keys found", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{
+			"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + dest,
+			"p:repl_st:" + user + ":" + bucket + ":" + from + ":anotherDest",
+		}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.ErrorIs(err, dom.ErrAmbiguousDestination)
+		r.Empty(result)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("redis error", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetErr(fmt.Errorf("redis error"))
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.Error(err)
+		r.Empty(result)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("custom destination bucket matches source bucket", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + from + ":" + bucket}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.NoError(err)
+		r.Equal(ReplicationPolicyDest(from+":"+bucket), result)
+
+		storage, parsedBucket := result.Parse()
+		r.Equal(from, storage)
+		r.NotNil(parsedBucket)
+		r.Equal(bucket, *parsedBucket)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("custom destination bucket differs from source bucket", func(t *testing.T) {
+		// Mock the Redis scan result
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":*", 1).SetVal([]string{"p:repl_st:" + user + ":" + bucket + ":" + from + ":" + from + ":" + customBucket}, 0)
+
+		result, err := service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, nil)
+
+		r.NoError(err)
+		r.Equal(ReplicationPolicyDest(from+":"+customBucket), result)
+
+		storage, parsedBucket := result.Parse()
+		r.Equal(from, storage)
+		r.NotNil(parsedBucket)
+		r.Equal(customBucket, *parsedBucket)
+
+		// Ensure all expectations were met
+		r.NoError(mock.ExpectationsWereMet())
+	})
+
+	t.Run("query with non-nil destination", func(t *testing.T) {
+		mock.ExpectScan(0, "p:repl_st:"+user+":"+bucket+":"+from+":"+from+"*", 1).SetVal([]string{}, 0)
+		service.GetBucketReplicationPolicyDest(ctx, user, from, bucket, &from)
+		r.NoError(mock.ExpectationsWereMet())
+	})
 }

@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,20 +91,20 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			panic(err)
 		}
-		proxyConf.Redis.Address = redisSvc.Addr()
-		workerConf.Redis.Address = redisSvc.Addr()
+		proxyConf.Redis.Address = s3.NewConfAddr(redisSvc.Addr())
+		workerConf.Redis.Address = s3.NewConfAddr(redisSvc.Addr())
 	} else {
 		if url := os.Getenv("EXT_REDIS_URL"); url != "" {
-			proxyConf.Redis.Address = url
-			workerConf.Redis.Address = url
+			proxyConf.Redis.Address = s3.NewConfAddr(url)
+			workerConf.Redis.Address = s3.NewConfAddr(url)
 		}
-		client := redis.NewClient(&redis.Options{Addr: proxyConf.Redis.Address})
+		client := redis.NewClient(&redis.Options{Addr: proxyConf.Redis.Address.ValueWithProtocol()})
 		err = client.FlushAll(context.TODO()).Err()
 		if err != nil {
 			panic(err)
 		}
 	}
-	fmt.Println("redis url", proxyConf.Redis.Address)
+	fmt.Println("redis url", proxyConf.Redis.Address.ValueWithProtocol())
 
 	mainBackend := s3mem.New()
 	mainFaker := gofakes3.New(mainBackend)
@@ -120,26 +121,26 @@ func TestMain(m *testing.M) {
 	f2Ts := httptest.NewServer(f2Faker.Server())
 	defer f2Ts.Close()
 
-	taskClient = asynq.NewClient(asynq.RedisClientOpt{Addr: proxyConf.Redis.Address, DB: proxyConf.Redis.QueueDB})
+	taskClient = asynq.NewClient(asynq.RedisClientOpt{Addr: proxyConf.Redis.Address.ValueWithProtocol(), DB: proxyConf.Redis.QueueDB})
 	defer taskClient.Close()
 
 	proxyConf.Storage.Storages = map[string]s3.Storage{}
 	proxyConf.Storage.Storages["main"] = s3.Storage{
-		Address:     mainTs.URL,
+		Address:     s3.NewConfAddr(mainTs.URL),
 		Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
 		Provider:    "Other",
 		IsMain:      true,
 	}
 
 	proxyConf.Storage.Storages["f1"] = s3.Storage{
-		Address:     f1Ts.URL,
+		Address:     s3.NewConfAddr(f1Ts.URL),
 		Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
 		Provider:    "Other",
 		IsMain:      false,
 	}
 
 	proxyConf.Storage.Storages["f2"] = s3.Storage{
-		Address:     f2Ts.URL,
+		Address:     s3.NewConfAddr(f2Ts.URL),
 		Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
 		Provider:    "Other",
 		IsMain:      false,
@@ -203,7 +204,7 @@ func TestMain(m *testing.M) {
 		}
 	}()
 	proxyClient, mpProxyClient = createClient(s3.Storage{
-		Address:     addr,
+		Address:     s3.NewConfAddr("http://" + addr),
 		Credentials: proxyConf.Storage.Storages["main"].Credentials,
 		IsSecure:    false,
 	})
@@ -234,9 +235,7 @@ func getRandomPort() (int, string) {
 }
 
 func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
-	addr := strings.TrimPrefix(c.Address, "http://")
-	addr = strings.TrimPrefix(addr, "https://")
-	mc, err := mclient.New(addr, &mclient.Options{
+	mc, err := mclient.New(c.Address.Value(), &mclient.Options{
 		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
 		Secure: c.IsSecure,
 	})
@@ -257,10 +256,10 @@ func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
 		ready = !mc.IsOffline()
 	}
 	if !ready {
-		panic("client " + addr + " is not ready")
+		panic("client " + c.Address.Value() + " is not ready")
 	}
 
-	core, err := mclient.NewCore(addr, &mclient.Options{
+	core, err := mclient.NewCore(c.Address.Value(), &mclient.Options{
 		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
 		Secure: c.IsSecure,
 	})

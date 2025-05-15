@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -312,7 +313,7 @@ func (h *handlers) GetStorages(_ context.Context, _ *emptypb.Empty) (*pb.GetStor
 		})
 		res = append(res, &pb.Storage{
 			Name:        name,
-			Address:     stor.Address,
+			Address:     stor.Address.ValueWithProtocol(),
 			Provider:    pb.Storage_Provider(pb.Storage_Provider_value[stor.Provider]),
 			Credentials: creds,
 			IsMain:      stor.IsMain,
@@ -643,7 +644,25 @@ func (h *handlers) CompareBucket(ctx context.Context, req *pb.CompareBucketReque
 	}
 	ctx = log.WithUser(ctx, req.User)
 
-	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.From, req.To, req.Bucket, req.ToBucket)
+	var toBucket *string
+	debugLog := zerolog.Ctx(ctx).Debug().Str("from", req.From).Str("to", req.To).Str("bucket", req.Bucket)
+	if req.ToBucket != nil && *req.ToBucket != "" {
+		debugLog.Str("toBucket from", "request")
+		toBucket = req.ToBucket
+	} else {
+		dst, err := h.policySvc.GetBucketReplicationPolicyDest(ctx, req.User, req.From, req.Bucket, &req.To)
+		if err != nil {
+			zerolog.Ctx(ctx).Err(err).Msg("unable to get bucket replication policy destination")
+			return nil, err
+		}
+		_, toBucket = dst.Parse()
+		if toBucket == nil || *toBucket == "" {
+			return nil, fmt.Errorf("%w: misbehaving GetBucketReplicationPolicyDest returned empty toBucket", dom.ErrInternal)
+		}
+		debugLog.Str("toBucket from", "policy")
+	}
+	debugLog.Msg("compare bucket")
+	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.From, req.To, req.Bucket, toBucket)
 	if err != nil {
 		return nil, err
 	}

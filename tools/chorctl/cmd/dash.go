@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +27,11 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
+	"github.com/clyso/chorus/tools/chorctl/internal/common"
 	"github.com/clyso/chorus/tools/chorctl/internal/ui"
 )
+
+var dashNameFormat string
 
 // dashCmd represents the dash command
 var dashCmd = &cobra.Command{
@@ -37,13 +41,23 @@ var dashCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
-		model := ui.New(ctx, client)
+
+		nameBuilder, err := common.NewReplNameBuilder(&dashNameFormat)
+		if err != nil {
+			logrus.WithError(err).WithField("format", dashNameFormat).Fatal("unable to parse name format")
+		}
+		model := ui.New(ctx, client, nameBuilder)
 		p := tea.NewProgram(model, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Println("could not start program:", err)
@@ -52,6 +66,7 @@ var dashCmd = &cobra.Command{
 }
 
 func init() {
+	dashCmd.Flags().StringVarP(&dashNameFormat, "name-format", "n", "%u:%F:%f->%t:%T", common.ReplNameFormatHelp)
 	rootCmd.AddCommand(dashCmd)
 
 	// Here you will define your flags and configuration settings.

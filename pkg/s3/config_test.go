@@ -9,13 +9,13 @@ import (
 func TestStorageConfig_Validate(t *testing.T) {
 	s := StorageConfig{
 		Storages: map[string]Storage{
-			"a": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"b": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"c": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"d": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"e": {IsMain: true, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"f": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"g": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"a": {IsMain: false, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"b": {IsMain: false, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"c": {IsMain: false, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"d": {IsMain: false, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"e": {IsMain: true, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"f": {IsMain: false, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+			"g": {IsMain: false, Address: NewConfAddr("a"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 		},
 	}
 	r := require.New(t)
@@ -55,22 +55,22 @@ func TestStorageConfig_ValidateAddress(t *testing.T) {
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, Address: NewConfAddr("clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.NoError(s.Init())
-		r.EqualValues("http://clyso.com", s.Storages["a"].Address)
+		r.EqualValues("http://clyso.com", s.Storages["a"].Address.ValueWithProtocol())
 	})
 	t.Run("Add https", func(t *testing.T) {
 		r := require.New(t)
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, IsSecure: true, Address: NewConfAddr("clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.NoError(s.Init())
-		r.EqualValues("https://clyso.com", s.Storages["a"].Address)
+		r.EqualValues("https://clyso.com", s.Storages["a"].Address.ValueWithProtocol())
 	})
 
 	t.Run("Already http", func(t *testing.T) {
@@ -78,22 +78,22 @@ func TestStorageConfig_ValidateAddress(t *testing.T) {
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, Address: NewConfAddr("http://clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.NoError(s.Init())
-		r.EqualValues("http://clyso.com", s.Storages["a"].Address)
+		r.EqualValues("http://clyso.com", s.Storages["a"].Address.ValueWithProtocol())
 	})
 	t.Run("Already https", func(t *testing.T) {
 		r := require.New(t)
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, IsSecure: true, Address: NewConfAddr("https://clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.NoError(s.Init())
-		r.EqualValues("https://clyso.com", s.Storages["a"].Address)
+		r.EqualValues("https://clyso.com", s.Storages["a"].Address.ValueWithProtocol())
 	})
 
 	t.Run("Invalid http", func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestStorageConfig_ValidateAddress(t *testing.T) {
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, Address: NewConfAddr("https://clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.Error(s.Init())
@@ -111,7 +111,7 @@ func TestStorageConfig_ValidateAddress(t *testing.T) {
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, IsSecure: true, Address: NewConfAddr("http://clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.Error(s.Init())
@@ -121,7 +121,7 @@ func TestStorageConfig_ValidateAddress(t *testing.T) {
 
 		s := StorageConfig{
 			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "http:/clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
+				"a": {IsMain: true, IsSecure: true, Address: NewConfAddr("http::clyso.com"), Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
 			},
 		}
 		r.Error(s.Init())

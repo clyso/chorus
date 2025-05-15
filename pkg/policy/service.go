@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -255,6 +256,7 @@ type Service interface {
 	DeleteUserReplication(ctx context.Context, user string, from string, to string) error
 
 	AddBucketReplicationPolicy(ctx context.Context, user, bucket, from string, to string, toBucket *string, priority tasks.Priority, agentURL *string) error
+	GetBucketReplicationPolicyDest(ctx context.Context, user, bucket, from string, to *string) (ReplicationPolicyDest, error)
 	GetReplicationPolicyInfo(ctx context.Context, user, bucket, from, to string, toBucket *string) (ReplicationPolicyStatus, error)
 	ListReplicationPolicyInfo(ctx context.Context) ([]ReplicationPolicyStatusExtended, error)
 	IsReplicationPolicyExists(ctx context.Context, user, bucket, from, to string, toBucket *string) (bool, error)
@@ -979,6 +981,41 @@ func (s *policySvc) DeleteBucketReplicationsByUser(ctx context.Context, user, fr
 	return deleted, nil
 }
 
+func (s *policySvc) replicationDestinationExists(user, toStor string, bucket string, toBucket *string) (bool, error) {
+	if toStor == "" {
+		return false, fmt.Errorf("%w: toStor is required to check replication destination", dom.ErrInvalidArg)
+	}
+	if bucket == "" {
+		return false, fmt.Errorf("%w: bucket is required to check replication destination", dom.ErrInvalidArg)
+	}
+	if toBucket == nil || *toBucket == "" || *toBucket == bucket {
+		keys, _, err := s.client.Scan(context.Background(), 0, fmt.Sprintf("p:repl_st:%s:%s:*:%s", user, bucket, toStor), 0).Result()
+		if err != nil {
+			return false, err
+		}
+		if len(keys) > 0 {
+			return true, nil
+		}
+		keys, _, err = s.client.Scan(context.Background(), 0, fmt.Sprintf("p:repl_st:%s:*:*:%s:%s*", user, toStor, bucket), 0).Result()
+		if err != nil {
+			return false, err
+		}
+		return len(keys) > 0, nil
+	}
+	keys, _, err := s.client.Scan(context.Background(), 0, fmt.Sprintf("p:repl_st:%s:*:*:%s:%s", user, toStor, *toBucket), 0).Result()
+	if err != nil {
+		return false, err
+	}
+	if len(keys) > 0 {
+		return true, nil
+	}
+	keys, _, err = s.client.Scan(context.Background(), 0, fmt.Sprintf("p:repl_st:%s:%s:*:%s", user, *toBucket, toStor), 0).Result()
+	if err != nil {
+		return false, err
+	}
+	return len(keys) > 0, nil
+}
+
 func (s *policySvc) AddBucketReplicationPolicy(ctx context.Context, user, bucket, fromStor string, toStor string, toBucket *string, priority tasks.Priority, agentURL *string) (err error) {
 	if toBucket != nil && (*toBucket == "" || *toBucket == bucket) {
 		// custom dest bucket makes sense only if different from src bucket
@@ -1026,6 +1063,14 @@ func (s *policySvc) AddBucketReplicationPolicy(ctx context.Context, user, bucket
 	if _, ok := prev.To[ReplicationPolicyDest(dest)]; ok {
 		return dom.ErrAlreadyExists
 	}
+	exists, err := s.replicationDestinationExists(user, toStor, bucket, toBucket)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return dom.ErrDestinationConflict
+	}
+
 	key := fmt.Sprintf("p:repl:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", fromStor, dest)
 	added, err := s.client.ZAddNX(ctx, key, redis.Z{Member: val, Score: float64(priority)}).Result()
@@ -1053,6 +1098,33 @@ func (s *policySvc) AddBucketReplicationPolicy(ctx context.Context, user, bucket
 
 	}
 	return
+}
+
+func (s *policySvc) GetBucketReplicationPolicyDest(ctx context.Context, user, from, bucket string, to *string) (ReplicationPolicyDest, error) {
+	var keys []string
+	var err error
+	zerolog.Ctx(ctx).Debug().Msgf("user: %s, bucket: %s, from: %s, to: %v", user, bucket, from, to)
+	if to == nil || *to == "" {
+		keys, _, err = s.client.Scan(ctx, 0, fmt.Sprintf("p:repl_st:%s:%s:%s:*", user, bucket, from), 1).Result()
+	} else {
+		keys, _, err = s.client.Scan(ctx, 0, fmt.Sprintf("p:repl_st:%s:%s:%s:%s*", user, bucket, from, *to), 1).Result()
+	}
+	zerolog.Ctx(ctx).Debug().Msgf("keys: %v", keys)
+	if err != nil {
+		return "", err
+	}
+	if len(keys) == 0 {
+		return "", dom.ErrUnknownDestination
+	}
+	if len(keys) > 1 {
+		return "", dom.ErrAmbiguousDestination
+	}
+	key := keys[0]
+	key = strings.TrimPrefix(key, fmt.Sprintf("p:repl_st:%s:%s:%s:", user, bucket, from))
+	if strings.Contains(key, ":") {
+		return ReplicationPolicyDest(key), nil
+	}
+	return ReplicationPolicyDest(key + ":" + bucket), nil
 }
 
 func fromStrPtr(s *string) string {

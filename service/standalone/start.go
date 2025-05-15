@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,22 +68,22 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		var err error
 		isFake := false
 		fakePort := 0
-		if storage.Address == "" {
+		if !storage.Address.IsSet() {
 			_, fakePort, err = getRandomPort()
 			if err != nil {
 				return fmt.Errorf("%w: unable to get random port", err)
 			}
 			isFake = true
-		} else if strings.HasPrefix(storage.Address, ":") {
-			fakePort, err = strconv.Atoi(strings.TrimPrefix(storage.Address, ":"))
+		} else if strings.HasPrefix(storage.Address.Value(), ":") {
+			fakePort, err = strconv.Atoi(strings.TrimPrefix(storage.Address.Value(), ":"))
 			if err != nil {
-				return fmt.Errorf("%w: unable to parse storage address %s", err, storage.Address)
+				return fmt.Errorf("%w: unable to parse storage address %s", err, storage.Address.RawValue())
 			}
 			isFake = true
 		}
 		if isFake {
 			fake[name] = fakePort
-			storage.Address = httpLocalhost(fakePort)
+			storage.Address = s3.NewConfAddr(httpLocalhost(fakePort))
 			storage.IsSecure = false
 			conf.Storage.Storages[name] = storage
 		}
@@ -125,7 +126,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	workerConf := conf.Config
 	if len(workerConf.Redis.Addresses) == 0 {
-		workerConf.Redis.Addresses = []string{redisSvc.Addr()}
+		workerConf.Redis.Addresses = s3.NewConfAddrs(redisSvc.Addr())
 	}
 
 	// deep copy worker config
@@ -152,7 +153,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			Cors:    conf.Proxy.Cors,
 		}
 		if len(proxyConf.Redis.Addresses) == 0 {
-			proxyConf.Redis.Addresses = []string{redisSvc.Addr()}
+			proxyConf.Redis.Addresses = s3.NewConfAddrs(redisSvc.Addr())
 		}
 
 		// deep copy proxy config
@@ -182,12 +183,16 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return err
 	}
 
+	httpPort := httpLocalhost(conf.Api.HttpPort)
+	if conf.Api.Secure {
+		httpPort = "disabled due to grpc TLS"
+	}
 	fmt.Printf(connectInfo,
 		uiURL,
 		proxyURL,
 		printCreds(conf),
 		localhost(conf.Api.GrpcPort),
-		httpLocalhost(conf.Api.HttpPort),
+		httpPort,
 		redisSvc.Addr(),
 		printStorages(fake, conf.Storage),
 	)
@@ -218,7 +223,11 @@ func printCreds(conf *Config) string {
 	}
 	res := make([]string, 0, len(creds))
 	for s, v4 := range creds {
-		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, v4.SecretAccessKey))
+		secret := "<hidden>"
+		if conf.PrintSecrets {
+			secret = v4.SecretAccessKey
+		}
+		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, secret))
 	}
 	return strings.Join(res, "\n")
 }
@@ -237,7 +246,7 @@ func printStorages(fake map[string]int, conf *s3.StorageConfig) string {
 		if stor.IsMain {
 			m = " < \u001B[94mMAIN\u001B[0m"
 		}
-		res = append(res, fmt.Sprintf(" - %s%s: %s%s", f, name, stor.Address, m))
+		res = append(res, fmt.Sprintf(" - %s%s: %s%s", f, name, stor.Address.ValueWithProtocol(), m))
 	}
 	return strings.Join(res, "\n")
 }

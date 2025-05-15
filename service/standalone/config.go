@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +23,7 @@ import (
 	"io/fs"
 
 	"github.com/clyso/chorus/pkg/config"
-	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/service/proxy/auth"
-	"github.com/clyso/chorus/service/proxy/cors"
+	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/worker"
 )
 
@@ -55,13 +54,7 @@ type Config struct {
 
 	UIPort int `yaml:"uiPort"`
 
-	Proxy struct {
-		Enabled bool         `yaml:"enabled"`
-		Auth    *auth.Config `yaml:"auth,omitempty"`
-		Port    int          `yaml:"port"`
-		Address string       `yaml:"address"`
-		Cors    *cors.Config `yaml:"cors"`
-	} `yaml:"proxy"`
+	Proxy proxy.Config `yaml:"proxy"`
 }
 
 func (c *Config) Validate() error {
@@ -79,34 +72,11 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Proxy.Enabled {
-		if c.Proxy.Auth == nil {
-			return fmt.Errorf("chorus config: empty Auth config")
-		}
-		if c.Proxy.Auth.UseStorage != "" {
-			if _, ok := c.Storage.Storages[c.Proxy.Auth.UseStorage]; !ok {
-				return fmt.Errorf("chorus config: auth UseStorage points to unknown storage")
-			}
-		}
-		if len(c.Proxy.Auth.Custom) != 0 {
-			var storCreds map[string]s3.CredentialsV4
-			for _, storage := range c.Storage.Storages {
-				storCreds = storage.Credentials
-				break
-			}
-			for user := range c.Proxy.Auth.Custom {
-				if _, ok := storCreds[user]; !ok {
-					return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
-				}
-			}
-		}
-		if c.Proxy.Auth.UseStorage == "" && len(c.Proxy.Auth.Custom) == 0 {
-			return fmt.Errorf("chorus config: auth credentials enabled but not set")
-		}
-
-		if c.Proxy.Port <= 0 {
-			return fmt.Errorf("chorus config: Port must be positive: %d", c.Proxy.Port)
+		if err := c.Proxy.Validate(); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
@@ -124,5 +94,9 @@ func GetConfig(src ...config.Src) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	conf.Proxy.Common = conf.Common
+	conf.Proxy.Storage = conf.Storage
+
 	return &conf, err
 }

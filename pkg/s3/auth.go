@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +28,11 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 )
 
-// AWS Signature Version '4' constants.
 const (
-	signV4Algorithm = "AWS4-HMAC-SHA256"
-	yyyymmdd        = "20060102"
+	SignV2Algorithm   = "AWS"
+	SignV4Algorithm   = "AWS4-HMAC-SHA256"
+	TimeYyyymmdd      = "20060102"
+	TimeIso8601Format = "20060102T150405Z"
 )
 
 type SignValues struct {
@@ -41,7 +43,7 @@ type SignValues struct {
 
 func ParseSignV4(v4Auth string) (sv SignValues, err error) {
 	// credElement is fetched first to skip replacing the space in access key.
-	credElement := strings.TrimPrefix(strings.Split(strings.TrimSpace(v4Auth), ",")[0], signV4Algorithm)
+	credElement := strings.TrimPrefix(strings.Split(strings.TrimSpace(v4Auth), ",")[0], SignV4Algorithm)
 	// Replace all spaced strings, some clients can send spaced
 	// parameters and some won't. So we pro-actively remove any spaces
 	// to make parsing easier.
@@ -51,12 +53,12 @@ func ParseSignV4(v4Auth string) (sv SignValues, err error) {
 	}
 
 	// Verify if the header algorithm is supported or not.
-	if !strings.HasPrefix(v4Auth, signV4Algorithm) {
+	if !strings.HasPrefix(v4Auth, SignV4Algorithm) {
 		return sv, fmt.Errorf("%w: parse signature: signature type is not supported", dom.ErrAuth)
 	}
 
 	// Strip off the Algorithm prefix.
-	v4Auth = strings.TrimPrefix(v4Auth, signV4Algorithm)
+	v4Auth = strings.TrimPrefix(v4Auth, SignV4Algorithm)
 	authFields := strings.Split(strings.TrimSpace(v4Auth), ",")
 	if len(authFields) != 3 {
 		return sv, fmt.Errorf("%w: parse signature: fields missing %+v", dom.ErrAuth, authFields)
@@ -97,15 +99,6 @@ type CredentialHeader struct {
 	}
 }
 
-func (c CredentialHeader) GetScope() string {
-	return strings.Join([]string{
-		c.Scope.Date.Format(yyyymmdd),
-		c.Scope.Region,
-		c.Scope.Service,
-		c.Scope.Request,
-	}, "/")
-}
-
 // parse credentialHeader string into its structured form.
 func parseCredentialHeader(credElement string) (ch CredentialHeader, err error) {
 	creds := strings.SplitN(strings.TrimSpace(credElement), "=", 2)
@@ -127,7 +120,7 @@ func parseCredentialHeader(credElement string) (ch CredentialHeader, err error) 
 	}
 	credElements = credElements[len(credElements)-4:]
 	var e error
-	cred.Scope.Date, e = time.Parse(yyyymmdd, credElements[0])
+	cred.Scope.Date, e = time.Parse(TimeYyyymmdd, credElements[0])
 	if e != nil {
 		return ch, fmt.Errorf("%w: invalid credential header date format %+v", dom.ErrAuth, credElements[0])
 	}

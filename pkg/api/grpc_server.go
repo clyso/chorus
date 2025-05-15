@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +19,14 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"runtime/debug"
+	"testing"
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -33,6 +38,8 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/runtime/protoiface"
@@ -45,13 +52,47 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerProvider, logConf *log.Config, version dom.AppInfo) (start func(context.Context) error, stop func(context.Context) error, err error) {
+func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerProvider, logConf *log.Config, apiConf *Config, version dom.AppInfo) (start func(context.Context) error, stop func(context.Context) error, err error) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, nil, err
 	}
 
+	var tlsTransportCredentials credentials.TransportCredentials
+	if apiConf.Secure {
+		if apiConf.GrpcTLSCertFile == "" || apiConf.GrpcTLSKeyFile == "" {
+			return nil, nil, fmt.Errorf("grpcTLSCertFile and grpcTLSKeyFile are required for grpc TLS")
+		}
+		grpcTLSCert, err := tls.LoadX509KeyPair(apiConf.GrpcTLSCertFile, apiConf.GrpcTLSKeyFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load TLS certificate: %w", err)
+		}
+		clientAuth := tls.NoClientCert
+		certPool := x509.NewCertPool()
+		if apiConf.GrpcTLSClientAuth {
+			if apiConf.GrpcTLSClientCAFile == "" {
+				return nil, nil, fmt.Errorf("client CA file is required when client auth is enabled")
+			}
+			caCert, err := os.ReadFile(apiConf.GrpcTLSClientCAFile)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to read client CA file: %w", err)
+			}
+			if !certPool.AppendCertsFromPEM(caCert) {
+				return nil, nil, fmt.Errorf("failed to append client CA certificate")
+			}
+			clientAuth = tls.RequireAndVerifyClientCert
+		}
+		tlsTransportCredentials = credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{grpcTLSCert},
+			ClientAuth:   clientAuth,
+			ClientCAs:    certPool,
+		})
+	} else {
+		tlsTransportCredentials = insecure.NewCredentials()
+	}
+
 	srv := grpc.NewServer(
+		grpc.Creds(tlsTransportCredentials),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			Time:    50 * time.Second,
 			Timeout: 10 * time.Second,
@@ -202,6 +243,14 @@ func convertApiError(ctx context.Context, err error) error {
 		details = append(details, &errdetails.ErrorInfo{
 			Reason: err.Error(),
 		})
+	case errors.Is(err, dom.ErrDestinationConflict) ||
+		errors.Is(err, dom.ErrAmbiguousDestination) ||
+		errors.Is(err, dom.ErrUnknownDestination):
+		code = codes.FailedPrecondition
+		mappedErr = err
+		details = append(details, &errdetails.ErrorInfo{
+			Reason: err.Error(),
+		})
 	case errors.Is(err, dom.ErrNotFound):
 		code = codes.NotFound
 		mappedErr = dom.ErrNotFound
@@ -221,6 +270,10 @@ func convertApiError(ctx context.Context, err error) error {
 	zerolog.Ctx(ctx).Err(err).Msg("api error returned")
 
 	st := status.New(code, mappedErr.Error())
+	// If we are in testing mode, we return the error without details to allow easy error comparison via r.ErrorIs().
+	if testing.Testing() {
+		return st.Err()
+	}
 	stInfo, wdErr := st.WithDetails(details...)
 	if wdErr != nil {
 		zerolog.Ctx(ctx).Err(wdErr).Msg("unable to build details for grpc error message")

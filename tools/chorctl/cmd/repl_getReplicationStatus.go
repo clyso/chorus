@@ -13,6 +13,7 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
+	"github.com/clyso/chorus/tools/chorctl/internal/common"
 )
 
 var (
@@ -31,7 +32,12 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOption, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOption)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
@@ -53,10 +59,15 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 			logrus.WithError(err).Fatal("unable to add replication")
 		}
 
+		replNameBuilder, err := common.NewReplNameBuilder(&replNameFormat)
+		if err != nil {
+			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication name format")
+		}
+
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 		fmt.Fprintln(w, api.ReplHeader())
-		fmt.Fprintln(w, api.ReplRow(res))
+		fmt.Fprintln(w, api.ReplRow(res, replNameBuilder(res)))
 		w.Flush()
 	},
 }

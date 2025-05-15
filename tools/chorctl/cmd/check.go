@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,18 +33,24 @@ import (
 
 var (
 	checkBucket string
+	toBucket    string
 )
 
 // checkCmd represents the check command
 var checkCmd = &cobra.Command{
-	Use:   "check <from_storage> <to_storage> --bucket=<bucket_name>",
+	Use:   "check <from_storage> <to_storage> --check-bucket=<bucket_name> [--to-bucket=<to_bucket_name>]",
 	Short: "Checks the files in the source and destination match.",
 	Long:  ``,
 	Args:  cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
@@ -64,12 +71,18 @@ var checkCmd = &cobra.Command{
 		var from, to = args[0], args[1]
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
+
 		if checkBucket != "" {
 			fmt.Println("Checking files in bucket", checkBucket, "...")
 			max := 6
@@ -77,10 +90,13 @@ var checkCmd = &cobra.Command{
 				max = len(checkBucket)
 			}
 			fmt.Printf("🪣 %s | Match\t | MissSrc\t | MissDst\t | Differ\t | Error\n", fillName("BUCKET", max, " "))
-			check(ctx, client, from, to, checkBucket, max)
+			check(ctx, client, from, to, checkBucket, &toBucket, max)
 			return
 		}
 
+		if toBucket != "" {
+			logrus.Fatal("to-bucket flag can be used only with check-bucket flag")
+		}
 		fmt.Println("Getting list of buckets...")
 
 		m, err := client.ListReplications(ctx, &emptypb.Empty{})
@@ -111,20 +127,21 @@ var checkCmd = &cobra.Command{
 		for i := range buckets {
 			go func(bucket string) {
 				defer wg.Done()
-				check(ctx, client, from, to, bucket, max)
+				check(ctx, client, from, to, bucket, nil, max)
 			}(buckets[i])
 		}
 		wg.Wait()
 	},
 }
 
-func check(ctx context.Context, client pb.ChorusClient, from, to, bucket string, max int) {
+func check(ctx context.Context, client pb.ChorusClient, from, to, bucket string, toBucket *string, max int) {
 	res, err := client.CompareBucket(ctx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
 		From:      from,
 		To:        to,
 		ShowMatch: true,
 		User:      user,
+		ToBucket:  toBucket,
 	})
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to check bucket")
@@ -161,6 +178,7 @@ func fillName(in string, size int, fill string) string {
 func init() {
 	rootCmd.AddCommand(checkCmd)
 	checkCmd.Flags().StringVarP(&checkBucket, "check-bucket", "b", "", "check bucket name")
+	checkCmd.Flags().StringVarP(&toBucket, "to-bucket", "t", "", "destination bucket name")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

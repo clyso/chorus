@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +44,13 @@ chorctl repl add-user -f main -t follower -u admin
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+
+		tlsOptions, err := getTLSOptions()
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get tls options")
+		}
+
+		conn, err := api.Connect(ctx, address, tlsOptions)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}

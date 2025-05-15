@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 Strato GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 
 	stdlog "github.com/rs/zerolog/log"
@@ -29,25 +31,29 @@ import (
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/trace"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 //go:embed config.yaml
 var configFile embed.FS
 
 type Common struct {
-	Log      *log.Config      `yaml:"log,omitempty"`
-	Trace    *trace.Config    `yaml:"trace,omitempty"`
-	Metrics  *metrics.Config  `yaml:"metrics,omitempty"`
-	Redis    *Redis           `yaml:"redis,omitempty"`
-	Features *features.Config `yaml:"features,omitempty"`
+	Log          *log.Config      `yaml:"log,omitempty"`
+	Trace        *trace.Config    `yaml:"trace,omitempty"`
+	Metrics      *metrics.Config  `yaml:"metrics,omitempty"`
+	Redis        *Redis           `yaml:"redis,omitempty"`
+	Features     *features.Config `yaml:"features,omitempty"`
+	PrintSecrets bool             `yaml:"printSecret,omitempty"`
 }
 
 type Redis struct {
 	// Deprecated: Address is deprecated: use Addresses
 	// If Addresses set, Address will be ignored
-	Address   string        `yaml:"address"`
-	Addresses []string      `yaml:"addresses"`
+	Address   s3.ConfAddr   `yaml:"address"`
+	Addresses []s3.ConfAddr `yaml:"addresses"`
 	Sentinel  RedisSentinel `yaml:"sentinel"`
 	User      string        `yaml:"user"`
 	Password  string        `yaml:"password"`
@@ -78,10 +84,14 @@ func (r *Redis) validate() error {
 
 func (r *Redis) GetAddresses() []string {
 	if len(r.Addresses) != 0 {
-		return r.Addresses
+		addrs := make([]string, len(r.Addresses))
+		for i, addr := range r.Addresses {
+			addrs[i] = addr.ValueWithProtocol()
+		}
+		return addrs
 	}
-	if r.Address != "" {
-		return []string{r.Address}
+	if r.Address.IsSet() {
+		return []string{r.Address.ValueWithProtocol()}
 	}
 	return nil
 }
@@ -129,7 +139,27 @@ func Get(conf any, sources ...Src) error {
 	v.AutomaticEnv()
 	v.SetEnvPrefix("CFG")
 
-	err = v.Unmarshal(&conf)
+	/*
+	 * Unfortunately, viper does not support custom UnmarshalYAML methods
+	 * (https://github.com/spf13/viper/issues/338, still open), nor does it support `yaml:`
+	 * struct annotations (https://github.com/spf13/viper/issues/385, closed, by design).
+	 * Instead, a custom decode hook is required to teach mapstructure (which is used by viper
+	 * internally) how to decode the s3.ConfAddr type. As an unlucky design choice the
+	 * mapstructure API only allows to configure all the hooks at once, not adding an additional
+	 * one. Thus we prepend the default hooks mentioned in the viper documentation
+	 * (https://pkg.go.dev/github.com/spf13/viper#DecodeHook).
+	 */
+	decodeHooks := mapstructure.ComposeDecodeHookFunc(
+		mapstructure.StringToTimeDurationHookFunc(),
+		mapstructure.StringToSliceHookFunc(","),
+		func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+			if f.Kind() == reflect.String && t == reflect.TypeOf(s3.ConfAddr{}) {
+				return s3.NewConfAddr(data.(string)), nil
+			}
+			return data, nil
+		},
+	)
+	err = v.Unmarshal(&conf, viper.DecodeHook(decodeHooks))
 	if err != nil {
 		return fmt.Errorf("%w: unable to unmarshal config", err)
 	}
