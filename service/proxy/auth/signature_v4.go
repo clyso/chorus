@@ -47,10 +47,8 @@ func compareSignatureV4(sig1, sig2 string) bool {
 	return subtle.ConstantTimeCompare([]byte(sig1), []byte(sig2)) == 1
 }
 
-func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request) (string, error) {
-	req := *r
-
-	v4Auth := req.Header.Get(s3.Authorization)
+func (m *middleware) doesSignatureV4Match(r *http.Request) (string, error) {
+	v4Auth := r.Header.Get(s3.Authorization)
 
 	signV4Values, err := s3.ParseSignV4(v4Auth)
 	if err != nil {
@@ -66,10 +64,9 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 	if err != nil {
 		return "", err
 	}
-	cred := credInfo.cred
 
 	var date string
-	if date = req.Header.Get(s3.AmzDate); date == "" {
+	if date = r.Header.Get(s3.AmzDate); date == "" {
 		if date = r.Header.Get(s3.Date); date == "" {
 			return "", fmt.Errorf("%w: invalid signature: %q header is missing", dom.ErrAuth, s3.AmzDate)
 		}
@@ -79,12 +76,12 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 	if e != nil {
 		return "", fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
 	}
-	queryStr := req.URL.Query().Encode()
-	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
-	stringToSign := getV4StringToSign(canonicalRequest, t, signV4Values.Credential.GetScope())
-	signingKey := getV4SigningKey(cred.SecretAccessKey, signV4Values.Credential.Scope.Date,
-		signV4Values.Credential.Scope.Region)
-	newSignature := getV4Signature(signingKey, stringToSign)
+
+	newSignature := computeSignatureV4(r, credInfo.cred.AccessKeyID, credInfo.cred.SecretAccessKey,
+		signV4Values.Credential.Scope.Region, t, extractedSignedHeaders)
+	if err != nil {
+		return "", err
+	}
 
 	if !compareSignatureV4(newSignature, signV4Values.Signature) {
 		return "", mclient.ErrorResponse{
@@ -98,6 +95,21 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 	}
 
 	return credInfo.user, nil
+}
+
+func computeSignatureV4(req *http.Request, accessKeyID, secretAccessKey, region string, date time.Time, extractedSignedHeaders http.Header) string {
+	hashedPayload := getContentSha256Cksum(req)
+	queryStr := req.URL.Query().Encode()
+	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
+	scope := strings.Join([]string{
+		date.Format(s3.TimeYyyymmdd),
+		region,
+		"s3",
+		"aws4_request",
+	}, "/")
+	stringToSign := getV4StringToSign(canonicalRequest, date, scope)
+	signingKey := getV4SigningKey(secretAccessKey, date, region)
+	return getV4Signature(signingKey, stringToSign)
 }
 
 func getCanonicalV4Request(extractedSignedHeaders http.Header, payload, queryStr, urlPath, method string) string {

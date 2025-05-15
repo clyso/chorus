@@ -99,15 +99,6 @@ type CredentialHeader struct {
 	}
 }
 
-func (c CredentialHeader) GetScope() string {
-	return strings.Join([]string{
-		c.Scope.Date.Format(TimeYyyymmdd),
-		c.Scope.Region,
-		c.Scope.Service,
-		c.Scope.Request,
-	}, "/")
-}
-
 // parse credentialHeader string into its structured form.
 func parseCredentialHeader(credElement string) (ch CredentialHeader, err error) {
 	creds := strings.SplitN(strings.TrimSpace(credElement), "=", 2)
