@@ -230,18 +230,24 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		return nil, false, err
 	}
 	newReq.ContentLength = req.ContentLength
-	toSign, notToSign := processHeaders(req.Header)
-	newReq.Header = toSign
 
-	copyReqSpan.End()
-	_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
-	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") // todo: get location if needed ("us-east-1")
-	signReqSpan.End()
-	if err != nil {
-		return nil, false, err
-	}
-	for name, vals := range notToSign {
-		newReq.Header[name] = vals
+	if url.Host == req.Host {
+		// transparent proxy mode, forward request as-is
+		newReq.Header = req.Header
+	} else {
+		toSign, notToSign := processHeaders(req.Header)
+		newReq.Header = toSign
+
+		copyReqSpan.End()
+		_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
+		newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") // todo: get location if needed ("us-east-1")
+		signReqSpan.End()
+		if err != nil {
+			return nil, false, err
+		}
+		for name, vals := range notToSign {
+			newReq.Header[name] = vals
+		}
 	}
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
 	resp, err = c.c.Do(newReq)
