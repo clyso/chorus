@@ -42,6 +42,7 @@ func defaultConfig() fs.File {
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
 
+	Enabled bool              `yaml:"enabled"`
 	Storage *s3.StorageConfig `yaml:"storage,omitempty"`
 	Auth    *auth.Config      `yaml:"auth,omitempty"`
 	Port    int               `yaml:"port"`
