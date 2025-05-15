@@ -36,11 +36,6 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-// AWS Signature Version '4' constants.
-const (
-	signV2Algorithm = "AWS"
-)
-
 // Whitelist resource list that will be used in query string for signature-V2 calculation.
 //
 // This list should be kept alphabetically sorted, do not hastily edit.
@@ -78,8 +73,8 @@ var resourceList = []string{
 
 // Verify if request has AWS Signature Version '2'.
 func isRequestSignatureV2(r *http.Request) bool {
-	return !strings.HasPrefix(r.Header.Get(s3.Authorization), signV4Algorithm) &&
-		strings.HasPrefix(r.Header.Get(s3.Authorization), signV2Algorithm)
+	return !strings.HasPrefix(r.Header.Get(s3.Authorization), s3.SignV4Algorithm) &&
+		strings.HasPrefix(r.Header.Get(s3.Authorization), s3.SignV2Algorithm)
 }
 
 func (m *middleware) doesSignatureV2Match(r *http.Request, domains []string) (string, error) {
@@ -112,7 +107,7 @@ func (m *middleware) doesSignatureV2Match(r *http.Request, domains []string) (st
 	expectedAuth := signatureV2(cred, r.Method, encodedResource, strings.Join(unescapedQueries, "&"), r.Header)
 
 	v2Auth := r.Header.Get(s3.Authorization)
-	prefix := fmt.Sprintf("%s %s:", signV2Algorithm, cred.AccessKeyID)
+	prefix := fmt.Sprintf("%s %s:", s3.SignV2Algorithm, cred.AccessKeyID)
 	if !strings.HasPrefix(v2Auth, prefix) {
 		return "", fmt.Errorf("%w: unsupported sign alhorithm", dom.ErrAuth)
 	}
@@ -137,7 +132,7 @@ func getReqAccessKeyV2(r *http.Request) (string, error) {
 	}
 
 	// Verify if the header algorithm is supported or not.
-	if !strings.HasPrefix(v2Auth, signV2Algorithm) {
+	if !strings.HasPrefix(v2Auth, s3.SignV2Algorithm) {
 		return "", fmt.Errorf("%w: unsupported sign alhorithm", dom.ErrAuth)
 	}
 

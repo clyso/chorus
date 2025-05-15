@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Clyso GmbH
+ * Copyright © 2025 STRATO GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,14 +37,10 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-const (
-	signV4Algorithm = "AWS4-HMAC-SHA256"
-	iso8601Format   = "20060102T150405Z"
-	yyyymmdd        = "20060102"
-)
+const ()
 
 func isRequestSignatureV4(r *http.Request) bool {
-	return strings.HasPrefix(r.Header.Get(s3.Authorization), signV4Algorithm)
+	return strings.HasPrefix(r.Header.Get(s3.Authorization), s3.SignV4Algorithm)
 }
 
 func compareSignatureV4(sig1, sig2 string) bool {
@@ -78,7 +75,7 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 		}
 	}
 
-	t, e := time.Parse(iso8601Format, date)
+	t, e := time.Parse(s3.TimeIso8601Format, date)
 	if e != nil {
 		return "", fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
 	}
@@ -154,7 +151,7 @@ func getSignedV4Headers(signedHeaders http.Header) string {
 }
 
 func getV4StringToSign(canonicalRequest string, t time.Time, scope string) string {
-	stringToSign := signV4Algorithm + "\n" + t.Format(iso8601Format) + "\n"
+	stringToSign := s3.SignV4Algorithm + "\n" + t.Format(s3.TimeIso8601Format) + "\n"
 	stringToSign += scope + "\n"
 	canonicalRequestBytes := sha256.Sum256([]byte(canonicalRequest))
 	stringToSign += hex.EncodeToString(canonicalRequestBytes[:])
@@ -162,7 +159,7 @@ func getV4StringToSign(canonicalRequest string, t time.Time, scope string) strin
 }
 
 func getV4SigningKey(secretKey string, t time.Time, region string) []byte {
-	date := sumHMAC([]byte("AWS4"+secretKey), []byte(t.Format(yyyymmdd)))
+	date := sumHMAC([]byte("AWS4"+secretKey), []byte(t.Format(s3.TimeYyyymmdd)))
 	regionBytes := sumHMAC(date, []byte(region))
 	service := sumHMAC(regionBytes, []byte("s3"))
 	signingKey := sumHMAC(service, []byte("aws4_request"))
