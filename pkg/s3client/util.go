@@ -252,6 +252,15 @@ func signV4(req *http.Request, accessKeyID, secretAccessKey, location string) *h
 	return &res
 }
 
+func signV2(req *http.Request, accessKeyID, secretAccessKey string, domains []string) (*http.Request, error) {
+	computedAuth, err := s3.ComputeSignatureV2(req, secretAccessKey, domains)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(s3.Authorization, fmt.Sprintf("%s %s:%s", s3.SignV2Algorithm, accessKeyID, computedAuth))
+	return req, nil
+}
+
 var ignoreInSignature = map[string]struct{}{
 	"x-forwarded-for":    {},
 	"x-forwarded-host":   {},

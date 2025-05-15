@@ -223,12 +223,18 @@ func IsRequestSignatureV2(r *http.Request) bool {
 }
 
 func ComputeSignatureV2(r *http.Request, secretAccessKey string, domains []string) (string, error) {
-	// r.RequestURI will have raw encoded URI as sent by the client.
-	tokens := strings.SplitN(r.RequestURI, "?", 2)
-	encodedResource := s3utils.EncodePath(tokens[0]) // TODO: create test that fails without this -> bugfix -> own commit
-	encodedQuery := ""
-	if len(tokens) == 2 {
-		encodedQuery = tokens[1]
+	var encodedResource, encodedQuery string
+	if r.RequestURI != "" {
+		// We are the server, r.RequestURI will have raw encoded URI as sent by the client.
+		tokens := strings.SplitN(r.RequestURI, "?", 2)
+		encodedResource = tokens[0]
+		if len(tokens) == 2 {
+			encodedQuery = tokens[1]
+		}
+	} else {
+		// We are the client and are about to send a new request.
+		encodedResource = s3utils.EncodePath(r.URL.Path)
+		encodedQuery = r.URL.RawQuery
 	}
 
 	unescapedQueries, err := unescapeQueries(encodedQuery)

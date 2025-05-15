@@ -37,6 +37,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
 )
@@ -237,7 +238,21 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		// transparent proxy mode, forward request as-is
 	} else {
 		_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
-		newReq = signV4(newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "us-east-1") // todo: get location if needed ("us-east-1")
+		if s3.IsRequestSignatureV4(req) { //nolint:gocritic // switch subject would be empty
+			newReq = signV4(newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "us-east-1") // todo: get location if needed ("us-east-1")
+		} else if s3.IsRequestSignatureV2(req) {
+			domains := make([]string, len(c.conf.Domains))
+			for i, dom := range c.conf.Domains {
+				domains[i] = dom.Value()
+			}
+			newReq, err = signV2(newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, domains)
+			if err != nil {
+				return nil, false, err
+			}
+		} else {
+			// Should have been avoided by isReqAuthenticated() in the first place
+			return nil, false, dom.ErrInternal
+		}
 		signReqSpan.End()
 	}
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
