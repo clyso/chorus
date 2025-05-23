@@ -3,6 +3,8 @@ package swift
 import (
 	"net/http"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 func ParseReq(r *http.Request) (account string, container string, object string, method Method) {
@@ -18,7 +20,7 @@ func ParseReq(r *http.Request) (account string, container string, object string,
 	if r.Method == "GET" && path == "endpoints" {
 		return "", "", "", GetEndpoints
 	}
-	paths := strings.Split(path, "/")
+	paths := strings.SplitN(path, "/", 3)
 	switch len(paths) {
 	case 1:
 		// account requests:
@@ -30,9 +32,40 @@ func ParseReq(r *http.Request) (account string, container string, object string,
 		method = parseContainer(r.Method)
 	case 3:
 		// object requests:
-		account, container, object = paths[0], paths[1], paths[2]
+		account, container, object = paths[0], paths[1], strings.Join(paths[2:], "/")
 		method = parseObject(r.Method)
+		// in swift copy object method destination set in header:
+		if method == CopyObject {
+			sameName := true
+			destAcc := r.Header.Get("Destination-Account")
+			if destAcc != "" && destAcc != account {
+				//TODO: should we check that source and dest accounts are routed to the same storage???
+				account = destAcc
+				sameName = false
+			}
+			// get copy destination:
+			dest := r.Header.Get("Destination")
+			dest = strings.Trim(dest, "/")
+			destContObj := strings.SplitN(dest, "/", 2)
+			if len(destContObj) != 2 {
+				zerolog.Ctx(r.Context()).Warn().Msgf("invalid swift copy obj destination: %q", dest)
+				// invalid request: copy should contain container and object in destination
+				return "", "", "", UndefinedMethod
+			}
+			// check if source equals to destination:
+			sameName = sameName && container == destContObj[0] && object == destContObj[1]
+			if sameName {
+				// according to swift spec if copy object has the same name and destination,
+				// then obj content is not updated and method is equal to PostObject
+				// where only obj meta is updated
+				method = PostObject
+			}
+			container, object = destContObj[0], destContObj[1]
+		}
+
 	default:
+		// should not be possible
+		zerolog.Ctx(r.Context()).Warn().Msgf("invalid swift method path: %q", r.URL.Path)
 		// invalid request
 		return "", "", "", UndefinedMethod
 	}

@@ -53,6 +53,13 @@ const (
 
 	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
+
+	// swift tasks:
+	TypeAccountUpdate   = "account:update"
+	TypeContainerUpdate = "container:update"
+	TypeObjUpdate       = "obj:update"
+	TypeObjMetaUpdate   = "obj:meta:update"
+	TypeObjDelete       = "obj:del"
 )
 
 type Priority uint8
@@ -125,35 +132,53 @@ type SyncTask interface {
 	GetFrom() string
 	GetToStorage() string
 	GetToBucket() *string
-	SetFrom(from string)
-	SetTo(storage string, bucket *string)
+	SetFrom(storage, account string)
+	SetTo(storage, account string, bucket *string)
 	InitDate()
 	GetDate() time.Time
+	GetFromAccount() string
+	GetToAccount() string
 }
 
 type Sync struct {
 	FromStorage string
+	FromAccount string
 	ToStorage   string
 	ToBucket    *string
 	CreatedAt   time.Time
+	ToAccount   string
+}
+
+func (t *Sync) GetFromAccount() string {
+	return t.FromAccount
+}
+
+func (t *Sync) GetToAccount() string {
+	return t.ToAccount
 }
 
 func (t *Sync) GetFrom() string {
 	return t.FromStorage
 }
+
 func (t *Sync) GetToStorage() string {
 	return t.ToStorage
 }
+
 func (t *Sync) GetToBucket() *string {
 	return t.ToBucket
 }
-func (t *Sync) SetFrom(from string) {
-	t.FromStorage = from
+
+func (t *Sync) SetFrom(storage, account string) {
+	t.FromStorage, t.FromAccount = storage, account
 }
-func (t *Sync) SetTo(storage string, bucket *string) {
+
+func (t *Sync) SetTo(storage, account string, bucket *string) {
 	t.ToStorage = storage
+	t.ToAccount = account
 	t.ToBucket = bucket
 }
+
 func (t *Sync) InitDate() {
 	t.CreatedAt = time.Now().UTC()
 }
@@ -279,11 +304,47 @@ type SwitchWithDowntimePayload struct {
 	CreatedAt   time.Time
 }
 
+type AccountUpdatePayload struct {
+	Sync
+	Timestamp float64
+}
+
+type ContainerUpdatePayload struct {
+	Sync
+	Bucket    string
+	Timestamp float64
+}
+
+type ObjectMetaUpdatePayload struct {
+	Sync
+	Bucket    string
+	Object    string
+	Timestamp float64
+}
+
+type ObjectUpdatePayload struct {
+	Sync
+	Bucket    string
+	Object    string
+	VersionID string
+	Etag      string
+	Timestamp float64
+}
+
+type ObjectDeletePayload struct {
+	Sync
+	Bucket    string
+	Object    string
+	VersionID string
+	Timestamp float64
+}
+
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
+	AccountUpdatePayload | ContainerUpdatePayload | ObjectUpdatePayload | ObjectMetaUpdatePayload | ObjectDeletePayload |
 	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
@@ -344,6 +405,21 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	case ObjSyncACLPayload:
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeObjectSyncACL
+	case AccountUpdatePayload:
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		taskType = TypeAccountUpdate
+	case ContainerUpdatePayload:
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		taskType = TypeContainerUpdate
+	case ObjectUpdatePayload:
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		taskType = TypeObjUpdate
+	case ObjectMetaUpdatePayload:
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		taskType = TypeObjMetaUpdate
+	case ObjectDeletePayload:
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		taskType = TypeObjDelete
 	case MigrateBucketListObjectsPayload:
 		id := fmt.Sprintf("mgr:lo:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
 		if p.ToBucket != nil {
