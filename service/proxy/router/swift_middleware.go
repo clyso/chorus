@@ -23,7 +23,6 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/swift"
 )
 
