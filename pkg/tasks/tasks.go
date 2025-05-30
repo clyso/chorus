@@ -129,7 +129,7 @@ const (
 )
 
 type SyncTask interface {
-	GetFrom() string
+	GetFromStorage() string
 	GetToStorage() string
 	GetToBucket() *string
 	SetFrom(storage, account string)
@@ -144,9 +144,9 @@ type Sync struct {
 	FromStorage string
 	FromAccount string
 	ToStorage   string
+	ToAccount   string
 	ToBucket    *string
 	CreatedAt   time.Time
-	ToAccount   string
 }
 
 func (t *Sync) GetFromAccount() string {
@@ -157,7 +157,7 @@ func (t *Sync) GetToAccount() string {
 	return t.ToAccount
 }
 
-func (t *Sync) GetFrom() string {
+func (t *Sync) GetFromStorage() string {
 	return t.FromStorage
 }
 
@@ -306,29 +306,38 @@ type SwitchWithDowntimePayload struct {
 
 type AccountUpdatePayload struct {
 	Sync
-	Timestamp float64
+	// Date of the server response. Not Account modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Account Updates
+	Date string
 }
 
 type ContainerUpdatePayload struct {
 	Sync
-	Bucket    string
-	Timestamp float64
+	Bucket string
+	// Date of the server response. Not Container modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Container Updates
+	Date string
 }
 
 type ObjectMetaUpdatePayload struct {
 	Sync
-	Bucket    string
-	Object    string
-	Timestamp float64
+	Bucket string
+	Object string
+	// Date of the server response. Not Object modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object Meta Updates
+	Date string
 }
 
 type ObjectUpdatePayload struct {
 	Sync
-	Bucket    string
-	Object    string
-	VersionID string
-	Etag      string
-	Timestamp float64
+	Bucket       string
+	Object       string
+	VersionID    string
+	Etag         string
+	LastModified string
 }
 
 type ObjectDeletePayload struct {
@@ -336,7 +345,10 @@ type ObjectDeletePayload struct {
 	Bucket    string
 	Object    string
 	VersionID string
-	Timestamp float64
+	// Date of the server response. Not Object deletion date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object delete
+	Date string
 }
 
 func NewTask[T BucketCreatePayload | BucketDeletePayload |

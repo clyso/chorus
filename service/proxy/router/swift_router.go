@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -81,6 +80,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		// because different containers from the same account are used to implement
 		// object versioning and multipart upload (swift DLO and SLO)
 		// TODO: change this method when swift zero-downtime migration will be implemented
+		//TODO: support account routing policies
 		storage, err = r.policySvc.GetRoutingPolicy(ctx, account)
 		if err != nil && !errors.Is(err, dom.ErrNotFound) {
 			return nil, nil, "", false, err
@@ -109,7 +109,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 				FromStorage: storage,
 				FromAccount: account,
 			},
-			Timestamp: getTimestamp(resp),
+			Date: getDate(resp), // Use date because Last-modified not returned by swift
 		}
 	case swift.PutContainer, swift.PostContainer, swift.DeleteContainer:
 		// handle container changes:
@@ -118,8 +118,8 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 				FromStorage: storage,
 				FromAccount: account,
 			},
-			Bucket:    bucket,
-			Timestamp: getTimestamp(resp),
+			Bucket: bucket,
+			Date:   getDate(resp), // Use date because Last-modified not returned by swift
 		}
 	case swift.PostObject:
 		// updates only object meta
@@ -129,9 +129,9 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 				FromStorage: storage,
 				FromAccount: account,
 			},
-			Bucket:    bucket,
-			Object:    object,
-			Timestamp: getTimestamp(resp),
+			Bucket: bucket,
+			Object: object,
+			Date:   getDate(resp), // Use date because Last-modified not returned by swift
 		}
 	case swift.PutObject, swift.CopyObject:
 		// same as POST but also updates object payload
@@ -141,11 +141,11 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 				FromStorage: storage,
 				FromAccount: account,
 			},
-			Bucket:    bucket,
-			Object:    object,
-			VersionID: getObjVersion(resp),
-			Etag:      getObjEtag(resp),
-			Timestamp: getTimestamp(resp),
+			Bucket:       bucket,
+			Object:       object,
+			VersionID:    getObjVersion(resp),
+			Etag:         getObjEtag(resp),
+			LastModified: getLastModified(resp),
 		}
 	case swift.DeleteObject:
 		// can contain version id
@@ -157,7 +157,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 			Bucket:    bucket,
 			Object:    object,
 			VersionID: getVersionFromRequest(req),
-			Timestamp: getTimestamp(resp),
+			Date:      getDate(resp), // Use date because Last-modified not returned by swift
 		}
 	case swift.UndefinedMethod:
 	// not swift method - no action needed
@@ -247,13 +247,16 @@ func replaceSwiftReqBaseURL(old *url.URL, newBase url.URL) *url.URL {
 	return &newBase
 }
 
-func getTimestamp(resp *http.Response) float64 {
-	res, _ := strconv.ParseFloat(resp.Header.Get("X-Timestamp"), 64)
-	return res
-}
-
 func getObjEtag(resp *http.Response) string {
 	return resp.Header.Get("Etag")
+}
+
+func getLastModified(resp *http.Response) string {
+	return resp.Header.Get("Last-Modified")
+}
+
+func getDate(resp *http.Response) string {
+	return resp.Header.Get("Date")
 }
 
 func getObjVersion(resp *http.Response) string {

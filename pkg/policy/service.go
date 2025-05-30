@@ -111,11 +111,32 @@ type ReplicationPolicies struct {
 
 type ReplicationPolicyDest string
 
-func (d ReplicationPolicyDest) Parse() (storage string, bucket *string) {
-	if arr := strings.Split(string(d), ":"); len(arr) == 2 {
-		return arr[0], &arr[1]
+func (d ReplicationPolicyDest) Parse() (storage, account string, bucket *string) {
+	arr := strings.Split(string(d), ":")
+	switch len(arr) {
+	case 1:
+		// backward compatibility with old implementation before introducing swift:
+		// before there were 2 possible values: <storage> OR <storage>:<to bucket>
+		storage, account, bucket = arr[0], "", nil
+	case 2:
+		// backward compatibility with old implementation before introducing swift:
+		// before there were 2 possible values: <storage> OR <storage>:<to bucket>
+		storage, account, bucket = arr[0], "", &arr[1]
+	case 3:
+		// TODO: update CreateReplicationPolicy for SWIFT
+
+		// new destination format should always have 3 segments:
+		// <storage>:<account[empty for s3]>:<to bucket[may be empty]>
+		storage, account = arr[0], arr[1]
+		if arr[2] != "" {
+			bucket = &arr[2]
+		}
+	default:
+		// should not be possible
+		// in this case it is better to fail system rather than copy to the wrong place
+		panic(fmt.Sprintf("corrupted replication destination: %v", d))
 	}
-	return string(d), nil
+	return
 }
 
 func ReplicationIDFromStr(s string) (ReplicationID, error) {
@@ -249,11 +270,14 @@ type Service interface {
 
 	// -------------- Replication policy related methods: --------------
 
+	// TODO:swift allow account instead of user
 	GetBucketReplicationPolicies(ctx context.Context, user, bucket string) (ReplicationPolicies, error)
+	// TODO:swift allow account instead of user
 	GetUserReplicationPolicies(ctx context.Context, user string) (ReplicationPolicies, error)
 	AddUserReplicationPolicy(ctx context.Context, user string, from string, to string, priority tasks.Priority) error
 	DeleteUserReplication(ctx context.Context, user string, from string, to string) error
 
+	// TODO:swift support custom account destination
 	AddBucketReplicationPolicy(ctx context.Context, user, bucket, from string, to string, toBucket *string, priority tasks.Priority, agentURL *string) error
 	GetReplicationPolicyInfo(ctx context.Context, user, bucket, from, to string, toBucket *string) (ReplicationPolicyStatus, error)
 	ListReplicationPolicyInfo(ctx context.Context) ([]ReplicationPolicyStatusExtended, error)
