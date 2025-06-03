@@ -76,7 +76,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 
 	// Handle all swift tasks here
 	// There is no task-specific logic for SWIFT because chorus does not track obj/bucket versions metadata in Redis (unlike S3).
-	// Versions are needed only for zero-downtime migration which is currently to supported for SWIFT.
+	// Versions are needed only for zero-downtime migration which is currently not supported for SWIFT.
 	// Swift is using multiple buckets to implement obj versioning and multipart upload
 	// and allows cross-account and cross-bucket references in API for symlinks and COPY.
 	// This and eventual consistency makes zero-downtime implementation very tricky.
@@ -192,7 +192,7 @@ func (s *swiftSVC) getReplicationPolicy(ctx context.Context, task tasks.SyncTask
 	for to, priority := range accPolicy.To {
 		toStorage, toAccount, toBucket := to.Parse()
 		//TODO:swift support custom acc dest for replication policy in service
-		err = s.policySvc.AddBucketReplicationPolicy(ctx, account, bucket, accPolicy.From, toStorage, toAccount, toBucket, priority, nil)
+		err = s.policySvc.AddBucketReplicationPolicy(ctx, account, bucket, accPolicy.From, toStorage, toBucket, priority, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {
 				continue

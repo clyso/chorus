@@ -154,11 +154,13 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 				FromStorage: storage,
 				FromAccount: account,
 			},
-			Bucket:    bucket,
-			Object:    object,
-			VersionID: getVersionFromRequest(req),
-			Date:      getDate(resp), // Use date because Last-modified not returned by swift
+			Bucket:          bucket,
+			Object:          object,
+			VersionID:       getVersionFromRequest(req),
+			Date:            getDate(resp), // Use date because Last-modified not returned by swift
+			DeleteMultipart: req.URL.Query().Get("multipart-manifest") == "delete",
 		}
+
 	case swift.UndefinedMethod:
 	// not swift method - no action needed
 	default:

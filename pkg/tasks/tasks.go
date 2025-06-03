@@ -348,7 +348,8 @@ type ObjectDeletePayload struct {
 	// Date of the server response. Not Object deletion date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
 	// because Openstack Swift does not return Last-Modified for Object delete
-	Date string
+	Date            string
+	DeleteMultipart bool
 }
 
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
