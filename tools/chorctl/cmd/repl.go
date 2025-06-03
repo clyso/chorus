@@ -61,7 +61,7 @@ chorctl repl`,
 
 		replNameBuilder, err := format.NewReplNameBuilder(replNameFormat)
 		if err != nil {
-			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication naem format")
+			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication name format")
 		}
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint

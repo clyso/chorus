@@ -50,7 +50,7 @@ var dashCmd = &cobra.Command{
 
 		nameBuilder, err := format.NewReplNameBuilder(dashNameFormat)
 		if err != nil {
-			logrus.WithError(err).WithField("format", dashNameFormat).Fatal("unable to parse name format")
+			logrus.WithError(err).WithField("format", dashNameFormat).Fatal("malformed replication name format")
 		}
 		model := ui.New(ctx, client, nameBuilder)
 		p := tea.NewProgram(model, tea.WithAltScreen())
