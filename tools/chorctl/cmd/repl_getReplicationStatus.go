@@ -13,7 +13,7 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
-	"github.com/clyso/chorus/tools/chorctl/internal/common"
+	"github.com/clyso/chorus/tools/chorctl/internal/format"
 )
 
 var (
@@ -54,7 +54,7 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 			logrus.WithError(err).Fatal("unable to add replication")
 		}
 
-		replNameBuilder, err := common.NewReplNameBuilder(&replNameFormat)
+		replNameBuilder, err := format.NewReplNameBuilder(&replNameFormat)
 		if err != nil {
 			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication name format")
 		}

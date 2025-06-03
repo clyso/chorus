@@ -31,7 +31,7 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
-	"github.com/clyso/chorus/tools/chorctl/internal/common"
+	"github.com/clyso/chorus/tools/chorctl/internal/format"
 )
 
 var (
@@ -52,7 +52,7 @@ var (
 	maxWidth = 120
 )
 
-func New(ctx context.Context, client pb.ChorusClient, nameBuilder common.ReplNameBuilder) tea.Model {
+func New(ctx context.Context, client pb.ChorusClient, nameBuilder format.ReplNameBuilder) tea.Model {
 	model := &UI{
 		client:          client,
 		ctx:             ctx,
@@ -80,7 +80,7 @@ type UI struct {
 	table           *table.Model
 	spinner         spinner.Model
 	events          chan tea.Msg
-	replNameBuilder common.ReplNameBuilder
+	replNameBuilder format.ReplNameBuilder
 }
 
 func (u *UI) Init() tea.Cmd {

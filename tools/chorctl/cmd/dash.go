@@ -27,7 +27,7 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
-	"github.com/clyso/chorus/tools/chorctl/internal/common"
+	"github.com/clyso/chorus/tools/chorctl/internal/format"
 	"github.com/clyso/chorus/tools/chorctl/internal/ui"
 )
 
@@ -48,7 +48,7 @@ var dashCmd = &cobra.Command{
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
 
-		nameBuilder, err := common.NewReplNameBuilder(&dashNameFormat)
+		nameBuilder, err := format.NewReplNameBuilder(&dashNameFormat)
 		if err != nil {
 			logrus.WithError(err).WithField("format", dashNameFormat).Fatal("unable to parse name format")
 		}
@@ -61,7 +61,7 @@ var dashCmd = &cobra.Command{
 }
 
 func init() {
-	dashCmd.Flags().StringVarP(&dashNameFormat, "name-format", "n", "%u:%F:%f->%t:%T", common.ReplNameFormatHelp)
+	dashCmd.Flags().StringVarP(&dashNameFormat, "name-format", "n", "%u:%F:%f->%t:%T", format.ReplNameFormatHelp)
 	rootCmd.AddCommand(dashCmd)
 
 	// Here you will define your flags and configuration settings.

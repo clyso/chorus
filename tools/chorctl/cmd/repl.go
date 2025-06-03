@@ -29,7 +29,7 @@ import (
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
-	"github.com/clyso/chorus/tools/chorctl/internal/common"
+	"github.com/clyso/chorus/tools/chorctl/internal/format"
 
 	"github.com/spf13/cobra"
 )
@@ -59,7 +59,7 @@ chorctl repl`,
 			return res.Replications[i].CreatedAt.AsTime().After(res.Replications[j].CreatedAt.AsTime())
 		})
 
-		replNameBuilder, err := common.NewReplNameBuilder(&replNameFormat)
+		replNameBuilder, err := format.NewReplNameBuilder(&replNameFormat)
 		if err != nil {
 			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication naem format")
 		}
@@ -75,7 +75,7 @@ chorctl repl`,
 }
 
 func init() {
-	replCmd.Flags().StringVarP(&replNameFormat, "name-format", "n", "%u:%F:%f->%t:%T", common.ReplNameFormatHelp)
+	replCmd.Flags().StringVarP(&replNameFormat, "name-format", "n", "%u:%F:%f->%t:%T", format.ReplNameFormatHelp)
 	rootCmd.AddCommand(replCmd)
 
 	// Here you will define your flags and configuration settings.
