@@ -59,7 +59,7 @@ chorctl repl`,
 			return res.Replications[i].CreatedAt.AsTime().After(res.Replications[j].CreatedAt.AsTime())
 		})
 
-		replNameBuilder, err := format.NewReplNameBuilder(&replNameFormat)
+		replNameBuilder, err := format.NewReplNameBuilder(replNameFormat)
 		if err != nil {
 			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication naem format")
 		}

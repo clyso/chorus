@@ -54,7 +54,7 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 			logrus.WithError(err).Fatal("unable to add replication")
 		}
 
-		replNameBuilder, err := format.NewReplNameBuilder(&replNameFormat)
+		replNameBuilder, err := format.NewReplNameBuilder(replNameFormat)
 		if err != nil {
 			logrus.WithError(err).WithField("format", replNameFormat).Fatal("malformed replication name format")
 		}

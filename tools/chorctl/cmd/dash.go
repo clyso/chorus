@@ -48,7 +48,7 @@ var dashCmd = &cobra.Command{
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
 
-		nameBuilder, err := format.NewReplNameBuilder(&dashNameFormat)
+		nameBuilder, err := format.NewReplNameBuilder(dashNameFormat)
 		if err != nil {
 			logrus.WithError(err).WithField("format", dashNameFormat).Fatal("unable to parse name format")
 		}

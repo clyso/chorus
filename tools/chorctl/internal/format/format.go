@@ -25,11 +25,11 @@ import (
 
 type ReplNameBuilder func(*pb.Replication) string
 
-func NewReplNameBuilder(inFormat *string) (ReplNameBuilder, error) {
+func NewReplNameBuilder(inFormat string) (ReplNameBuilder, error) {
 	isEscaped := false
 	outFormat := ""
 	outFuncs := []ReplNameBuilder{}
-	for i, c := range *inFormat {
+	for i, c := range inFormat {
 		if isEscaped {
 			switch c {
 			case '%':
@@ -73,8 +73,7 @@ func NewReplNameBuilder(inFormat *string) (ReplNameBuilder, error) {
 					return fmt.Sprintf("%d", r.CreatedAt.AsTime().Unix())
 				})
 			default:
-				return nil, fmt.Errorf("invalid format character: '%c' at index %d in '%s'", c, i, *inFormat)
-
+				return nil, fmt.Errorf("invalid format character: '%c' at index %d in '%s'", c, i, inFormat)
 			}
 			isEscaped = false
 		} else {
@@ -86,7 +85,7 @@ func NewReplNameBuilder(inFormat *string) (ReplNameBuilder, error) {
 		}
 	}
 	if isEscaped {
-		return nil, fmt.Errorf("incomplete escape sequence at the end of format: '%s'", *inFormat)
+		return nil, fmt.Errorf("incomplete escape sequence at the end of format: '%s'", inFormat)
 	}
 	res := func(r *pb.Replication) string {
 		outArgs := make([]interface{}, len(outFuncs))
