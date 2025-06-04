@@ -280,8 +280,9 @@ func Test_api_CompareBucketErrorConditions(t *testing.T) {
 			ShowMatch: true,
 			User:      user,
 		})
-		expectedErr := status.Error(codes.FailedPrecondition, dom.ErrAmbiguousDestination.Error())
-		r.ErrorIs(err, expectedErr)
+		r.Error(err)
+		r.Equal(codes.FailedPrecondition, status.Code(err))
+		r.Equal(dom.ErrAmbiguousDestination.Error(), status.Convert(err).Message())
 
 		_, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucketSrc01,
@@ -303,8 +304,9 @@ func Test_api_CompareBucketErrorConditions(t *testing.T) {
 			ShowMatch: true,
 			User:      user,
 		})
-		expectedErr := status.Error(codes.FailedPrecondition, dom.ErrUnknownDestination.Error())
-		r.ErrorIs(err, expectedErr)
+		r.Error(err)
+		r.Equal(codes.FailedPrecondition, status.Code(err))
+		r.Equal(dom.ErrUnknownDestination.Error(), status.Convert(err).Message())
 
 		_, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucketSrc01,
@@ -357,8 +359,9 @@ func Test_api_CompareBucketErrorConditions(t *testing.T) {
 			ShowMatch: true,
 			User:      user,
 		})
-		expectedErr := status.Error(codes.FailedPrecondition, dom.ErrUnknownDestination.Error())
-		r.ErrorIs(err, expectedErr)
+		r.Error(err)
+		r.Equal(codes.FailedPrecondition, status.Code(err))
+		r.Equal(dom.ErrUnknownDestination.Error(), status.Convert(err).Message())
 
 		_, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucketSrc02,
@@ -367,8 +370,9 @@ func Test_api_CompareBucketErrorConditions(t *testing.T) {
 			ShowMatch: true,
 			User:      user,
 		})
-		expectedErr = status.Error(codes.FailedPrecondition, dom.ErrUnknownDestination.Error())
-		r.ErrorIs(err, expectedErr)
+		r.Error(err)
+		r.Equal(codes.FailedPrecondition, status.Code(err))
+		r.Equal(dom.ErrUnknownDestination.Error(), status.Convert(err).Message())
 
 		_, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucketSrc01,
