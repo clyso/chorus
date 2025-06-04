@@ -37,6 +37,7 @@ import (
 )
 
 const (
+	//nolint:staticcheck //character used to set terminal color
 	connectInfo = `[92m_________ .__                               
 \_   ___ \|  |__   ___________ __ __  ______
 /    \  \/|  |  \ /  _ \_  __ \  |  \/  ___/

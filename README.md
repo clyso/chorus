@@ -111,6 +111,8 @@ The chart source is located in [deploy/chorus](./deploy/chorus).
 
 Chorus is written in Go—no other dependencies are required to build, run, or test.
 
+Want to contribute? See our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ### Test
 [Test](./test) package contains e2e tests for replications between S3 storages.
 It starts:

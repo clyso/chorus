@@ -1,0 +1,43 @@
+name: Check DCO
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  dco-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to access all commits
+
+      - name: Check DCO
+        run: |
+          # Get the base and head SHAs for the PR
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+
+          # Get the list of commits in the PR
+          COMMITS=$(git rev-list $BASE_SHA..$HEAD_SHA)
+
+          # Flag to track if all commits are signed
+          ALL_SIGNED=true
+
+          # Check each commit for a Signed-off-by line
+          for COMMIT in $COMMITS; do
+            SIGNED_OFF=$(git show -s --format=%B $COMMIT | grep -E "Signed-off-by: .* <.*@.*>")
+            if [ -z "$SIGNED_OFF" ]; then
+              echo "Commit $COMMIT is missing a Signed-off-by line."
+              ALL_SIGNED=false
+            else
+              echo "Commit $COMMIT is properly signed off."
+            fi
+          done
+
+          # Exit with an error if any commit is not signed
+          if [ "$ALL_SIGNED" = false ]; then
+            echo "DCO check failed: One or more commits lack a Signed-off-by line."
+            exit 1
+          else
+            echo "DCO check passed: All commits have a Signed-off-by line."
+          fi
