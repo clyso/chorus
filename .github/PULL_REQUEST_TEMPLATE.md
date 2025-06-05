@@ -1,7 +1,9 @@
 ## Pull Request
 
 ### Description
+<!--
 Describe the changes in this pull request and the problem it solves or feature it adds.
+-->
 
 ### Related Issue
 Link to the GitHub issue (if applicable): #[issue number]
