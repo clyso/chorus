@@ -42,9 +42,9 @@ Check [README.md](./README.md) and [Makefile](./Makefile) for details.
 2. Include:
   - Expected vs. actual behavior.
   - Steps to reproduce (including code, if applicable).
-  - Environment details (OS, Go version, etc.).
+  - Environment details (OS, Chorus version, S3 vendor, etc.).
 
-Use the bug report template (if provided) to ensure clarity.
+Use the bug report template to ensure clarity.
 
 ### Proposing Features
 
