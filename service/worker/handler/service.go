@@ -30,6 +30,7 @@ import (
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/swift"
 )
 
 type Config struct {
@@ -38,19 +39,20 @@ type Config struct {
 }
 
 type svc struct {
-	clients    s3client.Service
-	versionSvc meta.VersionService
-	policySvc  policy.Service
-	storageSvc storage.Service
-	rc         rclone.Service
-	taskClient *asynq.Client
-	limit      ratelimit.RPM
-	locker     lock.Service
-	conf       *Config
+	swiftClients swift.Client
+	clients      s3client.Service
+	versionSvc   meta.VersionService
+	policySvc    policy.Service
+	storageSvc   storage.Service
+	rc           rclone.Service
+	taskClient   *asynq.Client
+	limit        ratelimit.RPM
+	locker       lock.Service
+	conf         *Config
 }
 
-func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService, policySvc policy.Service, storageSvc storage.Service, rc rclone.Service, taskClient *asynq.Client, limit ratelimit.RPM, locker lock.Service) *svc {
-	return &svc{conf: conf, clients: clients, versionSvc: versionSvc, policySvc: policySvc, storageSvc: storageSvc, rc: rc, taskClient: taskClient, limit: limit, locker: locker}
+func New(conf *Config, swiftClients swift.Client, clients s3client.Service, versionSvc meta.VersionService, policySvc policy.Service, storageSvc storage.Service, rc rclone.Service, taskClient *asynq.Client, limit ratelimit.RPM, locker lock.Service) *svc {
+	return &svc{conf: conf, swiftClients: swiftClients, clients: clients, versionSvc: versionSvc, policySvc: policySvc, storageSvc: storageSvc, rc: rc, taskClient: taskClient, limit: limit, locker: locker}
 }
 
 func (s *svc) getClients(ctx context.Context, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {

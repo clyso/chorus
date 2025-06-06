@@ -16,17 +16,16 @@ package swift
 
 import (
 	"context"
+	"net/http"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/v2/openstack"
-	"github.com/majewsky/schwift"
-	"github.com/majewsky/schwift/gopherschwift"
+	"github.com/gophercloud/gophercloud/v2"
 )
 
 type Client interface {
-	Account(ctx context.Context, account string) (*schwift.Account, error)
+	For(ctx context.Context, storage, account string) (*gophercloud.ServiceClient, error)
 }
 
 func New(conf WorkerConfig) (Client, error) {
+	http.CanonicalHeaderKey()
 	panic("todo: implement")
 }

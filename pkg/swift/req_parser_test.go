@@ -50,3 +50,50 @@ func Test_trimV1(t *testing.T) {
 		})
 	}
 }
+
+func Test_trimResellerPrefix(t *testing.T) {
+	type args struct {
+		account string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "",
+			args: args{
+				account: "AUTH_account",
+			},
+			want: "account",
+		},
+		{
+			name: "",
+			args: args{
+				account: "account",
+			},
+			want: "account",
+		},
+		{
+			name: "",
+			args: args{
+				account: "some_account",
+			},
+			want: "account",
+		},
+		{
+			name: "",
+			args: args{
+				account: "some-account",
+			},
+			want: "some-account",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := trimAccountResellerPrefix(tt.args.account); got != tt.want {
+				t.Errorf("trimAccountResellerPrefix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
