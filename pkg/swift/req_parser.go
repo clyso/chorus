@@ -69,6 +69,7 @@ func ParseReq(r *http.Request) (account string, container string, object string,
 		// invalid request
 		return "", "", "", UndefinedMethod
 	}
+	// trim reseller prefix:
 	account = strings.TrimPrefix(account, "AUTH_")
 	return account, container, object, method
 }
@@ -127,4 +128,8 @@ func parseObject(httpMethod string) Method {
 // remove all symbols in path before v1/ incuding v1/
 func trimV1(path string) string {
 	return path[strings.Index(path, "v1/")+len("v1/"):]
+}
+
+func trimAccountResellerPrefix(account string) string {
+	return account[strings.Index(account, "_")+len("_"):]
 }
