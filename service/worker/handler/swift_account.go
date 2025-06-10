@@ -17,17 +17,15 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
@@ -78,30 +76,68 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
+		// copy openstack swift account metadata headers from source to destination openstack swift account using gophercloud:
+		// copy only swift metadata headers
 		fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
 		if err != nil {
 			return err
 		}
-		// copy openstack swift account metadata headers from source to destination openstack swift account
+		fromHeaders, fromMeta, err := getSwiftAccMeta(ctx, fromClient)
+		if err != nil {
+			return fmt.Errorf("failed to get source account %q headers: %w", p.FromAccount, err)
+		}
 		toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
 		if err != nil {
 			return err
 		}
-		// get source account metadata
-		accountMeta, err := accounts.Get(ctx, fromClient).Extract()
+		_, toMeta, err := getSwiftAccMeta(ctx, toClient)
 		if err != nil {
-			return fmt.Errorf("failed to get account metadata for %q: %w", p.FromAccount, err)
+			return fmt.Errorf("failed to get destination account %q headers: %w", p.ToAccount, err)
 		}
-		logger.Debug().Str(log.Storage, p.FromStorage).Str(log.Account, p.FromAccount).Msg("got account metadata")
-		// filter out metadata that is not allowed to be set on destination account
-
-		if err = accounts.Update(ctx, toClient, accounts.UpdateOpts{
-			Metadata: accountMeta.Metadata,
-		}).ExtractErr(); err != nil {
-			return fmt.Errorf("failed to update account metadata for %q: %w", p.ToAccount, err)
+		updateOpts := accounts.UpdateOpts{
+			Metadata:       fromMeta,
+			ContentType:    &fromHeaders.ContentType,
+			TempURLKey:     fromHeaders.TempURLKey,
+			TempURLKey2:    fromHeaders.TempURLKey2,
+			RemoveMetadata: []string{},
 		}
 
+		// collect remove metadata keys
+		for k := range toMeta {
+			if _, ok := fromMeta[k]; !ok {
+				// remove only if not exists in source
+				k = strings.TrimPrefix(k, "X-Account-Meta-")
+				updateOpts.RemoveMetadata = append(updateOpts.RemoveMetadata, k)
+			}
+		}
+		// update destination account metadata
+		err = accounts.Update(ctx, toClient, updateOpts).Err
+		if err != nil {
+			return fmt.Errorf("failed to update destination account %q headers: %w", p.ToAccount, err)
+		}
+		return nil
 	}, refresh, time.Second*2)
 
+	return
+}
+
+func getSwiftAccMeta(ctx context.Context, client *gophercloud.ServiceClient) (headers *accounts.GetHeader, meta map[string]string, err error) {
+	res := accounts.Get(ctx, client, accounts.GetOpts{
+		Newest: true,
+	})
+	if res.Err != nil {
+		return nil, nil, res.Err
+	}
+	meta, err = res.ExtractMetadata()
+	if err != nil {
+		return nil, nil, err
+	}
+	if meta == nil {
+		meta = make(map[string]string)
+	}
+	headers, err = res.Extract()
+	if err != nil {
+		return nil, nil, err
+	}
 	return
 }
