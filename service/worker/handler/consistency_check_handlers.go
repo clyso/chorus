@@ -50,6 +50,10 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 		return fmt.Errorf("migration location list is empty: %w", asynq.SkipRetry)
 	}
 
+	if err := s.storageSvc.StoreConsistencyCheckID(ctx, payload.ID); err != nil {
+		return fmt.Errorf("unable to record consistency check id: %w", err)
+	}
+
 	for _, location := range payload.Locations {
 		listTask := tasks.ConsistencyCheckListPayload{
 			MigrateLocation: location,

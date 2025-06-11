@@ -74,15 +74,18 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 		}
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
-		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
+		w := tabwriter.NewWriter(os.Stdout, 10, 1, 1, ' ', 0)
 		fmt.Fprintln(w, api.ConsistencyCheckReportBrief(res.Check))
-		fmt.Fprintln(w)
 		w.Flush()
 
 		if res.Check.Consistent {
 			return
 		}
 
+		fmt.Fprintln(w)
+		w.Flush()
+
+		w = tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 		fmt.Fprintln(w, api.ConsistencyCheckReportHeader(storages))
 
 		pageSize := int64(10)
