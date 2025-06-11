@@ -34,10 +34,12 @@ var (
 )
 
 var consistencyCheckCmd = &cobra.Command{
-	Use:   "consistency check <storage_1>:<bucket_1> <storage_2>:<bucket_2> --user user  ...",
+	Use:   "check",
 	Short: "start consistency check",
-	Long: `Example:
-chorctl consistency check oldstorage:bucket newstorage:altbucket --user username`,
+	Long: `Start consistency check against 2 or more buckets.
+
+Example:
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())

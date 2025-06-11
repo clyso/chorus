@@ -32,9 +32,11 @@ import (
 )
 
 var consistencyReportCmd = &cobra.Command{
-	Use:   "consistency report <storage_1>:<bucket_1> <storage_2>:<bucket_2>",
-	Short: "list consistency checks",
-	Long: `Example:
+	Use:   "report",
+	Short: "display consistency check report",
+	Long: `Get a detailed report on consistency check done between 2 or more storages.
+	
+Example:
 chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
