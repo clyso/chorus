@@ -84,6 +84,19 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 	// all case statements are the same but we cannot move it to a function
 	// or add all types to a single case because of Go generics.
 	// tasks.NewTask is generic func and we will get compile error otherwise
+	case *tasks.AccountUpdatePayload:
+		// Fan-out task to replication destinations:
+		for to, priority := range replTo {
+			t.SetTo(to.Parse())
+			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			if err != nil {
+				return err
+			}
+			_, err = s.taskClient.EnqueueContext(ctx, payload)
+			if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+				return err
+			}
+		}
 	case *tasks.ContainerUpdatePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
@@ -124,19 +137,6 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			}
 		}
 	case *tasks.ObjectDeletePayload:
-		// Fan-out task to replication destinations:
-		for to, priority := range replTo {
-			t.SetTo(to.Parse())
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-				return err
-			}
-		}
-	case *tasks.AccountUpdatePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
 			t.SetTo(to.Parse())
