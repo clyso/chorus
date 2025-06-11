@@ -154,12 +154,11 @@ func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
 }
 
 func ConsistencyCheckReportBrief(in *pb.ConsistencyCheck) string {
-	briefTable := `ID:\t%s
-READY:\t%t
-QUEUED:\t%d
-COMPLETED:\t%d
-CONSISTENT:\t%t`
-	return fmt.Sprintf(briefTable, in.Id, in.Ready, in.Queued, in.Completed, in.Consistent)
+	briefTable := `READY:	%t
+QUEUED:	%d
+COMPLETED:	%d
+CONSISTENT:	%t`
+	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent)
 }
 
 func ConsistencyCheckReportHeader(storages []string) string {
