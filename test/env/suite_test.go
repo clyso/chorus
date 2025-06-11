@@ -67,6 +67,9 @@ type KeystoneEC2Credentials struct {
 
 func TestEnv(t *testing.T) {
 	RegisterFailHandler(Fail)
+	// This test is provided as guide on testcontainers environment usage,
+	// therefore its execution is skipped.
+	t.Skip()
 	RunSpecs(t, "Test Env Suite")
 }
 
