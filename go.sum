@@ -673,8 +673,8 @@ github.com/nakabonne/nestif v0.3.1 h1:wm28nZjhQY5HyYPx+weN3Q65k6ilSBxDb8v5S81B81
 github.com/nakabonne/nestif v0.3.1/go.mod h1:9EtoZochLn5iUprVDmDjqGKPofoUEBL8U4Ngq6aY7OE=
 github.com/ncw/go-acd v0.0.0-20201019170801-fe55f33415b1 h1:nAjWYc03awJAjsozNehdGZsm5LP7AhLOvjgbS8zN1tk=
 github.com/ncw/go-acd v0.0.0-20201019170801-fe55f33415b1/go.mod h1:MLIrzg7gp/kzVBxRE1olT7CWYMCklcUWU+ekoxOD9x0=
-github.com/ncw/swift/v2 v2.0.2 h1:jx282pcAKFhmoZBSdMcCRFn9VWkoBIRsCpe+yZq7vEk=
-github.com/ncw/swift/v2 v2.0.2/go.mod h1:z0A9RVdYPjNjXVo2pDOPxZ4eu3oarO1P91fTItcb+Kg=
+github.com/ncw/swift/v2 v2.0.4 h1:hHWVFxn5/YaTWAASmn4qyq2p6OyP/Hm3vMLzkjEqR7w=
+github.com/ncw/swift/v2 v2.0.4/go.mod h1:cbAO76/ZwcFrFlHdXPjaqWZ9R7Hdar7HpjRXBfbjigk=
 github.com/nishanths/exhaustive v0.12.0 h1:vIY9sALmw6T/yxiASewa4TQcFsVYZQQRUQJhKRf3Swg=
 github.com/nishanths/exhaustive v0.12.0/go.mod h1:mEZ95wPIZW+x8kC4TgC+9YCUgiST7ecevsVDTgc2obs=
 github.com/nishanths/predeclared v0.2.2 h1:V2EPdZPliZymNAn79T8RkNApBjMmVKh5XRpLm/w98Vk=

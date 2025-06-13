@@ -40,7 +40,16 @@ type StorageConfig struct {
 	storageList []string
 }
 
+type StorageType string
+
+const (
+	S3    StorageType = "S3"
+	Swift StorageType = "SWIFT"
+)
+
 type Storage struct {
+	Type                StorageType              `yaml:"type"`
+	SwiftAuthURL        string                   `yaml:"swiftAuthURL"`
 	Address             string                   `yaml:"address"`
 	Credentials         map[string]CredentialsV4 `yaml:"credentials"`
 	Provider            string                   `yaml:"provider"`
