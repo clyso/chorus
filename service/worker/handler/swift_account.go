@@ -90,27 +90,12 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 		if err != nil {
 			return err
 		}
-		_, toMeta, err := getSwiftAccMeta(ctx, toClient)
+		toHeaders, toMeta, err := getSwiftAccMeta(ctx, toClient)
 		if err != nil {
 			return fmt.Errorf("failed to get destination account %q headers: %w", p.ToAccount, err)
 		}
-		updateOpts := accounts.UpdateOpts{
-			Metadata:       fromMeta,
-			ContentType:    &fromHeaders.ContentType,
-			TempURLKey:     fromHeaders.TempURLKey,
-			TempURLKey2:    fromHeaders.TempURLKey2,
-			RemoveMetadata: []string{},
-		}
-
-		// collect remove metadata keys
-		for k := range toMeta {
-			if _, ok := fromMeta[k]; !ok {
-				// remove only if not exists in source
-				k = strings.TrimPrefix(k, "X-Account-Meta-")
-				updateOpts.RemoveMetadata = append(updateOpts.RemoveMetadata, k)
-			}
-		}
 		// update destination account metadata
+		updateOpts := accountCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
 		err = accounts.Update(ctx, toClient, updateOpts).Err
 		if err != nil {
 			return fmt.Errorf("failed to update destination account %q headers: %w", p.ToAccount, err)
@@ -140,4 +125,30 @@ func getSwiftAccMeta(ctx context.Context, client *gophercloud.ServiceClient) (he
 		return nil, nil, err
 	}
 	return
+}
+
+func accountCopyMetaRequest(fromHeaders *accounts.GetHeader, fromMeta map[string]string, toHeaders *accounts.GetHeader, toMeta map[string]string) *accounts.UpdateOpts {
+	updateOpts := accounts.UpdateOpts{
+		Metadata:       make(map[string]string),
+		RemoveMetadata: []string{},
+		TempURLKey:     fromHeaders.TempURLKey,
+		TempURLKey2:    fromHeaders.TempURLKey2,
+	}
+
+	// copy metadata from source to destination
+	for k, v := range fromMeta {
+		updateOpts.Metadata[k] = v
+	}
+
+	// collect remove metadata keys
+	for k := range toMeta {
+		if _, ok := fromMeta[k]; !ok {
+			// remove only if not exists in source
+			updateOpts.RemoveMetadata = append(updateOpts.RemoveMetadata, k)
+		}
+	}
+	if fromHeaders.ContentType != "" {
+		updateOpts.ContentType = &fromHeaders.ContentType
+	}
+	return &updateOpts
 }

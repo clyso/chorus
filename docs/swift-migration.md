@@ -92,6 +92,8 @@ Handles container, Creation, Metadata update, and deletion:
   - a) Retry the delete container task later (simple, but may cause a deadlock if the delete object task is lost due to a bug or outage).
   - b) Delete all objects in the container and try to delete the container again (may take a long time if there are many objects).
   - c) Create an async task to delete all objects, then retry the delete container task later.
+  - d) Use [swift bulk delete](https://docs.openstack.org/swift/latest/api/bulk-delete.html). Is it supported by all swift implementations?
+- Q: Should we support [container synchronization](https://docs.openstack.org/swift/latest/overview_container_sync.html)? What if container `X-Container-Sync-To` was not migrated to the destination?
 
 ```mermaid
 ---
