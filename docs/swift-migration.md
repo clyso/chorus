@@ -8,12 +8,12 @@ For a detailed overview of the S3 migration process, see the [article](https://d
 
 ## 1. Initial migration
 
-TBD:
-1. copy account metadata
+Workflow per account:
+1. copy src account metadata to dest
 2. list all containers in src account
 3. create containers in dest and copy container metadata
 4. list all objects in src containers
-5. copy all objects with meta to src
+5. copy all objects with meta to dest
 6. **TODO: how to resolve cross-container/cross-account dependencies - SLO,DLO,symlinks???**
 
 ## 2. Live migration
@@ -93,7 +93,7 @@ Handles container, Creation, Metadata update, and deletion:
   - b) Delete all objects in the container and try to delete the container again (may take a long time if there are many objects).
   - c) Create an async task to delete all objects, then retry the delete container task later.
   - d) Use [swift bulk delete](https://docs.openstack.org/swift/latest/api/bulk-delete.html). Is it supported by all swift implementations?
-- Q: Should we support [container synchronization](https://docs.openstack.org/swift/latest/overview_container_sync.html)? What if container `X-Container-Sync-To` was not migrated to the destination?
+- Q: Should we support [container synchronization](https://docs.openstack.org/swift/latest/overview_container_sync.html)? What if container `X-Container-Sync-To` was not migrated to the destination? Should we exclude sync destination container from migration because it will by synced by swift anyway?
 
 ```mermaid
 ---
