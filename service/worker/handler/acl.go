@@ -146,7 +146,7 @@ func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.C
 		return nil
 	}
 
-	// destination bucket name is equal to soruce bucke name unless toBucket param is set
+	// destination bucket name is equal to source bucke name unless toBucket param is set
 	toBucketName := fromBucket
 	if toBucket != nil {
 		toBucketName = *toBucket
@@ -212,7 +212,7 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 		return nil
 	}
 
-	// destination bucket name is equal to soruce bucke name unless toBucket param is set
+	// destination bucket name is equal to source bucke name unless toBucket param is set
 	toBucketName := fromBucket
 	if toBucket != nil {
 		toBucketName = *toBucket

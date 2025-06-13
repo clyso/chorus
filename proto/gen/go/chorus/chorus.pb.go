@@ -1048,7 +1048,7 @@ type AddBucketReplicationRequest struct {
 	FromBucket string `protobuf:"bytes,3,opt,name=from_bucket,json=fromBucket,proto3" json:"from_bucket,omitempty"`
 	// destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source.
 	ToStorage string `protobuf:"bytes,4,opt,name=to_storage,json=toStorage,proto3" json:"to_storage,omitempty"`
-	// custom destination bucket name. if not set, destination bucket name will be equal to soruce bucket
+	// custom destination bucket name. if not set, destination bucket name will be equal to source bucket
 	ToBucket *string `protobuf:"bytes,5,opt,name=to_bucket,json=toBucket,proto3,oneof" json:"to_bucket,omitempty"`
 	// webhook URL of chorus agent. Required if chorus agent setup is used.
 	AgentUrl      *string `protobuf:"bytes,6,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`

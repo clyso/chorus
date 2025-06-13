@@ -173,13 +173,13 @@ func (s *svc) SetLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 
 func (s *svc) StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error {
 	if user == "" {
-		return fmt.Errorf("%w: user is requred to set uploadID", dom.ErrInvalidArg)
+		return fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if bucket == "" {
-		return fmt.Errorf("%w: bucket is requred to set uploadID", dom.ErrInvalidArg)
+		return fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if uploadID == "" {
-		return fmt.Errorf("%w: uploadID is requred", dom.ErrInvalidArg)
+		return fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
 	}
 	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", object, uploadID)
@@ -193,13 +193,13 @@ func (s *svc) StoreUploadID(ctx context.Context, user, bucket, object, uploadID 
 
 func (s *svc) ExistsUploadID(ctx context.Context, user, bucket, object, uploadID string) (bool, error) {
 	if user == "" {
-		return false, fmt.Errorf("%w: user is requred to set uploadID", dom.ErrInvalidArg)
+		return false, fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if bucket == "" {
-		return false, fmt.Errorf("%w: bucket is requred to set uploadID", dom.ErrInvalidArg)
+		return false, fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if uploadID == "" {
-		return false, fmt.Errorf("%w: uploadID is requred", dom.ErrInvalidArg)
+		return false, fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
 	}
 	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", object, uploadID)
@@ -208,10 +208,10 @@ func (s *svc) ExistsUploadID(ctx context.Context, user, bucket, object, uploadID
 
 func (s *svc) ExistsUploads(ctx context.Context, user, bucket string) (bool, error) {
 	if user == "" {
-		return false, fmt.Errorf("%w: user is requred to set uploadID", dom.ErrInvalidArg)
+		return false, fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if bucket == "" {
-		return false, fmt.Errorf("%w: bucket is requred to set uploadID", dom.ErrInvalidArg)
+		return false, fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
 	}
 	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
 	num, err := s.client.SCard(ctx, key).Result()
@@ -223,13 +223,13 @@ func (s *svc) ExistsUploads(ctx context.Context, user, bucket string) (bool, err
 
 func (s *svc) DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error {
 	if user == "" {
-		return fmt.Errorf("%w: user is requred to set uploadID", dom.ErrInvalidArg)
+		return fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if bucket == "" {
-		return fmt.Errorf("%w: bucket is requred to set uploadID", dom.ErrInvalidArg)
+		return fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if uploadID == "" {
-		return fmt.Errorf("%w: uploadID is requred", dom.ErrInvalidArg)
+		return fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
 	}
 	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", object, uploadID)

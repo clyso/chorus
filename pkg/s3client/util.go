@@ -255,7 +255,7 @@ var ignoreInSignature = map[string]struct{}{
 	"x-real-ip":          {},
 }
 
-// processHeaders decides which orginal headers should be copied to forwarded request.
+// processHeaders decides which original headers should be copied to forwarded request.
 func processHeaders(origin http.Header) (toSign http.Header, notToSign http.Header) {
 	// get a set of headers from origin signature if it was V4
 	var origSigned map[string]struct{}

@@ -187,7 +187,7 @@ func (s *svc) checkConsistencyForListedObject(ctx context.Context, payload *task
 			StorageCount:    payload.StorageCount,
 		}
 		if err := s.checkConsistencyForDirectory(ctx, discoveredDirPayload); err != nil {
-			return fmt.Errorf("unable to schedule sibdirectory consistenty check list task %w", err)
+			return fmt.Errorf("unable to schedule sibdirectory consistency check list task %w", err)
 		}
 		return nil
 	}

@@ -793,7 +793,7 @@
         },
         "toBucket": {
           "type": "string",
-          "title": "custom destination bucket name. if not set, destination bucket name will be equal to soruce bucket"
+          "title": "custom destination bucket name. if not set, destination bucket name will be equal to source bucket"
         },
         "agentUrl": {
           "type": "string",
