@@ -91,7 +91,7 @@ var _ = BeforeSuite(func() {
 	minioAccessConfig, err := suiteEnv.GetMinioAccessConfig(CMinioTestComponentKey)
 	Expect(err).NotTo(HaveOccurred())
 
-	minioS3Endpoint := fmt.Sprintf("%s:%d", minioAccessConfig.Host, minioAccessConfig.S3Port)
+	minioS3Endpoint := fmt.Sprintf("%s:%d", minioAccessConfig.Host.Local, minioAccessConfig.S3Port.Forwarded)
 	adminClient, err := madmin.NewWithOptions(minioS3Endpoint, &madmin.Options{
 		Creds:  mcredentials.NewStaticV4(minioAccessConfig.User, minioAccessConfig.Password, ""),
 		Secure: false,
@@ -118,7 +118,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	providerClient, err := openstack.AuthenticatedClient(suiteCtx, gophercloud.AuthOptions{
-		IdentityEndpoint: fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host, keystoneAccessConfig.ExternalPort),
+		IdentityEndpoint: fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host.Local, keystoneAccessConfig.ExternalPort.Forwarded),
 		Username:         keystoneAccessConfig.User,
 		Password:         keystoneAccessConfig.Password,
 		DomainName:       keystoneAccessConfig.DefaultDomain.Name,
@@ -185,7 +185,7 @@ var _ = Describe("Interacting with test components", func() {
 		minioAccessConfig, err := suiteEnv.GetMinioAccessConfig(CMinioTestComponentKey)
 		Expect(err).NotTo(HaveOccurred())
 
-		minioS3Endpoint := fmt.Sprintf("%s:%d", minioAccessConfig.Host, minioAccessConfig.S3Port)
+		minioS3Endpoint := fmt.Sprintf("%s:%d", minioAccessConfig.Host.Local, minioAccessConfig.S3Port.Forwarded)
 		s3Client, err := minio.New(minioS3Endpoint, &minio.Options{
 			Creds:  mcredentials.NewStaticV4(CMinioTestUsername, CMinioTestPassword, ""),
 			Secure: false,
@@ -213,7 +213,7 @@ var _ = Describe("Interacting with test components", func() {
 		cephAccessConfig, err := suiteEnv.GetCephAccessConfig(CCephTestComponentKey)
 		Expect(err).NotTo(HaveOccurred())
 
-		endpoint := fmt.Sprintf("%s:%d", cephAccessConfig.Host, cephAccessConfig.Port)
+		endpoint := fmt.Sprintf("%s:%d", cephAccessConfig.Host.Local, cephAccessConfig.Port.Forwarded)
 		s3Client, err := minio.New(endpoint, &minio.Options{
 			Creds:  mcredentials.NewStaticV4(CKeystoneTestEC2AccessToken, CKeystoneTestEC2SecretToken, ""),
 			Secure: false,
@@ -240,7 +240,7 @@ var _ = Describe("Interacting with test components", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		providerClient, err := openstack.AuthenticatedClient(suiteCtx, gophercloud.AuthOptions{
-			IdentityEndpoint: fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host, keystoneAccessConfig.ExternalPort),
+			IdentityEndpoint: fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host.Local, keystoneAccessConfig.ExternalPort.Forwarded),
 			Username:         CKeystoneTestUsername,
 			Password:         CKeystoneTestPassword,
 			TenantName:       CKeystoneTestProjectName,
@@ -274,7 +274,7 @@ var _ = Describe("Interacting with test components", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		providerClient, err := openstack.AuthenticatedClient(suiteCtx, gophercloud.AuthOptions{
-			IdentityEndpoint: fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host, keystoneAccessConfig.ExternalPort),
+			IdentityEndpoint: fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host.Local, keystoneAccessConfig.ExternalPort.Forwarded),
 			Username:         CKeystoneTestUsername,
 			Password:         CKeystoneTestPassword,
 			TenantName:       CKeystoneTestProjectName,
@@ -315,7 +315,7 @@ var _ = Describe("Interacting with test components", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		rdb := redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", redisAccessConfig.Host, redisAccessConfig.Port),
+			Addr:     fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded),
 			Password: redisAccessConfig.Password,
 			DB:       0,
 		})
