@@ -200,7 +200,7 @@ message AddBucketReplicationRequest {
   string from_bucket = 3;
   // destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source.
   string to_storage = 4;
-  // custom destination bucket name. if not set, destination bucket name will be equal to soruce bucket
+  // custom destination bucket name. if not set, destination bucket name will be equal to source bucket
   optional string to_bucket = 5;
   // webhook URL of chorus agent. Required if chorus agent setup is used.
   optional string agent_url = 6;
