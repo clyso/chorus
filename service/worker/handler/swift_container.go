@@ -29,9 +29,7 @@ import (
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2"
-	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
-	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 )
@@ -42,6 +40,10 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 		return fmt.Errorf("ContainerUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
 
 	//TODO:swift support account-level repl policy
 	// paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
@@ -75,61 +77,42 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 		}
 	}()
 
-	release, refresh, err := s.locker.Lock(ctx, lock.BucketKey(p.ToStorage, p.ToAccount))
+	release, refresh, err := s.locker.Lock(ctx, lock.BucketKey(p.ToStorage+p.ToAccount, toBucket))
 	if err != nil {
 		return err
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		// copy openstack swift account metadata headers from source to destination openstack swift account using gophercloud:
-		// copy only swift metadata headers
+		// setup swift clients:
 		fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
 		if err != nil {
 			return err
-		}
-		fromHeaders, fromMeta, err := getSwiftContainerMeta(ctx, fromClient, p.Bucket)
-		if errors.Is(err, dom.ErrNotFound) {
-			// if source container does not exist, remove destination container
-			toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
-			if err != nil {
-				return err
-			}
-
-			// remove destination container
-			err = containers.Delete(ctx, toClient, p.ToBucket).Err
-
-		}
-		if err != nil && ! {
-			return fmt.Errorf("failed to get source account %q headers: %w", p.FromAccount, err)
 		}
 		toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
 		if err != nil {
 			return err
 		}
-		_, toMeta, err := getSwiftAccMeta(ctx, toClient)
-		if err != nil {
-			return fmt.Errorf("failed to get destination account %q headers: %w", p.ToAccount, err)
+		// get container metadata from source:
+		fromHeaders, fromMeta, err := getSwiftContainerMeta(ctx, fromClient, fromBucket)
+		if errors.Is(err, dom.ErrNotFound) {
+			// if source container does not exist, remove destination container
+			return deleteSwiftContainer(ctx, toClient, toBucket)
 		}
-		updateOpts := accounts.UpdateOpts{
-			Metadata:       fromMeta,
-			ContentType:    &fromHeaders.ContentType,
-			TempURLKey:     fromHeaders.TempURLKey,
-			TempURLKey2:    fromHeaders.TempURLKey2,
-			RemoveMetadata: []string{},
+		if err != nil {
+			return fmt.Errorf("failed to get source container %q headers: %w", fromBucket, err)
 		}
 
-		// collect remove metadata keys
-		for k := range toMeta {
-			if _, ok := fromMeta[k]; !ok {
-				// remove only if not exists in source
-				k = strings.TrimPrefix(k, "X-Account-Meta-")
-				updateOpts.RemoveMetadata = append(updateOpts.RemoveMetadata, k)
-			}
+		// get destination container metadata if exists:
+		toHeaders, toMeta, err := getSwiftContainerMeta(ctx, toClient, toBucket)
+		if err != nil && !errors.Is(err, dom.ErrNotFound) {
+			return fmt.Errorf("failed to get destination container %q headers: %w", toBucket, err)
 		}
-		// update destination account metadata
-		err = accounts.Update(ctx, toClient, updateOpts).Err
+
+		// update destination container metadata
+		updateOpts := containerCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
+		err = containers.Update(ctx, toClient, toBucket, updateOpts).Err
 		if err != nil {
-			return fmt.Errorf("failed to update destination account %q headers: %w", p.ToAccount, err)
+			return fmt.Errorf("failed to update destination container %q headers: %w", toBucket, err)
 		}
 		return nil
 	}, refresh, time.Second*2)
@@ -159,4 +142,86 @@ func getSwiftContainerMeta(ctx context.Context, client *gophercloud.ServiceClien
 		return nil, nil, err
 	}
 	return
+}
+
+func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[string]string, toHeaders *containers.GetHeader, toMeta map[string]string) *containers.UpdateOpts {
+	updateOpts := containers.UpdateOpts{
+		Metadata:         make(map[string]string),
+		RemoveMetadata:   []string{},
+		TempURLKey:       fromHeaders.TempURLKey,
+		TempURLKey2:      fromHeaders.TempURLKey2,
+		VersionsLocation: fromHeaders.VersionsLocation,
+		HistoryLocation:  fromHeaders.HistoryLocation,
+		VersionsEnabled:  &fromHeaders.VersionsEnabled,
+	}
+
+	// Copy all metadata from source
+	for k, v := range fromMeta {
+		updateOpts.Metadata[k] = v
+	}
+
+	// Remove metadata keys that exist in destination but not in source
+	for k := range toMeta {
+		if _, ok := fromMeta[k]; !ok {
+			// Remove only if not exists in source
+			updateOpts.RemoveMetadata = append(updateOpts.RemoveMetadata, k)
+		}
+	}
+
+	// Copy Content-Type if present
+	if fromHeaders.ContentType != "" {
+		updateOpts.ContentType = &fromHeaders.ContentType
+	}
+
+	// ACLs: Read, Write
+	if len(fromHeaders.Read) != 0 {
+		aclRead := strings.Join(fromHeaders.Read, ",")
+		updateOpts.ContainerRead = &aclRead
+	}
+	if len(fromHeaders.Write) != 0 {
+		aclWrite := strings.Join(fromHeaders.Write, ",")
+		updateOpts.ContainerWrite = &aclWrite
+	}
+
+	//TODO:swift do we need to migrate syncTo and syncKey? How to handle if syncTo was not yet migrated?
+	if fromHeaders.SyncTo != "" {
+		updateOpts.ContainerSyncTo = &fromHeaders.SyncTo
+	}
+	if fromHeaders.SyncKey != "" {
+		updateOpts.ContainerSyncKey = &fromHeaders.SyncKey
+	}
+
+	// disable versioning
+	if toHeaders.VersionsLocation != "" && fromHeaders.VersionsLocation == "" {
+		updateOpts.RemoveVersionsLocation = "DELETE"
+	}
+
+	if toHeaders.HistoryLocation != "" && fromHeaders.HistoryLocation == "" {
+		updateOpts.RemoveHistoryLocation = "DELETE"
+	}
+
+	if fromHeaders.VersionsEnabled != toHeaders.VersionsEnabled {
+		updateOpts.VersionsEnabled = &fromHeaders.VersionsEnabled
+	}
+
+	return &updateOpts
+}
+
+func deleteSwiftContainer(ctx context.Context, client *gophercloud.ServiceClient, container string) error {
+	logger := zerolog.Ctx(ctx)
+	err := containers.Delete(ctx, client, container).Err
+	if gophercloud.ResponseCodeIs(err, http.StatusConflict) {
+		// if destination container is not empty, skip task
+		logger.Info().Msgf("unable delete non-empty container %q: skip task", container)
+		return nil
+	}
+	if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
+		// destination container was already deleted. Exit.
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to delete destination container %q: %w", container, err)
+	}
+	// destination container was successfully deleted. Exit.
+	return nil
 }
