@@ -96,7 +96,7 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 		fromHeaders, fromMeta, err := getSwiftContainerMeta(ctx, fromClient, fromBucket)
 		if errors.Is(err, dom.ErrNotFound) {
 			// if source container does not exist, remove destination container
-			return deleteSwiftContainer(ctx, toClient, toBucket)
+			return s.deleteSwiftContainer(ctx, toClient, toBucket)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to get source container %q headers: %w", fromBucket, err)
@@ -207,13 +207,11 @@ func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[st
 	return &updateOpts
 }
 
-func deleteSwiftContainer(ctx context.Context, client *gophercloud.ServiceClient, container string) error {
-	logger := zerolog.Ctx(ctx)
+func (s *svc) deleteSwiftContainer(ctx context.Context, client *gophercloud.ServiceClient, container string) error {
 	err := containers.Delete(ctx, client, container).Err
 	if gophercloud.ResponseCodeIs(err, http.StatusConflict) {
-		// if destination container is not empty, skip task
-		logger.Info().Msgf("unable delete non-empty container %q: skip task", container)
-		return nil
+		// if destination container is not empty, retry task later
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwiftRetryInterval}
 	}
 	if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 		// destination container was already deleted. Exit.

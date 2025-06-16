@@ -54,6 +54,7 @@ Account creation is handled by the initial migration. Account deletion is ignore
 | [POST](https://docs.openstack.org/api-ref/object-store/?expanded=#create-update-or-delete-account-metadata) | create, update, or delete account metadata |
 | [DELETE](https://docs.openstack.org/api-ref/object-store/?expanded=#delete-the-specified-account) | IGNORED - admin only |
 
+- Q: Is it OK to use Swift `X-Newest: true` header?
 - Q: Is it possible that dest acc not exists?
 
 ```mermaid
