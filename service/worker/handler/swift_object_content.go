@@ -95,23 +95,99 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 		if err != nil {
 			return err
 		}
-		// get object metadata from source:
-		fromHeaders, fromMeta, err := getSwiftObjectMeta(ctx, fromClient, fromBucket, p.Object)
-		if errors.Is(err, dom.ErrNotFound) {
-			// object was deleted from source, skip update obj content task
-			// event will be handled by object delete task
-			logger.Info().Msgf("object %q in container %q was deleted from source, skip update object content task", p.Object, fromBucket)
-			return nil
+		// head object
+		// check last modified
+		// check if manifest
+		// check if symlink
+		//
+		// head object
+		res := objects.Get(ctx, fromClient, fromBucket, p.Object, objects.GetOpts{})
+		if res.Err != nil {
+			if gophercloud.ResponseCodeIs(res.Err, http.StatusNotFound) {
+				logger.Info().Msgf("object %q in container %q was deleted from source, skip update object content task", p.Object, fromBucket)
+				return nil
+			}
+			return res.Err
 		}
+		fromHeaders, err := res.Extract()
 		if err != nil {
-			return fmt.Errorf("failed to get source object %q headers: %w", p.Object, err)
+			return fmt.Errorf("failed to extract source object %q headers: %w", p.Object, err)
 		}
-		//TODO:
-		//- check Last-Modified header - retry
-		//- check if multipart
-		//- check if symlink
-		//- versioning - done separately
+		fromMeta, err := res.ExtractMetadata()
+		if err != nil {
+			return fmt.Errorf("failed to extract source object %q metadata: %w", p.Object, err)
+		}
 
+		// check if object was synced to swift
+		if taskLastModified, err := time.Parse(time.RFC3339, p.LastModified); err == nil {
+			if fromHeaders.LastModified.Before(taskLastModified) {
+				// retry later
+				return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwiftRetryInterval}
+			}
+		}
+		toReq := objects.CreateOpts{
+			Content:         nil,
+			Metadata:        fromMeta,
+			ContentEncoding: fromHeaders.ContentEncoding,
+			ContentType:     fromHeaders.ContentType,
+			NoETag:          true,
+		}
+		if !fromHeaders.DeleteAt.IsZero() {
+			toReq.DeleteAt = fromHeaders.DeleteAt.Unix()
+		}
+
+		if dlo := res.Header.Get("X-Object-Manifest"); dlo != "" {
+			// don't fetch object body for DLO
+			toReq.ObjectManifest = dlo
+		} else {
+			//fetch object body from source
+			fromReq := objects.DownloadOpts{
+				IfModifiedSince: fromHeaders.LastModified.Add(-time.Second),
+			}
+			if res.Header.Get("X-Static-Large-Object") == "True" {
+				// fetch manifest for SLO
+				fromReq.MultipartManifest = "get"
+				// put manifest to dest
+				toReq.MultipartManifest = "put"
+			}
+			fromObjContent := objects.Download(ctx, fromClient, fromBucket, p.Object, fromReq)
+			if fromObjContent.Err != nil {
+				if gophercloud.ResponseCodeIs(fromObjContent.Err, http.StatusNotModified) {
+					// retry later
+					return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwiftRetryInterval}
+				}
+				return fmt.Errorf("failed to download source object %q: %w", p.Object, fromObjContent.Err)
+			}
+			defer fromObjContent.Body.Close()
+			toReq.Content = fromObjContent.Body
+			// set ETag if not a manifest
+			if toReq.MultipartManifest == "" {
+				res, err := fromObjContent.Extract()
+				if err != nil {
+					return fmt.Errorf("failed to extract source object %q content: %w", p.Object, err)
+				}
+				toReq.ContentLength = res.ContentLength
+				toReq.NoETag = false
+				toReq.ETag = res.ETag
+				toReq.IfNoneMatch = res.ETag
+			}
+		}
+		// upload to destination
+		err = objects.Create(ctx, toClient, toBucket, p.Object, toReq).Err
+		if err != nil {
+			if gophercloud.ResponseCodeIs(err, http.StatusPreconditionFailed) {
+				// object with given ETag already exists. Skip update.
+				logger.Info().Err(err).Msgf("object %q in container %q already exists with the same etag", p.Object, toBucket)
+				return nil
+			}
+			if gophercloud.ResponseCodeIs(err, http.StatusNotModified) {
+				// object with given ETag already exists. Skip update.
+				logger.Info().Err(err).Msgf("object %q in container %q already exists with the same etag", p.Object, toBucket)
+				return nil
+
+			}
+			return fmt.Errorf("failed to upload object %q to container %q: %w", p.Object, toBucket, err)
+		}
 		return nil
 	}, refresh, time.Second*2)
 
