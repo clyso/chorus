@@ -34,6 +34,10 @@ imports:
 lint:
 	go tool golangci-lint run
 
+.PHONY: vuln
+vuln:
+	go tool govulncheck ./...
+
 .PHONY: license-check
 license-check:
 	find . -name "*.go" ! -name "*_test.go" | xargs go tool addlicense -check -c 'Clyso GmbH' || (echo "Missing license headers (run make license-fix):"; exit 1)
@@ -43,7 +47,7 @@ license-fix:
 	find . -name "*.go" ! -name "*_test.go" | xargs go tool addlicense -c 'Clyso GmbH' || (echo "Missing license headers"; exit 1)
 
 .PHONY: pretty
-pretty: tidy gen fmt vet imports lint license-check
+pretty: tidy gen fmt vet imports lint vuln license-check
 
 .PHONY: mkdir-build
 mkdir-build: 
