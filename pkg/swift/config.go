@@ -68,8 +68,10 @@ type ProxyStorageCredentials struct {
 }
 
 type WokerStorageCredentials struct {
-	// StorageURL - [REQUIRED] swift storage URL.
-	StorageURL string `yaml:"storageURL"`
+	// StorageEndpointName - [REQUIRED] name of the object storage endpoint in openstack keystone.
+	StorageEndpointName string `yaml:"storageEndpointName"`
+	// Region - [OPTIONAL] openstack region name.
+	Region string `yaml:"region"`
 	// AuthURL - [REQUIRED] keystone auth URL.
 	AuthURL string `yaml:"authURL"`
 	// Superuser - user with access to all projects.
@@ -84,4 +86,6 @@ type UserCredentials struct {
 	Username string `yaml:"username"`
 	// Password - [REQUIRED] user password. Equal to openstack OS_PASSWORD.
 	Password string `yaml:"password"`
+	// DomainName - [REQUIRED] user domain name. Equal to openstack OS_DOMAIN_NAME.
+	DomainName string `yaml:"domainName"`
 }
