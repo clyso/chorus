@@ -96,7 +96,7 @@ func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mam
 				vStr := fmt.Sprint(v)
 				scm.Set(k, vStr)
 			}
-			cm := fs.ConfigMap(s3, name, scm)
+			cm := fs.ConfigMap(s3.Prefix, s3.Options, name, scm)
 			s._configs[name] = cm
 		}
 	}
