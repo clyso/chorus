@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
@@ -40,23 +39,22 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 		return fmt.Errorf("ContainerUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
-	fromBucket, toBucket := p.Bucket, p.Bucket
+	toBucket := p.Bucket
 	if p.ToBucket != nil {
 		toBucket = *p.ToBucket
 	}
 
-	//TODO:swift support account-level repl policy
-	// paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-	// if err != nil {
-	// 	if errors.Is(err, dom.ErrNotFound) {
-	// 		zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-	// 		return nil
-	// 	}
-	// 	return err
-	// }
-	// if paused {
-	// 	return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	// }
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
+			return nil
+		}
+		return err
+	}
+	if paused {
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
+	}
 
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
@@ -70,8 +68,7 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 		if err != nil {
 			return
 		}
-		//TODO:swift support account-level repl policy
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+		verErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
 		if verErr != nil {
 			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
 		}
@@ -83,41 +80,49 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		// setup swift clients:
-		fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
-		if err != nil {
-			return err
-		}
-		toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
-		if err != nil {
-			return err
-		}
-		// get container metadata from source:
-		fromHeaders, fromMeta, err := getSwiftContainerMeta(ctx, fromClient, fromBucket)
-		if errors.Is(err, dom.ErrNotFound) {
-			// if source container does not exist, remove destination container
-			return s.deleteSwiftContainer(ctx, toClient, toBucket)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to get source container %q headers: %w", fromBucket, err)
-		}
-
-		// get destination container metadata if exists:
-		toHeaders, toMeta, err := getSwiftContainerMeta(ctx, toClient, toBucket)
-		if err != nil && !errors.Is(err, dom.ErrNotFound) {
-			return fmt.Errorf("failed to get destination container %q headers: %w", toBucket, err)
-		}
-
-		// update destination container metadata
-		updateOpts := containerCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
-		err = containers.Update(ctx, toClient, toBucket, updateOpts).Err
-		if err != nil {
-			return fmt.Errorf("failed to update destination container %q headers: %w", toBucket, err)
-		}
-		return nil
+		return s.handleContainerUpdate(ctx, p)
 	}, refresh, time.Second*2)
 
 	return
+}
+
+func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.ContainerUpdatePayload) (err error) {
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
+	// setup swift clients:
+	fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
+	if err != nil {
+		return err
+	}
+	toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
+	if err != nil {
+		return err
+	}
+	// get container metadata from source:
+	fromHeaders, fromMeta, err := getSwiftContainerMeta(ctx, fromClient, fromBucket)
+	if errors.Is(err, dom.ErrNotFound) {
+		// if source container does not exist, remove destination container
+		return s.deleteSwiftContainer(ctx, toClient, toBucket)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get source container %q headers: %w", fromBucket, err)
+	}
+
+	// get destination container metadata if exists:
+	toHeaders, toMeta, err := getSwiftContainerMeta(ctx, toClient, toBucket)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("failed to get destination container %q headers: %w", toBucket, err)
+	}
+
+	// update destination container metadata
+	updateOpts := containerCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
+	err = containers.Update(ctx, toClient, toBucket, updateOpts).Err
+	if err != nil {
+		return fmt.Errorf("failed to update destination container %q headers: %w", toBucket, err)
+	}
+	return nil
 }
 
 func getSwiftContainerMeta(ctx context.Context, client *gophercloud.ServiceClient, containerName string) (headers *containers.GetHeader, meta map[string]string, err error) {

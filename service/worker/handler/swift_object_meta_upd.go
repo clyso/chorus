@@ -20,10 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
@@ -40,23 +38,22 @@ func (s *svc) HandleObjectMetaUpdate(ctx context.Context, t *asynq.Task) (err er
 		return fmt.Errorf("ObjectMetaUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
-	fromBucket, toBucket := p.Bucket, p.Bucket
+	toBucket := p.Bucket
 	if p.ToBucket != nil {
 		toBucket = *p.ToBucket
 	}
 
-	//TODO:swift support account-level repl policy
-	// paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-	// if err != nil {
-	// 	if errors.Is(err, dom.ErrNotFound) {
-	// 		zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-	// 		return nil
-	// 	}
-	// 	return err
-	// }
-	// if paused {
-	// 	return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	// }
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
+			return nil
+		}
+		return err
+	}
+	if paused {
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
+	}
 
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
@@ -70,8 +67,7 @@ func (s *svc) HandleObjectMetaUpdate(ctx context.Context, t *asynq.Task) (err er
 		if err != nil {
 			return
 		}
-		//TODO:swift support account-level repl policy
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+		verErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
 		if verErr != nil {
 			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
 		}
@@ -86,49 +82,60 @@ func (s *svc) HandleObjectMetaUpdate(ctx context.Context, t *asynq.Task) (err er
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		// setup swift clients:
-		fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
-		if err != nil {
-			return err
-		}
-		toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
-		if err != nil {
-			return err
-		}
-		// get object metadata from source:
-		fromHeaders, fromMeta, err := getSwiftObjectMeta(ctx, fromClient, fromBucket, p.Object)
-		if errors.Is(err, dom.ErrNotFound) {
-			// object was deleted from source, skip update obj meta task
-			// event will be handled by object delete task
-			logger.Info().Msgf("object %q in container %q was deleted from source, skip update object meta task", p.Object, fromBucket)
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("failed to get source object %q headers: %w", p.Object, err)
-		}
-
-		// get destination object metadata:
-		toHeaders, toMeta, err := getSwiftObjectMeta(ctx, toClient, toBucket, p.Object)
-		if errors.Is(err, dom.ErrNotFound) {
-			// object not exists in source, skip update obj meta task
-			// meta will be sync'ed on next object create task
-			logger.Info().Msgf("object %q in container %q was not found in destination, skip update object meta task", p.Object, toBucket)
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("failed to get destination object %q headers: %w", toBucket, err)
-		}
-
-		// update destination object metadata
-		updateOpts := objectCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
-		err = objects.Update(ctx, toClient, toBucket, p.Object, updateOpts).Err
-		if err != nil {
-			return fmt.Errorf("failed to update destination object %q metadata: %w", p.Object, err)
-		}
-		return nil
+		return s.handleObjectMetaUpdate(ctx, p)
 	}, refresh, time.Second*2)
 
 	return
+}
+
+// handleObjectMetaUpdate handles the object metadata update task, copying metadata from the source object to the destination object.
+func (s *svc) handleObjectMetaUpdate(ctx context.Context, p tasks.ObjectMetaUpdatePayload) (err error) {
+	logger := zerolog.Ctx(ctx)
+	fromBucket, toBucket := p.Bucket, p.Bucket
+	if p.ToBucket != nil {
+		toBucket = *p.ToBucket
+	}
+
+	// setup swift clients:
+	fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
+	if err != nil {
+		return err
+	}
+	toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
+	if err != nil {
+		return err
+	}
+	// get object metadata from source:
+	fromHeaders, fromMeta, err := getSwiftObjectMeta(ctx, fromClient, fromBucket, p.Object)
+	if errors.Is(err, dom.ErrNotFound) {
+		// object was deleted from source, skip update obj meta task
+		// event will be handled by object delete task
+		logger.Info().Msgf("object %q in container %q was deleted from source, skip update object meta task", p.Object, fromBucket)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get source object %q headers: %w", p.Object, err)
+	}
+
+	// get destination object metadata:
+	toHeaders, toMeta, err := getSwiftObjectMeta(ctx, toClient, toBucket, p.Object)
+	if errors.Is(err, dom.ErrNotFound) {
+		// object not exists in source, skip update obj meta task
+		// meta will be sync'ed on next object create task
+		logger.Info().Msgf("object %q in container %q was not found in destination, skip update object meta task", p.Object, toBucket)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get destination object %q headers: %w", toBucket, err)
+	}
+
+	// update destination object metadata
+	updateOpts := objectCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
+	err = objects.Update(ctx, toClient, toBucket, p.Object, updateOpts).Err
+	if err != nil {
+		return fmt.Errorf("failed to update destination object %q metadata: %w", p.Object, err)
+	}
+	return nil
 }
 
 func getSwiftObjectMeta(ctx context.Context, client *gophercloud.ServiceClient, containerName, objectName string) (headers *objects.GetHeader, meta map[string]string, err error) {

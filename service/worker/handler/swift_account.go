@@ -17,10 +17,11 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -38,17 +39,17 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 	logger := zerolog.Ctx(ctx)
 
 	//TODO:swift support account-level repl policy
-	// paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-	// if err != nil {
-	// 	if errors.Is(err, dom.ErrNotFound) {
-	// 		zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-	// 		return nil
-	// 	}
-	// 	return err
-	// }
-	// if paused {
-	// 	return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	// }
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, "", p.FromStorage, p.ToStorage, nil)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
+			return nil
+		}
+		return err
+	}
+	if paused {
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
+	}
 
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
@@ -63,7 +64,7 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 			return
 		}
 		//TODO:swift support account-level repl policy
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+		verErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, "", p.FromStorage, p.ToStorage, nil, p.CreatedAt)
 		if verErr != nil {
 			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
 		}
@@ -75,34 +76,37 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		// copy openstack swift account metadata headers from source to destination openstack swift account using gophercloud:
-		// copy only swift metadata headers
-		fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
-		if err != nil {
-			return err
-		}
-		fromHeaders, fromMeta, err := getSwiftAccMeta(ctx, fromClient)
-		if err != nil {
-			return fmt.Errorf("failed to get source account %q headers: %w", p.FromAccount, err)
-		}
-		toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
-		if err != nil {
-			return err
-		}
-		toHeaders, toMeta, err := getSwiftAccMeta(ctx, toClient)
-		if err != nil {
-			return fmt.Errorf("failed to get destination account %q headers: %w", p.ToAccount, err)
-		}
-		// update destination account metadata
-		updateOpts := accountCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
-		err = accounts.Update(ctx, toClient, updateOpts).Err
-		if err != nil {
-			return fmt.Errorf("failed to update destination account %q headers: %w", p.ToAccount, err)
-		}
-		return nil
+		return s.handleAccountUpdate(ctx, p)
 	}, refresh, time.Second*2)
 
 	return
+}
+
+// handleAccountUpdate handles the account update task, copying metadata from the source account to the destination account.
+func (s *svc) handleAccountUpdate(ctx context.Context, p tasks.AccountUpdatePayload) (err error) {
+	fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
+	if err != nil {
+		return err
+	}
+	fromHeaders, fromMeta, err := getSwiftAccMeta(ctx, fromClient)
+	if err != nil {
+		return fmt.Errorf("failed to get source account %q headers: %w", p.FromAccount, err)
+	}
+	toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
+	if err != nil {
+		return err
+	}
+	toHeaders, toMeta, err := getSwiftAccMeta(ctx, toClient)
+	if err != nil {
+		return fmt.Errorf("failed to get destination account %q headers: %w", p.ToAccount, err)
+	}
+	// update destination account metadata
+	updateOpts := accountCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
+	err = accounts.Update(ctx, toClient, updateOpts).Err
+	if err != nil {
+		return fmt.Errorf("failed to update destination account %q headers: %w", p.ToAccount, err)
+	}
+	return nil
 }
 
 func getSwiftAccMeta(ctx context.Context, client *gophercloud.ServiceClient) (headers *accounts.GetHeader, meta map[string]string, err error) {
