@@ -1,6 +1,6 @@
 module github.com/clyso/chorus/tools/bench
 
-go 1.24.2
+go 1.24.4
 
 require (
 	github.com/boltdb/bolt v1.3.1
