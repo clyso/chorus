@@ -60,9 +60,9 @@ func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerP
 			MinTime:             30 * time.Second,
 			PermitWithoutStream: true,
 		}),
+		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracer))),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			prometheus.UnaryServerInterceptor,
-			otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracer)),
 			grpc_ctxtags.UnaryServerInterceptor(),
 			log.UnaryInterceptor(logConf, version.App, version.AppID),
 			trace.UnaryInterceptor(),
@@ -72,7 +72,6 @@ func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerP
 		)),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			prometheus.StreamServerInterceptor,
-			otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracer)),
 			grpc_ctxtags.StreamServerInterceptor(),
 			log.StreamInterceptor(logConf, version.App, version.AppID),
 			trace.StreamInterceptor(),
