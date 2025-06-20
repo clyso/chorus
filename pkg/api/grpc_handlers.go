@@ -77,6 +77,14 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.Consistenc
 	}
 
 	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
+	idExists, err := h.storageSvc.HasConsistencyCheckID(ctx, consistencyCheckID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check if consistency check id exists: %w", err)
+	}
+	if idExists {
+		return nil, errors.New("consistency check for this set of storage locations already exists")
+	}
+
 	locations := make([]tasks.MigrateLocation, 0, len(req.Locations))
 	for _, location := range req.Locations {
 		locations = append(locations, tasks.MigrateLocation{
@@ -160,10 +168,10 @@ func MakeConsistencyCheckID(locations []*pb.MigrateLocation) string {
 
 	parts := make([]string, 0, len(locations))
 	for _, location := range locations {
-		parts = append(parts, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
+		parts = append(parts, fmt.Sprintf("%s_%s", location.Storage, location.Bucket))
 	}
 
-	return strings.Join(parts, ":")
+	return strings.Join(parts, "_")
 }
 
 func (h *handlers) constructConsistencyCheck(ctx context.Context, id string) (*pb.ConsistencyCheck, error) {

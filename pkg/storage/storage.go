@@ -99,6 +99,7 @@ type Service interface {
 	DeleteConsistencyCheckScheduledCounter(ctx context.Context, id string) error
 	DeleteConsistencyCheckCompletedCounter(ctx context.Context, id string) error
 	StoreConsistencyCheckID(ctx context.Context, id string) error
+	HasConsistencyCheckID(ctx context.Context, id string) (bool, error)
 	DeleteConsistencyCheckID(ctx context.Context, id string) error
 	ListConsistencyCheckIDs(ctx context.Context) ([]string, error)
 	AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyCheckRecord) error
@@ -390,6 +391,15 @@ func (s *svc) StoreConsistencyCheckID(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *svc) HasConsistencyCheckID(ctx context.Context, id string) (bool, error) {
+	cmd := s.client.SIsMember(ctx, "ccv:id", id)
+	if cmd.Err() != nil {
+		return false, fmt.Errorf("unable to check id exists in consistency check set: %w", cmd.Err())
+	}
+
+	return cmd.Val(), nil
 }
 
 func (s *svc) DeleteConsistencyCheckID(ctx context.Context, id string) error {
