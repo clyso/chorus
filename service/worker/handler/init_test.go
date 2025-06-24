@@ -40,9 +40,9 @@ func TestMain(m *testing.M) {
 	tstCtx = context.Background()
 
 	componentConfig := map[string]env.ComponentCreationConfig{
-		CKeystoneTestComponentKey: env.AsKeystone(),
-		swiftTestKey:              env.AsSwift(CKeystoneTestComponentKey),
-		cephTestKey:               env.AsCeph(CKeystoneTestComponentKey),
+		CKeystoneTestComponentKey: env.AsKeystone(env.WithDisabledSTDErrLog(), env.WithDisabledSTDOutLog()),
+		swiftTestKey:              env.AsSwift(CKeystoneTestComponentKey, env.WithDisabledSTDErrLog(), env.WithDisabledSTDOutLog()),
+		cephTestKey:               env.AsCeph(CKeystoneTestComponentKey, env.WithDisabledSTDErrLog(), env.WithDisabledSTDOutLog()),
 	}
 	testEnv, err := env.NewTestEnvironment(tstCtx, componentConfig)
 	if err != nil {

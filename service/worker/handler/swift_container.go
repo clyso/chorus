@@ -116,11 +116,36 @@ func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.ContainerUpdate
 		return fmt.Errorf("failed to get destination container %q headers: %w", toBucket, err)
 	}
 
-	// update destination container metadata
-	updateOpts := containerCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
-	err = containers.Update(ctx, toClient, toBucket, updateOpts).Err
-	if err != nil {
-		return fmt.Errorf("failed to update destination container %q headers: %w", toBucket, err)
+	// create container if it does not exist:
+	if toHeaders == nil {
+		cereateOpts := containers.CreateOpts{
+			Metadata: fromMeta,
+			// Container temp URL are not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
+			// TempURLKey:       fromHeaders.TempURLKey,
+			// TempURLKey2:      fromHeaders.TempURLKey2,
+			VersionsLocation: fromHeaders.VersionsLocation,
+			// HistoryLocation is not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
+			// HistoryLocation:  fromHeaders.HistoryLocation,
+			VersionsEnabled:  fromHeaders.VersionsEnabled,
+			ContainerRead:    strings.Join(fromHeaders.Read, ","),
+			ContainerSyncTo:  fromHeaders.SyncTo,
+			ContainerSyncKey: fromHeaders.SyncKey,
+			ContainerWrite:   strings.Join(fromHeaders.Write, ","),
+			ContentType:      fromHeaders.ContentType,
+			//TODO: check swift StoragePolicy - simply copy it to ceph will not work - InvalidLocationConstraint will be returned by RGW.
+			// StoragePolicy:    fromHeaders.StoragePolicy,
+		}
+		err = containers.Create(ctx, toClient, toBucket, cereateOpts).Err
+		if err != nil {
+			return fmt.Errorf("failed to create destination container %q: %w", toBucket, err)
+		}
+	} else {
+		// update destination container metadata
+		updateOpts := containerCopyMetaRequest(fromHeaders, fromMeta, toHeaders, toMeta)
+		err = containers.Update(ctx, toClient, toBucket, updateOpts).Err
+		if err != nil {
+			return fmt.Errorf("failed to update destination container %q headers: %w", toBucket, err)
+		}
 	}
 	return nil
 }
@@ -130,7 +155,7 @@ func getSwiftContainerMeta(ctx context.Context, client *gophercloud.ServiceClien
 		Newest: true,
 	})
 	if res.Err != nil {
-		if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
+		if gophercloud.ResponseCodeIs(res.Err, http.StatusNotFound) {
 			return nil, nil, dom.ErrNotFound
 		}
 		return nil, nil, res.Err
@@ -151,13 +176,15 @@ func getSwiftContainerMeta(ctx context.Context, client *gophercloud.ServiceClien
 
 func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[string]string, toHeaders *containers.GetHeader, toMeta map[string]string) *containers.UpdateOpts {
 	updateOpts := containers.UpdateOpts{
-		Metadata:         make(map[string]string),
-		RemoveMetadata:   []string{},
-		TempURLKey:       fromHeaders.TempURLKey,
-		TempURLKey2:      fromHeaders.TempURLKey2,
+		Metadata:       make(map[string]string),
+		RemoveMetadata: []string{},
+		// Container temp URL are not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
+		// TempURLKey:       fromHeaders.TempURLKey,
+		// TempURLKey2:      fromHeaders.TempURLKey2,
 		VersionsLocation: fromHeaders.VersionsLocation,
-		HistoryLocation:  fromHeaders.HistoryLocation,
-		VersionsEnabled:  &fromHeaders.VersionsEnabled,
+		// HistoryLocation is not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
+		// HistoryLocation:  fromHeaders.HistoryLocation,
+		VersionsEnabled: &fromHeaders.VersionsEnabled,
 	}
 
 	// Copy all metadata from source
@@ -197,15 +224,16 @@ func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[st
 	}
 
 	// disable versioning
-	if toHeaders.VersionsLocation != "" && fromHeaders.VersionsLocation == "" {
+	if toHeaders != nil && toHeaders.VersionsLocation != "" && fromHeaders.VersionsLocation == "" {
 		updateOpts.RemoveVersionsLocation = "DELETE"
 	}
 
-	if toHeaders.HistoryLocation != "" && fromHeaders.HistoryLocation == "" {
-		updateOpts.RemoveHistoryLocation = "DELETE"
-	}
+	// HistoryLocation is not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
+	// if toHeaders != nil && toHeaders.HistoryLocation != "" && fromHeaders.HistoryLocation == "" {
+	// 	updateOpts.RemoveHistoryLocation = "DELETE"
+	// }
 
-	if fromHeaders.VersionsEnabled != toHeaders.VersionsEnabled {
+	if toHeaders != nil && fromHeaders.VersionsEnabled != toHeaders.VersionsEnabled {
 		updateOpts.VersionsEnabled = &fromHeaders.VersionsEnabled
 	}
 
