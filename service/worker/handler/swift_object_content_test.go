@@ -87,4 +87,9 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// defer cleanup dest object in ceph
 	delRes := objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
 	r.NoError(delRes.Err, "failed to delete test object in ceph")
+	//TODO:
+	// - test version
+	// - test acl
+	// - test update/delete
+	// - test symlink
 }

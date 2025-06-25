@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -126,12 +127,14 @@ func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.ContainerUpdate
 			VersionsLocation: fromHeaders.VersionsLocation,
 			// HistoryLocation is not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
 			// HistoryLocation:  fromHeaders.HistoryLocation,
-			VersionsEnabled:  fromHeaders.VersionsEnabled,
+			VersionsEnabled: fromHeaders.VersionsEnabled,
+			//TODO: map acls?
 			ContainerRead:    strings.Join(fromHeaders.Read, ","),
 			ContainerSyncTo:  fromHeaders.SyncTo,
 			ContainerSyncKey: fromHeaders.SyncKey,
-			ContainerWrite:   strings.Join(fromHeaders.Write, ","),
-			ContentType:      fromHeaders.ContentType,
+			//TODO: map acls?
+			ContainerWrite: strings.Join(fromHeaders.Write, ","),
+			ContentType:    fromHeaders.ContentType,
 			//TODO: check swift StoragePolicy - simply copy it to ceph will not work - InvalidLocationConstraint will be returned by RGW.
 			// StoragePolicy:    fromHeaders.StoragePolicy,
 		}
@@ -176,7 +179,7 @@ func getSwiftContainerMeta(ctx context.Context, client *gophercloud.ServiceClien
 
 func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[string]string, toHeaders *containers.GetHeader, toMeta map[string]string) *containers.UpdateOpts {
 	updateOpts := containers.UpdateOpts{
-		Metadata:       make(map[string]string),
+		Metadata:       make(map[string]string, len(fromMeta)),
 		RemoveMetadata: []string{},
 		// Container temp URL are not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
 		// TempURLKey:       fromHeaders.TempURLKey,
@@ -188,9 +191,7 @@ func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[st
 	}
 
 	// Copy all metadata from source
-	for k, v := range fromMeta {
-		updateOpts.Metadata[k] = v
-	}
+	maps.Copy(updateOpts.Metadata, fromMeta)
 
 	// Remove metadata keys that exist in destination but not in source
 	for k := range toMeta {
@@ -207,10 +208,12 @@ func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[st
 
 	// ACLs: Read, Write
 	if len(fromHeaders.Read) != 0 {
+		//TODO: map acls?
 		aclRead := strings.Join(fromHeaders.Read, ",")
 		updateOpts.ContainerRead = &aclRead
 	}
 	if len(fromHeaders.Write) != 0 {
+		//TODO: map acls?
 		aclWrite := strings.Join(fromHeaders.Write, ",")
 		updateOpts.ContainerWrite = &aclWrite
 	}
