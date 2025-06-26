@@ -92,7 +92,8 @@ func Test_handleAccountUpdate(t *testing.T) {
 	r.NoError(res.Err, "failed to get swift account")
 	meta, err = res.ExtractMetadata()
 	r.NoError(err, "failed to extract metadata from swift account")
-	// r.Len(meta, 1, "swift account metadata should be empty")
+	t.Log(meta)
+	r.Len(meta, 3, "swift account metadata should be empty")
 	r.Equal(metaValue, meta[metaKey], "swift account metadata should contain updated value")
 	headers, err = res.Extract()
 	r.NoError(err, "failed to extract headers from swift account")
@@ -104,7 +105,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	r.NoError(res.Err, "failed to get ceph account")
 	meta, err = res.ExtractMetadata()
 	r.NoError(err, "failed to extract metadata from ceph account")
-	// r.Len(meta, 1, "ceph account metadata should contain updated value")
+	r.Len(meta, 4, "ceph account metadata should contain updated value")
 	r.Equal(metaValue, meta[metaKey], "ceph account metadata should contain updated value")
 	headers, err = res.Extract()
 	r.NoError(err, "failed to extract headers from ceph account")
@@ -115,8 +116,6 @@ func Test_handleAccountUpdate(t *testing.T) {
 
 	// cleanup swift account
 	updRes = accounts.Update(tstCtx, swiftClient, accounts.UpdateOpts{
-		TempURLKey:     "",
-		TempURLKey2:    "",
 		RemoveMetadata: keys,
 	})
 	r.NoError(updRes.Err, "failed to update swift account metadata")
@@ -148,7 +147,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	r.NoError(res.Err, "failed to get ceph account")
 	meta, err = res.ExtractMetadata()
 	r.NoError(err, "failed to extract metadata from ceph account")
-	// r.Empty(meta, "ceph account metadata should be empty")
+	r.Len(meta, 1, "ceph account metadata should be empty")
 	headers, err = res.Extract()
 	r.NoError(err, "failed to extract headers from ceph account")
 	r.Empty(headers.TempURLKey, "ceph account TempURLKey should be empty")

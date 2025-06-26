@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
@@ -134,14 +135,10 @@ func accountCopyMetaRequest(fromHeaders *accounts.GetHeader, fromMeta map[string
 	updateOpts := accounts.UpdateOpts{
 		Metadata:       make(map[string]string),
 		RemoveMetadata: []string{},
-		TempURLKey:     fromHeaders.TempURLKey,
-		TempURLKey2:    fromHeaders.TempURLKey2,
 	}
 
 	// copy metadata from source to destination
-	for k, v := range fromMeta {
-		updateOpts.Metadata[k] = v
-	}
+	maps.Copy(updateOpts.Metadata, fromMeta)
 
 	// collect remove metadata keys
 	for k := range toMeta {
