@@ -30,6 +30,10 @@ api:
   grpcPort: 9670
   httpPort: 9671
   secure: false
+  # grpcCertFile: /path/to/grpc/cert/file # path to grpc server certificate file
+  # grpcKeyFile: /path/to/grpc/key/file # path to grpc server key file
+  # grpcClientAuth: false # set true to enforce grpc client authentication
+  # grpcClientCAFile: /path/to/grpc/client/ca/file # path to CA file for grpc client authentication
 storage:
   createRouting: true # create roting rules to route proxy requests to main storage
   createReplication: false # create replication rules to replicate data from main to other storages
