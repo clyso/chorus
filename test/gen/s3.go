@@ -116,6 +116,14 @@ type GeneratedS3Object struct {
 	versionCount       uint64
 }
 
+func (r *GeneratedS3Object) GetFullPath() string {
+	return r.fullPath
+}
+
+func (r *GeneratedS3Object) GetVersionCount() uint64 {
+	return r.versionCount
+}
+
 func (r *GeneratedS3Object) ContentReaderIterator() iter.Seq2[uint64, *GeneratedS3ObjectContentReader] {
 	return func(yield func(uint64, *GeneratedS3ObjectContentReader) bool) {
 		for i := uint64(0); i < r.versionCount; i++ {
@@ -207,7 +215,7 @@ func (r *S3ObjectGenerator) Generate(rnd *Rnd, nodeType TreeNodeType, parentData
 	case CRootTreeNodeType:
 		return r.generateRoot(), nil
 	case CJointTreeNodeType:
-		return r.generateLeaf(rnd, parentData), nil
+		return r.generateJoint(rnd, parentData), nil
 	case CLeafTreeNodeType:
 		return r.generateLeaf(rnd, parentData), nil
 	}
@@ -215,19 +223,27 @@ func (r *S3ObjectGenerator) Generate(rnd *Rnd, nodeType TreeNodeType, parentData
 }
 
 func (r *S3ObjectGenerator) setDefaults() {
-	r.contentLenghtRange = &GeneratorRange{
-		Min: 1024,
-		Max: 2048,
+	if r.contentLenghtRange == nil {
+		r.contentLenghtRange = &GeneratorRange{
+			Min: 1024,
+			Max: 2048,
+		}
 	}
-	r.nameLengthRange = &GeneratorRange{
-		Min: 5,
-		Max: 10,
+	if r.nameLengthRange == nil {
+		r.nameLengthRange = &GeneratorRange{
+			Min: 5,
+			Max: 10,
+		}
 	}
-	r.versionRange = &GeneratorRange{
-		Min: 1,
-		Max: 10,
+	if r.versionRange == nil {
+		r.versionRange = &GeneratorRange{
+			Min: 1,
+			Max: 10,
+		}
 	}
-	r.nameGenerationCharacters = GenerateS3SafeCharacters()
+	if r.nameGenerationCharacters == nil {
+		r.nameGenerationCharacters = GenerateS3SafeCharacters()
+	}
 }
 
 func (r *S3ObjectGenerator) generateRoot() *GeneratedS3Object {
@@ -240,23 +256,19 @@ func (r *S3ObjectGenerator) generateRoot() *GeneratedS3Object {
 	}
 }
 
-func (r *S3ObjectGenerator) generateLeaf(rnd *Rnd, parentData *GeneratedS3Object) *GeneratedS3Object {
-	nameLength := rnd.Int64InRange(r.nameLengthRange.Min, r.nameLengthRange.Max)
-	alphabetLenght := len(r.nameGenerationCharacters)
-	var nameBuilder strings.Builder
-	for i := int64(0); i < nameLength; i++ {
-		nameRuneIdx := rnd.Int64InRange(0, int64(alphabetLenght)-1)
-		nameRune := r.nameGenerationCharacters[nameRuneIdx]
-		_, _ = nameBuilder.WriteRune(nameRune)
-	}
-	name := nameBuilder.String()
+func (r *S3ObjectGenerator) generateJoint(rnd *Rnd, parentData *GeneratedS3Object) *GeneratedS3Object {
+	name := r.generateName(rnd)
 
-	var fullPath string
-	if parentData.name == "" {
-		fullPath = parentData.fullPath + name
-	} else {
-		fullPath = parentData.fullPath + "/" + name
+	return &GeneratedS3Object{
+		name:               name,
+		fullPath:           parentData.fullPath + name + "/",
+		contentLengthRange: &GeneratorRange{},
+		versionCount:       1,
 	}
+}
+
+func (r *S3ObjectGenerator) generateLeaf(rnd *Rnd, parentData *GeneratedS3Object) *GeneratedS3Object {
+	name := r.generateName(rnd)
 
 	var versionCount int64
 	if r.versioned {
@@ -267,11 +279,23 @@ func (r *S3ObjectGenerator) generateLeaf(rnd *Rnd, parentData *GeneratedS3Object
 
 	return &GeneratedS3Object{
 		name:               name,
-		fullPath:           fullPath,
+		fullPath:           parentData.fullPath + name,
 		contentLengthRange: r.contentLenghtRange,
 		contentSeed:        rnd.Int64(),
 		versionCount:       uint64(versionCount),
 	}
+}
+
+func (r *S3ObjectGenerator) generateName(rnd *Rnd) string {
+	nameLength := rnd.Int64InRange(r.nameLengthRange.Min, r.nameLengthRange.Max)
+	alphabetLenght := len(r.nameGenerationCharacters)
+	var nameBuilder strings.Builder
+	for i := int64(0); i < nameLength; i++ {
+		nameRuneIdx := rnd.Int64InRange(0, int64(alphabetLenght)-1)
+		nameRune := r.nameGenerationCharacters[nameRuneIdx]
+		_, _ = nameBuilder.WriteRune(nameRune)
+	}
+	return nameBuilder.String()
 }
 
 type S3Filler struct {
@@ -279,7 +303,7 @@ type S3Filler struct {
 	client *minio.Client
 }
 
-func NewS3Filler(tree *Tree[*GeneratedS3Object], client *minio.Client, bucket string) *S3Filler {
+func NewS3Filler(tree *Tree[*GeneratedS3Object], client *minio.Client) *S3Filler {
 	return &S3Filler{
 		tree:   tree,
 		client: client,

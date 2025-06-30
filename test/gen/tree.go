@@ -181,7 +181,7 @@ func WithRandomSeed[T any](seed int64) TreeGeneratorOption[T] {
 
 //nolint:unused // detected as unused, but it is used in tree generator
 func (r *TreeGeneratorWithRandomSeedOption[T]) apply(gen *TreeGenerator[T]) {
-	gen.Rnd = NewRnd(r.seed)
+	gen.rnd = NewRnd(r.seed)
 }
 
 type TreeGeneratorWithForceTargetDepthOption[T any] struct{}
@@ -192,7 +192,7 @@ func WithForceTargetDepth[T any]() TreeGeneratorOption[T] {
 
 //nolint:unused // detected as unused, but it is used in tree generator
 func (r *TreeGeneratorWithForceTargetDepthOption[T]) apply(gen *TreeGenerator[T]) {
-	gen.ForceTargetDepth = true
+	gen.forceTargetDepth = true
 }
 
 type TreeGeneratorWithDepthRangeOption[T any] struct {
@@ -210,7 +210,7 @@ func WithDepthRange[T any](min uint32, max uint32) TreeGeneratorOption[T] {
 
 //nolint:unused // detected as unused, but it is used in tree generator
 func (r *TreeGeneratorWithDepthRangeOption[T]) apply(gen *TreeGenerator[T]) {
-	gen.DepthRange = r.depthRange
+	gen.depthRange = r.depthRange
 }
 
 type TreeGeneratorWithWidthRangeOption[T any] struct {
@@ -228,7 +228,7 @@ func WithWidthRange[T any](min uint32, max uint32) TreeGeneratorOption[T] {
 
 //nolint:unused // detected as unused, but it is used in tree generator
 func (r *TreeGeneratorWithWidthRangeOption[T]) apply(gen *TreeGenerator[T]) {
-	gen.WidthRange = r.widthRange
+	gen.widthRange = r.widthRange
 }
 
 type TreeGeneratorWithObjectGeneratorOption[T any] struct {
@@ -243,20 +243,20 @@ func WithObjectGenerator[T any](generator ObjectGenerator[T]) TreeGeneratorOptio
 
 //nolint:unused // detected as unused, but it is used in tree generator
 func (r *TreeGeneratorWithObjectGeneratorOption[T]) apply(gen *TreeGenerator[T]) {
-	gen.ObjectGenerator = r.generator
+	gen.objectGenerator = r.generator
 }
 
 type TreeGenerationTask[T any] struct {
-	Node         *TreeNode[T]
-	CurrentDepth uint64
+	node         *TreeNode[T]
+	currentDepth uint64
 }
 
 type TreeGenerator[T any] struct {
-	ForceTargetDepth bool
-	DepthRange       *GeneratorRange
-	WidthRange       *GeneratorRange
-	ObjectGenerator  ObjectGenerator[T]
-	Rnd              *Rnd
+	forceTargetDepth bool
+	depthRange       *GeneratorRange
+	widthRange       *GeneratorRange
+	objectGenerator  ObjectGenerator[T]
+	rnd              *Rnd
 }
 
 func NewTreeGenerator[T any](opts ...TreeGeneratorOption[T]) (*TreeGenerator[T], error) {
@@ -274,7 +274,7 @@ func NewTreeGenerator[T any](opts ...TreeGeneratorOption[T]) (*TreeGenerator[T],
 
 func (r *TreeGenerator[T]) Generate() (*Tree[T], error) {
 	var noVal T
-	rootData, err := r.ObjectGenerator.Generate(r.Rnd, CRootTreeNodeType, noVal)
+	rootData, err := r.objectGenerator.Generate(r.rnd, CRootTreeNodeType, noVal)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate node data: %w", err)
 	}
@@ -284,9 +284,9 @@ func (r *TreeGenerator[T]) Generate() (*Tree[T], error) {
 	}
 	generationStack := NewStack[TreeGenerationTask[T]]()
 	generationStack.Push(TreeGenerationTask[T]{
-		Node: rootNode,
+		node: rootNode,
 	})
-	targetDepth := r.Rnd.Int64InRange(r.DepthRange.Min, r.DepthRange.Max)
+	targetDepth := r.rnd.Int64InRange(r.depthRange.Min, r.depthRange.Max)
 
 	for !generationStack.Empty() {
 		generationTask, err := generationStack.Pop()
@@ -294,31 +294,31 @@ func (r *TreeGenerator[T]) Generate() (*Tree[T], error) {
 			return nil, fmt.Errorf("unable to pop task from stack: %w", err)
 		}
 
-		childDepth := generationTask.CurrentDepth + 1
+		childDepth := generationTask.currentDepth + 1
 
 		var childrenCount int64
 		var forceTargetDepthChildIndex int64
-		if r.ForceTargetDepth && r.WidthRange.Min == 0 {
-			childrenCount = r.Rnd.Int64InRange(1, r.WidthRange.Max)
+		if r.forceTargetDepth && r.widthRange.Min == 0 {
+			childrenCount = r.rnd.Int64InRange(1, r.widthRange.Max)
 		} else {
-			childrenCount = r.Rnd.Int64InRange(r.WidthRange.Min, r.WidthRange.Max)
+			childrenCount = r.rnd.Int64InRange(r.widthRange.Min, r.widthRange.Max)
 		}
 
-		if r.ForceTargetDepth {
-			forceTargetDepthChildIndex = r.Rnd.Int64InRange(0, childrenCount-1)
+		if r.forceTargetDepth {
+			forceTargetDepthChildIndex = r.rnd.Int64InRange(0, childrenCount-1)
 		}
 
 		var prevChild *TreeNode[T]
 		for i := int64(0); i < childrenCount; i++ {
 			var nodeType TreeNodeType
 			if childDepth < uint64(targetDepth) &&
-				(r.ForceTargetDepth && forceTargetDepthChildIndex == i || r.Rnd.Bool()) {
+				(r.forceTargetDepth && forceTargetDepthChildIndex == i || r.rnd.Bool()) {
 				nodeType = CJointTreeNodeType
 			} else {
 				nodeType = CLeafTreeNodeType
 			}
 
-			data, err := r.ObjectGenerator.Generate(r.Rnd, nodeType, generationTask.Node.data)
+			data, err := r.objectGenerator.Generate(r.rnd, nodeType, generationTask.node.data)
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate node data: %w", err)
 			}
@@ -334,12 +334,12 @@ func (r *TreeGenerator[T]) Generate() (*Tree[T], error) {
 			}
 
 			generationStack.Push(TreeGenerationTask[T]{
-				Node:         node,
-				CurrentDepth: childDepth,
+				node:         node,
+				currentDepth: childDepth,
 			})
 		}
 
-		generationTask.Node.leftChild = prevChild
+		generationTask.node.leftChild = prevChild
 	}
 
 	return &Tree[T]{
@@ -348,28 +348,28 @@ func (r *TreeGenerator[T]) Generate() (*Tree[T], error) {
 }
 
 func (r *TreeGenerator[T]) setDefaults() error {
-	if r.DepthRange == nil {
-		r.DepthRange = &GeneratorRange{
+	if r.depthRange == nil {
+		r.depthRange = &GeneratorRange{
 			Min: 5,
 			Max: 5,
 		}
 	}
-	if r.WidthRange == nil {
-		r.WidthRange = &GeneratorRange{
+	if r.widthRange == nil {
+		r.widthRange = &GeneratorRange{
 			Min: 5,
 			Max: 5,
 		}
 	}
-	if r.ObjectGenerator == nil {
-		r.ObjectGenerator = NewDummyObjectGenerator[T]()
+	if r.objectGenerator == nil {
+		r.objectGenerator = NewDummyObjectGenerator[T]()
 	}
-	if r.Rnd == nil {
+	if r.rnd == nil {
 		var seed [8]byte
 		_, err := crand.Read(seed[:])
 		if err != nil {
 			return fmt.Errorf("unable to read random bytes for seed: %w", err)
 		}
-		r.Rnd = NewRnd(int64(binary.NativeEndian.Uint64(seed[:])))
+		r.rnd = NewRnd(int64(binary.NativeEndian.Uint64(seed[:])))
 	}
 	return nil
 }
