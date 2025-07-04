@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hibiken/asynq"
-
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -40,14 +38,12 @@ type Router interface {
 
 func NewRouter(
 	clients s3client.Service,
-	taskClient *asynq.Client,
 	versionSvc meta.VersionService,
 	policySvc policy.Service,
 	storageSvc storage.Service,
 	limit ratelimit.RPM) Router {
 	return &router{
 		clients:    clients,
-		taskClient: taskClient,
 		versionSvc: versionSvc,
 		policySvc:  policySvc,
 		storageSvc: storageSvc,
@@ -57,7 +53,6 @@ func NewRouter(
 
 type router struct {
 	clients    s3client.Service
-	taskClient *asynq.Client
 	versionSvc meta.VersionService
 	policySvc  policy.Service
 	storageSvc storage.Service
@@ -144,7 +139,7 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 		err = dom.ErrNotImplemented
 	}
 	if err == nil && task != nil {
-		task.SetFrom(storage)
+		task.SetFrom(storage, "")
 		if taskList == nil {
 			taskList = []tasks.SyncTask{task}
 		}

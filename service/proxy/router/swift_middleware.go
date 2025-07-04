@@ -23,20 +23,22 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 )
 
-func Middleware(next http.Handler) http.Handler {
+func SwiftMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bucket, object, method := s3.ParseReq(r)
-		ctx := log.WithBucket(r.Context(), bucket)
-		ctx = log.WithObjName(ctx, object)
-		ctx = log.WithMethod(ctx, method)
+		ctx := log.WithStorType(r.Context(), "swift")
 		ctx = log.WithFlow(ctx, xctx.Event)
-		if method == s3.UndefinedMethod {
-			zerolog.Ctx(ctx).Warn().Str("request_url", r.Method+": "+r.URL.Path+"?"+r.URL.RawQuery).Msg("unable to define s3 method")
-		}
 
+		account, bucket, object, method := swift.ParseReq(r)
+		ctx = log.WithAccount(ctx, account)
+		ctx = log.WithBucket(ctx, bucket)
+		ctx = log.WithObjName(ctx, object)
+		ctx = log.WithSwiftMethod(ctx, method)
+		if method == swift.UndefinedMethod {
+			zerolog.Ctx(ctx).Warn().Str("request_url", r.Method+": "+r.URL.Path+"?"+r.URL.RawQuery).Msg("unable to define swift method")
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
