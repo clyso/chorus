@@ -116,25 +116,25 @@ func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.ContainerUpdate
 	if err != nil && !errors.Is(err, dom.ErrNotFound) {
 		return fmt.Errorf("failed to get destination container %q headers: %w", toBucket, err)
 	}
+	// Container temp URL are not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
+	delete(fromMeta, "Temp-Url-Key")
+	delete(fromMeta, "Temp-Url-Key-2")
 
 	// create container if it does not exist:
 	if toHeaders == nil {
 		cereateOpts := containers.CreateOpts{
-			Metadata: fromMeta,
-			// Container temp URL are not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
-			// TempURLKey:       fromHeaders.TempURLKey,
-			// TempURLKey2:      fromHeaders.TempURLKey2,
+			Metadata:         fromMeta,
 			VersionsLocation: fromHeaders.VersionsLocation,
 			// HistoryLocation is not supported by Ceph RGW: https://docs.ceph.com/en/latest/radosgw/swift/#features-support
 			// HistoryLocation:  fromHeaders.HistoryLocation,
 			VersionsEnabled: fromHeaders.VersionsEnabled,
 			//TODO: map acls?
-			ContainerRead:    strings.Join(fromHeaders.Read, ","),
-			ContainerSyncTo:  fromHeaders.SyncTo,
-			ContainerSyncKey: fromHeaders.SyncKey,
-			//TODO: map acls?
+			ContainerRead:  strings.Join(fromHeaders.Read, ","),
 			ContainerWrite: strings.Join(fromHeaders.Write, ","),
-			ContentType:    fromHeaders.ContentType,
+			// Ignore swift container sync headers.
+			// ContainerSyncTo:  fromHeaders.SyncTo,
+			// ContainerSyncKey: fromHeaders.SyncKey,
+			ContentType: fromHeaders.ContentType,
 			//TODO: check swift StoragePolicy - simply copy it to ceph will not work - InvalidLocationConstraint will be returned by RGW.
 			// StoragePolicy:    fromHeaders.StoragePolicy,
 		}
@@ -218,13 +218,13 @@ func containerCopyMetaRequest(fromHeaders *containers.GetHeader, fromMeta map[st
 		updateOpts.ContainerWrite = &aclWrite
 	}
 
-	//TODO:swift do we need to migrate syncTo and syncKey? How to handle if syncTo was not yet migrated?
-	if fromHeaders.SyncTo != "" {
-		updateOpts.ContainerSyncTo = &fromHeaders.SyncTo
-	}
-	if fromHeaders.SyncKey != "" {
-		updateOpts.ContainerSyncKey = &fromHeaders.SyncKey
-	}
+	// Ignore swift container sync headers.
+	// if fromHeaders.SyncTo != "" {
+	// 	updateOpts.ContainerSyncTo = &fromHeaders.SyncTo
+	// }
+	// if fromHeaders.SyncKey != "" {
+	// 	updateOpts.ContainerSyncKey = &fromHeaders.SyncKey
+	// }
 
 	// disable versioning
 	if toHeaders != nil && toHeaders.VersionsLocation != "" && fromHeaders.VersionsLocation == "" {
