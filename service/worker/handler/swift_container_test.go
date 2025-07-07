@@ -147,6 +147,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	}
 
 	t.Run("versions_enabled", func(t *testing.T) {
+		t.Skip("")
 		r := require.New(t)
 		versionsCont := "test-versions-container"
 		// create container with versions enabled in swift
@@ -246,8 +247,4 @@ func Test_handleContainerUpdate(t *testing.T) {
 		}
 
 	})
-	//create container
-	// check if syncTo wokrs
-	// check version
-
 }

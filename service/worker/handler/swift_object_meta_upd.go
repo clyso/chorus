@@ -143,7 +143,7 @@ func getSwiftObjectMeta(ctx context.Context, client *gophercloud.ServiceClient, 
 		Newest: true,
 	})
 	if res.Err != nil {
-		if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
+		if gophercloud.ResponseCodeIs(res.Err, http.StatusNotFound) {
 			return nil, nil, dom.ErrNotFound
 		}
 		return nil, nil, res.Err
