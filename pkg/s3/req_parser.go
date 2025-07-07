@@ -21,6 +21,55 @@ import (
 	"strings"
 )
 
+// GetReqType detects swift or s3 request
+func GetReqType(r *http.Request) StorageType {
+	for header := range r.Header {
+		if strings.HasPrefix(strings.ToLower(header), "x-amz-") {
+			return S3
+		}
+		if strings.EqualFold(header, "Authorization") {
+			return S3
+		}
+		if strings.EqualFold(header, "X-Auth-Token") {
+			return Swift
+		}
+		if strings.EqualFold(header, "X-Service-Token") {
+			return Swift
+		}
+		if strings.HasPrefix(strings.ToLower(header), "x-container-") {
+			return Swift
+		}
+		if strings.HasPrefix(strings.ToLower(header), "x-object-") {
+			return Swift
+		}
+		if strings.HasPrefix(strings.ToLower(header), "x-account-") {
+			return Swift
+		}
+	}
+	var (
+		path  = strings.Trim(r.URL.Path, "/")
+		query = r.URL.Query()
+	)
+
+	if query.Has("temp_url_sig") {
+		return Swift
+	}
+	if r.Method == "GET" && query.Has("format") {
+		return Swift
+	}
+
+	if strings.HasPrefix(path, "v1/") {
+		return Swift
+	}
+	if strings.Contains(path, "/v1/") {
+		return Swift
+	}
+	if r.Method == "GET" && path == "info" {
+		return Swift
+	}
+	return S3
+}
+
 func ParseReq(r *http.Request) (bucket string, object string, method Method) {
 	var (
 		path  = strings.Trim(r.URL.Path, "/")
