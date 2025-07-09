@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
 	"github.com/stretchr/testify/require"
@@ -19,7 +23,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client}
+	svc := &svc{swiftClients: client, conf: &Config{}}
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -65,9 +69,44 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// defer cleanup dest container in ceph
 	defer func() {
-		delRes := containers.Delete(tstCtx, cephClient, bucket)
-		r.NoError(delRes.Err, "failed to delete test bucket in ceph")
+		_ = containers.Delete(tstCtx, cephClient, bucket)
 	}()
+
+	t.Run("task skipped if obj not exist in src container", func(t *testing.T) {
+		r := require.New(t)
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Bucket: bucket,
+			Object: "non-existing-object",
+		})
+		r.NoError(err, "handleObjectUpdate should not return an error if object does not exist in source container")
+	})
+
+	t.Run("task retried if src swift is not consistent", func(t *testing.T) {
+		r := require.New(t)
+		futureDate := objInfo.LastModified.Add(time.Hour * 24).Format(time.RFC3339)
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Bucket:       bucket,
+			Object:       obj,
+			VersionID:    "",
+			Etag:         objInfo.ETag,
+			LastModified: futureDate,
+		})
+		r.Error(err)
+		var rateLimitErr *dom.ErrRateLimitExceeded
+		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if swift is not consistent")
+	})
 
 	// sync object to ceph
 	err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
@@ -87,9 +126,64 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// defer cleanup dest object in ceph
 	delRes := objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
 	r.NoError(delRes.Err, "failed to delete test object in ceph")
+	t.Run("deleteAt", func(t *testing.T) {
+		r := require.New(t)
+		objName := "tst-delete-at-object"
+		// create test object in swift
+		oRes = objects.Create(tstCtx, swiftClient, bucket, objName, objects.CreateOpts{
+			ContentType: "text/plain",
+			Metadata:    map[string]string{"test": "object-metadata"},
+			Content:     strings.NewReader("test-content"),
+			DeleteAfter: 5, // delete in 5 seconds
+		})
+		r.NoError(oRes.Err, "failed to create test object with deleteAt")
+		// defer cleanup src object in swift
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, swiftClient, bucket, objName, objects.DeleteOpts{})
+		})
+		// sync obj to ceph
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Bucket:       bucket,
+			Object:       objName,
+			Etag:         oRes.Header.Get("Etag"),
+			LastModified: oRes.Header.Get("Last-Modified"),
+		})
+		r.NoError(err, "handleObjectUpdate should not return an error for object with deleteAt")
+		// check if object was created in ceph
+		getRes := objects.Get(tstCtx, cephClient, bucket, objName, objects.GetOpts{})
+		r.NoError(getRes.Err, "failed to get object from ceph")
+		// check if object has deleteAt headers
+		headers, err := getRes.Extract()
+		r.NoError(err, "failed to extract object headers from ceph")
+		r.False(headers.DeleteAt.IsZero(), "object in ceph should have deleteAt header set")
+		r.True(headers.DeleteAt.After(time.Now()), "object in ceph should have deleteAt header set to future time")
+		// before in 5 secconds
+		r.True(headers.DeleteAt.Before(time.Now().Add(5*time.Second)), "object in ceph should have deleteAt header set to future time")
+		r.Eventually(func() bool {
+			// check if object was deleted from ceph
+			getRes = objects.Get(tstCtx, cephClient, bucket, objName, objects.GetOpts{})
+			return gophercloud.ResponseCodeIs(getRes.Err, http.StatusNotFound)
+		}, 6*time.Second, 1*time.Second, "object in ceph should be deleted after deleteAt time")
+	})
 	//TODO:
-	// - test version
+	// - test dlo
+	// - test slo
 	// - test acl
 	// - test update/delete
 	// - test symlink
+	t.Run("", func(t *testing.T) {
+
+	})
+	t.Run("", func(t *testing.T) {
+
+	})
+	t.Run("", func(t *testing.T) {
+
+	})
 }

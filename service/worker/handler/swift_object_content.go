@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
@@ -104,14 +105,11 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 		return err
 	}
 	// head object
-	// check last modified
-	// check if manifest
-	// check if symlink
-	//
-	// head object
 	res := objects.Get(ctx, fromClient, fromBucket, p.Object, objects.GetOpts{})
 	if res.Err != nil {
 		if gophercloud.ResponseCodeIs(res.Err, http.StatusNotFound) {
+			// object was deleted from source, skip update
+			// object deletion will be handled by the object deletion task
 			logger.Info().Msgf("object %q in container %q was deleted from source, skip update object content task", p.Object, fromBucket)
 			return nil
 		}
@@ -152,7 +150,8 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 		fromReq := objects.DownloadOpts{
 			IfModifiedSince: fromHeaders.LastModified.Add(-time.Second),
 		}
-		if res.Header.Get("X-Static-Large-Object") == "True" {
+		slo := strings.EqualFold(res.Header.Get("X-Static-Large-Object"), "True")
+		if slo {
 			// fetch manifest for SLO
 			fromReq.MultipartManifest = "get"
 			// put manifest to dest
@@ -169,7 +168,7 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 		defer fromObjContent.Body.Close()
 		toReq.Content = fromObjContent.Body
 		// set ETag if not a manifest
-		if toReq.MultipartManifest == "" {
+		if !slo {
 			res, err := fromObjContent.Extract()
 			if err != nil {
 				return fmt.Errorf("failed to extract source object %q content: %w", p.Object, err)
@@ -194,6 +193,7 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 			return nil
 
 		}
+		// TODO: handle missing parts for SLO
 		return fmt.Errorf("failed to upload object %q to container %q: %w", p.Object, toBucket, err)
 	}
 	return nil
