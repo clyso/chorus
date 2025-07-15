@@ -219,7 +219,7 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 
 	// add new downtime switch
 	// validate corresponding replication state:
-	policy, err := s.GetReplicationPolicyInfo(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket)
+	policy, err := s.GetReplicationPolicyInfo(ctx, replID)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policy: %w", err)
 	}
@@ -231,7 +231,7 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 		return fmt.Errorf("%w: cannot create downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
 
-	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.FromBucket)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policies: %w", err)
 	}
@@ -244,7 +244,7 @@ func (s *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID Rep
 		dest = d
 		prio = p
 	}
-	if string(dest) != replID.To {
+	if string(dest) != replID.ToStorage {
 		return fmt.Errorf("%w: cannot create downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
 	info := &SwitchInfo{
@@ -324,7 +324,7 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		return dom.ErrAlreadyExists
 	}
 	// validate corresponding replication state:
-	policy, err := s.GetReplicationPolicyInfo(ctx, replID.User, replID.Bucket, replID.From, replID.To, replID.ToBucket)
+	policy, err := s.GetReplicationPolicyInfo(ctx, replID)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policy: %w", err)
 	}
@@ -337,7 +337,7 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	if policy.IsPaused {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: replication is paused", dom.ErrInvalidArg)
 	}
-	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.Bucket)
+	policies, err := s.GetBucketReplicationPolicies(ctx, replID.User, replID.FromBucket)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policies: %w", err)
 	}
@@ -350,23 +350,23 @@ func (s *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		dest = d
 		prio = p
 	}
-	if string(dest) != replID.To {
+	if string(dest) != replID.ToStorage {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
 
 	// validate routing policy
-	toStorage, err := s.getRoutingPolicy(ctx, replID.User, replID.Bucket)
+	toStorage, err := s.getRoutingPolicy(ctx, replID.User, replID.FromBucket)
 	if err != nil {
 		return fmt.Errorf("unable to get routing policy: %w", err)
 	}
-	if toStorage != replID.From {
+	if toStorage != replID.FromStorage {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
 
 	now := timeNow()
 	pipe := s.client.TxPipeline()
 	// switch routing
-	pipe.Set(ctx, replID.RoutingKey(), replID.To, 0)
+	pipe.Set(ctx, replID.RoutingKey(), replID.ToStorage, 0)
 	// create switch metadata
 	pipe.HSet(ctx, replID.SwitchKey(), SwitchInfo{
 		ReplicationIDStr:    replID.String(),
@@ -400,13 +400,13 @@ func (s *policySvc) DeleteReplicationSwitch(ctx context.Context, replID Replicat
 	if existing.IsZeroDowntime() {
 		if existing.LastStatus != StatusDone {
 			//revert routing idempotently
-			if err = addBucketRoutingPolicyWithClient(ctx, pipe, replID.User, replID.Bucket, replID.From, true); err != nil {
+			if err = addBucketRoutingPolicyWithClient(ctx, pipe, replID.User, replID.FromBucket, replID.FromStorage, true); err != nil {
 				return fmt.Errorf("unable to revert bucket routing policy: %w", err)
 			}
 		}
 	} else {
 		// delete routing block idempotently
-		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.FromStorage, replID.FromBucket); err != nil {
 			return fmt.Errorf("unable to delete routing block: %w", err)
 		}
 	}
@@ -458,7 +458,7 @@ func (s *policySvc) GetReplicationSwitchInfo(ctx context.Context, replID Replica
 
 func (s *policySvc) GetInProgressZeroDowntimeSwitchInfo(ctx context.Context, user string, bucket string) (ZeroDowntimeSwitchInProgressInfo, error) {
 	info := ZeroDowntimeSwitchInProgressInfo{}
-	key := ReplicationID{User: user, Bucket: bucket}.SwitchKey()
+	key := ReplicationID{User: user, FromBucket: bucket}.SwitchKey()
 	err := s.client.HMGet(ctx, key, "multipartTTL", "lastStatus", "replicationID", "replPriority").Scan(&info)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
@@ -544,20 +544,20 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 	switch newStatus {
 	// if switch in progress set routing block idempotently
 	case StatusInProgress, StatusCheckInProgress:
-		if err = addRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+		if err = addRoutingBlockWithClient(ctx, pipe, replID.FromStorage, replID.FromBucket); err != nil {
 			return fmt.Errorf("unable to add routing block: %w", err)
 		}
 	// if error, delete routing block idempotently
 	case StatusError:
-		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.FromStorage, replID.FromBucket); err != nil {
 			return fmt.Errorf("unable to delete routing block: %w", err)
 		}
 	// if done, switch routing and replication to new bucket idempotently
 	case StatusDone:
-		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.From, replID.Bucket); err != nil {
+		if err = deleteRoutingBlockWithClient(ctx, pipe, replID.FromStorage, replID.FromBucket); err != nil {
 			return fmt.Errorf("unable to delete routing block: %w", err)
 		}
-		if err = addBucketRoutingPolicyWithClient(ctx, pipe, replID.User, replID.Bucket, replID.To, true); err != nil {
+		if err = addBucketRoutingPolicyWithClient(ctx, pipe, replID.User, replID.FromBucket, replID.ToStorage, true); err != nil {
 			return fmt.Errorf("unable to add bucket routing policy: %w", err)
 		}
 		if err = archiveReplicationWithClient(ctx, pipe, replID); err != nil {
@@ -565,11 +565,11 @@ func (s *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID Repli
 		}
 		if existing.ContinueReplication {
 			// create backwards replication policy
-			key := fmt.Sprintf("p:repl:%s:%s", replID.User, replID.Bucket)
-			val := fmt.Sprintf("%s:%s", replID.To, replID.From)
+			key := fmt.Sprintf("p:repl:%s:%s", replID.User, replID.FromBucket)
+			val := fmt.Sprintf("%s:%s", replID.ToStorage, replID.FromStorage)
 			pipe.ZAddNX(ctx, key, redis.Z{Member: val, Score: float64(existing.ReplicationPriority)})
 			replBackID := replID
-			replBackID.From, replBackID.To = replID.To, replID.From
+			replBackID.FromStorage, replBackID.ToStorage = replID.ToStorage, replID.FromStorage
 
 			now := timeNow()
 			statusKey := replBackID.StatusKey()

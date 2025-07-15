@@ -98,7 +98,7 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 			}
 		}
 	}
-	r.NoError(storage.CleanLastListedObj(ctx, s1.FromStorage, s1.ToStorage, b1, nil))
+	r.NoError(storage.CleanLastListedObj(ctx, s1.FromStorage, s1.ToStorage, b1, ""))
 	for storIdx, stor := range stors {
 		for buckIdx, buck := range bucks {
 			for prefIdx, pref := range prefs {
@@ -135,7 +135,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 		Sync: tasks.Sync{
 			FromStorage: "a",
 			ToStorage:   "b",
-			ToBucket:    nil,
+			ToBucket:    "c",
 		},
 		Bucket: "c",
 		Prefix: "",
@@ -145,7 +145,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 		Sync: tasks.Sync{
 			FromStorage: "a",
 			ToStorage:   "b",
-			ToBucket:    nil,
+			ToBucket:    "c",
 		},
 		Bucket: "c",
 		Prefix: "d",
@@ -155,7 +155,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 		Sync: tasks.Sync{
 			FromStorage: "a",
 			ToStorage:   "b",
-			ToBucket:    &destBuck,
+			ToBucket:    destBuck,
 		},
 		Bucket: "c",
 		Prefix: "",
@@ -165,7 +165,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 		Sync: tasks.Sync{
 			FromStorage: "a",
 			ToStorage:   "b",
-			ToBucket:    &destBuck,
+			ToBucket:    destBuck,
 		},
 		Bucket: "c",
 		Prefix: "d",

@@ -44,6 +44,7 @@ require (
 	github.com/adhocore/gronx v1.19.5
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-connections v0.5.0
+	github.com/google/uuid v1.6.0
 	github.com/gophercloud/gophercloud/v2 v2.7.0
 	github.com/minio/madmin-go/v4 v4.0.17
 	github.com/onsi/ginkgo/v2 v2.23.4
@@ -215,7 +216,6 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.20.3 // indirect
 	github.com/google/pprof v0.0.0-20250501235452-c0086092b71a // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gordonklaus/ineffassign v0.1.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect

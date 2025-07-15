@@ -75,11 +75,11 @@ func (d Destination) Parse() (storage string, bucket *string) {
 }
 
 // ToDest builds destination from storage name and optional bucket name
-func ToDest(storage string, bucket *string) Destination {
-	if bucket == nil {
+func ToDest(storage string, bucket string) Destination {
+	if bucket == "" {
 		return Destination(storage)
 	}
-	return Destination(fmt.Sprintf("%s:%s", storage, *bucket))
+	return Destination(fmt.Sprintf("%s:%s", storage, bucket))
 }
 
 type VersionService interface {

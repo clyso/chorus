@@ -45,6 +45,7 @@ type Semaphore interface {
 	// TryAcquireN - see TryAcquire
 	TryAcquireN(ctx context.Context, n int64) (release func(), err error)
 }
+
 type SemaphoreConfig struct {
 	Enabled  bool          `yaml:"enabled"`
 	Limit    int64         `yaml:"limit"`

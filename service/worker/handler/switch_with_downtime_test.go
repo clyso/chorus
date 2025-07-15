@@ -19,11 +19,11 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 
 	ctx := context.Background()
 	id := policy.ReplicationID{
-		User:     "user",
-		Bucket:   "bucket",
-		From:     "from",
-		To:       "to",
-		ToBucket: stringPtr("toBucket"),
+		User:        "user",
+		FromBucket:  "bucket",
+		FromStorage: "from",
+		ToStorage:   "to",
+		ToBucket:    "toBucket",
 	}
 
 	for _, status := range []policy.SwitchStatus{policy.StatusNotStarted, policy.StatusError, policy.StatusSkipped, ""} {

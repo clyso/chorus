@@ -207,7 +207,7 @@ func (r *router) routeMultipart(req *http.Request) (storage string, switchInProg
 	if err != nil {
 		return storage, true, err
 	}
-	return oldReplicationID.From, true, nil
+	return oldReplicationID.FromStorage, true, nil
 }
 
 func (r *router) routeListMultipart(req *http.Request) (storage string, err error) {
@@ -245,5 +245,5 @@ func (r *router) routeListMultipart(req *http.Request) (storage string, err erro
 	if err != nil {
 		return storage, err
 	}
-	return oldReplicationID.From, nil
+	return oldReplicationID.FromStorage, nil
 }

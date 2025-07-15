@@ -47,6 +47,7 @@ type svc struct {
 	limit      ratelimit.RPM
 	locker     lock.Service
 	conf       *Config
+	rclone.CopySvc
 }
 
 func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService, policySvc policy.Service, storageSvc storage.Service, rc rclone.Service, taskClient *asynq.Client, limit ratelimit.RPM, locker lock.Service) *svc {

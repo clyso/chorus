@@ -50,7 +50,7 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		bucket := "bucket"
 		src := BucketCreatePayload{
 			Sync: Sync{
-				ToBucket: &bucket,
+				ToBucket: bucket,
 			},
 		}
 		srcJson, err := json.Marshal(&src)
@@ -58,7 +58,7 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		var dst BucketCreatePayload
 		r.NoError(json.Unmarshal(srcJson, &dst))
 		r.NotNil(dst.ToBucket)
-		r.EqualValues(*src.ToBucket, *dst.ToBucket, "custom bucket preserved")
+		r.EqualValues(src.ToBucket, dst.ToBucket, "custom bucket preserved")
 
 		src = BucketCreatePayload{}
 		srcJson, err = json.Marshal(&src)

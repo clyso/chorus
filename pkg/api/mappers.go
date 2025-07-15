@@ -68,11 +68,11 @@ func strPtr(s string) *string {
 
 func pbToReplicationID(in *pb.ReplicationRequest) policy.ReplicationID {
 	return policy.ReplicationID{
-		User:     in.User,
-		Bucket:   in.Bucket,
-		From:     in.From,
-		To:       in.To,
-		ToBucket: in.ToBucket,
+		User:        in.User,
+		FromBucket:  in.Bucket,
+		FromStorage: in.From,
+		ToStorage:   in.To,
+		ToBucket:    in.ToBucket,
 	}
 }
 
@@ -119,9 +119,9 @@ func toPbSwitchStatus(in policy.SwitchInfo) (*pb.GetBucketSwitchStatusResponse, 
 		History:       in.History,
 		ReplicationId: &pb.ReplicationRequest{
 			User:     id.User,
-			Bucket:   id.Bucket,
-			From:     id.From,
-			To:       id.To,
+			Bucket:   id.FromBucket,
+			From:     id.FromStorage,
+			To:       id.ToStorage,
 			ToBucket: id.ToBucket,
 		},
 	}

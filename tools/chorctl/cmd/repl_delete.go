@@ -52,13 +52,14 @@ chorctl repl delete -f main -t follower -u admin -b bucket1`,
 		client := pb.NewChorusClient(conn)
 
 		req := &pb.ReplicationRequest{
-			User:   rdUser,
-			Bucket: rdBucket,
-			From:   rdFrom,
-			To:     rdTo,
+			User:     rdUser,
+			Bucket:   rdBucket,
+			From:     rdFrom,
+			To:       rdTo,
+			ToBucket: rdToBucket,
 		}
-		if rdToBucket != "" {
-			req.ToBucket = &rdToBucket
+		if rdToBucket == "" {
+			req.ToBucket = rdBucket
 		}
 		_, err = client.DeleteReplication(ctx, req)
 		if err != nil {

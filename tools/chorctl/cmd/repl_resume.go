@@ -52,13 +52,14 @@ chorctl repl resume -f main -t follower -u admin -b bucket1`,
 		client := pb.NewChorusClient(conn)
 
 		req := &pb.ReplicationRequest{
-			User:   rdUser,
-			Bucket: rdBucket,
-			From:   rdFrom,
-			To:     rdTo,
+			User:     rrUser,
+			Bucket:   rrBucket,
+			From:     rrFrom,
+			To:       rrTo,
+			ToBucket: rrToBucket,
 		}
-		if rrToBucket != "" {
-			req.ToBucket = &rrToBucket
+		if rrToBucket == "" {
+			req.ToBucket = rrBucket
 		}
 		_, err = client.ResumeReplication(ctx, req)
 		if err != nil {

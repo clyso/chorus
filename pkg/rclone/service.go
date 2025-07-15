@@ -45,6 +45,7 @@ type File struct {
 	Storage string
 	Bucket  string
 	Name    string
+	Version string
 }
 
 type CompareRes struct {
@@ -67,7 +68,7 @@ func (f File) path() string {
 type Service interface {
 	CopyTo(ctx context.Context, from, to File, size int64) error
 
-	Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket *string) (*CompareRes, error)
+	Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket string) (*CompareRes, error)
 }
 
 func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mamCalc *MemCalculator, memLimiter, fileLimiter ratelimit.Semaphore) (Service, error) {
@@ -79,7 +80,7 @@ func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mam
 		return nil, err
 	}
 
-	s := svc{s3: s3, _configs: make(map[string]*configmap.Map, len(conf.Storages)), metricsSvc: metricsSvc, mamCalc: mamCalc, memLimiter: memLimiter, fileLimiter: fileLimiter}
+	s := svc{s3: s3, _configs: make(map[string]*configmap.Map, len(conf.Storages)), metricsSvc: metricsSvc, memCalc: mamCalc, memLimiter: memLimiter, fileLimiter: fileLimiter}
 
 	for storName, stor := range conf.Storages {
 		for user, cred := range stor.Credentials {
@@ -125,7 +126,7 @@ type svc struct {
 	_configs   map[string]*configmap.Map
 	metricsSvc metrics.S3Service
 
-	mamCalc     *MemCalculator
+	memCalc     *MemCalculator
 	memLimiter  ratelimit.Semaphore
 	fileLimiter ratelimit.Semaphore
 }
@@ -139,7 +140,7 @@ func (s *svc) getConf(storage, user string) (*configmap.Map, error) {
 	return res, nil
 }
 
-func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket *string) (*CompareRes, error) {
+func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket string) (*CompareRes, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "rclone.Compare")
 	span.SetAttributes(attribute.String("bucket", fromBucket), attribute.String("from", from), attribute.String("to", to))
 	defer span.End()
@@ -148,12 +149,7 @@ func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, fromBucket 
 	if err != nil {
 		return nil, err
 	}
-	// destination bucket name is equal to source bucke name unless toBucket param is set
-	toBucketName := fromBucket
-	if toBucket != nil {
-		toBucketName = *toBucket
-	}
-	dest, err := s.getFS(ctx, to, toBucketName)
+	dest, err := s.getFS(ctx, to, toBucket)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +283,7 @@ func (s *svc) checkLimit(ctx context.Context, fileSize int64) (release func(), e
 		}
 	}()
 
-	reserve := s.mamCalc.calcMemFromFileSize(fileSize)
+	reserve := s.memCalc.calcMemFromFileSize(fileSize)
 	var memLimitRelease func()
 	memLimitRelease, err = s.memLimiter.TryAcquireN(ctx, reserve)
 	if err != nil {

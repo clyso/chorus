@@ -72,7 +72,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		FromStorage: "main",
 		FromBucket:  bucketSrc,
 		ToStorage:   "main",
-		ToBucket:    &bucketDst,
+		ToBucket:    bucketDst,
 	})
 	r.NoError(err)
 	t.Cleanup(func() {
@@ -81,7 +81,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 			From:     "main",
 			Bucket:   bucketSrc,
 			To:       "main",
-			ToBucket: &bucketDst,
+			ToBucket: bucketDst,
 		})
 		cleanup(bucketDst)
 	})
@@ -94,7 +94,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	r.EqualValues("main", reps.Replications[0].To)
 	r.EqualValues(bucketSrc, reps.Replications[0].Bucket)
 	r.NotNil(reps.Replications[0].ToBucket)
-	r.EqualValues(bucketDst, *reps.Replications[0].ToBucket)
+	r.EqualValues(bucketDst, reps.Replications[0].ToBucket)
 
 	//w8 replication to start
 	r.Eventually(func() bool {
@@ -131,7 +131,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		To:        "main",
 		ShowMatch: true,
 		User:      user,
-		ToBucket:  &bucketDst,
+		ToBucket:  bucketDst,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -172,7 +172,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		FromStorage: "main",
 		FromBucket:  bucketSrc,
 		ToStorage:   "f1",
-		ToBucket:    &bucketDst,
+		ToBucket:    bucketDst,
 	})
 	r.NoError(err)
 	t.Cleanup(func() {
@@ -181,7 +181,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 			From:     "main",
 			Bucket:   bucketSrc,
 			To:       "f1",
-			ToBucket: &bucketDst,
+			ToBucket: bucketDst,
 		})
 		cleanup(bucketDst)
 	})
@@ -194,7 +194,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	r.EqualValues("f1", reps.Replications[0].To)
 	r.EqualValues(bucketSrc, reps.Replications[0].Bucket)
 	r.NotNil(reps.Replications[0].ToBucket)
-	r.EqualValues(bucketDst, *reps.Replications[0].ToBucket)
+	r.EqualValues(bucketDst, reps.Replications[0].ToBucket)
 
 	//w8 replication to finish
 	r.Eventually(func() bool {
@@ -219,7 +219,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		To:        "main",
 		ShowMatch: true,
 		User:      user,
-		ToBucket:  &bucketDst,
+		ToBucket:  bucketDst,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -234,7 +234,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		To:        "f1",
 		ShowMatch: true,
 		User:      user,
-		ToBucket:  &bucketDst,
+		ToBucket:  bucketDst,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)

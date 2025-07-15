@@ -40,8 +40,10 @@ const (
 	TypeObjectSyncTags = "object:sync:tags"
 	TypeObjectSyncACL  = "object:sync:acl"
 
-	TypeMigrateBucketListObjects = "migrate:bucket:list_objects"
-	TypeMigrateObjCopy           = "migrate:object:copy"
+	TypeMigrateBucketListObjects  = "migrate:bucket:list_objects"
+	TypeMigrateObjCopy            = "migrate:object:copy"
+	TypeMigrateObjectListVersions = "migrate:object:list_versions"
+	TypeMigrateVersionedObject    = "migrate:object:copy_versioned"
 
 	TypeApiCostEstimation     = "api:cost_estimation"
 	TypeApiCostEstimationList = "api:cost_estimation:list"
@@ -124,9 +126,9 @@ const (
 type SyncTask interface {
 	GetFrom() string
 	GetToStorage() string
-	GetToBucket() *string
+	GetToBucket() string
 	SetFrom(from string)
-	SetTo(storage string, bucket *string)
+	SetTo(storage string, bucket string)
 	InitDate()
 	GetDate() time.Time
 }
@@ -134,7 +136,7 @@ type SyncTask interface {
 type Sync struct {
 	FromStorage string
 	ToStorage   string
-	ToBucket    *string
+	ToBucket    string
 	CreatedAt   time.Time
 }
 
@@ -144,13 +146,13 @@ func (t *Sync) GetFrom() string {
 func (t *Sync) GetToStorage() string {
 	return t.ToStorage
 }
-func (t *Sync) GetToBucket() *string {
+func (t *Sync) GetToBucket() string {
 	return t.ToBucket
 }
 func (t *Sync) SetFrom(from string) {
 	t.FromStorage = from
 }
-func (t *Sync) SetTo(storage string, bucket *string) {
+func (t *Sync) SetTo(storage string, bucket string) {
 	t.ToStorage = storage
 	t.ToBucket = bucket
 }
@@ -225,6 +227,18 @@ type ObjInfo struct {
 	VersionID string
 }
 
+type ListObjectVersionsPayload struct {
+	Sync
+	Bucket string
+	Prefix string
+}
+
+type MigrateVersionedObjectPayload struct {
+	Sync
+	Bucket string
+	Prefix string
+}
+
 type MigrateBucketListObjectsPayload struct {
 	Sync
 	Bucket string
@@ -284,7 +298,8 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
-	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
+	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload |
+	ListObjectVersionsPayload | MigrateVersionedObjectPayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -316,10 +331,7 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(id)}
 		taskType = TypeApiCostEstimationList
 	case BucketCreatePayload:
-		id := fmt.Sprintf("cb:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
-		if p.ToBucket != nil {
-			id += ":" + *p.ToBucket
-		}
+		id := fmt.Sprintf("cb:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue()), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
 	case SwitchWithDowntimePayload:
@@ -345,20 +357,14 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeObjectSyncACL
 	case MigrateBucketListObjectsPayload:
-		id := fmt.Sprintf("mgr:lo:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
-		if p.ToBucket != nil {
-			id += ":" + *p.ToBucket
-		}
+		id := fmt.Sprintf("mgr:lo:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
 		if p.Prefix != "" {
 			id += ":" + p.Prefix
 		}
 		optionList = []asynq.Option{asynq.Queue(QueueMigrateBucketListObjects), asynq.TaskID(id)}
 		taskType = TypeMigrateBucketListObjects
 	case MigrateObjCopyPayload:
-		id := fmt.Sprintf("mgr:co:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Obj.Name)
-		if p.ToBucket != nil {
-			id += ":" + *p.ToBucket
-		}
+		id := fmt.Sprintf("mgr:co:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket, p.Obj.Name)
 		if p.Obj.VersionID != "" {
 			id += ":" + p.Obj.VersionID
 		}
@@ -379,6 +385,14 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		id := fmt.Sprintf("cc:d:%s", p.ID)
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckResult
+	case ListObjectVersionsPayload:
+		id := fmt.Sprintf("mgr:lov:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
+		optionList = []asynq.Option{asynq.Queue(QueueMigrateBucketListObjects), asynq.TaskID(id)}
+		taskType = TypeMigrateObjectListVersions
+	case MigrateVersionedObjectPayload:
+		id := fmt.Sprintf("mgr:cov:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		taskType = TypeMigrateVersionedObject
 	default:
 		return nil, fmt.Errorf("%w: unknown task type %+v", dom.ErrInvalidArg, payload)
 	}

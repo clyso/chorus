@@ -537,10 +537,9 @@ func TestDestination_Parse(t *testing.T) {
 }
 
 func TestToDest(t *testing.T) {
-	strPtr := func(s string) *string { return &s }
 	type args struct {
 		storage string
-		bucket  *string
+		bucket  string
 	}
 	tests := []struct {
 		name string
@@ -551,7 +550,7 @@ func TestToDest(t *testing.T) {
 			name: "empty",
 			args: args{
 				storage: "",
-				bucket:  nil,
+				bucket:  "",
 			},
 			want: "",
 		},
@@ -559,7 +558,7 @@ func TestToDest(t *testing.T) {
 			name: "only storage",
 			args: args{
 				storage: "stor",
-				bucket:  nil,
+				bucket:  "",
 			},
 			want: "stor",
 		},
@@ -567,7 +566,7 @@ func TestToDest(t *testing.T) {
 			name: "storage and bucket",
 			args: args{
 				storage: "stor",
-				bucket:  strPtr("buck"),
+				bucket:  "buck",
 			},
 			want: "stor:buck",
 		},
