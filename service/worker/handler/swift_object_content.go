@@ -141,7 +141,7 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 	if !fromHeaders.DeleteAt.IsZero() {
 		toReq.DeleteAt = fromHeaders.DeleteAt.Unix()
 	}
-
+	isSlo := false
 	if dlo := res.Header.Get("X-Object-Manifest"); dlo != "" {
 		// don't fetch object body for DLO
 		toReq.ObjectManifest = dlo
@@ -150,8 +150,8 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 		fromReq := objects.DownloadOpts{
 			IfModifiedSince: fromHeaders.LastModified.Add(-time.Second),
 		}
-		slo := strings.EqualFold(res.Header.Get("X-Static-Large-Object"), "True")
-		if slo {
+		isSlo = strings.EqualFold(res.Header.Get("X-Static-Large-Object"), "True")
+		if isSlo {
 			// fetch manifest for SLO
 			fromReq.MultipartManifest = "get"
 			// put manifest to dest
@@ -168,7 +168,7 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 		defer fromObjContent.Body.Close()
 		toReq.Content = fromObjContent.Body
 		// set ETag if not a manifest
-		if !slo {
+		if !isSlo {
 			res, err := fromObjContent.Extract()
 			if err != nil {
 				return fmt.Errorf("failed to extract source object %q content: %w", p.Object, err)
@@ -191,9 +191,11 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 			// object with given ETag already exists. Skip update.
 			logger.Info().Err(err).Msgf("object %q in container %q already exists with the same etag", p.Object, toBucket)
 			return nil
-
 		}
-		// TODO: handle missing parts for SLO
+		if isSlo && gophercloud.ResponseCodeIs(err, http.StatusBadRequest) {
+			// SLO failed because manifest parts are not copied yet. Try again later.
+			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwiftRetryInterval}
+		}
 		return fmt.Errorf("failed to upload object %q to container %q: %w", p.Object, toBucket, err)
 	}
 	return nil

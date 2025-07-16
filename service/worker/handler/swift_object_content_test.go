@@ -177,10 +177,158 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// - test acl
 	// - test update/delete
 	// - test symlink
-	t.Run("", func(t *testing.T) {
+	t.Run("DLO", func(t *testing.T) {
+		r := require.New(t)
+		dloBucket := "tst-dlo-bucket"
+		dloPref := "dlo-pref"
+		dloObj := "dlo-obj"
+		r.NoError(containers.Create(tstCtx, swiftClient, dloBucket, &containers.CreateOpts{}).Err)
+		t.Cleanup(func() {
+			_ = containers.Delete(tstCtx, swiftClient, dloBucket)
+		})
+		r.NoError(objects.Create(tstCtx, swiftClient, bucket, dloObj, &objects.CreateOpts{
+			NoETag:         true,
+			ObjectManifest: dloBucket + "/" + dloPref,
+		}).Err)
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, swiftClient, bucket, dloObj, &objects.DeleteOpts{})
+		})
 
+		// sync obj to ceph
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Bucket: bucket,
+			Object: dloObj,
+		})
+		r.NoError(err, "handleObjectUpdate should not return an error for DLO object")
+
+		// get object from ceph and check if it has X-Object-Manifest header
+		getRes := objects.Get(tstCtx, cephClient, bucket, dloObj, objects.GetOpts{})
+		r.Error(getRes.Err, "failed to get DLO object from ceph")
+
+		// create dlo bucket in ceph
+		err = containers.Create(tstCtx, cephClient, dloBucket, &containers.CreateOpts{}).Err
+		r.NoError(err, "failed to create DLO bucket in ceph")
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, cephClient, bucket, dloObj, &objects.DeleteOpts{})
+			_ = containers.Delete(tstCtx, cephClient, dloBucket)
+		})
+		getRes = objects.Get(tstCtx, cephClient, bucket, dloObj, objects.GetOpts{})
+		r.NoError(getRes.Err, "failed to get DLO object from ceph")
+		headers, err := getRes.Extract()
+		r.NoError(err)
+		r.Equal(dloBucket+"/"+dloPref, headers.ObjectManifest, "DLO object in ceph should have correct ObjectManifest header")
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("SLO", func(t *testing.T) {
+		r := require.New(t)
+		sloBucket := "tst-slo-bucket"
+		sloObj := "tst-slo-object"
+		sloPart1 := "tst-slo-part1"
+		sloPart2 := "tst-slo-part2"
+		// create slo bucket in swift
+		r.NoError(containers.Create(tstCtx, swiftClient, sloBucket, &containers.CreateOpts{}).Err)
+		t.Cleanup(func() {
+			_ = containers.Delete(tstCtx, swiftClient, sloBucket)
+		})
+		// create slo parts in swift
+		pt1Res := objects.Create(tstCtx, swiftClient, sloBucket, sloPart1, &objects.CreateOpts{
+			ContentType: "text/plain",
+			Metadata:    map[string]string{"test": "slo-part-metadata"},
+			Content:     strings.NewReader("111")})
+		r.NoError(pt1Res.Err)
+
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, swiftClient, sloBucket, sloPart1, &objects.DeleteOpts{})
+		})
+		pt2Res := objects.Create(tstCtx, swiftClient, sloBucket, sloPart2, &objects.CreateOpts{
+			ContentType: "text/plain",
+			Metadata:    map[string]string{"test": "slo-part-metadata"},
+			Content:     strings.NewReader("222")})
+		r.NoError(pt2Res.Err)
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, swiftClient, sloBucket, sloPart2, &objects.DeleteOpts{})
+		})
+		// create json reader with swift slo multipart json body:
+		sloManifest := `[
+				{
+					"size_bytes": 3,
+					"path": "` + sloBucket + "/" + sloPart1 + `"
+				},
+				{
+					"size_bytes": 3,
+					"path": "` + sloBucket + "/" + sloPart2 + `"
+				}]`
+		sloObjReader := strings.NewReader(sloManifest)
+		// create slo object in swift
+		r.NoError(objects.Create(tstCtx, swiftClient, bucket, sloObj, &objects.CreateOpts{
+			Content:           sloObjReader,
+			ContentType:       "application/json",
+			ContentLength:     int64(len(sloManifest)),
+			NoETag:            true,
+			MultipartManifest: "put",
+		}).Err)
+
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, swiftClient, bucket, sloObj, &objects.DeleteOpts{
+				MultipartManifest: "delete",
+			})
+		})
+		// read obj from swift
+		objRes := objects.Get(tstCtx, swiftClient, bucket, sloObj, objects.GetOpts{})
+		r.NoError(objRes.Err, "failed to get SLO object from swift")
+		// sync slo object to ceph
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Etag:         objRes.Header.Get("Etag"),
+			LastModified: objRes.Header.Get("Last-Modified"),
+			Bucket:       bucket,
+			Object:       sloObj,
+		})
+		r.Error(err)
+		var rateLimitErr *dom.ErrRateLimitExceeded
+		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
+		// create slo bucket in ceph
+		err = containers.Create(tstCtx, cephClient, sloBucket, &containers.CreateOpts{}).Err
+		r.NoError(err, "failed to create SLO bucket in ceph")
+		t.Cleanup(func() {
+			_ = containers.Delete(tstCtx, cephClient, sloBucket)
+		})
+		//upload parts to ceph
+		pt1CephRes := objects.Create(tstCtx, cephClient, sloBucket, sloPart1, &objects.CreateOpts{
+			ContentType: "text/plain",
+			Content:     strings.NewReader("111")})
+		r.NoError(pt1CephRes.Err, "failed to create SLO part 1 in ceph")
+		pt2CephRes := objects.Create(tstCtx, cephClient, sloBucket, sloPart2, &objects.CreateOpts{
+			ContentType: "text/plain",
+			Content:     strings.NewReader("222")})
+		r.NoError(pt2CephRes.Err, "failed to create SLO part 2 in ceph")
+
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Etag:         objRes.Header.Get("Etag"),
+			LastModified: objRes.Header.Get("Last-Modified"),
+			Bucket:       bucket,
+			Object:       sloObj,
+		})
+		r.NoError(err)
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, cephClient, bucket, sloObj, &objects.DeleteOpts{MultipartManifest: "delete"})
+		})
 
 	})
 	t.Run("", func(t *testing.T) {
