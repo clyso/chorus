@@ -224,6 +224,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		r.NoError(err)
 		r.Equal(dloBucket+"/"+dloPref, headers.ObjectManifest, "DLO object in ceph should have correct ObjectManifest header")
 	})
+
 	t.Run("SLO", func(t *testing.T) {
 		r := require.New(t)
 		sloBucket := "tst-slo-bucket"
@@ -238,7 +239,6 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		// create slo parts in swift
 		pt1Res := objects.Create(tstCtx, swiftClient, sloBucket, sloPart1, &objects.CreateOpts{
 			ContentType: "text/plain",
-			Metadata:    map[string]string{"test": "slo-part-metadata"},
 			Content:     strings.NewReader("111")})
 		r.NoError(pt1Res.Err)
 
@@ -247,7 +247,6 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		})
 		pt2Res := objects.Create(tstCtx, swiftClient, sloBucket, sloPart2, &objects.CreateOpts{
 			ContentType: "text/plain",
-			Metadata:    map[string]string{"test": "slo-part-metadata"},
 			Content:     strings.NewReader("222")})
 		r.NoError(pt2Res.Err)
 		t.Cleanup(func() {
@@ -297,6 +296,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		r.Error(err)
 		var rateLimitErr *dom.ErrRateLimitExceeded
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
+
 		// create slo bucket in ceph
 		err = containers.Create(tstCtx, cephClient, sloBucket, &containers.CreateOpts{}).Err
 		r.NoError(err, "failed to create SLO bucket in ceph")
@@ -304,14 +304,35 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 			_ = containers.Delete(tstCtx, cephClient, sloBucket)
 		})
 		//upload parts to ceph
-		pt1CephRes := objects.Create(tstCtx, cephClient, sloBucket, sloPart1, &objects.CreateOpts{
+		pt1Res = objects.Create(tstCtx, cephClient, sloBucket, sloPart1, &objects.CreateOpts{
 			ContentType: "text/plain",
 			Content:     strings.NewReader("111")})
-		r.NoError(pt1CephRes.Err, "failed to create SLO part 1 in ceph")
-		pt2CephRes := objects.Create(tstCtx, cephClient, sloBucket, sloPart2, &objects.CreateOpts{
+		r.NoError(pt1Res.Err)
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, cephClient, sloBucket, sloPart1, &objects.DeleteOpts{})
+		})
+		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+			Sync: tasks.Sync{
+				FromStorage: swiftTestKey,
+				FromAccount: testAcc,
+				ToStorage:   cephTestKey,
+				ToAccount:   testAcc,
+			},
+			Etag:         objRes.Header.Get("Etag"),
+			LastModified: objRes.Header.Get("Last-Modified"),
+			Bucket:       bucket,
+			Object:       sloObj,
+		})
+		r.Error(err)
+		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
+
+		pt2Res = objects.Create(tstCtx, cephClient, sloBucket, sloPart2, &objects.CreateOpts{
 			ContentType: "text/plain",
 			Content:     strings.NewReader("222")})
-		r.NoError(pt2CephRes.Err, "failed to create SLO part 2 in ceph")
+		r.NoError(pt2Res.Err)
+		t.Cleanup(func() {
+			_ = objects.Delete(tstCtx, cephClient, sloBucket, sloPart2, &objects.DeleteOpts{})
+		})
 
 		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
 			Sync: tasks.Sync{

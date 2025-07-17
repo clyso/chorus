@@ -26,6 +26,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
@@ -147,13 +148,16 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 		toReq.ObjectManifest = dlo
 	} else {
 		//fetch object body from source
-		fromReq := objects.DownloadOpts{
-			IfModifiedSince: fromHeaders.LastModified.Add(-time.Second),
+		fromReq := &swift.DownloadOpts{
+			DownloadOpts: &objects.DownloadOpts{
+				IfModifiedSince: fromHeaders.LastModified.Add(-time.Second),
+			},
 		}
 		isSlo = strings.EqualFold(res.Header.Get("X-Static-Large-Object"), "True")
 		if isSlo {
 			// fetch manifest for SLO
 			fromReq.MultipartManifest = "get"
+			fromReq.Raw = true // fetch raw content for SLO
 			// put manifest to dest
 			toReq.MultipartManifest = "put"
 		}
@@ -166,14 +170,15 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 			return fmt.Errorf("failed to download source object %q: %w", p.Object, fromObjContent.Err)
 		}
 		defer fromObjContent.Body.Close()
+		res, err := fromObjContent.Extract()
+		if err != nil {
+			return fmt.Errorf("failed to extract source object %q content: %w", p.Object, err)
+		}
+		toReq.ContentLength = res.ContentLength
+		toReq.ContentType = res.ContentType
 		toReq.Content = fromObjContent.Body
 		// set ETag if not a manifest
 		if !isSlo {
-			res, err := fromObjContent.Extract()
-			if err != nil {
-				return fmt.Errorf("failed to extract source object %q content: %w", p.Object, err)
-			}
-			toReq.ContentLength = res.ContentLength
 			toReq.NoETag = false
 			toReq.ETag = res.ETag
 			toReq.IfNoneMatch = res.ETag
@@ -192,7 +197,7 @@ func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayloa
 			logger.Info().Err(err).Msgf("object %q in container %q already exists with the same etag", p.Object, toBucket)
 			return nil
 		}
-		if isSlo && gophercloud.ResponseCodeIs(err, http.StatusBadRequest) {
+		if isSlo && gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 			// SLO failed because manifest parts are not copied yet. Try again later.
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwiftRetryInterval}
 		}
