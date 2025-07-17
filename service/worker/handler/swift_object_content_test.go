@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -70,7 +71,65 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// defer cleanup dest container in ceph
 	defer func() {
 		_ = containers.Delete(tstCtx, cephClient, bucket)
+		_ = objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
 	}()
+	// sync object to ceph
+	err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		Sync: tasks.Sync{
+			FromStorage: swiftTestKey,
+			FromAccount: testAcc,
+			ToStorage:   cephTestKey,
+			ToAccount:   testAcc,
+		},
+		Bucket:       bucket,
+		Object:       obj,
+		VersionID:    "",
+		Etag:         objInfo.ETag,
+		LastModified: objInfo.LastModified.Format(time.RFC3339),
+	})
+	r.NoError(err, "handleObjectUpdate should not return an error for new object")
+	// compare ceph obj content
+	objRes := objects.Download(tstCtx, cephClient, bucket, obj, objects.DownloadOpts{})
+	r.NoError(objRes.Err, "failed to get object from ceph")
+	objBytes, err := io.ReadAll(objRes.Body)
+	r.NoError(err, "failed to read object content from ceph")
+	r.Equal("test-content", string(objBytes), "object content in ceph should match swift object content")
+
+	// update object in swift
+	oRes = objects.Create(tstCtx, swiftClient, bucket, obj, objects.CreateOpts{
+		ContentType: "text/plain",
+		Metadata:    map[string]string{"test": "updated-object-metadata"},
+		Content:     strings.NewReader("updated-test-content"),
+	})
+	r.NoError(oRes.Err, "failed to update test object in swift")
+	// sync object update to ceph
+	err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		Sync: tasks.Sync{
+			FromStorage: swiftTestKey,
+			FromAccount: testAcc,
+			ToStorage:   cephTestKey,
+			ToAccount:   testAcc,
+		},
+		Bucket:    bucket,
+		Object:    obj,
+		VersionID: "",
+
+		Etag:         oRes.Header.Get("Etag"),
+		LastModified: oRes.Header.Get("Last-Modified"),
+	})
+	r.NoError(err, "handleObjectUpdate should not return an error for updated object")
+	// compare ceph obj content after update
+	objRes = objects.Download(tstCtx, cephClient, bucket, obj, objects.DownloadOpts{})
+	r.NoError(objRes.Err, "failed to get updated object from ceph")
+	objBytes, err = io.ReadAll(objRes.Body)
+	r.NoError(err, "failed to read updated object content from ceph")
+	r.Equal("updated-test-content", string(objBytes), "object content in ceph should match updated swift object content")
+	// check if object metadata is synced
+	cephObjRes := objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{})
+	r.NoError(cephObjRes.Err, "failed to get object from ceph")
+	meta, err := cephObjRes.ExtractMetadata()
+	r.NoError(err, "failed to extract object info from ceph")
+	r.Equal("updated-object-metadata", meta["Test"], "object metadata in ceph should match updated swift object metadata")
 
 	t.Run("task skipped if obj not exist in src container", func(t *testing.T) {
 		r := require.New(t)
@@ -171,12 +230,6 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 			return gophercloud.ResponseCodeIs(getRes.Err, http.StatusNotFound)
 		}, 6*time.Second, 1*time.Second, "object in ceph should be deleted after deleteAt time")
 	})
-	//TODO:
-	// - test dlo
-	// - test slo
-	// - test acl
-	// - test update/delete
-	// - test symlink
 	t.Run("DLO", func(t *testing.T) {
 		r := require.New(t)
 		dloBucket := "tst-dlo-bucket"
@@ -350,9 +403,6 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		t.Cleanup(func() {
 			_ = objects.Delete(tstCtx, cephClient, bucket, sloObj, &objects.DeleteOpts{MultipartManifest: "delete"})
 		})
-
-	})
-	t.Run("", func(t *testing.T) {
 
 	})
 }
