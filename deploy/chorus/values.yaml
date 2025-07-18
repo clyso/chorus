@@ -57,7 +57,7 @@ worker:
       memory: 150Mi
   restApiService:
     portRest:
-      port: 9071
+      port: 9671
       targetPort: rest
     type: ClusterIP
   grpcApiService:
@@ -96,6 +96,25 @@ worker:
     concurrency: 10
     api:
       enabled: true
+ui:
+  enabled: false
+  image:
+    repository: harbor.clyso.com/chorus/web-ui
+    tag: "" # Chart appVersion will be used if empty
+    pullPolicy: Always
+  replicas: 1
+  resources:
+    limits:
+      cpu: 50m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  service:
+    portHttp:
+      port: 9672
+      targetPort: http
+    type: ClusterIP
 commonConfig:
   features:
     tagging: true
