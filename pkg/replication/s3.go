@@ -37,30 +37,30 @@ type Service interface {
 }
 
 func New(taskClient *asynq.Client, versionSvc meta.VersionService, policySvc policy.Service) Service {
-	return &svc{
+	return &s3SVC{
 		taskClient: taskClient,
 		versionSvc: versionSvc,
 		policySvc:  policySvc,
 	}
 }
 
-type svc struct {
+type s3SVC struct {
 	taskClient *asynq.Client
 	versionSvc meta.VersionService
 	policySvc  policy.Service
 }
 
-func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
+func (s *s3SVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 	if task == nil {
 		zerolog.Ctx(ctx).Info().Msg("replication task is nil")
 		return nil
 	}
 	zerolog.Ctx(ctx).Debug().Msg("creating replication task")
 	task.InitDate()
-	if task.GetFrom() == "" {
+	if task.GetFromStorage() == "" {
 		storage := xctx.GetStorage(ctx)
 		zerolog.Ctx(ctx).Warn().Msgf("replication task from storage not set, using storage from context: %s", storage)
-		task.SetFrom(storage)
+		task.SetFrom(storage, "")
 	}
 
 	// 1. find repl rule(-s)
@@ -108,7 +108,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFromStorage(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -128,7 +128,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFromStorage(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -148,7 +148,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFromStorage(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -172,7 +172,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFromStorage(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -192,7 +192,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFromStorage(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -212,7 +212,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFrom(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, user, bucket, t.GetFromStorage(), t.GetToStorage(), t.GetToBucket(), t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -223,18 +223,18 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 	return nil
 }
 
-func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[policy.ReplicationPolicyDest]tasks.Priority, error) {
+func (s *s3SVC) getDestinations(ctx context.Context, task tasks.SyncTask) (map[policy.ReplicationPolicyDest]tasks.Priority, error) {
 	replPolicy, err := s.getReplicationPolicy(ctx, task)
 	if err != nil {
 		return nil, err
 	}
-	if replPolicy.From == task.GetFrom() {
+	if replPolicy.From == task.GetFromStorage() {
 		return replPolicy.To, nil
 	}
 	// Policy source storage is different from task source storage.
 	// This only possible if switch is in progress, and we got CompleteMultipartUpload request.
 	if _, ok := task.(*tasks.ObjectSyncPayload); !ok || (xctx.GetMethod(ctx) != s3.UndefinedMethod && xctx.GetMethod(ctx) != s3.CompleteMultipartUpload) {
-		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", replPolicy.From, task.GetFrom())
+		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", replPolicy.From, task.GetFromStorage())
 	}
 
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
@@ -248,15 +248,15 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[pol
 	if err != nil {
 		return nil, fmt.Errorf("%w: unable to get replication ID from switch: %w", dom.ErrInternal, err)
 	}
-	if switchReplicationID.From != task.GetFrom() {
-		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, switchReplicationID.From, task.GetFrom())
+	if switchReplicationID.From != task.GetFromStorage() {
+		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, switchReplicationID.From, task.GetFromStorage())
 	}
 	return map[policy.ReplicationPolicyDest]tasks.Priority{
 		policy.ReplicationPolicyDest(switchReplicationID.To): tasks.Priority(replSwitch.ReplicationPriority),
 	}, nil
 }
 
-func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (policy.ReplicationPolicies, error) {
+func (s *s3SVC) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (policy.ReplicationPolicies, error) {
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	bucketPolicy, err := s.policySvc.GetBucketReplicationPolicies(ctx, user, bucket)
 	if err == nil {
@@ -272,7 +272,7 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 		// no-error means that zero-downtime switch in progress.
 		// return replication policy without destinations
 		return policy.ReplicationPolicies{
-			From: task.GetFrom(),
+			From: task.GetFromStorage(),
 		}, nil
 	}
 
@@ -289,7 +289,10 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 		return policy.ReplicationPolicies{}, err
 	}
 	for to, priority := range userPolicy.To {
-		toStorage, toBucket := to.Parse()
+		toStorage, toSwiftAccount, toBucket := to.Parse()
+		if toSwiftAccount != "" {
+			zerolog.Ctx(ctx).Error().Msgf("S3 user replication destination should not contain account %v. %q will be ignored", to, toSwiftAccount)
+		}
 		err = s.policySvc.AddBucketReplicationPolicy(ctx, user, bucket, userPolicy.From, toStorage, toBucket, priority, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {

@@ -12,6 +12,7 @@ rgw keystone implicit tenants = false\
 rgw keystone verify ssl = false\
 rgw s3 auth use keystone = true\
 rgw swift account in url = true\
+rgw swift versioning enabled = true\
 rgw swift url prefix = swift' /opt/ceph-container/bin/demo  
 
 exec "$@"
