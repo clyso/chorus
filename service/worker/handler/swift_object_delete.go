@@ -123,6 +123,9 @@ func (s *svc) handleObjectDelete(ctx context.Context, p tasks.ObjectDeletePayloa
 		// object already deleted in destination, no error
 		return nil
 	}
-
+	if gophercloud.ResponseCodeIs(err, http.StatusOK) {
+		// rgw may retun 200 OK for delete, which is unexpected for gophercloud
+		return nil
+	}
 	return err
 }

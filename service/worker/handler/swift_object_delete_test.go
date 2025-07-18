@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -28,7 +30,6 @@ func Test_handleObjectDelete(t *testing.T) {
 	// create test container in swift
 	cRes := containers.Create(tstCtx, swiftClient, bucket, containers.CreateOpts{})
 	r.NoError(cRes.Err, "failed to create test bucket")
-	// defer cleanup src container in swift
 	defer func() {
 		delRes := containers.Delete(tstCtx, swiftClient, bucket)
 		r.NoError(delRes.Err, "failed to delete test bucket in swift")
@@ -36,7 +37,6 @@ func Test_handleObjectDelete(t *testing.T) {
 	// create test container in ceph
 	cRes = containers.Create(tstCtx, cephClient, bucket, containers.CreateOpts{})
 	r.NoError(cRes.Err, "failed to create test bucket in ceph")
-	// defer cleanup dest container in ceph
 	defer func() {
 		delRes := containers.Delete(tstCtx, cephClient, bucket)
 		r.NoError(delRes.Err, "failed to delete test bucket in ceph")
@@ -63,7 +63,7 @@ func Test_handleObjectDelete(t *testing.T) {
 		_ = objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
 	}()
 
-	// error when src object not deleted
+	// task ignored when src object not deleted
 	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
@@ -120,4 +120,128 @@ func Test_handleObjectDelete(t *testing.T) {
 	r.True(gophercloud.ResponseCodeIs(err, 404), "expected object to be deleted in ceph, got: %v", err)
 	// todo test SLO
 	// todo test version delete
+}
+
+type sloPart struct {
+	Path      string `json:"path"`
+	SizeBytes int    `json:"size_bytes"`
+}
+
+func Test_handleObjectDeleteMultipart(t *testing.T) {
+	r := require.New(t)
+	bucket, sloBucket, obj := "test-obj-delete-multipart", "tst-delete-slo", "test-obj-del-multipart"
+
+	// setup clients
+	client, err := swift.New(swiftConf)
+	r.NoError(err, "failed to create swift client")
+	svc := &svc{swiftClients: client}
+	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
+	r.NoError(err, "failed to get ceph client for test account")
+
+	// create test container in ceph
+	cRes := containers.Create(tstCtx, cephClient, bucket, containers.CreateOpts{})
+	r.NoError(cRes.Err, "failed to create test bucket in ceph")
+	defer func() {
+		delRes := containers.Delete(tstCtx, cephClient, bucket)
+		r.NoError(delRes.Err, "failed to delete test bucket in ceph")
+	}()
+	cRes = containers.Create(tstCtx, cephClient, sloBucket, containers.CreateOpts{})
+	r.NoError(cRes.Err, "failed to create test bucket in ceph")
+	defer func() {
+		delRes := containers.Delete(tstCtx, cephClient, sloBucket)
+		r.NoError(delRes.Err, "failed to delete test bucket in ceph")
+	}()
+
+	// upload SLO object parts to ceph
+	parts := []string{"part1", "part2"}
+	manifestParts := make([]sloPart, 0, len(parts))
+	for _, part := range parts {
+		partObj := obj + "-" + part
+		content := "cont-" + part
+		oRes := objects.Create(tstCtx, cephClient, sloBucket, partObj, objects.CreateOpts{
+			ContentType: "text/plain",
+			Content:     strings.NewReader(content),
+		})
+		r.NoError(oRes.Err, "failed to create test object part in ceph")
+		err = objects.Get(tstCtx, cephClient, sloBucket, partObj, objects.GetOpts{}).Err
+		r.NoError(err, "expected part object to exist in ceph: %s", partObj)
+		manifestParts = append(manifestParts, sloPart{
+			Path:      sloBucket + "/" + partObj,
+			SizeBytes: len(content),
+		})
+	}
+	jsonParts, err := json.Marshal(manifestParts)
+	r.NoError(err, "failed to marshal SLO manifest parts to JSON")
+
+	// upload SLO manifest json to ceph
+	err = objects.Create(tstCtx, cephClient, bucket, obj, objects.CreateOpts{
+		ContentType:       "application/json",
+		Content:           bytes.NewReader(jsonParts),
+		ContentLength:     int64(len(jsonParts)),
+		NoETag:            true,
+		MultipartManifest: "put",
+	}).Err
+	r.NoError(err, "failed to create SLO manifest object in ceph")
+	// check that slo and parts exist
+	for _, part := range parts {
+		partObj := obj + "-" + part
+		err = objects.Get(tstCtx, cephClient, sloBucket, partObj, objects.GetOpts{Newest: true}).Err
+		r.NoError(err, "expected part object to exist in ceph: %s", partObj)
+	}
+	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
+	r.NoError(err, "expected SLO manifest object to exist in ceph: %s", obj)
+
+	// sync object delete without multipart delete
+	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+		Sync: tasks.Sync{
+			FromStorage: swiftTestKey,
+			FromAccount: testAcc,
+			ToStorage:   cephTestKey,
+			ToAccount:   testAcc,
+		},
+		Bucket:          bucket,
+		Object:          obj,
+		DeleteMultipart: false,
+	})
+	r.NoError(err, "failed to sync object delete with multipart delete")
+	// check that SLO manifest was deleted, but parts still exist
+	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
+	r.True(gophercloud.ResponseCodeIs(err, 404), "expected SLO manifest object to be deleted in ceph, got: %v", err)
+	for _, part := range parts {
+		partObj := obj + "-" + part
+		err = objects.Get(tstCtx, cephClient, sloBucket, partObj, objects.GetOpts{Newest: true}).Err
+		r.NoError(err, "expected part object to still exist in ceph: %s", partObj)
+	}
+
+	// revert slo manifest back
+	err = objects.Create(tstCtx, cephClient, bucket, obj, objects.CreateOpts{
+		ContentType:       "application/json",
+		Content:           bytes.NewReader(jsonParts),
+		ContentLength:     int64(len(jsonParts)),
+		NoETag:            true,
+		MultipartManifest: "put",
+	}).Err
+	r.NoError(err, "failed to recreate SLO manifest object in ceph")
+
+	// sync object delete with multipart delete
+	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+		Sync: tasks.Sync{
+			FromStorage: swiftTestKey,
+			FromAccount: testAcc,
+			ToStorage:   cephTestKey,
+			ToAccount:   testAcc,
+		},
+		Bucket:          bucket,
+		Object:          obj,
+		DeleteMultipart: true,
+	})
+	r.NoError(err, "failed to sync object delete with multipart delete")
+	// check that SLO manifest and parts were deleted
+	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
+	r.True(gophercloud.ResponseCodeIs(err, 404), "expected SLO manifest object to be deleted in ceph, got: %v", err)
+	for _, part := range parts {
+		partObj := obj + "-" + part
+		err = objects.Get(tstCtx, cephClient, sloBucket, partObj, objects.GetOpts{Newest: true}).Err
+		r.True(gophercloud.ResponseCodeIs(err, 404), "expected part object to be deleted in ceph: %s, got: %v", partObj, err)
+	}
 }
