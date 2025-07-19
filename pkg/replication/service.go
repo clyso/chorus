@@ -36,18 +36,20 @@ type Service interface {
 	Replicate(ctx context.Context, task tasks.SyncTask) error
 }
 
-func New(taskClient *asynq.Client, versionSvc meta.VersionService, policySvc policy.Service) Service {
+func New(taskClient *asynq.Client, versionSvc meta.VersionService, /* policySvc policy.Service */ policyService policy.PolicyService) Service {
 	return &svc{
 		taskClient: taskClient,
 		versionSvc: versionSvc,
-		policySvc:  policySvc,
+		// policySvc:  policySvc,
+		policyService: policyService,
 	}
 }
 
 type svc struct {
 	taskClient *asynq.Client
 	versionSvc meta.VersionService
-	policySvc  policy.Service
+	// policySvc  policy.Service
+	policyService policy.PolicyService
 }
 
 func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
@@ -108,14 +110,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
+			replicationID := policy.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -135,14 +138,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
+			replicationID := policy.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -162,14 +166,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
+			replicationID := policy.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -193,14 +198,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
+			replicationID := policy.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -220,14 +226,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
+			replicationID := policy.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -247,14 +254,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
+			replicationID := policy.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
