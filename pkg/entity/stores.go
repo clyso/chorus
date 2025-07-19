@@ -22,10 +22,10 @@ type Page[T any] struct {
 	Next    uint64
 }
 
-type ScoredSetEntry[T any] struct {
-	Value T
-	Score uint8
-}
+// type ScoredSetEntry[T any] struct {
+// 	Value T
+// 	Score uint8
+// }
 
 type ReplicationSwitchID struct {
 	User       string
@@ -152,53 +152,22 @@ type BucketRoutingPolicyStore struct {
 
 func NewBucketRoutingPolicyStore(client redis.Cmdable) *BucketRoutingPolicyStore {
 	return &BucketRoutingPolicyStore{
-		*NewRedisIDKeyValue[BucketRoutingPolicyID, string](client, "p:route:user",
+		*NewRedisIDKeyValue[BucketRoutingPolicyID, string](client, "p:route:bucket",
 			BucketRoutingPolicyIDToTokensConverter, TokensToBucketRoutingPolicyIDConverter,
 			StringValueConverter, StringValueConverter),
 	}
 }
 
 type RoutingBlockStore struct {
-	prefix string
-	client redis.Cmdable
+	RedisIDKeySet[string, string]
 }
 
 func NewRoutingBlockStore(client redis.Cmdable) *RoutingBlockStore {
 	return &RoutingBlockStore{
-		prefix: "p:route:block",
-		client: client,
+		*NewRedisIDKeySet(client, "p:route:block", 
+			StringToSingleTokenConverter, SingleTokenToStringConverter,
+			StringValueConverter, StringValueConverter),
 	}
-}
-
-func (r *RoutingBlockStore) makeID(id string) string {
-	return r.prefix + ":" + id
-}
-
-func (r *RoutingBlockStore) Add(ctx context.Context, id string, val ...string) (uint64, error) {
-	key := r.makeID(id)
-	affected, err := r.client.SAdd(ctx, key, val).Result()
-	if err != nil {
-		return 0, err
-	}
-	return uint64(affected), nil
-}
-
-func (r *RoutingBlockStore) Remove(ctx context.Context, id string, val ...string) (uint64, error) {
-	key := r.makeID(id)
-	affected, err := r.client.SRem(ctx, key, val).Result()
-	if err != nil {
-		return 0, err
-	}
-	return uint64(affected), nil
-}
-
-func (r *RoutingBlockStore) IsMember(ctx context.Context, id string, val string) (bool, error) {
-	key := r.makeID(id)
-	exists, err := r.client.SIsMember(ctx, key, val).Result()
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
 }
 
 type BucketReplicationPolicyStore struct {

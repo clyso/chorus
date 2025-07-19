@@ -15,7 +15,7 @@ type RedisIDKeySet[ID any, V any] struct {
 	RedisIDCommonStore[ID]
 }
 
-func NewRedisIDKeySet[ID any, V Numeric](client redis.Cmdable, idPrefix string,
+func NewRedisIDKeySet[ID any, V any](client redis.Cmdable, idPrefix string,
 	tokenizeID SingleToMultiValueConverter[ID, string], restoreID MultiToSingleValueConverter[string, ID],
 	serializeValue SingleValueConverter[V, string], deserializeValue SingleValueConverter[string, V]) *RedisIDKeySet[ID, V] {
 	return &RedisIDKeySet[ID, V]{
@@ -31,30 +31,60 @@ func (r *RedisIDKeySet[ID, V]) Get(ctx context.Context, id ID) ([]V, error) {
 		return nil, fmt.Errorf("unable to make key: %w", err)
 	}
 	cmd := r.client.SMembers(ctx, key)
-	err = cmd.Err()
-	if errors.Is(err, redis.Nil) {
+	if err := cmd.Err(); errors.Is(err, redis.Nil) {
 		return nil, fmt.Errorf("%w: %w", dom.ErrNotFound, err)
 	}
-	val, err := r.extractValue(cmd.Val())
+	values, err := r.deserializer.ConvertMulti(cmd.Val())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get counter %s: %w", id, err)
 	}
-	return val, nil
+	return values, nil
 }
 
-func (r *RedisIDKeySet[ID, V]) Add(ctx context.Context, id ID, val ...V) error {
+func (r *RedisIDKeySet[ID, V]) Add(ctx context.Context, id ID, values ...V) (uint64, error) {
 	key, err := r.MakeKey(id)
 	if err != nil {
-		return fmt.Errorf("unable to make key: %w", err)
+		return 0, fmt.Errorf("unable to make key: %w", err)
 	}
-	affected, err := r.client.SAdd(ctx, key, val).Result()
+	convertedValues, err := r.serializer.ConvertMulti(values)
 	if err != nil {
-		return fmt.Errorf("unable to add values to set: %w", id, err)
+		return 0, fmt.Errorf("unable to convert values: %w", err)
 	}
-	return nil
+	affected, err := r.client.SAdd(ctx, key, convertedValues).Result()
+	if err != nil {
+		return 0, fmt.Errorf("unable to add values to set: %w", id, err)
+	}
+	return uint64(affected), nil
 }
 
-func (r *RedisIDKeySet[ID, V]) extractValue(values []string) ([]V, error) {
+func (r *RedisIDKeySet[ID, V]) Remove(ctx context.Context, id ID, values ...V) (uint64, error) {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return 0, fmt.Errorf("unable to make key: %w", err)
+	}
+	convertedValues, err := r.serializer.ConvertMulti(values)
+	if err != nil {
+		return 0, fmt.Errorf("unable to convert values: %w", err)
+	}
+	affected, err := r.client.SRem(ctx, key, convertedValues).Result()
+	if err != nil {
+		return 0, err
+	}
+	return uint64(affected), nil
+}
 
-	return nil, nil
+func (r *RedisIDKeySet[ID, V]) IsMember(ctx context.Context, id ID, value V) (bool, error) {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return false, fmt.Errorf("unable to make key: %w", err)
+	}
+	convertedValue, err := r.serializer.ConvertSingle(value)
+	if err != nil {
+		return false, fmt.Errorf("unable to convert values: %w", err)
+	}
+	exists, err := r.client.SIsMember(ctx, key, convertedValue).Result()
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
