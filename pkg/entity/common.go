@@ -78,6 +78,18 @@ func NewRedisIDCommonStore[ID any](client redis.Cmdable, keyPrefix string, token
 	}
 }
 
+func (r *RedisIDCommonStore[ID]) Drop(ctx context.Context, id ID) (uint64, error) {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return 0, fmt.Errorf("unable to make key: %w", err)
+	}
+	affected, err := r.client.Unlink(ctx, key).Result()
+	if err != nil {
+		return 0, fmt.Errorf("unable to unlink key: %w", err)
+	}
+	return uint64(affected), nil
+}
+
 func (r *RedisIDCommonStore[ID]) MakeKey(id ID) (string, error) {
 	idTokens, err := r.tokenizeID(id)
 	if err != nil {

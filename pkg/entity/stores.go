@@ -3,7 +3,6 @@ package entity
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -63,8 +62,6 @@ type BucketReplicationPolicy struct {
 	ToStorage   string
 	ToBucket    string
 }
-
-type PrioritizedBucketReplicationPolicy ScoredSetEntry[BucketReplicationPolicy]
 
 type BucketRoutingPolicyID struct {
 	User   string
@@ -170,79 +167,53 @@ func NewRoutingBlockStore(client redis.Cmdable) *RoutingBlockStore {
 	}
 }
 
-type BucketReplicationPolicyStore struct {
-	prefix string
-	client redis.Cmdable
+func TokensToBucketReplicationPolicyIDConverter(tokens []string) (BucketReplicationPolicyID, error) {
+	return BucketReplicationPolicyID{
+		User:   tokens[0],
+		FromBucket: tokens[1],
+	}, nil
 }
 
-func NewBucketReplicationPolicyStore(client redis.Cmdable) *BucketRoutingPolicyStore {
-	return &BucketRoutingPolicyStore{
-		prefix: "p:repl:bucket",
-		client: client,
-	}
+func BucketReplicationPolicyIDToTokensConverter(id BucketReplicationPolicyID) ([]string, error) {
+	return []string{id.User, id.FromBucket}, nil
 }
 
-func (r *BucketReplicationPolicyStore) Add(ctx context.Context, id BucketReplicationPolicyID, values ...PrioritizedBucketReplicationPolicy) (uint64, error) {
-	key := r.makeID(id)
-	scoredSetValues := make([]redis.Z, 0, len(values))
-	for _, value := range values {
-		serializedValue, err := json.Marshal(value.Value)
-		if err != nil {
-			return 0, err
-		}
-		scoredSetValue := redis.Z{Member: serializedValue, Score: float64(value.Score)}
-		scoredSetValues = append(scoredSetValues, scoredSetValue)
-	}
-
-	affected, err := r.client.ZAddNX(ctx, key, scoredSetValues...).Result()
-	return uint64(affected), err
-}
-
-func (r *BucketReplicationPolicyStore) GetAll(ctx context.Context, id BucketReplicationPolicyID) ([]PrioritizedBucketReplicationPolicy, error) {
-	key := r.makeID(id)
-	result, err := r.client.ZRangeWithScores(ctx, key, 0, -1).Result()
-	if errors.Is(err, redis.Nil) {
-		return nil, fmt.Errorf("%w: no replication from policy for user %q", dom.ErrNotFound, key)
-	}
+func BucketReplicationPolicyToStringConverter(value BucketReplicationPolicy) (string, error) {
+	bytes, err := json.Marshal(value)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("unable to serialize bucket replication policy: %w", err)
 	}
-
-	policies := make([]PrioritizedBucketReplicationPolicy, 0, len(result))
-	for _, resultEntry := range result {
-		var policy PrioritizedBucketReplicationPolicy
-		serializedValue, ok := resultEntry.Member.([]byte)
-		if !ok {
-			return nil, fmt.Errorf("unable to cast to bytes")
-		}
-
-		if err := json.Unmarshal(serializedValue, &policy.Value); err != nil {
-			return nil, fmt.Errorf("unable deserialize value: %w", err)
-		}
-
-		policy.Score = uint8(resultEntry.Score)
-		policies = append(policies, policy)
-	}
-
-	return policies, nil
+	return string(bytes), nil
 }
 
-func (r *BucketReplicationPolicyStore) Remove(ctx context.Context, id BucketReplicationPolicyID, values ...PrioritizedBucketReplicationPolicy) (uint64, error) {
-	key := r.makeID(id)
-	scoredSetMemebers := make([][]byte, 0, len(values))
-	for _, value := range values {
-		serializedValue, err := json.Marshal(value.Value)
-		if err != nil {
-			return 0, err
-		}
-		scoredSetMemebers = append(scoredSetMemebers, serializedValue)
+func StringToBucketReplicationPolicyConverter(value string) (BucketReplicationPolicy, error) {
+	var result BucketReplicationPolicy
+	if err := json.Unmarshal([]byte(value), &result); err != nil {
+		var noVal BucketReplicationPolicy
+		return noVal, fmt.Errorf("unable to deserialize bucket replication policy: %w", err)
 	}
-	affected, err := r.client.ZRem(ctx, key, scoredSetMemebers).Result()
-	return uint64(affected), err
+	return result, nil
 }
 
-func (r *BucketReplicationPolicyStore) makeID(id BucketReplicationPolicyID) string {
-	return r.prefix + ":" + id.String()
+func Uint8ToFloat64Converter(value uint8) (float64, error) {
+	return float64(value), nil
+}
+
+func Float64ToUint8Converter(value float64) (uint8, error) {
+	return uint8(value), nil
+}
+
+type BucketReplicationPolicyStore struct {
+	RedisIDKeySortedSet[BucketReplicationPolicyID, BucketReplicationPolicy, uint8]
+}
+
+func NewBucketReplicationPolicyStore(client redis.Cmdable) *BucketReplicationPolicyStore {
+	return &BucketReplicationPolicyStore{
+		*NewRedisIDKeySortedSet(client, "p:repl:bucket", 
+		BucketReplicationPolicyIDToTokensConverter, TokensToBucketReplicationPolicyIDConverter,
+		BucketReplicationPolicyToStringConverter, StringToBucketReplicationPolicyConverter,
+		Uint8ToFloat64Converter, Float64ToUint8Converter),
+	}
 }
 
 type ReplicationStatusStore struct {
