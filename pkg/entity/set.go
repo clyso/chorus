@@ -36,7 +36,7 @@ func (r *RedisIDKeySet[ID, V]) Get(ctx context.Context, id ID) ([]V, error) {
 	}
 	values, err := r.deserializer.ConvertMulti(cmd.Val())
 	if err != nil {
-		return nil, fmt.Errorf("unable to get counter %s: %w", id, err)
+		return nil, fmt.Errorf("unable to deserialize result: %w", err)
 	}
 	return values, nil
 }
@@ -52,7 +52,7 @@ func (r *RedisIDKeySet[ID, V]) Add(ctx context.Context, id ID, values ...V) (uin
 	}
 	affected, err := r.client.SAdd(ctx, key, convertedValues).Result()
 	if err != nil {
-		return 0, fmt.Errorf("unable to add values to set: %w", id, err)
+		return 0, fmt.Errorf("unable to add values to set: %w", err)
 	}
 	return uint64(affected), nil
 }

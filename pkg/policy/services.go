@@ -11,24 +11,24 @@ import (
 )
 
 type PolicyService struct {
-	userRoutingPolicyStore *UserRoutingPolicyStore
-	bucketRoutingPolicyStore *BucketRoutingPolicyStore
-	routingBlockStore *RoutingBlockStore
+	userRoutingPolicyStore       *UserRoutingPolicyStore
+	bucketRoutingPolicyStore     *BucketRoutingPolicyStore
+	routingBlockStore            *RoutingBlockStore
 	bucketReplicationPolicyStore *BucketReplicationPolicyStore
-	replicationStatusStore *ReplicationStatusStore
+	replicationStatusStore       *ReplicationStatusStore
 }
 
 func (r *PolicyService) GetRoutingPolicyStorage(ctx context.Context, id BucketRoutingPolicyID) (string, error) {
 	storage, err := r.bucketRoutingPolicyStore.Get(ctx, id)
 	if err == nil {
-		return storage, nil	
+		return storage, nil
 	}
 	if !errors.Is(err, dom.ErrNotFound) {
 		return "", err
 	}
 	storage, err = r.userRoutingPolicyStore.Get(ctx, id.User)
 	if err != nil {
-		return "", err	
+		return "", err
 	}
 	return storage, nil
 }
@@ -83,4 +83,3 @@ func (r *PolicyService) AccountReplicationEvent(ctx context.Context, id Replicat
 	}
 	return nil
 }
-

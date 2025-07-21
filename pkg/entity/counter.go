@@ -99,7 +99,7 @@ func (r *RedisIDKeyCounter[ID, V]) IncrementByN(ctx context.Context, id ID, n V)
 	val, err := r.increment(ctx, key, n)
 	if err != nil {
 		var noVal V
-		return noVal, fmt.Errorf("unable to increment counter %s: %w", id, err)
+		return noVal, fmt.Errorf("unable to increment counter: %w", err)
 	}
 	return val, nil
 }
@@ -117,7 +117,7 @@ func (r *RedisIDKeyCounter[ID, V]) DecrementByN(ctx context.Context, id ID, n V)
 	val, err := r.decrement(ctx, key, n)
 	if err != nil {
 		var noVal V
-		return noVal, fmt.Errorf("unable to decrement counter %s: %w", id, err)
+		return noVal, fmt.Errorf("unable to decrement counter: %w", err)
 	}
 	return val, nil
 }
@@ -187,4 +187,3 @@ func (r *RedisIDKeyCounter[K, V]) decrement(ctx context.Context, key string, n V
 
 	return value, nil
 }
-

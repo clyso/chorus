@@ -13,6 +13,16 @@ const (
 	CWildcardSelector  = "*"
 )
 
+type Pager struct {
+	From  uint64
+	Count uint64
+}
+
+type Page[T any] struct {
+	Entries []T
+	Next    uint64
+}
+
 func StringValueConverter(value string) (string, error) {
 	return value, nil
 }
@@ -76,6 +86,51 @@ func NewRedisIDCommonStore[ID any](client redis.Cmdable, keyPrefix string, token
 		restoreID:        restoreID,
 		RedisCommonStore: *NewRedisCommonStore(client, keyPrefix),
 	}
+}
+
+func (r *RedisIDCommonStore[ID]) GetAllIDs(ctx context.Context, keyParts ...string) ([]ID, error) {
+	pager := Pager{
+		From:  0,
+		Count: 100,
+	}
+
+	ids := []ID{}
+	for {
+		idPage, err := r.GetIDs(ctx, pager, keyParts...)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, idPage.Entries...)
+
+		if idPage.Next == 0 {
+			break
+		}
+		pager.From = idPage.Next
+	}
+
+	return ids, nil
+}
+
+func (r *RedisIDCommonStore[ID]) GetIDs(ctx context.Context, pager Pager, keyParts ...string) (*Page[ID], error) {
+	selector := r.MakeWildcardSelector(keyParts...)
+	keys, cursor, err := r.client.Scan(ctx, pager.From, selector, int64(pager.Count)).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]ID, 0, len(keys))
+	for _, key := range keys {
+		id, err := r.RestoreID(key)
+		if err != nil {
+
+		}
+		ids = append(ids, id)
+	}
+
+	return &Page[ID]{
+		Entries: ids,
+		Next:    cursor,
+	}, nil
 }
 
 func (r *RedisIDCommonStore[ID]) Drop(ctx context.Context, id ID) (uint64, error) {

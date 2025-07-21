@@ -4,27 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/redis/go-redis/v9"
 )
-
-type Pager struct {
-	From  uint64
-	Count uint64
-}
-
-type Page[T any] struct {
-	Entries []T
-	Next    uint64
-}
-
-// type ScoredSetEntry[T any] struct {
-// 	Value T
-// 	Score uint8
-// }
 
 type ReplicationSwitchID struct {
 	User       string
@@ -102,24 +86,6 @@ type ReplicationStatusID struct {
 	ToBucket    string
 }
 
-func (r *ReplicationStatusID) String() string {
-	return fmt.Sprintf("%s:%s:%s:%s:%s", r.User, r.FromStorage, r.FromBucket, r.ToStorage, r.ToBucket)
-}
-
-func (r *ReplicationStatusID) FromString(s string) error {
-	parts := strings.Split(s, ":")
-	partsCount := len(parts)
-	if partsCount != 5 {
-		return fmt.Errorf("expected to have 5 parts, but got %d", partsCount)
-	}
-	r.User = parts[0]
-	r.FromStorage = parts[1]
-	r.FromBucket = parts[2]
-	r.ToStorage = parts[3]
-	r.ToBucket = parts[4]
-	return nil
-}
-
 type UserRoutingPolicyStore struct {
 	RedisIDKeyValue[string, string]
 }
@@ -161,7 +127,7 @@ type RoutingBlockStore struct {
 
 func NewRoutingBlockStore(client redis.Cmdable) *RoutingBlockStore {
 	return &RoutingBlockStore{
-		*NewRedisIDKeySet(client, "p:route:block", 
+		*NewRedisIDKeySet(client, "p:route:block",
 			StringToSingleTokenConverter, SingleTokenToStringConverter,
 			StringValueConverter, StringValueConverter),
 	}
@@ -169,7 +135,7 @@ func NewRoutingBlockStore(client redis.Cmdable) *RoutingBlockStore {
 
 func TokensToBucketReplicationPolicyIDConverter(tokens []string) (BucketReplicationPolicyID, error) {
 	return BucketReplicationPolicyID{
-		User:   tokens[0],
+		User:       tokens[0],
 		FromBucket: tokens[1],
 	}, nil
 }
@@ -209,22 +175,35 @@ type BucketReplicationPolicyStore struct {
 
 func NewBucketReplicationPolicyStore(client redis.Cmdable) *BucketReplicationPolicyStore {
 	return &BucketReplicationPolicyStore{
-		*NewRedisIDKeySortedSet(client, "p:repl:bucket", 
-		BucketReplicationPolicyIDToTokensConverter, TokensToBucketReplicationPolicyIDConverter,
-		BucketReplicationPolicyToStringConverter, StringToBucketReplicationPolicyConverter,
-		Uint8ToFloat64Converter, Float64ToUint8Converter),
+		*NewRedisIDKeySortedSet(client, "p:repl:bucket",
+			BucketReplicationPolicyIDToTokensConverter, TokensToBucketReplicationPolicyIDConverter,
+			BucketReplicationPolicyToStringConverter, StringToBucketReplicationPolicyConverter,
+			Uint8ToFloat64Converter, Float64ToUint8Converter),
 	}
 }
 
+func ReplicationStatusIDToTokensConverter(value ReplicationStatusID) ([]string, error) {
+	return []string{value.User, value.FromStorage, value.FromBucket, value.ToStorage, value.ToBucket}, nil
+}
+
+func TokensToReplicationStatusIDConverter(values []string) (ReplicationStatusID, error) {
+	return ReplicationStatusID{
+		User:        values[0],
+		FromStorage: values[1],
+		FromBucket:  values[2],
+		ToStorage:   values[3],
+		ToBucket:    values[4],
+	}, nil
+}
+
 type ReplicationStatusStore struct {
-	prefix string
-	client redis.Cmdable
+	RedisIDKeyHash[ReplicationStatusID, ReplicationStatus]
 }
 
 func NewReplicationStatusStore(client redis.Cmdable) *ReplicationStatusStore {
 	return &ReplicationStatusStore{
-		prefix: "p:repl:status",
-		client: client,
+		*NewRedisIDKeyHash[ReplicationStatusID, ReplicationStatus](
+			client, "p:repl:status", ReplicationStatusIDToTokensConverter, TokensToReplicationStatusIDConverter),
 	}
 }
 
@@ -238,144 +217,4 @@ func (r *ReplicationStatusStore) SetLastEmittedAt(ctx context.Context, id Replic
 
 func (r *ReplicationStatusStore) IncrementEvents(ctx context.Context, id ReplicationStatusID) (int64, error) {
 	return r.IncrementFieldIfExists(ctx, id, "events")
-}
-
-func (r *ReplicationStatusStore) SetFieldIfExists(ctx context.Context, id ReplicationStatusID, fieldName string, value any) error {
-	key := r.makeID(id)
-	result, err := luaHSetEx.Run(ctx, r.client, []string{key}, fieldName, value).Result()
-	if err != nil {
-		return err
-	}
-	inc, ok := result.(int64)
-	if !ok {
-		return fmt.Errorf("%w: unable to cast luaHSetEx result %T to int64", dom.ErrInternal, result)
-	}
-	if inc == 0 {
-		return dom.ErrNotFound
-	}
-	return nil
-}
-
-func (r *ReplicationStatusStore) SetField(ctx context.Context, id ReplicationStatusID, fieldName string, value any) (uint64, error) {
-	key := r.makeID(id)
-	affected, err := r.client.HSet(ctx, key, fieldName, value).Result()
-	if err != nil {
-		return 0, err
-	}
-	return uint64(affected), nil
-}
-
-func (r *ReplicationStatusStore) IncrementField(ctx context.Context, id ReplicationStatusID, fieldName string) (int64, error) {
-	return r.IncrementFieldByN(ctx, id, fieldName, 1)
-}
-
-func (r *ReplicationStatusStore) IncrementFieldByN(ctx context.Context, id ReplicationStatusID, fieldName string, value int64) (int64, error) {
-	key := r.makeID(id)
-	count, err := r.client.HIncrBy(ctx, key, fieldName, value).Result()
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
-func (r *ReplicationStatusStore) IncrementFieldIfExists(ctx context.Context, id ReplicationStatusID, fieldName string) (int64, error) {
-	return r.IncrementFieldByNIfExists(ctx, id, fieldName, 1)
-}
-
-func (r *ReplicationStatusStore) IncrementFieldByNIfExists(ctx context.Context, id ReplicationStatusID, fieldName string, value int64) (int64, error) {
-	key := r.makeID(id)
-	result, err := luaHIncrByEx.Run(ctx, r.client, []string{key}, fieldName, value).Result()
-	if err != nil {
-		return 0, err
-	}
-	count, ok := result.(int64)
-	if !ok {
-		return 0, fmt.Errorf("%w: unable to cast luaHIncrByEx result %T to int64", dom.ErrInternal, result)
-	}
-	if count == 0 {
-		return 0, dom.ErrNotFound
-	}
-	return count, nil
-}
-
-func (r *ReplicationStatusStore) Set(ctx context.Context, id ReplicationStatusID, info ReplicationStatus) error {
-	key := r.makeID(id)
-	if err := r.client.HSet(ctx, key, info).Err(); err != nil {
-		return fmt.Errorf("unable to set value in hash: %w", err)
-	}
-
-	return nil
-}
-
-func (r *ReplicationStatusStore) Get(ctx context.Context, id ReplicationStatusID) (*ReplicationStatus, error) {
-	key := r.makeID(id)
-	cmd := r.client.HGetAll(ctx, key)
-	if err := cmd.Err(); err != nil {
-		return nil, err
-	}
-	entity := &ReplicationStatus{}
-	if err := cmd.Scan(entity); err != nil {
-		return nil, err
-	}
-	return entity, nil
-}
-
-func (r *ReplicationStatusStore) GetAllIDs(ctx context.Context, keyParts ...string) ([]ReplicationStatusID, error) {
-	pager := Pager{
-		From:  0,
-		Count: 100,
-	}
-
-	ids := []ReplicationStatusID{}
-	for {
-		idPage, err := r.GetIDs(ctx, pager, keyParts...)
-		if err != nil {
-			return nil, err
-		}
-		ids = append(ids, idPage.Entries...)
-
-		if idPage.Next == 0 {
-			break
-		}
-		pager.From = idPage.Next
-	}
-
-	return ids, nil
-}
-
-func (r *ReplicationStatusStore) GetIDs(ctx context.Context, pager Pager, keyParts ...string) (*Page[ReplicationStatusID], error) {
-	selector := r.makeWildcardSelector()
-	keys, cursor, err := r.client.Scan(ctx, pager.From, selector, int64(pager.Count)).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	ids := make([]ReplicationStatusID, 0, len(keys))
-	for _, key := range keys {
-		trimmedKey := strings.TrimPrefix(key, r.prefix+":")
-		var id ReplicationStatusID
-		if err := id.FromString(trimmedKey); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-
-	return &Page[ReplicationStatusID]{
-		Entries: ids,
-		Next:    cursor,
-	}, nil
-}
-
-// TODO make id method to use a set of key parts, rather than string method
-// rename to make key
-func (r *ReplicationStatusStore) makeID(id ReplicationStatusID) string {
-	return r.prefix + ":" + id.String()
-}
-
-func (r *ReplicationStatusStore) makeWildcardSelector(keyParts ...string) string {
-	joinedKeyParts := strings.Join(keyParts, ":")
-	if joinedKeyParts == "" {
-		return r.prefix + ":*"
-	}
-	return r.prefix + joinedKeyParts + ":*"
 }

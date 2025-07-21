@@ -36,7 +36,7 @@ type Service interface {
 	Replicate(ctx context.Context, task tasks.SyncTask) error
 }
 
-func New(taskClient *asynq.Client, versionSvc meta.VersionService, /* policySvc policy.Service */ policyService policy.PolicyService) Service {
+func New(taskClient *asynq.Client, versionSvc meta.VersionService /* policySvc policy.Service */, policyService policy.PolicyService) Service {
 	return &svc{
 		taskClient: taskClient,
 		versionSvc: versionSvc,
