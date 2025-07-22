@@ -55,11 +55,12 @@ const (
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 
 	// swift tasks:
-	TypeAccountUpdate   = "account:update"
-	TypeContainerUpdate = "container:update"
-	TypeObjUpdate       = "obj:update"
-	TypeObjMetaUpdate   = "obj:meta:update"
-	TypeObjDelete       = "obj:del"
+	TypeAccountUpdate         = "account:update"
+	TypeContainerUpdate       = "container:update"
+	TypeObjUpdate             = "obj:update"
+	TypeObjMetaUpdate         = "obj:meta:update"
+	TypeObjDelete             = "obj:del"
+	TypeSwiftAccountMigration = "migrate:swift:account"
 )
 
 type Priority uint8
@@ -352,12 +353,20 @@ type ObjectDeletePayload struct {
 	DeleteMultipart bool
 }
 
+type SwiftAccountMigrationPayload struct {
+	FromStorage string
+	ToStorage   string
+	FromAccount string
+	ToAccount   string
+}
+
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
 	AccountUpdatePayload | ContainerUpdatePayload | ObjectUpdatePayload | ObjectMetaUpdatePayload | ObjectDeletePayload |
+	SwiftAccountMigrationPayload |
 	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
@@ -433,6 +442,10 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	case ObjectDeletePayload:
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
 		taskType = TypeObjDelete
+	case SwiftAccountMigrationPayload:
+		id := fmt.Sprintf("mgr:swift:a:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		taskType = TypeSwiftAccountMigration
 	case MigrateBucketListObjectsPayload:
 		id := fmt.Sprintf("mgr:lo:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
 		if p.ToBucket != nil {
