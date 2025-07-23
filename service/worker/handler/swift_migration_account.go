@@ -19,15 +19,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
+	"github.com/gophercloud/gophercloud/v2/pagination"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
+)
+
+const (
+	swiftContainerListLimit = 1000
 )
 
 func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (err error) {
@@ -37,6 +41,7 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 	}
 	logger := zerolog.Ctx(ctx)
 
+	// validation and setup:
 	replProlicy, err := s.policySvc.GetUserReplicationPolicies(ctx, p.FromAccount)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
@@ -63,10 +68,34 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 		return err
 	}
 
-	lastObjName, err := s.storageSvc.GetLastListedObj(ctx, p)
+	// resume from last container
+	lastContainerName, err := s.storageSvc.GetLastListedContainer(ctx, p)
 	if err != nil {
 		return err
 	}
 
+	// iterate through account containers
+	pager := containers.List(fromClient, containers.ListOpts{
+		Limit:  swiftContainerListLimit,
+		Marker: lastContainerName,
+	})
+	err = pager.EachPage(ctx, func(ctx context.Context, page pagination.Page) (bool, error) {
+		containerList, err := containers.ExtractNames(page)
+		if err != nil {
+			return false, err
+		}
+		for _, container := range containerList {
+			// start migration for each container:
+			// TODO:
+
+		}
+
+		// Continue to the next page
+		return len(containerList) == swiftContainerListLimit, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("error listing containers: %w", err)
+	}
 	return err
 }
