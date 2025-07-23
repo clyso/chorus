@@ -34,6 +34,18 @@ const (
 	lastListedObjTTL = time.Hour * 8
 )
 
+// redis keys prefixes:
+// keep track of used prefixes to avoid conflicts
+const (
+	lastListedObjPrefix              = "s:"                          // common prefix for listed objects checkpoint keys
+	lastListedContainerPrefix        = "s:c:"                        // common prefix for listed container checkpoint keys
+	uploadIDPrefix                   = "s:up:"                       // common prefix for upload id keys
+	consistencyCheckPrefix           = "ccv:"                        // common prefix for consistency check keys
+	consistencyCheckLastListedPrefix = consistencyCheckPrefix + "l:" // common prefix for consistency check last listed object keys
+	consistencyCheckCounterPrefix    = consistencyCheckPrefix + "c:" // common prefix for consistency check counter keys
+	consistencyChecksListKey         = consistencyCheckPrefix + "id" // key of redis list storing check ids
+)
+
 var (
 	luaDeleteKeysByPrefix = redis.NewScript(`local keys = redis.call('keys', ARGV[1])
 if #keys >0 then
@@ -81,6 +93,10 @@ type Service interface {
 	DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error
 	CleanLastListedObj(ctx context.Context, fromStor, toStor, fromBucket string, toBucket *string) error
 
+	GetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) (string, error)
+	SetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload, val string) error
+	DelLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) error
+
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
 	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
 	ExistsUploadID(ctx context.Context, user, bucket, object, uploadID string) (bool, error)
@@ -123,11 +139,66 @@ type svc struct {
 	client redis.UniversalClient
 }
 
-func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, fromBucket string, toBucket *string) error {
-	key := fmt.Sprintf("s:%s:%s:%s", fromStor, toStor, fromBucket)
-	if toBucket != nil {
-		key += ":" + *toBucket
+func lastListedContainerKey(task tasks.SwiftAccountMigrationPayload) string {
+	return fmt.Sprintf(lastListedContainerPrefix+"%s:%s:%s:%s",
+		task.FromStorage,
+		task.FromAccount,
+		task.ToStorage,
+		task.ToAccount)
+}
+
+func (s *svc) DelLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) error {
+	key := lastListedContainerKey(task)
+	if err := s.client.Del(ctx, key).Err(); err != nil {
+		return fmt.Errorf("unable to delete last listed container: %w", err)
 	}
+	return nil
+}
+
+func (s *svc) GetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) (string, error) {
+	key := lastListedContainerKey(task)
+	val, err := s.client.Get(ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", nil
+		}
+		return "", fmt.Errorf("unable to get last listed container: %w", err)
+	}
+	return val, nil
+}
+
+func (s *svc) SetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload, val string) error {
+	key := lastListedContainerKey(task)
+	if err := s.client.Set(ctx, key, val, lastListedObjTTL).Err(); err != nil {
+		return fmt.Errorf("unable to set last listed container: %w", err)
+	}
+	return nil
+}
+
+func lastListedObjKey(task tasks.MigrateBucketListObjectsPayload) string {
+	key := fmt.Sprintf(lastListedObjPrefix+"%s:%s:%s",
+		task.FromStorage,
+		task.ToStorage,
+		task.Bucket)
+	if task.ToBucket != nil {
+		key += ":" + *task.ToBucket
+	}
+	if task.Prefix != "" {
+		key += ":" + task.Prefix
+	}
+	return key
+}
+
+func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, fromBucket string, toBucket *string) error {
+	key := lastListedObjKey(tasks.MigrateBucketListObjectsPayload{
+		Sync: tasks.Sync{
+			FromStorage: fromStor,
+			ToStorage:   toStor,
+			ToBucket:    toBucket,
+		},
+		Bucket: fromBucket,
+		Prefix: "",
+	})
 	if err := s.client.Del(ctx, key).Err(); err != nil {
 		return err
 	}
@@ -136,24 +207,12 @@ func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor st
 }
 
 func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error {
-	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
-	if task.ToBucket != nil {
-		key += ":" + *task.ToBucket
-	}
-	if task.Prefix != "" {
-		key += ":" + task.Prefix
-	}
+	key := lastListedObjKey(task)
 	return s.client.Del(ctx, key).Err()
 }
 
 func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error) {
-	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
-	if task.ToBucket != nil {
-		key += ":" + *task.ToBucket
-	}
-	if task.Prefix != "" {
-		key += ":" + task.Prefix
-	}
+	key := lastListedObjKey(task)
 	val, err := s.client.Get(ctx, key).Result()
 	if errors.Is(err, redis.Nil) {
 		return "", nil
@@ -162,29 +221,41 @@ func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 }
 
 func (s *svc) SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error {
-	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
-	if task.ToBucket != nil {
-		key += ":" + *task.ToBucket
-	}
-	if task.Prefix != "" {
-		key += ":" + task.Prefix
-	}
+	key := lastListedObjKey(task)
 	return s.client.Set(ctx, key, val, lastListedObjTTL).Err()
 }
 
-func (s *svc) StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error {
+func uploadIDKey(user, bucket string) (string, error) {
 	if user == "" {
-		return fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
+		return "", fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if bucket == "" {
-		return fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
+		return "", fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
+	}
+	return fmt.Sprintf(uploadIDPrefix+"%s:%s", user, bucket), nil
+}
+
+func uploadIDKeyVal(user, bucket, object, uploadID string) (key string, val string, err error) {
+	key, err = uploadIDKey(user, bucket)
+	if err != nil {
+		return "", "", err
+	}
+	if object == "" {
+		return "", "", fmt.Errorf("%w: object is required to set uploadID", dom.ErrInvalidArg)
 	}
 	if uploadID == "" {
-		return fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
+		return "", "", fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
 	}
-	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
-	val := fmt.Sprintf("%s:%s", object, uploadID)
-	err := s.client.SAdd(ctx, key, val).Err()
+	val = fmt.Sprintf("%s:%s", object, uploadID)
+	return key, val, nil
+}
+
+func (s *svc) StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error {
+	key, val, err := uploadIDKeyVal(user, bucket, object, uploadID)
+	if err != nil {
+		return err
+	}
+	err = s.client.SAdd(ctx, key, val).Err()
 	if err != nil {
 		return err
 	}
@@ -193,28 +264,18 @@ func (s *svc) StoreUploadID(ctx context.Context, user, bucket, object, uploadID 
 }
 
 func (s *svc) ExistsUploadID(ctx context.Context, user, bucket, object, uploadID string) (bool, error) {
-	if user == "" {
-		return false, fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
+	key, val, err := uploadIDKeyVal(user, bucket, object, uploadID)
+	if err != nil {
+		return false, err
 	}
-	if bucket == "" {
-		return false, fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
-	}
-	if uploadID == "" {
-		return false, fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
-	}
-	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
-	val := fmt.Sprintf("%s:%s", object, uploadID)
 	return s.client.SIsMember(ctx, key, val).Result()
 }
 
 func (s *svc) ExistsUploads(ctx context.Context, user, bucket string) (bool, error) {
-	if user == "" {
-		return false, fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
+	key, err := uploadIDKey(user, bucket)
+	if err != nil {
+		return false, err
 	}
-	if bucket == "" {
-		return false, fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
-	}
-	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
 	num, err := s.client.SCard(ctx, key).Result()
 	if err != nil {
 		return false, err
@@ -223,22 +284,15 @@ func (s *svc) ExistsUploads(ctx context.Context, user, bucket string) (bool, err
 }
 
 func (s *svc) DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error {
-	if user == "" {
-		return fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
+	key, val, err := uploadIDKeyVal(user, bucket, object, uploadID)
+	if err != nil {
+		return err
 	}
-	if bucket == "" {
-		return fmt.Errorf("%w: bucket is required to set uploadID", dom.ErrInvalidArg)
-	}
-	if uploadID == "" {
-		return fmt.Errorf("%w: uploadID is required", dom.ErrInvalidArg)
-	}
-	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
-	val := fmt.Sprintf("%s:%s", object, uploadID)
 	return s.client.SRem(ctx, key, val).Err()
 }
 
 func (s *svc) GetLastListedConsistencyCheckObj(ctx context.Context, obj *ConsistencyCheckObject) (string, error) {
-	key := fmt.Sprintf("ccv:l:%s:%s:%s", obj.ConsistencyCheckID, obj.Storage, obj.Prefix)
+	key := fmt.Sprintf(consistencyCheckLastListedPrefix+"%s:%s:%s", obj.ConsistencyCheckID, obj.Storage, obj.Prefix)
 	cmd := s.client.Get(ctx, key)
 	err := cmd.Err()
 
@@ -253,7 +307,7 @@ func (s *svc) GetLastListedConsistencyCheckObj(ctx context.Context, obj *Consist
 }
 
 func (s *svc) SetLastListedConsistencyCheckObj(ctx context.Context, obj *ConsistencyCheckObject, value string) error {
-	key := fmt.Sprintf("ccv:l:%s:%s:%s", obj.ConsistencyCheckID, obj.Storage, obj.Prefix)
+	key := fmt.Sprintf(consistencyCheckLastListedPrefix+"%s:%s:%s", obj.ConsistencyCheckID, obj.Storage, obj.Prefix)
 	if err := s.client.Set(ctx, key, value, lastListedObjTTL).Err(); err != nil {
 		return fmt.Errorf("unable to set last listed object: %w", err)
 	}
@@ -262,7 +316,7 @@ func (s *svc) SetLastListedConsistencyCheckObj(ctx context.Context, obj *Consist
 }
 
 func (s *svc) DeleteLastListedConsistencyCheckObj(ctx context.Context, obj *ConsistencyCheckObject) error {
-	key := fmt.Sprintf("ccv:l:%s:%s:%s", obj.ConsistencyCheckID, obj.Storage, obj.Prefix)
+	key := fmt.Sprintf(consistencyCheckLastListedPrefix+"%s:%s:%s", obj.ConsistencyCheckID, obj.Storage, obj.Prefix)
 	if err := s.client.Unlink(ctx, key).Err(); err != nil {
 		return fmt.Errorf("unable to delete last listed object: %w", err)
 	}
@@ -271,7 +325,7 @@ func (s *svc) DeleteLastListedConsistencyCheckObj(ctx context.Context, obj *Cons
 }
 
 func (s *svc) DeleteAllLastListedConsistencyCheckObj(ctx context.Context, id string) error {
-	keyPattern := fmt.Sprintf("ccv:l:%s:*", id)
+	keyPattern := fmt.Sprintf(consistencyCheckLastListedPrefix+"%s:*", id)
 	pipe := s.client.Pipeline()
 	var cursor uint64
 
@@ -300,7 +354,7 @@ func (s *svc) DeleteAllLastListedConsistencyCheckObj(ctx context.Context, id str
 }
 
 func (s *svc) IncrementConsistencyCheckScheduledCounter(ctx context.Context, id string, count int64) error {
-	key := fmt.Sprintf("ccv:c:%s:scheduled", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:scheduled", id)
 	if err := s.client.IncrBy(ctx, key, count).Err(); err != nil {
 		return fmt.Errorf("unable to increment amount of scheduled consistency check tasks: %w", err)
 	}
@@ -309,7 +363,7 @@ func (s *svc) IncrementConsistencyCheckScheduledCounter(ctx context.Context, id 
 }
 
 func (s *svc) IncrementConsistencyCheckCompletedCounter(ctx context.Context, id string, count int64) error {
-	key := fmt.Sprintf("ccv:c:%s:completed", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:completed", id)
 	if err := s.client.IncrBy(ctx, key, count).Err(); err != nil {
 		return fmt.Errorf("unable to increment amount of completed consistency check tasks: %w", err)
 	}
@@ -318,7 +372,7 @@ func (s *svc) IncrementConsistencyCheckCompletedCounter(ctx context.Context, id 
 }
 
 func (s *svc) DecrementConsistencyCheckScheduledCounter(ctx context.Context, id string, count int64) error {
-	key := fmt.Sprintf("ccv:c:%s:scheduled", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:scheduled", id)
 	if err := s.client.DecrBy(ctx, key, count).Err(); err != nil {
 		return fmt.Errorf("unable to decrement amount of scheduled consistency check tasks: %w", err)
 	}
@@ -327,7 +381,7 @@ func (s *svc) DecrementConsistencyCheckScheduledCounter(ctx context.Context, id 
 }
 
 func (s *svc) DecrementConsistencyCheckCompletedCounter(ctx context.Context, id string, count int64) error {
-	key := fmt.Sprintf("ccv:c:%s:completed", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:completed", id)
 	if err := s.client.DecrBy(ctx, key, count).Err(); err != nil {
 		return fmt.Errorf("unable to decrement amount of completed consistency check tasks: %w", err)
 	}
@@ -336,7 +390,7 @@ func (s *svc) DecrementConsistencyCheckCompletedCounter(ctx context.Context, id 
 }
 
 func (s *svc) GetConsistencyCheckScheduledCounter(ctx context.Context, id string) (uint64, error) {
-	key := fmt.Sprintf("ccv:c:%s:scheduled", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:scheduled", id)
 	count, err := s.client.Get(ctx, key).Uint64()
 	if errors.Is(err, redis.Nil) {
 		return 0, nil
@@ -349,7 +403,7 @@ func (s *svc) GetConsistencyCheckScheduledCounter(ctx context.Context, id string
 }
 
 func (s *svc) GetConsistencyCheckCompletedCounter(ctx context.Context, id string) (uint64, error) {
-	key := fmt.Sprintf("ccv:c:%s:completed", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:completed", id)
 	count, err := s.client.Get(ctx, key).Uint64()
 	if errors.Is(err, redis.Nil) {
 		return 0, nil
@@ -362,7 +416,7 @@ func (s *svc) GetConsistencyCheckCompletedCounter(ctx context.Context, id string
 }
 
 func (s *svc) DeleteConsistencyCheckScheduledCounter(ctx context.Context, id string) error {
-	key := fmt.Sprintf("ccv:c:%s:scheduled", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:scheduled", id)
 	if err := s.client.Unlink(ctx, key).Err(); err != nil {
 		return fmt.Errorf("unable to delete counter for scheduled consistency check tasks: %w", err)
 	}
@@ -371,7 +425,7 @@ func (s *svc) DeleteConsistencyCheckScheduledCounter(ctx context.Context, id str
 }
 
 func (s *svc) DeleteConsistencyCheckCompletedCounter(ctx context.Context, id string) error {
-	key := fmt.Sprintf("ccv:c:%s:completed", id)
+	key := fmt.Sprintf(consistencyCheckCounterPrefix+"%s:completed", id)
 	if err := s.client.Unlink(ctx, key).Err(); err != nil {
 		return fmt.Errorf("unable to delete counter for completed consistency check tasks: %w", err)
 	}
@@ -380,7 +434,7 @@ func (s *svc) DeleteConsistencyCheckCompletedCounter(ctx context.Context, id str
 }
 
 func (s *svc) StoreConsistencyCheckID(ctx context.Context, id string) error {
-	cmd := s.client.SAdd(ctx, "ccv:id", id)
+	cmd := s.client.SAdd(ctx, consistencyChecksListKey, id)
 	if cmd.Err() != nil {
 		return fmt.Errorf("unable to add id to consistency check set: %w", cmd.Err())
 	}
@@ -394,7 +448,7 @@ func (s *svc) StoreConsistencyCheckID(ctx context.Context, id string) error {
 }
 
 func (s *svc) HasConsistencyCheckID(ctx context.Context, id string) (bool, error) {
-	cmd := s.client.SIsMember(ctx, "ccv:id", id)
+	cmd := s.client.SIsMember(ctx, consistencyChecksListKey, id)
 	if cmd.Err() != nil {
 		return false, fmt.Errorf("unable to check id exists in consistency check set: %w", cmd.Err())
 	}
@@ -403,7 +457,7 @@ func (s *svc) HasConsistencyCheckID(ctx context.Context, id string) (bool, error
 }
 
 func (s *svc) DeleteConsistencyCheckID(ctx context.Context, id string) error {
-	cmd := s.client.SRem(ctx, "ccv:id", id)
+	cmd := s.client.SRem(ctx, consistencyChecksListKey, id)
 	if cmd.Err() != nil {
 		return fmt.Errorf("unable to delete from consistency check set: %w", cmd.Err())
 	}
@@ -412,7 +466,7 @@ func (s *svc) DeleteConsistencyCheckID(ctx context.Context, id string) error {
 }
 
 func (s *svc) ListConsistencyCheckIDs(ctx context.Context) ([]string, error) {
-	res, err := s.client.SMembers(ctx, "ccv:id").Result()
+	res, err := s.client.SMembers(ctx, consistencyChecksListKey).Result()
 	if errors.Is(err, redis.Nil) {
 		return nil, nil
 	}
@@ -424,7 +478,7 @@ func (s *svc) ListConsistencyCheckIDs(ctx context.Context) ([]string, error) {
 }
 
 func (s *svc) AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyCheckRecord) error {
-	key := fmt.Sprintf("ccv:s:%s:%s:%s", record.ConsistencyCheckID, record.Object, record.ETag)
+	key := fmt.Sprintf(consistencyCheckPrefix+"s:%s:%s:%s", record.ConsistencyCheckID, record.Object, record.ETag)
 	if err := luaAddToConsistencySet.Run(ctx, s.client, []string{key}, record.Storage, record.StorageCount).Err(); err != nil {
 		return fmt.Errorf("unable to add object info to consistency check set: %w", err)
 	}
@@ -433,7 +487,7 @@ func (s *svc) AddToConsistencyCheckSet(ctx context.Context, record *ConsistencyC
 }
 
 func (s *svc) FindConsistencyCheckSets(ctx context.Context, id string) ([]ConsistencyCheckResultEntry, error) {
-	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+	keyPattern := fmt.Sprintf(consistencyCheckPrefix+"s:%s:*", id)
 	var results []ConsistencyCheckResultEntry
 	var cursor uint64
 
@@ -480,7 +534,7 @@ func (s *svc) FindConsistencyCheckSets(ctx context.Context, id string) ([]Consis
 }
 
 func (s *svc) FindConsistencyCheckSetsPageable(ctx context.Context, id string, cursor uint64, pageSize int64) (*ConsistencyCheckResultPage, error) {
-	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+	keyPattern := fmt.Sprintf(consistencyCheckPrefix+"s:%s:*", id)
 	results := make([]ConsistencyCheckResultEntry, 0, pageSize)
 
 	keys, nextCursor, err := s.client.Scan(ctx, cursor, keyPattern, pageSize).Result()
@@ -511,7 +565,7 @@ func (s *svc) FindConsistencyCheckSetsPageable(ctx context.Context, id string, c
 }
 
 func (s *svc) HasConsistencyCheckSets(ctx context.Context, id string) (bool, error) {
-	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+	keyPattern := fmt.Sprintf(consistencyCheckPrefix+"s:%s:*", id)
 
 	keys, _, err := s.client.Scan(ctx, 0, keyPattern, 1).Result()
 	if err != nil {
@@ -526,7 +580,7 @@ func (s *svc) HasConsistencyCheckSets(ctx context.Context, id string) (bool, err
 }
 
 func (s *svc) DeleteAllConsistencyCheckSets(ctx context.Context, id string) error {
-	keyPattern := fmt.Sprintf("ccv:s:%s:*", id)
+	keyPattern := fmt.Sprintf(consistencyCheckPrefix+"s:%s:*", id)
 	pipe := s.client.Pipeline()
 	var cursor uint64
 
@@ -555,7 +609,7 @@ func (s *svc) DeleteAllConsistencyCheckSets(ctx context.Context, id string) erro
 }
 
 func (s *svc) SetConsistencyCheckReadiness(ctx context.Context, id string, ready bool) error {
-	key := fmt.Sprintf("ccv:r:%s", id)
+	key := fmt.Sprintf(consistencyCheckPrefix+"r:%s", id)
 	if err := s.client.Set(ctx, key, ready, lastListedObjTTL).Err(); err != nil {
 		return fmt.Errorf("unable to set readiness flag: %w", err)
 	}
@@ -563,7 +617,7 @@ func (s *svc) SetConsistencyCheckReadiness(ctx context.Context, id string, ready
 }
 
 func (s *svc) GetConsistencyCheckReadiness(ctx context.Context, id string) (bool, error) {
-	key := fmt.Sprintf("ccv:r:%s", id)
+	key := fmt.Sprintf(consistencyCheckPrefix+"r:%s", id)
 	flag, err := s.client.Get(ctx, key).Bool()
 	if errors.Is(err, redis.Nil) {
 		return false, nil
@@ -575,7 +629,7 @@ func (s *svc) GetConsistencyCheckReadiness(ctx context.Context, id string) (bool
 }
 
 func (s *svc) DeleteConsistencyCheckReadiness(ctx context.Context, id string) error {
-	key := fmt.Sprintf("ccv:r:%s", id)
+	key := fmt.Sprintf(consistencyCheckPrefix+"r:%s", id)
 	if err := s.client.Unlink(ctx, key).Err(); err != nil {
 		return fmt.Errorf("unable to delete readiness flag: %w", err)
 	}
@@ -583,7 +637,7 @@ func (s *svc) DeleteConsistencyCheckReadiness(ctx context.Context, id string) er
 }
 
 func (s *svc) SetConsistencyCheckStorages(ctx context.Context, id string, storages []string) error {
-	key := fmt.Sprintf("ccv:stor:%s", id)
+	key := fmt.Sprintf(consistencyCheckPrefix+"stor:%s", id)
 	if err := s.client.SAdd(ctx, key, storages).Err(); err != nil {
 		return fmt.Errorf("unable to set storage set: %w", err)
 	}
@@ -591,7 +645,7 @@ func (s *svc) SetConsistencyCheckStorages(ctx context.Context, id string, storag
 }
 
 func (s *svc) GetConsistencyCheckStorages(ctx context.Context, id string) ([]string, error) {
-	key := fmt.Sprintf("ccv:stor:%s", id)
+	key := fmt.Sprintf(consistencyCheckPrefix+"stor:%s", id)
 	storages, err := s.client.SMembers(ctx, key).Result()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get storage set: %w", err)
@@ -600,7 +654,7 @@ func (s *svc) GetConsistencyCheckStorages(ctx context.Context, id string) ([]str
 }
 
 func (s *svc) DeleteConsistencyCheckStorages(ctx context.Context, id string) error {
-	key := fmt.Sprintf("ccv:stor:%s", id)
+	key := fmt.Sprintf(consistencyCheckPrefix+"stor:%s", id)
 	if err := s.client.Unlink(ctx, key).Err(); err != nil {
 		return fmt.Errorf("unable to delete stroage set: %w", err)
 	}
