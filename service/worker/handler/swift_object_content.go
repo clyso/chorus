@@ -35,6 +35,7 @@ import (
 )
 
 func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error) {
+	// setup:
 	var p tasks.ObjectUpdatePayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("ObjectUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
@@ -45,6 +46,7 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 		toBucket = *p.ToBucket
 	}
 
+	// check if replication policy is paused or removed:
 	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
@@ -57,6 +59,7 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
+	// check rate limits:
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
 		return err
@@ -65,16 +68,8 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 		logger.Debug().Err(err).Str(log.Storage, p.ToStorage).Msg("rate limit error")
 		return err
 	}
-	defer func() {
-		if err != nil {
-			return
-		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
-		if verErr != nil {
-			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
-		}
-	}()
 
+	// acquire lock for object update
 	release, refresh, err := s.locker.Lock(ctx, lock.ObjKey(p.ToStorage, dom.Object{
 		Bucket: toBucket,
 		Name:   p.Object,
@@ -83,11 +78,22 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 		return err
 	}
 	defer release()
+
+	// sync object:
 	err = lock.WithRefresh(ctx, func() error {
 		return s.handleObjectUpdate(ctx, p)
 	}, refresh, time.Second*2)
+	if err != nil {
+		return err
+	}
 
-	return
+	// update replication progress:
+	metaErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+	if metaErr != nil {
+		logger.Err(metaErr).Msg("unable to inc processed events")
+	}
+
+	return nil
 }
 
 func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayload) (err error) {

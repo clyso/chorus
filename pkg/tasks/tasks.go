@@ -55,12 +55,14 @@ const (
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 
 	// swift tasks:
-	TypeAccountUpdate         = "account:update"
-	TypeContainerUpdate       = "container:update"
-	TypeObjUpdate             = "obj:update"
-	TypeObjMetaUpdate         = "obj:meta:update"
-	TypeObjDelete             = "obj:del"
-	TypeSwiftAccountMigration = "migrate:swift:account"
+	TypeAccountUpdate           = "account:update"
+	TypeContainerUpdate         = "container:update"
+	TypeObjUpdate               = "obj:update"
+	TypeObjMetaUpdate           = "obj:meta:update"
+	TypeObjDelete               = "obj:del"
+	TypeSwiftAccountMigration   = "migrate:swift:account"
+	TypeSwiftContainerMigration = "migrate:swift:container"
+	TypeSwiftObjectMigration    = "migrate:swift:obj"
 )
 
 type Priority uint8
@@ -360,13 +362,37 @@ type SwiftAccountMigrationPayload struct {
 	ToAccount   string
 }
 
+type SwiftContainerMigrationPayload struct {
+	FromStorage  string
+	FromAccount  string
+	FromContaier string
+	ToStorage    string
+	ToAccount    string
+	ToContaier   string
+}
+
+type SwiftObjectMigrationPayload struct {
+	FromStorage  string
+	FromAccount  string
+	FromContaier string
+	ToStorage    string
+	ToAccount    string
+	ToContaier   string
+
+	ObjName         string
+	ObjVersion      string
+	ObjEtag         string
+	ObjSize         int64
+	ObjLastModified string
+}
+
 func NewTask[T BucketCreatePayload | BucketDeletePayload |
 	BucketSyncTagsPayload | BucketSyncACLPayload |
 	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
 	AccountUpdatePayload | ContainerUpdatePayload | ObjectUpdatePayload | ObjectMetaUpdatePayload | ObjectDeletePayload |
-	SwiftAccountMigrationPayload |
+	SwiftAccountMigrationPayload | SwiftContainerMigrationPayload | SwiftObjectMigrationPayload |
 	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
@@ -446,6 +472,14 @@ func NewTask[T BucketCreatePayload | BucketDeletePayload |
 		id := fmt.Sprintf("mgr:swift:a:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount)
 		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
 		taskType = TypeSwiftAccountMigration
+	case SwiftContainerMigrationPayload:
+		id := fmt.Sprintf("mgr:swift:c:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		taskType = TypeSwiftContainerMigration
+	case SwiftObjectMigrationPayload:
+		id := fmt.Sprintf("mgr:swift:o:%s:%s:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier, p.ObjName, p.ObjVersion)
+		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		taskType = TypeSwiftObjectMigration
 	case MigrateBucketListObjectsPayload:
 		id := fmt.Sprintf("mgr:lo:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
 		if p.ToBucket != nil {

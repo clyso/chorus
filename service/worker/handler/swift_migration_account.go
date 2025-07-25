@@ -45,6 +45,9 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 	replProlicy, err := s.policySvc.GetUserReplicationPolicies(ctx, p.FromAccount)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
+			// policy was removed, delete checkpoint:
+			_ = s.storageSvc.DelLastListedContainer(ctx, p)
+
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
 			return nil
 		}
@@ -59,6 +62,7 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 		return nil
 	}
 
+	// check rate limit:
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
 		return err
@@ -86,8 +90,35 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 		}
 		for _, container := range containerList {
 			// start migration for each container:
-			// TODO:
-
+			err = s.policySvc.AddBucketReplicationPolicy(ctx, p.FromAccount, container, p.FromStorage, p.ToStorage, nil, replProlicy.To[policy.ReplicationPolicyDest(p.ToStorage)], nil)
+			if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
+				if errors.Is(err, dom.ErrInvalidArg) {
+					// non recoverable error, skip this container
+					return false, fmt.Errorf("%w: error adding bucket replication policy: %w", asynq.SkipRetry, err)
+				}
+				return false, fmt.Errorf("error adding bucket replication policy: %w", err)
+			}
+			task, err := tasks.NewTask(ctx, tasks.SwiftContainerMigrationPayload{
+				FromStorage:  p.FromStorage,
+				FromAccount:  p.FromAccount,
+				FromContaier: container,
+				ToStorage:    p.ToStorage,
+				ToAccount:    p.ToAccount,
+				ToContaier:   container,
+			})
+			if err != nil {
+				return false, err
+			}
+			_, err = s.taskClient.EnqueueContext(ctx, task)
+			if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+				return false, err
+			}
+			// checkpoint last container
+			if err = s.storageSvc.SetLastListedContainer(ctx, p, container); err != nil {
+				return false, fmt.Errorf("error setting last listed container: %w", err)
+			}
+			//TODO: maintain account replication policy status:
+			// - increment listed/migrated containers
 		}
 
 		// Continue to the next page
@@ -96,6 +127,11 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 
 	if err != nil {
 		return fmt.Errorf("error listing containers: %w", err)
+	}
+
+	// cleanup last listed container
+	if err = s.storageSvc.DelLastListedContainer(ctx, p); err != nil {
+		return fmt.Errorf("error deleting last listed container: %w", err)
 	}
 	return err
 }
