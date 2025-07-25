@@ -29,10 +29,10 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -46,7 +46,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	ctx = log.WithObjName(ctx, p.Object.Name)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        xctx.GetUser(ctx),
 		FromStorage: p.FromStorage,
 		FromBucket:  p.Object.Bucket,

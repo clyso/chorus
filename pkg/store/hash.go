@@ -1,8 +1,10 @@
-package entity
+package store
 
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/redis/go-redis/v9"
@@ -122,4 +124,36 @@ func (r *RedisIDKeyHash[ID, V]) IncrementFieldByNIfExists(ctx context.Context, i
 		return 0, dom.ErrNotFound
 	}
 	return count, nil
+}
+
+func (r *RedisIDKeyHash[ID, V]) MakeFieldMap(value any) map[string]any {
+	result := map[string]any{}
+	reflectValue := reflect.ValueOf(value)
+	reflectType := reflectValue.Type()
+
+	for i := range reflectType.NumField() {
+		field := reflectType.Field(i)
+		redisTag := field.Tag.Get("redis")
+		if redisTag == "" || redisTag == "-" {
+			continue
+		}
+
+		redisTag = strings.Split(redisTag, ",")[0]
+
+		fieldValue := reflectValue.Field(i)
+		if !fieldValue.CanInterface() {
+			result[redisTag] = nil
+			continue
+		}
+		if field.Type.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			result[redisTag] = nil
+			continue
+		}
+		if field.Type.Kind() == reflect.Ptr {
+			result[redisTag] = fieldValue.Elem().Interface()
+		} else {
+			result[redisTag] = fieldValue.Interface()
+		}
+	}
+	return result
 }

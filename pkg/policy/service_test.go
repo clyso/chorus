@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -219,7 +220,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		_, err = svc.GetUserReplicationPolicies(ctx, "a")
 		r.NoError(err)
 
-		wrongReplicationIDs := []ReplicationID{
+		wrongReplicationIDs := []entity.ReplicationStatusID{
 			{
 				User:        "",
 				FromStorage: "a",
@@ -257,7 +258,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 			},
 		}
 
-		rightReplicationID := ReplicationID{
+		rightReplicationID := entity.ReplicationStatusID{
 			User:        "a",
 			FromStorage: "a",
 			ToStorage:   "b",
@@ -324,14 +325,14 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 			_, err := svc.GetUserReplicationPolicies(ctx, u)
 			r.ErrorIs(err, dom.ErrNotFound)
 			for _, b := range buckets {
-				replicationID12 := ReplicationID{
+				replicationID12 := entity.ReplicationStatusID{
 					User:        u,
 					FromStorage: s1,
 					ToStorage:   s2,
 					FromBucket:  b,
 					ToBucket:    "",
 				}
-				replicationID34 := ReplicationID{
+				replicationID34 := entity.ReplicationStatusID{
 					User:        u,
 					FromStorage: s3,
 					ToStorage:   s4,
@@ -418,35 +419,35 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
 
-		replicationIDu1s1s2 := ReplicationID{
+		replicationIDu1s1s2 := entity.ReplicationStatusID{
 			User:        u1,
 			FromStorage: s1,
 			ToStorage:   s2,
 			FromBucket:  b1,
 			ToBucket:    b1,
 		}
-		replicationIDu1s1s3 := ReplicationID{
+		replicationIDu1s1s3 := entity.ReplicationStatusID{
 			User:        u1,
 			FromStorage: s1,
 			ToStorage:   s2,
 			FromBucket:  b1,
 			ToBucket:    b1,
 		}
-		replicationIDu1s2s1 := ReplicationID{
+		replicationIDu1s2s1 := entity.ReplicationStatusID{
 			User:        u1,
 			FromStorage: s2,
 			ToStorage:   s1,
 			FromBucket:  b1,
 			ToBucket:    b1,
 		}
-		replicationIDu1s2s1b2 := ReplicationID{
+		replicationIDu1s2s1b2 := entity.ReplicationStatusID{
 			User:        u1,
 			FromStorage: s2,
 			ToStorage:   s1,
 			FromBucket:  b2,
 			ToBucket:    b2,
 		}
-		replicationIDu2s2s1 := ReplicationID{
+		replicationIDu2s2s1 := entity.ReplicationStatusID{
 			User:        u2,
 			FromStorage: s2,
 			ToStorage:   s1,
@@ -558,7 +559,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
 
-		replicationID12 := ReplicationID{
+		replicationID12 := entity.ReplicationStatusID{
 			User:        u1,
 			FromStorage: s1,
 			ToStorage:   s2,
@@ -700,7 +701,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
 
-		replicationID12 := ReplicationID{
+		replicationID12 := entity.ReplicationStatusID{
 			User:        u1,
 			FromStorage: s1,
 			ToStorage:   s2,
@@ -795,7 +796,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		res, err = svc.GetUserReplicationPolicies(ctx, u1)
 		r.ErrorIs(err, dom.ErrNotFound)
 
-		replicationIDs := []ReplicationID{
+		replicationIDs := []entity.ReplicationStatusID{
 			{
 				User:        u1,
 				FromStorage: s1,
@@ -862,7 +863,7 @@ func Test_CustomDestBucket(t *testing.T) {
 	stor := "stor"
 	stor2 := "stor2"
 	r.NoError(svc.AddUserRoutingPolicy(ctx, user, stor), "route to main storage")
-	replicationIDMatchingSrcDest := ReplicationID{
+	replicationIDMatchingSrcDest := entity.ReplicationStatusID{
 		User:        user,
 		FromStorage: stor,
 		ToStorage:   stor,
@@ -870,7 +871,7 @@ func Test_CustomDestBucket(t *testing.T) {
 		ToBucket:    srcBuck,
 	}
 
-	replicationIDDifferentBuckets := ReplicationID{
+	replicationIDDifferentBuckets := entity.ReplicationStatusID{
 		User:        user,
 		FromStorage: stor,
 		ToStorage:   stor,
@@ -878,7 +879,7 @@ func Test_CustomDestBucket(t *testing.T) {
 		ToBucket:    dstBuck,
 	}
 
-	replicationIDDifferentSrcDest := ReplicationID{
+	replicationIDDifferentSrcDest := entity.ReplicationStatusID{
 		User:        user,
 		FromStorage: stor,
 		ToStorage:   stor2,
@@ -1015,13 +1016,13 @@ func Test_CustomDestBucket(t *testing.T) {
 func TestReplicationID(t *testing.T) {
 	tests := []struct {
 		name    string
-		in      ReplicationID
+		in      entity.ReplicationStatusID
 		wantErr bool
 	}{
 		// Valid cases
 		{
 			name: "Valid basic replication ID",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user1",
 				FromBucket:  "bucket1",
 				FromStorage: "source1",
@@ -1031,7 +1032,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Valid with ToBucket",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user2",
 				FromBucket:  "bucket2",
 				FromStorage: "source2",
@@ -1042,7 +1043,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Valid with special characters (no colons)",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user-3_special",
 				FromBucket:  "bucket.3-special",
 				FromStorage: "src_3",
@@ -1054,7 +1055,7 @@ func TestReplicationID(t *testing.T) {
 		// Error cases: Missing required fields
 		{
 			name: "Empty User",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				FromBucket:  "bucket",
 				FromStorage: "from",
 				ToStorage:   "to",
@@ -1063,7 +1064,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Empty Bucket",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromStorage: "from",
 				ToStorage:   "to",
@@ -1072,7 +1073,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Empty From",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:       "user",
 				FromBucket: "bucket",
 				ToStorage:  "to",
@@ -1081,7 +1082,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Empty To",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket",
 				FromStorage: "from",
@@ -1092,7 +1093,7 @@ func TestReplicationID(t *testing.T) {
 		// Error cases: ToBucket validation
 		{
 			name: "Empty ToBucket",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket",
 				FromStorage: "from",
@@ -1103,7 +1104,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "ToBucket same as Bucket",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket",
 				FromStorage: "from",
@@ -1116,7 +1117,7 @@ func TestReplicationID(t *testing.T) {
 		// Error cases: Colon in fields
 		{
 			name: "Colon in User",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user:1",
 				FromBucket:  "bucket",
 				FromStorage: "from",
@@ -1126,7 +1127,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Colon in Bucket",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket:1",
 				FromStorage: "from",
@@ -1136,7 +1137,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Colon in From",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket",
 				FromStorage: "from:1",
@@ -1146,7 +1147,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Colon in To",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket",
 				FromStorage: "from",
@@ -1156,7 +1157,7 @@ func TestReplicationID(t *testing.T) {
 		},
 		{
 			name: "Colon in ToBucket",
-			in: ReplicationID{
+			in: entity.ReplicationStatusID{
 				User:        "user",
 				FromBucket:  "bucket",
 				FromStorage: "from",

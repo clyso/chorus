@@ -25,6 +25,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -106,7 +107,7 @@ func createReplication(
 		return err
 	}
 	for _, bucket := range buckets {
-		replicationID := policy.ReplicationID{
+		replicationID := entity.ReplicationStatusID{
 			User:        user,
 			FromStorage: from,
 			FromBucket:  bucket.Name,

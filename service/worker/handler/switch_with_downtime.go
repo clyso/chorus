@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -40,7 +41,7 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwitchWithDowntimePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
-	policyID := policy.ReplicationID{
+	policyID := entity.ReplicationStatusID{
 		User:        p.User,
 		FromBucket:  p.Bucket,
 		FromStorage: p.FromStorage,

@@ -28,10 +28,10 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -45,7 +45,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	ctx = log.WithObjName(ctx, p.Obj.Name)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        xctx.GetUser(ctx),
 		FromStorage: p.FromStorage,
 		FromBucket:  p.Bucket,
@@ -167,7 +167,7 @@ func (s *svc) HandleMigrationObjCopyHead(ctx context.Context, task *asynq.Task) 
 	ctx = log.WithObjName(ctx, payload.Obj.Name)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        xctx.GetUser(ctx),
 		FromStorage: payload.FromStorage,
 		FromBucket:  payload.Bucket,

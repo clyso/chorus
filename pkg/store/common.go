@@ -1,4 +1,4 @@
-package entity
+package store
 
 import (
 	"context"
@@ -207,7 +207,7 @@ func (r *RedisCommonStore) TxExecutor() *RedisExecutor {
 
 type Executor[T any] interface {
 	Get() T
-	Exec() error
+	Exec(ctx context.Context) error
 }
 
 type RedisExecutor struct {
@@ -220,7 +220,7 @@ func NewRedisExecutor(client redis.Pipeliner) *RedisExecutor {
 	}
 }
 
-func (r *RedisExecutor) Get() redis.Cmdable {
+func (r *RedisExecutor) Get() redis.Pipeliner {
 	return r.client
 }
 

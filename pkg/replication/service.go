@@ -26,6 +26,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
@@ -36,20 +37,19 @@ type Service interface {
 	Replicate(ctx context.Context, task tasks.SyncTask) error
 }
 
-func New(taskClient *asynq.Client, versionSvc meta.VersionService /* policySvc policy.Service */, policyService policy.PolicyService) Service {
+func New(taskClient *asynq.Client, versionSvc meta.VersionService, policySvc policy.Service) Service {
 	return &svc{
 		taskClient: taskClient,
 		versionSvc: versionSvc,
-		// policySvc:  policySvc,
-		policyService: policyService,
+		policySvc:  policySvc,
 	}
 }
 
 type svc struct {
 	taskClient *asynq.Client
 	versionSvc meta.VersionService
-	// policySvc  policy.Service
-	policyService policy.PolicyService
+	policySvc  policy.Service
+	// policySvc policy.PolicyService
 }
 
 func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
@@ -110,15 +110,15 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationStatusID{
+			replicationID := entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
-			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
+			// incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -138,14 +138,14 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationStatusID{
+			replicationID := entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			incErr := s.policySvc.AccountReplicationEvent(ctx, replicationID, t.GetDate())
 			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
@@ -166,14 +166,14 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationStatusID{
+			replicationID := entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			incErr := s.policySvc.AccountReplicationEvent(ctx, replicationID, t.GetDate())
 			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
@@ -198,14 +198,14 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationStatusID{
+			replicationID := entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			incErr := s.policySvc.AccountReplicationEvent(ctx, replicationID, t.GetDate())
 			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
@@ -226,14 +226,14 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationStatusID{
+			replicationID := entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			incErr := s.policySvc.AccountReplicationEvent(ctx, replicationID, t.GetDate())
 			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
@@ -254,14 +254,14 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationStatusID{
+			replicationID := entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: t.FromStorage,
 				ToStorage:   t.ToStorage,
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
+			incErr := s.policySvc.AccountReplicationEvent(ctx, replicationID, t.GetDate())
 			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
@@ -306,14 +306,16 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[pol
 	}, nil
 }
 
-func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (policy.ReplicationPolicies, error) {
+func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*policy.StorageBucketReplicationPolicies, error) {
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	bucketPolicy, err := s.policySvc.GetBucketReplicationPolicies(ctx, user, bucket)
+	// bucketPolicy, err := s.policySvc.GetBucketReplicationPolicies(ctx, user, bucket)
+	bucketReplicationPolicyID := *entity.NewBucketReplicationPolicyID(user, bucket)
+	bucketPolicies, err := s.policySvc.GetBucketReplicationPolicyPriorities(ctx, bucketReplicationPolicyID)
 	if err == nil {
-		return bucketPolicy, nil
+		return bucketPolicies, nil
 	}
 	if !errors.Is(err, dom.ErrNotFound) {
-		return policy.ReplicationPolicies{}, err
+		return nil, err
 	}
 	// if zero-downtime switch is in progress return empty replication policy
 	// to update obj version metadata and avoid creating replication tasks
@@ -321,26 +323,26 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (po
 	if err == nil {
 		// no-error means that zero-downtime switch in progress.
 		// return replication policy without destinations
-		return policy.ReplicationPolicies{
-			From: task.GetFrom(),
+		return &policy.StorageBucketReplicationPolicies{
+			Storage: task.GetFrom(),
 		}, nil
 	}
 
 	// policy not found. Create new bucket policy from user policy only for CreateBucket method
 	if _, ok := task.(*tasks.BucketCreatePayload); !ok {
-		return policy.ReplicationPolicies{}, fmt.Errorf("%w: replication policy not configured: %w", dom.ErrPolicy, err)
+		return nil, fmt.Errorf("%w: replication policy not configured: %w", dom.ErrPolicy, err)
 	}
 
 	userPolicy, err := s.policySvc.GetUserReplicationPolicies(ctx, user)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
-			return policy.ReplicationPolicies{}, fmt.Errorf("%w: user replication policy not configured: %w", dom.ErrPolicy, err)
+			return nil, fmt.Errorf("%w: user replication policy not configured: %w", dom.ErrPolicy, err)
 		}
-		return policy.ReplicationPolicies{}, err
+		return nil, err
 	}
 	for to, priority := range userPolicy.To {
 		toStorage, toBucket := to.Parse()
-		replicationID := policy.ReplicationID{
+		replicationID := entity.ReplicationStatusID{
 			User:        user,
 			FromStorage: userPolicy.From,
 			ToStorage:   toStorage,

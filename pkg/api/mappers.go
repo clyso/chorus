@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/policy"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
@@ -66,8 +67,8 @@ func strPtr(s string) *string {
 	return &s
 }
 
-func pbToReplicationID(in *pb.ReplicationRequest) policy.ReplicationID {
-	return policy.ReplicationID{
+func pbToReplicationID(in *pb.ReplicationRequest) entity.ReplicationStatusID {
+	return entity.ReplicationStatusID{
 		User:        in.User,
 		FromBucket:  in.Bucket,
 		FromStorage: in.From,

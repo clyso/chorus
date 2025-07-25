@@ -1,4 +1,4 @@
-package entity
+package store
 
 import (
 	"context"
@@ -78,8 +78,9 @@ func (r *ZToScoredSetEntryConverter[V, S]) Convert(entry redis.Z) (ScoredSetEntr
 }
 
 type RedisIDKeySortedSet[ID any, V any, S any] struct {
-	serializer   CollectionConverter[ScoredSetEntry[V, S], redis.Z]
-	deserializer CollectionConverter[redis.Z, ScoredSetEntry[V, S]]
+	zSerializer   CollectionConverter[ScoredSetEntry[V, S], redis.Z]
+	zDeserializer CollectionConverter[redis.Z, ScoredSetEntry[V, S]]
+	vSerializer   CollectionConverter[V, string]
 	RedisIDCommonStore[ID]
 }
 
@@ -88,8 +89,9 @@ func NewRedisIDKeySortedSet[ID any, V any, S any](client redis.Cmdable, idPrefix
 	serializeValue SingleValueConverter[V, string], deserializeValue SingleValueConverter[string, V],
 	serializeScore SingleValueConverter[S, float64], deserializeScore SingleValueConverter[float64, S]) *RedisIDKeySortedSet[ID, V, S] {
 	return &RedisIDKeySortedSet[ID, V, S]{
-		serializer:         NewSimpleCollectionConverter(NewScoredSetEntryToZConverter(serializeValue, serializeScore).Convert),
-		deserializer:       NewSimpleCollectionConverter(NewZToScoredSetEntryConverter(deserializeValue, deserializeScore).Convert),
+		zSerializer:        NewSimpleCollectionConverter(NewScoredSetEntryToZConverter(serializeValue, serializeScore).Convert),
+		zDeserializer:      NewSimpleCollectionConverter(NewZToScoredSetEntryConverter(deserializeValue, deserializeScore).Convert),
+		vSerializer:        NewSimpleCollectionConverter(serializeValue),
 		RedisIDCommonStore: *NewRedisIDCommonStore[ID](client, idPrefix, tokenizeID, restoreID),
 	}
 }
@@ -99,7 +101,7 @@ func (r *RedisIDKeySortedSet[ID, V, S]) Add(ctx context.Context, id ID, values .
 	if err != nil {
 		return 0, fmt.Errorf("unable to make key: %w", err)
 	}
-	scoredSetValues, err := r.serializer.ConvertMulti(values)
+	scoredSetValues, err := r.zSerializer.ConvertMulti(values)
 	if err != nil {
 		return 0, fmt.Errorf("unable to serialiye value: %w", err)
 	}
@@ -112,7 +114,7 @@ func (r *RedisIDKeySortedSet[ID, V, S]) AddIfNotExists(ctx context.Context, id I
 	if err != nil {
 		return 0, fmt.Errorf("unable to make key: %w", err)
 	}
-	scoredSetValues, err := r.serializer.ConvertMulti(values)
+	scoredSetValues, err := r.zSerializer.ConvertMulti(values)
 	if err != nil {
 		return 0, fmt.Errorf("unable to serialize values: %w", err)
 	}
@@ -132,19 +134,19 @@ func (r *RedisIDKeySortedSet[ID, V, S]) GetAll(ctx context.Context, id ID) ([]Sc
 	if err != nil {
 		return nil, err
 	}
-	entries, err := r.deserializer.ConvertMulti(result)
+	entries, err := r.zDeserializer.ConvertMulti(result)
 	if err != nil {
 		return nil, fmt.Errorf("unable to deserialize values: %w", err)
 	}
 	return entries, nil
 }
 
-func (r *RedisIDKeySortedSet[ID, V, S]) Remove(ctx context.Context, id ID, values ...ScoredSetEntry[V, S]) (uint64, error) {
+func (r *RedisIDKeySortedSet[ID, V, S]) Remove(ctx context.Context, id ID, values ...V) (uint64, error) {
 	key, err := r.MakeKey(id)
 	if err != nil {
 		return 0, fmt.Errorf("unable to make key: %w", err)
 	}
-	scoredSetValues, err := r.serializer.ConvertMulti(values)
+	scoredSetValues, err := r.vSerializer.ConvertMulti(values)
 	if err != nil {
 		return 0, fmt.Errorf("unable to serialize values: %w", err)
 	}

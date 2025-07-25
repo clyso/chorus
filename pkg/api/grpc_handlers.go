@@ -31,6 +31,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
@@ -342,7 +343,7 @@ func (h *handlers) ListBucketsForReplication(ctx context.Context, req *pb.ListBu
 		if errors.Is(err, dom.ErrRoutingBlock) {
 			continue
 		}
-		replicationID := policy.ReplicationID{
+		replicationID := entity.ReplicationStatusID{
 			User:        req.User,
 			FromStorage: req.From,
 			FromBucket:  bucket.Name,
@@ -426,7 +427,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 
 		// create policies:
 		for _, bucket := range req.Buckets {
-			replicationID := policy.ReplicationID{
+			replicationID := entity.ReplicationStatusID{
 				User:        req.User,
 				FromStorage: req.From,
 				FromBucket:  bucket,
@@ -494,7 +495,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 		return err
 	}
 	for _, bucket := range buckets {
-		replicationID := policy.ReplicationID{
+		replicationID := entity.ReplicationStatusID{
 			User:        req.User,
 			FromStorage: req.From,
 			FromBucket:  bucket.Name,
@@ -605,7 +606,7 @@ func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUser
 }
 
 func (h *handlers) PauseReplication(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        req.User,
 		FromStorage: req.From,
 		FromBucket:  req.Bucket,
@@ -620,7 +621,7 @@ func (h *handlers) PauseReplication(ctx context.Context, req *pb.ReplicationRequ
 }
 
 func (h *handlers) ResumeReplication(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        req.User,
 		FromStorage: req.From,
 		FromBucket:  req.Bucket,
@@ -642,7 +643,7 @@ func (h *handlers) DeleteReplication(ctx context.Context, req *pb.ReplicationReq
 	}
 	defer release()
 	err = lock.WithRefresh(ctx, func() error {
-		replicationID := policy.ReplicationID{
+		replicationID := entity.ReplicationStatusID{
 			User:        req.User,
 			FromStorage: req.From,
 			FromBucket:  req.Bucket,
@@ -711,7 +712,7 @@ func (h *handlers) StreamBucketReplication(req *pb.ReplicationRequest, server pb
 		case <-ctx.Done():
 			return nil
 		case <-timer.C:
-			replicationID := policy.ReplicationID{
+			replicationID := entity.ReplicationStatusID{
 				User:        req.User,
 				FromStorage: req.From,
 				FromBucket:  req.Bucket,
@@ -794,7 +795,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return fmt.Errorf("%w: unknown bucket %s", dom.ErrInvalidArg, req.FromBucket)
 		}
 
-		replicationID := policy.ReplicationID{
+		replicationID := entity.ReplicationStatusID{
 			User:        req.User,
 			FromStorage: req.FromStorage,
 			FromBucket:  req.FromBucket,
@@ -859,7 +860,7 @@ func (h *handlers) validateAgentURL(ctx context.Context, fromStorage string, age
 	return fmt.Errorf("%w: agent not found", dom.ErrInvalidArg)
 }
 
-func (h *handlers) createAgentBucketNotification(ctx context.Context, replicationID policy.ReplicationID, agentURL *string) error {
+func (h *handlers) createAgentBucketNotification(ctx context.Context, replicationID entity.ReplicationStatusID, agentURL *string) error {
 	if agentURL == nil || *agentURL == "" {
 		// agent is not set
 		return nil
@@ -878,7 +879,7 @@ func (h *handlers) createAgentBucketNotification(ctx context.Context, replicatio
 
 func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationRequest) (*pb.Replication, error) {
 	ctx = log.WithUser(ctx, req.User)
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        req.User,
 		FromStorage: req.From,
 		FromBucket:  req.Bucket,

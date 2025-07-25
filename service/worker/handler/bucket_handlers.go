@@ -29,9 +29,9 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -44,7 +44,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        xctx.GetUser(ctx),
 		FromStorage: p.FromStorage,
 		FromBucket:  p.Bucket,
@@ -276,7 +276,7 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        xctx.GetUser(ctx),
 		FromStorage: p.FromStorage,
 		FromBucket:  p.Bucket,

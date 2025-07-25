@@ -27,9 +27,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -40,7 +40,7 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	policyID := policy.ReplicationID{
+	policyID := entity.ReplicationStatusID{
 		User:        p.User,
 		FromBucket:  p.Bucket,
 		FromStorage: p.FromStorage,
@@ -59,9 +59,9 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 	}, refresh, time.Second*2)
 }
 
-func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID policy.ReplicationID, p tasks.ZeroDowntimeReplicationSwitchPayload) error {
+func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID entity.ReplicationStatusID, p tasks.ZeroDowntimeReplicationSwitchPayload) error {
 	// get latest replication and switch state and execute switch state machine:
-	replicationID := policy.ReplicationID{
+	replicationID := entity.ReplicationStatusID{
 		User:        p.User,
 		FromStorage: p.FromStorage,
 		FromBucket:  p.Bucket,
