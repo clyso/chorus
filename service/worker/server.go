@@ -223,6 +223,13 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeConsistencyCheckResult, workerSvc.HandleConsistencyCheckDelete)
 	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, workerSvc.HandleZeroDowntimeReplicationSwitch)
 	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, workerSvc.HandleSwitchWithDowntime)
+	// swift tasks:
+	mux.HandleFunc(tasks.TypeAccountUpdate, workerSvc.HandleAccountUpdate)
+	mux.HandleFunc(tasks.TypeContainerUpdate, workerSvc.HandleContainerUpdate)
+	mux.HandleFunc(tasks.TypeObjUpdate, workerSvc.HandleObjectUpdate)
+	mux.HandleFunc(tasks.TypeObjMetaUpdate, workerSvc.HandleObjectMetaUpdate)
+	mux.HandleFunc(tasks.TypeObjDelete, workerSvc.HandleObjectDelete)
+	mux.HandleFunc(tasks.TypeSwiftAccountMigration, workerSvc.HandleSwiftAccountMigration)
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
