@@ -43,6 +43,7 @@ import (
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
@@ -141,7 +142,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	locker := lock.New(lockRedis)
 
-	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, locker)
+	swiftClient, err := swift.New(conf.Worker)
+	if err != nil {
+		return fmt.Errorf("%w: unable to create swift client", err)
+	}
+
+	workerSvc := handler.New(conf.Worker, swiftClient, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, locker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -230,6 +236,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeObjMetaUpdate, workerSvc.HandleObjectMetaUpdate)
 	mux.HandleFunc(tasks.TypeObjDelete, workerSvc.HandleObjectDelete)
 	mux.HandleFunc(tasks.TypeSwiftAccountMigration, workerSvc.HandleSwiftAccountMigration)
+	mux.HandleFunc(tasks.TypeSwiftContainerMigration, workerSvc.HandleSwiftContainerMigration)
+	mux.HandleFunc(tasks.TypeSwiftObjectMigration, workerSvc.HandleSwiftObjectMigration)
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
