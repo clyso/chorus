@@ -188,7 +188,7 @@ message AddReplicationRequest {
   repeated string buckets = 5;
   bool is_for_all_buckets = 6;
   optional string agent_url = 7;
-  optional string to_bucket = 8;
+  string to_bucket = 8;
 }
 
 message AddBucketReplicationRequest {
@@ -201,7 +201,7 @@ message AddBucketReplicationRequest {
   // destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source.
   string to_storage = 4;
   // custom destination bucket name. if not set, destination bucket name will be equal to source bucket
-  optional string to_bucket = 5;
+  string to_bucket = 5;
   // webhook URL of chorus agent. Required if chorus agent setup is used.
   optional string agent_url = 6;
 }
@@ -246,7 +246,7 @@ message Replication {
 
   optional string agent_url = 16;
 
-  optional string to_bucket = 17;
+  string to_bucket = 17;
 
   google.protobuf.Timestamp init_done_at = 18;
 
@@ -264,7 +264,7 @@ message ReplicationRequest {
   string bucket = 2;
   string from = 3;
   string to = 4;
-  optional string to_bucket = 5;
+  string to_bucket = 5;
 }
 
 message ListUserReplicationsResponse {
@@ -291,7 +291,7 @@ message CompareBucketRequest {
   string to = 4;
   // set true to get list of matching files (match) in response
   bool show_match = 5;
-  optional string to_bucket = 6;
+  string to_bucket = 6;
 }
 
 message CompareBucketResponse {

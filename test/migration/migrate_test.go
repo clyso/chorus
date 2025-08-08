@@ -37,6 +37,7 @@ func TestApi_Migrate_test(t *testing.T) {
 
 	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b1,
+		ToBucket:  b1,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -51,6 +52,7 @@ func TestApi_Migrate_test(t *testing.T) {
 
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b2,
+		ToBucket:  b2,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -94,6 +96,7 @@ func TestApi_Migrate_test(t *testing.T) {
 
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b1,
+		ToBucket:  b1,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -109,6 +112,7 @@ func TestApi_Migrate_test(t *testing.T) {
 
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b2,
+		ToBucket:  b2,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -158,16 +162,18 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: b1,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   b1,
+			ToBucket: b1,
+			From:     "main",
+			To:       "f1",
 		})
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: b2,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   b2,
+			ToBucket: b2,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 
@@ -295,6 +301,7 @@ func TestApi_Migrate_test(t *testing.T) {
 
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b1,
+		ToBucket:  b1,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -310,6 +317,7 @@ func TestApi_Migrate_test(t *testing.T) {
 
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b2,
+		ToBucket:  b2,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: false,
@@ -388,10 +396,11 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: b1,
-			From:   "main",
-			To:     "f2",
+			User:     user,
+			Bucket:   b1,
+			ToBucket: b1,
+			From:     "main",
+			To:       "f2",
 		})
 	})
 
@@ -421,10 +430,11 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: b2,
-			From:   "main",
-			To:     "f2",
+			User:     user,
+			Bucket:   b2,
+			ToBucket: b2,
+			From:     "main",
+			To:       "f2",
 		})
 	})
 
@@ -492,6 +502,7 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.NoError(err)
 	r.Len(repl.Replications, 4)
 	cnt := 0
+
 	for i := 0; i < len(repl.Replications); i++ {
 		r.EqualValues("main", repl.Replications[i].From)
 		if repl.Replications[i].To != "f2" {

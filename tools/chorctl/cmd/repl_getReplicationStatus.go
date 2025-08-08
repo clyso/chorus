@@ -53,13 +53,14 @@ chorctl repl get -f main -t follower -u admin -b bucket1`,
 		client := pb.NewChorusClient(conn)
 
 		req := &pb.ReplicationRequest{
-			User:   rgUser,
-			Bucket: rgTo,
-			From:   rgUser,
-			To:     rgBucket,
+			User:     rgUser,
+			Bucket:   rgBucket,
+			From:     rgUser,
+			To:       rgTo,
+			ToBucket: rgToBucket,
 		}
-		if cmd.Flags().Lookup("to-bucket").Changed {
-			req.ToBucket = &rgToBucket
+		if req.ToBucket == "" {
+			req.ToBucket = rgBucket
 		}
 
 		res, err := client.GetReplication(ctx, req)

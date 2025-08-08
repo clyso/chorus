@@ -26,6 +26,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3"
 )
@@ -33,7 +34,8 @@ import (
 func (r *router) commonRead(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
+	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
+	storage, err = r.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
@@ -62,7 +64,8 @@ func (r *router) commonRead(req *http.Request) (resp *http.Response, storage str
 func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
+	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
+	storage, err = r.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
@@ -82,7 +85,8 @@ func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage st
 
 // adjustObjReadRoute adjust routing policy for read requests during switch process if old storage still has most recent obj version
 func (r *router) adjustObjReadRoute(ctx context.Context, prevStorage, user, bucket string) (string, error) {
-	_, err := r.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, user, bucket)
+	switchID := entity.NewReplicationSwitchInfoID(user, bucket)
+	_, err := r.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, switchID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			// no zero-downtime switch in progress

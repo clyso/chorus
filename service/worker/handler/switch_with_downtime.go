@@ -25,8 +25,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
-	"github.com/clyso/chorus/pkg/policy"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -40,23 +39,23 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwitchWithDowntimePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
-	policyID := policy.ReplicationID{
-		User:     p.User,
-		Bucket:   p.Bucket,
-		From:     p.FromStorage,
-		To:       p.ToStorage,
-		ToBucket: nil,
+	policyID := entity.ReplicationStatusID{
+		User:        p.User,
+		FromBucket:  p.Bucket,
+		FromStorage: p.FromStorage,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.Bucket,
 	}
 
-	// acquire exclusive lock to switch task:
-	release, refresh, err := s.locker.Lock(ctx, lock.StringKey(policyID.String()))
+	lock, err := s.replicationstatusLocker.Lock(ctx, policyID)
 	if err != nil {
 		return err
 	}
-	defer release()
-	return lock.WithRefresh(ctx, func() error {
+	defer lock.Release(ctx)
+
+	switchFunc := func() error {
 		// get latest replication and switch state and execute switch state machine:
-		replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, p.User, p.Bucket, p.FromStorage, p.ToStorage, nil)
+		replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, policyID)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
 				zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
@@ -98,7 +97,9 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 		}
 		return nil
-	}, refresh, time.Second*2)
+	}
+
+	return lock.Do(ctx, time.Second*2, switchFunc)
 }
 
 type switchResult struct {
@@ -107,28 +108,28 @@ type switchResult struct {
 }
 
 type state struct {
-	status    policy.SwitchStatus
+	status    entity.ReplicationSwitchStatus
 	message   string
 	startedAt *time.Time
 	doneAt    *time.Time
 }
 
-func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.ReplicationID, replStatus policy.ReplicationPolicyStatus, switchStatus policy.SwitchInfo) (switchResult, error) {
+func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.ReplicationStatusID, replStatus entity.ReplicationStatus, switchStatus entity.ReplicationSwitchInfo) (switchResult, error) {
 	// state machine for switch with downtime:
 	// switch statement contain all states in logical order
 	// each task handling iteration handles one state and returns new state or error
 	switch switchStatus.LastStatus {
 	// 1. Switch not started - check if it is time to start according to schedule:
-	case policy.StatusNotStarted, policy.StatusSkipped, policy.StatusError, "":
+	case entity.StatusNotStarted, entity.StatusSkipped, entity.StatusError, "":
 		// handle the case where switch is not recurring (no cron) and was already attempted:
-		alredyAttempted := switchStatus.LastStatus != policy.StatusNotStarted && switchStatus.LastStatus != ""
+		alredyAttempted := switchStatus.LastStatus != entity.StatusNotStarted && switchStatus.LastStatus != ""
 		_, isRecurring := switchStatus.GetCron()
 		if alredyAttempted && !isRecurring {
 			zerolog.Ctx(ctx).Error().Msgf("switch with downtime already executed with status %q and should not be retried: drop task", string(switchStatus.LastStatus))
 			return switchResult{
 				retryLater: false,
 				nextState: state{
-					status:  policy.StatusError,
+					status:  entity.StatusError,
 					message: "switch already executed and should not be retried",
 				},
 			}, nil
@@ -159,7 +160,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			return switchResult{
 				retryLater: true,
 				nextState: state{
-					status:  policy.StatusSkipped,
+					status:  entity.StatusSkipped,
 					message: "init replication was not done",
 				},
 			}, nil
@@ -173,7 +174,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 				return switchResult{
 					retryLater: true,
 					nextState: state{
-						status:  policy.StatusSkipped,
+						status:  entity.StatusSkipped,
 						message: fmt.Sprintf("event lag not met: %d > %d", currentLag, maxLag),
 					},
 				}, nil
@@ -184,14 +185,14 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 		return switchResult{
 			retryLater: true,
 			nextState: state{
-				status:    policy.StatusInProgress,
+				status:    entity.StatusInProgress,
 				message:   "downtime window started",
 				startedAt: &downtimeStart,
 			},
 		}, nil
 
 	// 2. Switch in progress - check migration queue drain progress and max duration to complete, cancel, or check it later:
-	case policy.StatusInProgress:
+	case entity.StatusInProgress:
 		isQueueDrained := replStatus.EventsDone >= replStatus.Events
 		if !isQueueDrained {
 			// switch is still in progress, check if max duration exceeded:
@@ -204,7 +205,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 				return switchResult{
 					retryLater: true,
 					nextState: state{
-						status:  policy.StatusError,
+						status:  entity.StatusError,
 						message: "max duration exceeded",
 					},
 				}, nil
@@ -222,13 +223,13 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 		return switchResult{
 			retryLater: true,
 			nextState: state{
-				status:  policy.StatusCheckInProgress,
+				status:  entity.StatusCheckInProgress,
 				message: "queue is drained, start buckets content check",
 			},
 		}, nil
 
 	// 3. Poll bucket check status to fail or complete switch:
-	case policy.StatusCheckInProgress:
+	case entity.StatusCheckInProgress:
 		if switchStatus.LastStartedAt == nil {
 			// should never happen
 			return switchResult{}, fmt.Errorf("switch with downtime started at is nil")
@@ -244,7 +245,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 				return switchResult{
 					retryLater: true,
 					nextState: state{
-						status:  policy.StatusError,
+						status:  entity.StatusError,
 						message: "max duration exceeded",
 					},
 				}, nil
@@ -259,7 +260,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 			return switchResult{
 				retryLater: true,
 				nextState: state{
-					status:  policy.StatusError,
+					status:  entity.StatusError,
 					message: "bucket contents are not equal",
 				},
 			}, nil
@@ -269,20 +270,20 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 		return switchResult{
 			retryLater: false,
 			nextState: state{
-				status:  policy.StatusDone,
+				status:  entity.StatusDone,
 				message: "switch done",
 				doneAt:  &doneAt,
 			},
 		}, nil
 
-	case policy.StatusDone:
+	case entity.StatusDone:
 		// should never be reached because Done is terminal state and we don't retry task.
 		// just in case double check that routing block is removed, switch routing and complete task:
 		doneAt := time.Now()
 		return switchResult{
 			retryLater: false,
 			nextState: state{
-				status:  policy.StatusDone,
+				status:  entity.StatusDone,
 				message: "switch done",
 				doneAt:  &doneAt,
 			},
@@ -292,7 +293,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id policy.Repl
 	}
 }
 
-func (s *svc) checkBuckets(_ context.Context, _ policy.ReplicationID, skip bool) (isEqual, isInProgress bool, err error) {
+func (s *svc) checkBuckets(_ context.Context, _ entity.ReplicationStatusID, skip bool) (isEqual, isInProgress bool, err error) {
 	if skip {
 		return true, false, nil
 	}

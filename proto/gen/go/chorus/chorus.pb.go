@@ -954,7 +954,7 @@ type AddReplicationRequest struct {
 	Buckets         []string               `protobuf:"bytes,5,rep,name=buckets,proto3" json:"buckets,omitempty"`
 	IsForAllBuckets bool                   `protobuf:"varint,6,opt,name=is_for_all_buckets,json=isForAllBuckets,proto3" json:"is_for_all_buckets,omitempty"`
 	AgentUrl        *string                `protobuf:"bytes,7,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`
-	ToBucket        *string                `protobuf:"bytes,8,opt,name=to_bucket,json=toBucket,proto3,oneof" json:"to_bucket,omitempty"`
+	ToBucket        string                 `protobuf:"bytes,8,opt,name=to_bucket,json=toBucket,proto3" json:"to_bucket,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1032,8 +1032,8 @@ func (x *AddReplicationRequest) GetAgentUrl() string {
 }
 
 func (x *AddReplicationRequest) GetToBucket() string {
-	if x != nil && x.ToBucket != nil {
-		return *x.ToBucket
+	if x != nil {
+		return x.ToBucket
 	}
 	return ""
 }
@@ -1049,7 +1049,7 @@ type AddBucketReplicationRequest struct {
 	// destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source.
 	ToStorage string `protobuf:"bytes,4,opt,name=to_storage,json=toStorage,proto3" json:"to_storage,omitempty"`
 	// custom destination bucket name. if not set, destination bucket name will be equal to source bucket
-	ToBucket *string `protobuf:"bytes,5,opt,name=to_bucket,json=toBucket,proto3,oneof" json:"to_bucket,omitempty"`
+	ToBucket string `protobuf:"bytes,5,opt,name=to_bucket,json=toBucket,proto3" json:"to_bucket,omitempty"`
 	// webhook URL of chorus agent. Required if chorus agent setup is used.
 	AgentUrl      *string `protobuf:"bytes,6,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1115,8 +1115,8 @@ func (x *AddBucketReplicationRequest) GetToStorage() string {
 }
 
 func (x *AddBucketReplicationRequest) GetToBucket() string {
-	if x != nil && x.ToBucket != nil {
-		return *x.ToBucket
+	if x != nil {
+		return x.ToBucket
 	}
 	return ""
 }
@@ -1310,7 +1310,7 @@ type Replication struct {
 	LastEmittedAt   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=last_emitted_at,json=lastEmittedAt,proto3" json:"last_emitted_at,omitempty"`
 	LastProcessedAt *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=last_processed_at,json=lastProcessedAt,proto3" json:"last_processed_at,omitempty"`
 	AgentUrl        *string                `protobuf:"bytes,16,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`
-	ToBucket        *string                `protobuf:"bytes,17,opt,name=to_bucket,json=toBucket,proto3,oneof" json:"to_bucket,omitempty"`
+	ToBucket        string                 `protobuf:"bytes,17,opt,name=to_bucket,json=toBucket,proto3" json:"to_bucket,omitempty"`
 	InitDoneAt      *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=init_done_at,json=initDoneAt,proto3" json:"init_done_at,omitempty"`
 	// true if given replication has associated replication switch with it.
 	HasSwitch bool `protobuf:"varint,19,opt,name=has_switch,json=hasSwitch,proto3" json:"has_switch,omitempty"`
@@ -1466,8 +1466,8 @@ func (x *Replication) GetAgentUrl() string {
 }
 
 func (x *Replication) GetToBucket() string {
-	if x != nil && x.ToBucket != nil {
-		return *x.ToBucket
+	if x != nil {
+		return x.ToBucket
 	}
 	return ""
 }
@@ -1506,7 +1506,7 @@ type ReplicationRequest struct {
 	Bucket        string                 `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
 	From          string                 `protobuf:"bytes,3,opt,name=from,proto3" json:"from,omitempty"`
 	To            string                 `protobuf:"bytes,4,opt,name=to,proto3" json:"to,omitempty"`
-	ToBucket      *string                `protobuf:"bytes,5,opt,name=to_bucket,json=toBucket,proto3,oneof" json:"to_bucket,omitempty"`
+	ToBucket      string                 `protobuf:"bytes,5,opt,name=to_bucket,json=toBucket,proto3" json:"to_bucket,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1570,8 +1570,8 @@ func (x *ReplicationRequest) GetTo() string {
 }
 
 func (x *ReplicationRequest) GetToBucket() string {
-	if x != nil && x.ToBucket != nil {
-		return *x.ToBucket
+	if x != nil {
+		return x.ToBucket
 	}
 	return ""
 }
@@ -1755,8 +1755,8 @@ type CompareBucketRequest struct {
 	From   string                 `protobuf:"bytes,3,opt,name=from,proto3" json:"from,omitempty"`
 	To     string                 `protobuf:"bytes,4,opt,name=to,proto3" json:"to,omitempty"`
 	// set true to get list of matching files (match) in response
-	ShowMatch     bool    `protobuf:"varint,5,opt,name=show_match,json=showMatch,proto3" json:"show_match,omitempty"`
-	ToBucket      *string `protobuf:"bytes,6,opt,name=to_bucket,json=toBucket,proto3,oneof" json:"to_bucket,omitempty"`
+	ShowMatch     bool   `protobuf:"varint,5,opt,name=show_match,json=showMatch,proto3" json:"show_match,omitempty"`
+	ToBucket      string `protobuf:"bytes,6,opt,name=to_bucket,json=toBucket,proto3" json:"to_bucket,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1827,8 +1827,8 @@ func (x *CompareBucketRequest) GetShowMatch() bool {
 }
 
 func (x *CompareBucketRequest) GetToBucket() string {
-	if x != nil && x.ToBucket != nil {
-		return *x.ToBucket
+	if x != nil {
+		return x.ToBucket
 	}
 	return ""
 }
@@ -2466,30 +2466,26 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"secret_key\x18\x03 \x01(\tR\tsecretKey\"m\n" +
 	"\x1bGetProxyCredentialsResponse\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x124\n" +
-	"\vcredentials\x18\x02 \x03(\v2\x12.chorus.CredentialR\vcredentials\"\xf6\x01\n" +
+	"\vcredentials\x18\x02 \x03(\v2\x12.chorus.CredentialR\vcredentials\"\xe3\x01\n" +
 	"\x15AddReplicationRequest\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x12\n" +
 	"\x04from\x18\x03 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x04 \x01(\tR\x02to\x12\x18\n" +
 	"\abuckets\x18\x05 \x03(\tR\abuckets\x12+\n" +
 	"\x12is_for_all_buckets\x18\x06 \x01(\bR\x0fisForAllBuckets\x12 \n" +
-	"\tagent_url\x18\a \x01(\tH\x00R\bagentUrl\x88\x01\x01\x12 \n" +
-	"\tto_bucket\x18\b \x01(\tH\x01R\btoBucket\x88\x01\x01B\f\n" +
+	"\tagent_url\x18\a \x01(\tH\x00R\bagentUrl\x88\x01\x01\x12\x1b\n" +
+	"\tto_bucket\x18\b \x01(\tR\btoBucketB\f\n" +
 	"\n" +
-	"_agent_urlB\f\n" +
-	"\n" +
-	"_to_bucket\"\xf4\x01\n" +
+	"_agent_url\"\xe1\x01\n" +
 	"\x1bAddBucketReplicationRequest\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12!\n" +
 	"\ffrom_storage\x18\x02 \x01(\tR\vfromStorage\x12\x1f\n" +
 	"\vfrom_bucket\x18\x03 \x01(\tR\n" +
 	"fromBucket\x12\x1d\n" +
 	"\n" +
-	"to_storage\x18\x04 \x01(\tR\ttoStorage\x12 \n" +
-	"\tto_bucket\x18\x05 \x01(\tH\x00R\btoBucket\x88\x01\x01\x12 \n" +
-	"\tagent_url\x18\x06 \x01(\tH\x01R\bagentUrl\x88\x01\x01B\f\n" +
-	"\n" +
-	"_to_bucketB\f\n" +
+	"to_storage\x18\x04 \x01(\tR\ttoStorage\x12\x1b\n" +
+	"\tto_bucket\x18\x05 \x01(\tR\btoBucket\x12 \n" +
+	"\tagent_url\x18\x06 \x01(\tH\x00R\bagentUrl\x88\x01\x01B\f\n" +
 	"\n" +
 	"_agent_url\"\x83\x01\n" +
 	" ListBucketsForReplicationRequest\x12\x12\n" +
@@ -2501,7 +2497,7 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\abuckets\x18\x01 \x03(\tR\abuckets\x12-\n" +
 	"\x12replicated_buckets\x18\x02 \x03(\tR\x11replicatedBuckets\"S\n" +
 	"\x18ListReplicationsResponse\x127\n" +
-	"\freplications\x18\x01 \x03(\v2\x13.chorus.ReplicationR\freplications\"\xd7\x06\n" +
+	"\freplications\x18\x01 \x03(\v2\x13.chorus.ReplicationR\freplications\"\xc4\x06\n" +
 	"\vReplication\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
@@ -2522,8 +2518,8 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"eventsDone\x12B\n" +
 	"\x0flast_emitted_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\rlastEmittedAt\x12F\n" +
 	"\x11last_processed_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x0flastProcessedAt\x12 \n" +
-	"\tagent_url\x18\x10 \x01(\tH\x00R\bagentUrl\x88\x01\x01\x12 \n" +
-	"\tto_bucket\x18\x11 \x01(\tH\x01R\btoBucket\x88\x01\x01\x12<\n" +
+	"\tagent_url\x18\x10 \x01(\tH\x00R\bagentUrl\x88\x01\x01\x12\x1b\n" +
+	"\tto_bucket\x18\x11 \x01(\tR\btoBucket\x12<\n" +
 	"\finit_done_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"initDoneAt\x12\x1d\n" +
 	"\n" +
@@ -2533,17 +2529,13 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\varchived_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"archivedAtB\f\n" +
 	"\n" +
-	"_agent_urlB\f\n" +
-	"\n" +
-	"_to_bucket\"\x94\x01\n" +
+	"_agent_url\"\x81\x01\n" +
 	"\x12ReplicationRequest\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
 	"\x04from\x18\x03 \x01(\tR\x04from\x12\x0e\n" +
-	"\x02to\x18\x04 \x01(\tR\x02to\x12 \n" +
-	"\tto_bucket\x18\x05 \x01(\tH\x00R\btoBucket\x88\x01\x01B\f\n" +
-	"\n" +
-	"_to_bucket\"[\n" +
+	"\x02to\x18\x04 \x01(\tR\x02to\x12\x1b\n" +
+	"\tto_bucket\x18\x05 \x01(\tR\btoBucket\"[\n" +
 	"\x1cListUserReplicationsResponse\x12;\n" +
 	"\freplications\x18\x01 \x03(\v2\x17.chorus.UserReplicationR\freplications\"I\n" +
 	"\x0fUserReplication\x12\x12\n" +
@@ -2554,17 +2546,15 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x12\n" +
 	"\x04from\x18\x02 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x03 \x01(\tR\x02to\x12<\n" +
-	"\x1adelete_bucket_replications\x18\x04 \x01(\bR\x18deleteBucketReplications\"\xb5\x01\n" +
+	"\x1adelete_bucket_replications\x18\x04 \x01(\bR\x18deleteBucketReplications\"\xa2\x01\n" +
 	"\x14CompareBucketRequest\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
 	"\x04from\x18\x03 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x04 \x01(\tR\x02to\x12\x1d\n" +
 	"\n" +
-	"show_match\x18\x05 \x01(\bR\tshowMatch\x12 \n" +
-	"\tto_bucket\x18\x06 \x01(\tH\x00R\btoBucket\x88\x01\x01B\f\n" +
-	"\n" +
-	"_to_bucket\"\xac\x01\n" +
+	"show_match\x18\x05 \x01(\bR\tshowMatch\x12\x1b\n" +
+	"\tto_bucket\x18\x06 \x01(\tR\btoBucket\"\xac\x01\n" +
 	"\x15CompareBucketResponse\x12\x19\n" +
 	"\bis_match\x18\x01 \x01(\bR\aisMatch\x12\x1b\n" +
 	"\tmiss_from\x18\x02 \x03(\tR\bmissFrom\x12\x17\n" +
@@ -2805,8 +2795,6 @@ func file_chorus_chorus_proto_init() {
 	file_chorus_chorus_proto_msgTypes[14].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[15].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[19].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[20].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[24].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[28].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[29].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[30].OneofWrappers = []any{}

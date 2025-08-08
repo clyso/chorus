@@ -29,6 +29,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -43,7 +44,14 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        xctx.GetUser(ctx),
+		FromStorage: p.FromStorage,
+		FromBucket:  p.Bucket,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.ToBucket,
+	}
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -130,8 +138,8 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
 	toBucketName := p.Bucket
-	if p.ToBucket != nil {
-		toBucketName = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucketName = p.ToBucket
 	}
 	// check if bucket already exists:
 	_, err := toClient.AWS().HeadBucketWithContext(ctx, &s3.HeadBucketInput{
@@ -178,8 +186,8 @@ func (s *svc) bucketCopyLC(ctx context.Context, fromClient, toClient s3client.Cl
 		return nil
 	}
 	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucket = p.ToBucket
 	}
 
 	fromLC, err := fromClient.S3().GetBucketLifecycle(ctx, fromBucket)
@@ -208,8 +216,8 @@ func (s *svc) bucketCopyPolicy(ctx context.Context, fromClient, toClient s3clien
 		return nil
 	}
 	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucket = p.ToBucket
 	}
 
 	fromPolicy, err := fromClient.S3().GetBucketPolicy(ctx, fromBucket)
@@ -238,8 +246,8 @@ func (s *svc) bucketCopyVersioning(ctx context.Context, fromClient, toClient s3c
 		return nil
 	}
 	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucket = p.ToBucket
 	}
 
 	fromVer, err := fromClient.S3().GetBucketVersioning(ctx, fromBucket)
@@ -268,7 +276,14 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        xctx.GetUser(ctx),
+		FromStorage: p.FromStorage,
+		FromBucket:  p.Bucket,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.ToBucket,
+	}
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -289,15 +304,15 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 		if err != nil {
 			return
 		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+		verErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
 		if verErr != nil {
 			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
 		}
 	}()
 
 	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucket = p.ToBucket
 	}
 	srcExists, err := fromClient.S3().BucketExists(ctx, fromBucket)
 	if err != nil {

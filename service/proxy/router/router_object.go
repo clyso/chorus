@@ -26,6 +26,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -33,7 +34,8 @@ import (
 func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
+	routingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
+	storage, err = r.policySvc.GetRoutingPolicy(ctx, routingPolicyID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
@@ -87,7 +89,8 @@ func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []t
 func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
+	routingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
+	storage, err = r.policySvc.GetRoutingPolicy(ctx, routingPolicyID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)

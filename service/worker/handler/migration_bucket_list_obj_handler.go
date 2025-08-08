@@ -29,6 +29,9 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
+
+	// "github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -42,7 +45,14 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        xctx.GetUser(ctx),
+		FromStorage: p.FromStorage,
+		FromBucket:  p.Bucket,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.ToBucket,
+	}
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -68,6 +78,13 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	if err != nil {
 		return err
 	}
+
+	// versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
+	// if err != nil {
+	// 	return fmt.Errorf("unable to get bucket versioning config: %w", err)
+	// }
+
+	// shouldListVersions := versioningConfig.Enabled() && features.Versioning(ctx)
 
 	objects := fromClient.S3().ListObjects(ctx, p.Bucket, mclient.ListObjectsOptions{StartAfter: lastObjName, Prefix: p.Prefix})
 	objectsNum := 0
@@ -98,6 +115,27 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			continue
 		}
 		p.Sync.InitDate()
+		// if shouldListVersions {
+		// 	task, err := tasks.NewTask(ctx, tasks.ListObjectVersionsPayload{
+		// 		Sync:   p.Sync,
+		// 		Bucket: p.Bucket,
+		// 		Prefix: object.Key,
+		// 	})
+
+		// 	if err != nil {
+		// 		return fmt.Errorf("unable to create list object versions task: %w", err)
+		// 	}
+		// 	_, err = s.taskClient.EnqueueContext(ctx, task)
+		// 	if err != nil {
+		// 		if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
+		// 			logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+		// 			continue
+		// 		}
+		// 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
+		// 	}
+
+		// 	continue
+		// }
 		task, err := tasks.NewTask(ctx, tasks.MigrateObjCopyPayload{
 			Sync:   p.Sync,
 			Bucket: p.Bucket,
@@ -120,7 +158,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			}
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		}
-		err = s.policySvc.IncReplInitObjListed(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, object.Size, p.GetDate())
+		err = s.policySvc.IncReplInitObjListed(ctx, replicationID, uint64(object.Size), p.GetDate())
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)
 		}
@@ -152,7 +190,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		case err != nil:
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		default:
-			err = s.policySvc.IncReplInitObjListed(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, 0, p.GetDate())
+			err = s.policySvc.IncReplInitObjListed(ctx, replicationID, 0, p.GetDate())
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)
 			}
@@ -161,7 +199,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	_ = s.storageSvc.DelLastListedObj(ctx, p)
 
 	if p.Prefix == "" {
-		err = s.policySvc.ObjListStarted(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+		err = s.policySvc.ObjListStarted(ctx, replicationID)
 		if err != nil {
 			logger.Err(err).Msg("migration bucket list obj: unable to set ObjListStarted")
 		}

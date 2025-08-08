@@ -31,7 +31,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/notifications"
@@ -41,7 +41,9 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/pkg/validate"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
@@ -50,25 +52,44 @@ const (
 	defaultZeroDowntimeMultipartTTL = time.Hour
 )
 
-func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client, rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService, storageSvc storage.Service, locker lock.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient, notificationSvc *notifications.Service, appInfo *dom.AppInfo) pb.ChorusServer {
-	return &handlers{storages: storages, rclone: rclone, s3clients: s3clients, taskClient: taskClient, policySvc: policySvc, versionSvc: versionSvc, storageSvc: storageSvc, locker: locker, proxyClient: proxyClient, agentClient: agentClient, notificationSvc: notificationSvc, appInfo: appInfo}
+func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client,
+	rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService,
+	storageSvc storage.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient,
+	notificationSvc *notifications.Service, replicationStatusLocker *store.ReplicationStatusLocker,
+	userLocker *store.UserLocker, appInfo *dom.AppInfo) pb.ChorusServer {
+	return &handlers{
+		storages:                storages,
+		rclone:                  rclone,
+		s3clients:               s3clients,
+		taskClient:              taskClient,
+		policySvc:               policySvc,
+		versionSvc:              versionSvc,
+		storageSvc:              storageSvc,
+		proxyClient:             proxyClient,
+		agentClient:             agentClient,
+		notificationSvc:         notificationSvc,
+		replicationStatusLocker: replicationStatusLocker,
+		userLocker:              userLocker,
+		appInfo:                 appInfo,
+	}
 }
 
 var _ pb.ChorusServer = &handlers{}
 
 type handlers struct {
-	storages        *s3.StorageConfig
-	s3clients       s3client.Service
-	taskClient      *asynq.Client
-	rclone          rclone.Service
-	policySvc       policy.Service
-	versionSvc      meta.VersionService
-	storageSvc      storage.Service
-	locker          lock.Service
-	proxyClient     rpc.Proxy
-	agentClient     *rpc.AgentClient
-	notificationSvc *notifications.Service
-	appInfo         *dom.AppInfo
+	storages                *s3.StorageConfig
+	s3clients               s3client.Service
+	taskClient              *asynq.Client
+	rclone                  rclone.Service
+	policySvc               policy.Service
+	versionSvc              meta.VersionService
+	storageSvc              storage.Service
+	proxyClient             rpc.Proxy
+	agentClient             *rpc.AgentClient
+	notificationSvc         *notifications.Service
+	appInfo                 *dom.AppInfo
+	replicationStatusLocker *store.ReplicationStatusLocker
+	userLocker              *store.UserLocker
 }
 
 func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
@@ -346,11 +367,19 @@ func (h *handlers) ListBucketsForReplication(ctx context.Context, req *pb.ListBu
 	res := &pb.ListBucketsForReplicationResponse{}
 
 	for _, bucket := range buckets {
-		_, err = h.policySvc.GetRoutingPolicy(ctx, req.User, bucket.Name)
+		bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(req.User, bucket.Name)
+		_, err = h.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
 		if errors.Is(err, dom.ErrRoutingBlock) {
 			continue
 		}
-		exists, err := h.policySvc.IsReplicationPolicyExists(ctx, req.User, bucket.Name, req.From, req.To, nil)
+		replicationID := entity.ReplicationStatusID{
+			User:        req.User,
+			FromStorage: req.From,
+			FromBucket:  bucket.Name,
+			ToStorage:   req.To,
+			ToBucket:    bucket.Name,
+		}
+		exists, err := h.policySvc.IsReplicationPolicyExists(ctx, replicationID)
 		if err != nil {
 			return nil, err
 		}
@@ -380,12 +409,13 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 		return nil, fmt.Errorf("%w: from and to should be different", dom.ErrInvalidArg)
 	}
 	ctx = log.WithUser(ctx, req.User)
-	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second*5), lock.WithRetry(true))
+	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second*5), store.WithRetry(true))
+	// release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second*5), lock.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second*5, func() error {
 		if req.IsForAllBuckets {
 			// create user replication policy:
 			err := h.addUserReplication(ctx, req)
@@ -415,7 +445,8 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			if !ok {
 				return fmt.Errorf("%w: unknown bucket %s", dom.ErrInvalidArg, bucket)
 			}
-			route, err := h.policySvc.GetRoutingPolicy(ctx, req.User, bucket)
+			bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(req.User, bucket)
+			route, err := h.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
 			if err == nil && route != req.From {
 				return fmt.Errorf("%w: from storage %s is different from bucket %s routing policy storage %s", dom.ErrInvalidArg, req.From, bucket, route)
 			}
@@ -427,7 +458,14 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 
 		// create policies:
 		for _, bucket := range req.Buckets {
-			err = h.policySvc.AddBucketReplicationPolicy(ctx, req.User, bucket, req.From, req.To, nil, tasks.PriorityDefault1, req.AgentUrl)
+			replicationID := entity.ReplicationStatusID{
+				User:        req.User,
+				FromStorage: req.From,
+				FromBucket:  bucket,
+				ToStorage:   req.To,
+				ToBucket:    bucket,
+			}
+			err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, req.AgentUrl)
 			if err != nil {
 				if errors.Is(err, dom.ErrAlreadyExists) {
 					continue
@@ -435,7 +473,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 				return err
 			}
 			// create bucket notification for agent:
-			err = h.createAgentBucketNotification(ctx, req.User, req.From, bucket, req.To, nil, req.AgentUrl)
+			err = h.createAgentBucketNotification(ctx, replicationID, req.AgentUrl)
 			if err != nil {
 				return err
 			}
@@ -443,6 +481,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 				Sync: tasks.Sync{
 					FromStorage: req.From,
 					ToStorage:   req.To,
+					ToBucket:    bucket,
 				},
 				Bucket: bucket,
 			})
@@ -455,7 +494,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			}
 		}
 		return nil
-	}, refresh, time.Second*5)
+	})
 
 	if err != nil {
 		return nil, err
@@ -483,12 +522,20 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 	if err != nil {
 		return err
 	}
-	err = h.policySvc.AddUserReplicationPolicy(ctx, req.User, req.From, req.To, tasks.PriorityDefault1)
+	userReplicationPolicy := entity.NewUserReplicationPolicy(req.From, req.To)
+	err = h.policySvc.AddUserReplicationPolicy(ctx, req.User, userReplicationPolicy, tasks.PriorityDefault1)
 	if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
 		return err
 	}
 	for _, bucket := range buckets {
-		err = h.policySvc.AddBucketReplicationPolicy(ctx, req.User, bucket.Name, req.From, req.To, nil, tasks.PriorityDefault1, nil)
+		replicationID := entity.ReplicationStatusID{
+			User:        req.User,
+			FromStorage: req.From,
+			FromBucket:  bucket.Name,
+			ToStorage:   req.To,
+			ToBucket:    bucket.Name,
+		}
+		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {
 				continue
@@ -499,6 +546,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 			Sync: tasks.Sync{
 				FromStorage: req.From,
 				ToStorage:   req.To,
+				ToBucket:    bucket.Name,
 			},
 			Bucket: bucket.Name,
 		})
@@ -518,9 +566,9 @@ func (h *handlers) ListReplications(ctx context.Context, _ *emptypb.Empty) (*pb.
 	if err != nil {
 		return nil, err
 	}
-	res := make([]*pb.Replication, len(replications))
-	for i, replication := range replications {
-		res[i] = replicationToPb(replication)
+	res := make([]*pb.Replication, 0, len(replications))
+	for k, v := range replications {
+		res = append(res, replicationToPb(k, v))
 	}
 	sort.Slice(res, func(i, j int) bool {
 		return res[i].CreatedAt.AsTime().After(res[j].CreatedAt.AsTime())
@@ -539,11 +587,11 @@ func (h *handlers) ListUserReplications(ctx context.Context, _ *emptypb.Empty) (
 			}
 			return nil, err
 		}
-		for to := range policies.To {
+		for to := range policies.Destinations {
 			res = append(res, &pb.UserReplication{
 				User: user,
-				From: policies.From,
-				To:   string(to),
+				From: policies.FromStorage,
+				To:   to.Storage,
 			})
 		}
 	}
@@ -552,13 +600,14 @@ func (h *handlers) ListUserReplications(ctx context.Context, _ *emptypb.Empty) (
 
 func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUserReplicationRequest) (*emptypb.Empty, error) {
 	ctx = log.WithUser(ctx, req.User)
-	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second), lock.WithRetry(true))
+	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
-		err = h.policySvc.DeleteUserReplication(ctx, req.User, req.From, req.To)
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
+		userReplicationPolicy := entity.NewUserReplicationPolicy(req.From, req.To)
+		err = h.policySvc.DeleteUserReplication(ctx, req.User, userReplicationPolicy)
 		if err != nil {
 			return err
 		}
@@ -570,11 +619,11 @@ func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUser
 			return err
 		}
 		for _, bucket := range deleted {
-			err = h.versionSvc.DeleteBucketMeta(ctx, meta.ToDest(req.To, nil), bucket)
+			err = h.versionSvc.DeleteBucketMeta(ctx, meta.ToDest(req.To, ""), bucket)
 			if err != nil {
 				zerolog.Ctx(ctx).Err(err).Msg("unable to delete bucket version metadata")
 			}
-			err = h.storageSvc.CleanLastListedObj(ctx, req.From, req.To, bucket, nil)
+			err = h.storageSvc.CleanLastListedObj(ctx, req.From, req.To, bucket, bucket)
 			if err != nil {
 				zerolog.Ctx(ctx).Err(err).Msg("unable to delete bucket obj list metadata")
 			}
@@ -584,7 +633,7 @@ func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUser
 			}
 		}
 		return nil
-	}, refresh, time.Second)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +641,14 @@ func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUser
 }
 
 func (h *handlers) PauseReplication(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
-	err := h.policySvc.PauseReplication(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        req.User,
+		FromStorage: req.From,
+		FromBucket:  req.Bucket,
+		ToStorage:   req.To,
+		ToBucket:    req.ToBucket,
+	}
+	err := h.policySvc.PauseReplication(ctx, replicationID)
 	if err != nil {
 		return nil, err
 	}
@@ -600,7 +656,14 @@ func (h *handlers) PauseReplication(ctx context.Context, req *pb.ReplicationRequ
 }
 
 func (h *handlers) ResumeReplication(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
-	err := h.policySvc.ResumeReplication(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        req.User,
+		FromStorage: req.From,
+		FromBucket:  req.Bucket,
+		ToStorage:   req.To,
+		ToBucket:    req.ToBucket,
+	}
+	err := h.policySvc.ResumeReplication(ctx, replicationID)
 	if err != nil {
 		return nil, err
 	}
@@ -609,13 +672,20 @@ func (h *handlers) ResumeReplication(ctx context.Context, req *pb.ReplicationReq
 
 func (h *handlers) DeleteReplication(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
 	ctx = log.WithUser(ctx, req.User)
-	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second), lock.WithRetry(true))
+	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
-		err = h.policySvc.DeleteReplication(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
+		replicationID := entity.ReplicationStatusID{
+			User:        req.User,
+			FromStorage: req.From,
+			FromBucket:  req.Bucket,
+			ToStorage:   req.To,
+			ToBucket:    req.ToBucket,
+		}
+		err = h.policySvc.DeleteReplication(ctx, replicationID)
 		if err != nil {
 			return fmt.Errorf("%w: unable to delete replication policy", err)
 		}
@@ -632,7 +702,7 @@ func (h *handlers) DeleteReplication(ctx context.Context, req *pb.ReplicationReq
 			zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
 		}
 		return nil
-	}, refresh, time.Second)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -677,18 +747,18 @@ func (h *handlers) StreamBucketReplication(req *pb.ReplicationRequest, server pb
 		case <-ctx.Done():
 			return nil
 		case <-timer.C:
-			m, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
+			replicationID := entity.ReplicationStatusID{
+				User:        req.User,
+				FromStorage: req.From,
+				FromBucket:  req.Bucket,
+				ToStorage:   req.To,
+				ToBucket:    req.ToBucket,
+			}
+			m, err := h.policySvc.GetReplicationPolicyInfo(ctx, replicationID)
 			if err != nil {
 				return err
 			}
-			pol := replicationToPb(policy.ReplicationPolicyStatusExtended{
-				ReplicationPolicyStatus: m,
-				User:                    req.User,
-				Bucket:                  req.Bucket,
-				From:                    req.From,
-				To:                      req.To,
-				ToBucket:                req.ToBucket,
-			})
+			pol := replicationToPb(replicationID, m)
 			if prev == nil || !proto.Equal(prev, pol) {
 				prev = pol
 				err = server.Send(pol)
@@ -728,13 +798,13 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.User)
 	}
 	ctx = log.WithUser(ctx, req.User)
-	release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second*5), lock.WithRetry(true))
+	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second*5), store.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+	defer lock.Release(ctx)
 	// obtain lock and try to add replication policy
-	err = lock.WithRefresh(ctx, func() error {
+	err = lock.Do(ctx, time.Second*5, func() error {
 		client, err := h.s3clients.GetByName(ctx, req.FromStorage)
 		if err != nil {
 			return err
@@ -753,13 +823,20 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return fmt.Errorf("%w: unknown bucket %s", dom.ErrInvalidArg, req.FromBucket)
 		}
 
+		replicationID := entity.ReplicationStatusID{
+			User:        req.User,
+			FromStorage: req.FromStorage,
+			FromBucket:  req.FromBucket,
+			ToStorage:   req.ToStorage,
+			ToBucket:    req.ToBucket,
+		}
 		// create policy:
-		err = h.policySvc.AddBucketReplicationPolicy(ctx, req.User, req.FromBucket, req.FromStorage, req.ToStorage, req.ToBucket, tasks.PriorityDefault1, req.AgentUrl)
+		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, req.AgentUrl)
 		if err != nil {
 			return err
 		}
 		// create bucket notification for agent:
-		err = h.createAgentBucketNotification(ctx, req.User, req.FromStorage, req.FromBucket, req.ToStorage, req.ToBucket, req.AgentUrl)
+		err = h.createAgentBucketNotification(ctx, replicationID, req.AgentUrl)
 		if err != nil {
 			return err
 		}
@@ -780,7 +857,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return err
 		}
 		return nil
-	}, refresh, time.Second*5)
+	})
 
 	if err != nil {
 		return nil, err
@@ -811,17 +888,17 @@ func (h *handlers) validateAgentURL(ctx context.Context, fromStorage string, age
 	return fmt.Errorf("%w: agent not found", dom.ErrInvalidArg)
 }
 
-func (h *handlers) createAgentBucketNotification(ctx context.Context, user, fromStorage, fromBucket, toStorage string, toBucket, agentURL *string) error {
+func (h *handlers) createAgentBucketNotification(ctx context.Context, replicationID entity.ReplicationStatusID, agentURL *string) error {
 	if agentURL == nil || *agentURL == "" {
 		// agent is not set
 		return nil
 	}
 	// create a topic and bucket notification for agent event source.
-	err := h.notificationSvc.SubscribeToBucketNotifications(ctx, fromStorage, user, fromBucket, *agentURL)
+	err := h.notificationSvc.SubscribeToBucketNotifications(ctx, replicationID.FromStorage, replicationID.User, replicationID.FromBucket, *agentURL)
 	if err != nil {
-		cleanupErr := h.policySvc.DeleteReplication(context.Background(), user, fromBucket, fromStorage, toStorage, toBucket)
+		cleanupErr := h.policySvc.DeleteReplication(context.Background(), replicationID)
 		if cleanupErr != nil {
-			zerolog.Ctx(ctx).Err(cleanupErr).Msgf("unable to cleanup replication policy for bucket %s", fromBucket)
+			zerolog.Ctx(ctx).Err(cleanupErr).Msgf("unable to cleanup replication policy for bucket %s", replicationID.FromBucket)
 		}
 		return err
 	}
@@ -830,19 +907,19 @@ func (h *handlers) createAgentBucketNotification(ctx context.Context, user, from
 
 func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationRequest) (*pb.Replication, error) {
 	ctx = log.WithUser(ctx, req.User)
-	status, err := h.policySvc.GetReplicationPolicyInfo(ctx, req.User, req.Bucket, req.From, req.To, req.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        req.User,
+		FromStorage: req.From,
+		FromBucket:  req.Bucket,
+		ToStorage:   req.To,
+		ToBucket:    req.ToBucket,
+	}
+	status, err := h.policySvc.GetReplicationPolicyInfo(ctx, replicationID)
 	if err != nil {
 		return nil, err
 	}
 	// Convert the status to the protobuf representation and return it
-	return replicationToPb(policy.ReplicationPolicyStatusExtended{
-		ReplicationPolicyStatus: status,
-		User:                    req.User,
-		Bucket:                  req.Bucket,
-		From:                    req.From,
-		To:                      req.To,
-		ToBucket:                req.ToBucket,
-	}), nil
+	return replicationToPb(replicationID, status), nil
 }
 
 func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest) (*emptypb.Empty, error) {
@@ -859,23 +936,23 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
 		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
 	}
-	if req.ReplicationId.ToBucket != nil && *req.ReplicationId.ToBucket != "" && *req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
+	if req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
 		// TODO: support replication to different bucket name in a separate PR.
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
 	}
-	req.ReplicationId.ToBucket = nil
+	// req.ReplicationId.ToBucket = ""
 
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
-	if err := policyID.Validate(); err != nil {
+	if err := validate.ReplicationStatusID(policyID); err != nil {
 		return nil, err
 	}
-	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
+	lock, err := h.replicationStatusLocker.Lock(ctx, policyID, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
 		// persist switch metadata
 		err = h.policySvc.SetDowntimeReplicationSwitch(ctx, policyID, pbToDowntimeOpts(req.DowntimeOpts))
 		if err != nil {
@@ -897,7 +974,7 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 			return fmt.Errorf("unable to enqueue switch task: %w", err)
 		}
 		return nil
-	}, refresh, time.Second)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -918,26 +995,26 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
 		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
 	}
-	if req.ReplicationId.ToBucket != nil && *req.ReplicationId.ToBucket != "" && *req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
+	if req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
 		// TODO: support replication to different bucket name in a separate PR.
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
 	}
-	req.ReplicationId.ToBucket = nil
+	// req.ReplicationId.ToBucket = ""
 
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
-	if err := policyID.Validate(); err != nil {
+	if err := validate.ReplicationStatusID(policyID); err != nil {
 		return nil, err
 	}
 
-	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
+	lock, err := h.replicationStatusLocker.Lock(ctx, policyID, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
 		// persist switch metadata
-		opts := &policy.SwitchZeroDowntimeOpts{
+		opts := &entity.ReplicationSwitchZeroDowntimeOpts{
 			MultipartTTL: defaultZeroDowntimeMultipartTTL,
 		}
 		if req.MultipartTtl != nil && req.MultipartTtl.AsDuration() > 0 {
@@ -967,7 +1044,7 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 			return err
 		}
 		return nil
-	}, refresh, time.Second)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -981,17 +1058,17 @@ func (h *handlers) DeleteBucketSwitch(ctx context.Context, req *pb.ReplicationRe
 	}
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req)
-	if err := policyID.Validate(); err != nil {
+	if err := validate.ReplicationStatusID(policyID); err != nil {
 		return nil, err
 	}
-	release, refresh, err := h.locker.Lock(ctx, lock.StringKey(policyID.String()), lock.WithDuration(time.Second), lock.WithRetry(true))
+	lock, err := h.replicationStatusLocker.Lock(ctx, policyID, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
 		return h.policySvc.DeleteReplicationSwitch(ctx, policyID)
-	}, refresh, time.Second)
+	})
 	if err != nil {
 		return nil, err
 	}

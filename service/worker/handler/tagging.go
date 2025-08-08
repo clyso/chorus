@@ -29,8 +29,8 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
-	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -44,7 +44,14 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        xctx.GetUser(ctx),
+		FromStorage: p.FromStorage,
+		FromBucket:  p.Bucket,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.ToBucket,
+	}
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -61,16 +68,16 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	bucketRelease, _, err := s.locker.Lock(ctx, lock.BucketKey(p.ToStorage, p.Bucket))
+	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.ToStorage, p.ToBucket))
 	if err != nil {
 		return err
 	}
-	defer bucketRelease()
+	defer lock.Release(ctx)
 	err = s.syncBucketTagging(ctx, fromClient, toClient, p.Bucket, p.ToBucket)
 	if err != nil {
 		return err
 	}
-	incErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+	incErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
 	if incErr != nil {
 		zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc processed events")
 	}
@@ -85,7 +92,14 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        xctx.GetUser(ctx),
+		FromStorage: p.FromStorage,
+		FromBucket:  p.Object.Bucket,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.ToBucket,
+	}
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -102,24 +116,25 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	release, _, err := s.locker.Lock(ctx, lock.ObjKey(p.ToStorage, p.Object))
+	objectLockID := entity.NewObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
+	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err
 	}
-	defer release()
+	defer lock.Release(ctx)
 
 	err = s.syncObjectTagging(ctx, fromClient, toClient, p.Object.Bucket, p.Object.Name, p.ToBucket)
 	if err != nil {
 		return err
 	}
-	incErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+	incErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
 	if incErr != nil {
 		zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc processed events")
 	}
 	return nil
 }
 
-func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3client.Client, fromBucket string, toBucket *string) error {
+func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3client.Client, fromBucket string, toBucket string) error {
 	if !features.Tagging(ctx) {
 		zerolog.Ctx(ctx).Info().Msg("Tagging feature is disabled: skip bucket tags sync")
 		return nil
@@ -128,7 +143,7 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(fromClient.Name(), nil)]
+	fromVer := versions[meta.ToDest(fromClient.Name(), "")]
 	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
@@ -140,8 +155,8 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 
 	// destination bucket name is equal to source bucke name unless toBucket param is set
 	toBucketName := fromBucket
-	if toBucket != nil {
-		toBucketName = *toBucket
+	if toBucket != "" {
+		toBucketName = toBucket
 	}
 	var mcErr mclient.ErrorResponse
 	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
@@ -180,7 +195,7 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 	return nil
 }
 
-func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3client.Client, fromBucket, object string, toBucket *string) error {
+func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3client.Client, fromBucket, object string, toBucket string) error {
 	if !features.Tagging(ctx) {
 		zerolog.Ctx(ctx).Info().Msg("Tagging feature is disabled: skip object tags sync")
 		return nil
@@ -189,7 +204,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(fromClient.Name(), nil)]
+	fromVer := versions[meta.ToDest(fromClient.Name(), "")]
 	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
@@ -201,8 +216,8 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 
 	// destination bucket name is equal to source bucke name unless toBucket param is set
 	toBucketName := fromBucket
-	if toBucket != nil {
-		toBucketName = *toBucket
+	if toBucket != "" {
+		toBucketName = toBucket
 	}
 	var mcErr mclient.ErrorResponse
 	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
