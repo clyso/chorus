@@ -26,6 +26,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -33,8 +34,8 @@ import (
 func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tasks.BucketCreatePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
+	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
+	storage, err = r.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
 	if err != nil {
 		return
 	}
@@ -56,7 +57,7 @@ func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tas
 	}
 
 	// create task:
-	task = &tasks.BucketCreatePayload{Bucket: bucket, Location: reqBody.Location, Sync: tasks.Sync{FromStorage: storage}}
+	task = &tasks.BucketCreatePayload{Bucket: bucket, Location: reqBody.Location, Sync: tasks.Sync{FromStorage: storage, ToBucket: bucket}}
 
 	return
 }
@@ -64,7 +65,8 @@ func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tas
 func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tasks.BucketDeletePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, user, bucket)
+	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
+	storage, err = r.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)

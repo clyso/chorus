@@ -79,7 +79,7 @@ type Service interface {
 	GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error)
 	SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error
 	DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error
-	CleanLastListedObj(ctx context.Context, fromStor, toStor, fromBucket string, toBucket *string) error
+	CleanLastListedObj(ctx context.Context, fromStor, toStor, fromBucket string, toBucket string) error
 
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
 	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
@@ -113,6 +113,12 @@ type Service interface {
 	SetConsistencyCheckStorages(ctx context.Context, id string, storages []string) error
 	GetConsistencyCheckStorages(ctx context.Context, id string) ([]string, error)
 	DeleteConsistencyCheckStorages(ctx context.Context, id string) error
+
+	GetLastListedObjectVersion(ctx context.Context, bucket string, object string) (string, error)
+	StoreObjectVersions(ctx context.Context, bucket string, object string, versions ...string) error
+	DeleteObjectVersions(ctx context.Context, bucket string, object string) error
+	FindObjectVersionIndex(ctx context.Context, bucket string, object string, versionID string) (int64, error)
+	GetObjectVersions(ctx context.Context, bucket string, object string, from int64, to int64) ([]string, error)
 }
 
 func New(client redis.UniversalClient) Service {
@@ -123,11 +129,8 @@ type svc struct {
 	client redis.UniversalClient
 }
 
-func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, fromBucket string, toBucket *string) error {
-	key := fmt.Sprintf("s:%s:%s:%s", fromStor, toStor, fromBucket)
-	if toBucket != nil {
-		key += ":" + *toBucket
-	}
+func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, fromBucket string, toBucket string) error {
+	key := fmt.Sprintf("s:%s:%s:%s:%s", fromStor, toStor, fromBucket, toBucket)
 	if err := s.client.Del(ctx, key).Err(); err != nil {
 		return err
 	}
@@ -136,10 +139,7 @@ func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor st
 }
 
 func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error {
-	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
-	if task.ToBucket != nil {
-		key += ":" + *task.ToBucket
-	}
+	key := fmt.Sprintf("s:%s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket, task.ToBucket)
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -147,10 +147,7 @@ func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 }
 
 func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error) {
-	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
-	if task.ToBucket != nil {
-		key += ":" + *task.ToBucket
-	}
+	key := fmt.Sprintf("s:%s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket, task.ToBucket)
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -162,10 +159,7 @@ func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 }
 
 func (s *svc) SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error {
-	key := fmt.Sprintf("s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket)
-	if task.ToBucket != nil {
-		key += ":" + *task.ToBucket
-	}
+	key := fmt.Sprintf("s:%s:%s:%s:%s", task.FromStorage, task.ToStorage, task.Bucket, task.ToBucket)
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -602,7 +596,56 @@ func (s *svc) GetConsistencyCheckStorages(ctx context.Context, id string) ([]str
 func (s *svc) DeleteConsistencyCheckStorages(ctx context.Context, id string) error {
 	key := fmt.Sprintf("ccv:stor:%s", id)
 	if err := s.client.Unlink(ctx, key).Err(); err != nil {
-		return fmt.Errorf("unable to delete stroage set: %w", err)
+		return fmt.Errorf("unable to delete storage set: %w", err)
 	}
 	return nil
+}
+
+func (s *svc) GetLastListedObjectVersion(ctx context.Context, bucket string, object string) (string, error) {
+	key := fmt.Sprintf("vm:%s:%s", bucket, object)
+	val, err := s.client.LIndex(ctx, key, 0).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("unable to get last element of list: %w", err)
+	}
+	return val, nil
+}
+
+func (s *svc) StoreObjectVersions(ctx context.Context, bucket string, object string, versions ...string) error {
+	key := fmt.Sprintf("vm:%s:%s", bucket, object)
+	if err := s.client.LPush(ctx, key, versions).Err(); err != nil {
+		return fmt.Errorf("unable to push values: %w", err)
+	}
+	return nil
+}
+
+func (s *svc) DeleteObjectVersions(ctx context.Context, bucket string, object string) error {
+	key := fmt.Sprintf("vm:%s:%s", bucket, object)
+	if err := s.client.Unlink(ctx, key).Err(); err != nil {
+		return fmt.Errorf("unable to delete list: %w", err)
+	}
+	return nil
+}
+
+func (s *svc) FindObjectVersionIndex(ctx context.Context, bucket string, object string, versionID string) (int64, error) {
+	key := fmt.Sprintf("vm:%s:%s", bucket, object)
+	val, err := s.client.LPos(ctx, key, versionID, redis.LPosArgs{}).Result()
+	if errors.Is(err, redis.Nil) {
+		return -1, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("unable to locate version: %w", err)
+	}
+	return val, nil
+}
+
+func (s *svc) GetObjectVersions(ctx context.Context, bucket string, object string, from int64, to int64) ([]string, error) {
+	key := fmt.Sprintf("vm:%s:%s", bucket, object)
+	val, err := s.client.LRange(ctx, key, from, to).Result()
+	if err != nil {
+		return nil, fmt.Errorf("unable to locate select versions: %w", err)
+	}
+	return val, nil
 }

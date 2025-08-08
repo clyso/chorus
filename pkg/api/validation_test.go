@@ -128,7 +128,7 @@ func TestValidateReplicationID(t *testing.T) {
 		},
 		{
 			name:    "valid with to_bucket",
-			input:   &pb.ReplicationRequest{User: "u", Bucket: "b", From: "f", To: "t", ToBucket: stringPtr("tb")},
+			input:   &pb.ReplicationRequest{User: "u", Bucket: "b", From: "f", To: "t", ToBucket: "tb"},
 			wantErr: "",
 		},
 	}

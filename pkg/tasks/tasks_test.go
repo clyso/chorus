@@ -42,7 +42,7 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		r.EqualValues(oldTask.CreatedAt.Unix(), p.CreatedAt.Unix())
 		r.EqualValues(oldTask.Bucket, p.Bucket)
 		r.EqualValues(oldTask.Location, p.Location)
-		r.Nil(p.ToBucket)
+		r.Empty(p.ToBucket)
 	})
 
 	t.Run("custom bucket name preserved", func(t *testing.T) {
@@ -50,7 +50,7 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		bucket := "bucket"
 		src := BucketCreatePayload{
 			Sync: Sync{
-				ToBucket: &bucket,
+				ToBucket: bucket,
 			},
 		}
 		srcJson, err := json.Marshal(&src)
@@ -58,12 +58,12 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		var dst BucketCreatePayload
 		r.NoError(json.Unmarshal(srcJson, &dst))
 		r.NotNil(dst.ToBucket)
-		r.EqualValues(*src.ToBucket, *dst.ToBucket, "custom bucket preserved")
+		r.EqualValues(src.ToBucket, dst.ToBucket, "custom bucket preserved")
 
 		src = BucketCreatePayload{}
 		srcJson, err = json.Marshal(&src)
 		r.NoError(err)
 		r.NoError(json.Unmarshal(srcJson, &dst))
-		r.Nil(dst.ToBucket, "no custom bucket unmarshal as nil")
+		r.Empty(dst.ToBucket, "no custom bucket unmarshal")
 	})
 }

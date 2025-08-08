@@ -23,10 +23,11 @@ func Test_Restart_Replication(t *testing.T) {
 	t.Cleanup(func() {
 		cleanup(bucket)
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 	ok, err := mainClient.BucketExists(tstCtx, bucket)
@@ -57,10 +58,11 @@ func Test_Restart_Replication(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 
@@ -101,6 +103,7 @@ func Test_Restart_Replication(t *testing.T) {
 
 	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -115,10 +118,11 @@ func Test_Restart_Replication(t *testing.T) {
 
 	// delete replication
 	_, err = apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f1",
+		User:     user,
+		Bucket:   bucket,
+		ToBucket: bucket,
+		From:     "main",
+		To:       "f1",
 	})
 	r.NoError(err)
 
@@ -127,6 +131,7 @@ func Test_Restart_Replication(t *testing.T) {
 
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,
@@ -168,6 +173,7 @@ func Test_Restart_Replication(t *testing.T) {
 	// check that sync was correct
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: true,

@@ -60,12 +60,13 @@ chorctl repl add -f main -t follower -u admin -b src-bucket --to-buckt=dest-buck
 			FromStorage: raFrom,
 			ToStorage:   raTo,
 			FromBucket:  raBucket,
+			ToBucket:    raToBucket,
 		}
 		if raAgentURL != "" {
 			req.AgentUrl = &raAgentURL
 		}
-		if raToBucket != "" {
-			req.ToBucket = &raToBucket
+		if raToBucket == "" {
+			req.ToBucket = raBucket
 		}
 
 		_, err = client.AddBucketReplication(ctx, req)

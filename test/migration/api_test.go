@@ -77,17 +77,19 @@ func Test_api_get_replication(t *testing.T) {
 	r.NoError(err)
 	defer func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			From:   "main",
-			To:     "f1",
-			Bucket: "replications",
+			User:     user,
+			From:     "main",
+			To:       "f1",
+			Bucket:   "replications",
+			ToBucket: "replications",
 		})
 	}()
 	res, err := apiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User:   user,
-		From:   "main",
-		To:     "f1",
-		Bucket: "replications",
+		User:     user,
+		From:     "main",
+		To:       "f1",
+		Bucket:   "replications",
+		ToBucket: "replications",
 	})
 	r.NoError(err)
 	r.EqualValues("replications", res.Bucket)

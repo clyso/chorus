@@ -56,8 +56,8 @@ func ReplRow(in *pb.Replication) string {
 	bytes := fmt.Sprintf("%s/%s", ByteCountIEC(in.InitBytesDone), ByteCountIEC(in.InitBytesListed))
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
-	if in.ToBucket != nil && *in.ToBucket != "" {
-		in.To += ":" + *in.ToBucket
+	if in.ToBucket != "" {
+		in.To += ":" + in.ToBucket
 	}
 	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, DateToAge(in.CreatedAt), in.HasSwitch)
 }

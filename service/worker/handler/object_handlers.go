@@ -29,7 +29,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/rclone"
@@ -45,7 +45,14 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	ctx = log.WithObjName(ctx, p.Object.Name)
 	logger := zerolog.Ctx(ctx)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
+	replicationID := entity.ReplicationStatusID{
+		User:        xctx.GetUser(ctx),
+		FromStorage: p.FromStorage,
+		FromBucket:  p.Object.Bucket,
+		ToStorage:   p.ToStorage,
+		ToBucket:    p.ToBucket,
+	}
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
@@ -69,17 +76,18 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		if err != nil {
 			return
 		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, xctx.GetUser(ctx), p.Object.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
+		verErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
 		if verErr != nil {
 			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
 		}
 	}()
 
-	release, refresh, err := s.locker.Lock(ctx, lock.ObjKey(p.ToStorage, p.Object))
+	objectLockID := entity.NewObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
+	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err
 	}
-	defer release()
+	defer lock.Release(ctx)
 	objMeta, err := s.versionSvc.GetObj(ctx, p.Object)
 	if err != nil {
 		return err
@@ -90,17 +98,17 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	}
 
 	destVersionKey := meta.ToDest(p.ToStorage, p.ToBucket)
-	fromVer, toVer := objMeta[meta.ToDest(p.FromStorage, nil)], objMeta[destVersionKey]
+	fromVer, toVer := objMeta[meta.ToDest(p.FromStorage, "")], objMeta[destVersionKey]
 	if fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("object sync: identical from/to obj version: skip copy")
 		return nil
 	}
 
 	fromBucket, toBucket := p.Object.Bucket, p.Object.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucket = p.ToBucket
 	}
-	err = lock.WithRefresh(ctx, func() error {
+	err = lock.Do(ctx, time.Second*2, func() error {
 		return s.rc.CopyTo(ctx, rclone.File{
 			Storage: p.FromStorage,
 			Bucket:  fromBucket,
@@ -110,7 +118,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 			Bucket:  toBucket,
 			Name:    p.Object.Name,
 		}, p.ObjSize)
-	}, refresh, time.Second*2)
+	})
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			logger.Warn().Msg("object sync: skip object sync: object missing in source")
@@ -139,8 +147,8 @@ func (s *svc) objectDelete(ctx context.Context, p tasks.ObjectSyncPayload) (err 
 	}
 
 	toBucket := p.Object.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
+	if p.ToBucket != "" {
+		toBucket = p.ToBucket
 	}
 	err = toClient.S3().RemoveObject(ctx, toBucket, p.Object.Name, mclient.RemoveObjectOptions{VersionID: p.Object.Version})
 	return

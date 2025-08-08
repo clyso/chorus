@@ -52,13 +52,14 @@ chorctl repl pause -f main -t follower -u admin -b bucket1`,
 		client := pb.NewChorusClient(conn)
 
 		req := &pb.ReplicationRequest{
-			User:   rdUser,
-			Bucket: rdBucket,
-			From:   rdFrom,
-			To:     rdTo,
+			User:     rpUser,
+			Bucket:   rpBucket,
+			From:     rpFrom,
+			To:       rpTo,
+			ToBucket: rpToBucket,
 		}
-		if rpToBucket != "" {
-			req.ToBucket = &rpToBucket
+		if rpToBucket == "" {
+			req.ToBucket = rpBucket
 		}
 		_, err = client.PauseReplication(ctx, req)
 		if err != nil {

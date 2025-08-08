@@ -97,10 +97,11 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 
@@ -152,6 +153,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	r.Eventually(func() bool {
 		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucket,
+			ToBucket:  bucket,
 			From:      "main",
 			To:        "f1",
 			ShowMatch: false,
@@ -266,10 +268,11 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	}()
 	time.Sleep(666 * time.Millisecond)
 	replID := &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f1",
+		User:     user,
+		Bucket:   bucket,
+		ToBucket: bucket,
+		From:     "main",
+		To:       "f1",
 	}
 	_, err = apiClient.SwitchBucketZeroDowntime(tstCtx, &pb.SwitchBucketZeroDowntimeRequest{
 		ReplicationId: replID,
@@ -439,10 +442,11 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 
@@ -479,10 +483,11 @@ func TestApi_switch_multipart(t *testing.T) {
 	}, waitInterval, retryInterval)
 
 	f1Stream, err := apiClient.StreamBucketReplication(tstCtx, &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f1",
+		User:     user,
+		Bucket:   bucket,
+		ToBucket: bucket,
+		From:     "main",
+		To:       "f1",
 	})
 	r.NoError(err)
 	defer f1Stream.CloseSend()
@@ -497,6 +502,7 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.Eventually(func() bool {
 		diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 			Bucket:    bucket,
+			ToBucket:  bucket,
 			From:      "main",
 			To:        "f1",
 			ShowMatch: false,
@@ -530,10 +536,11 @@ func TestApi_switch_multipart(t *testing.T) {
 		panic("increase multipart obj size or decrease part size")
 	}
 	replID := &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f1",
+		User:     user,
+		Bucket:   bucket,
+		ToBucket: bucket,
+		From:     "main",
+		To:       "f1",
 	}
 
 	parts := make([]*aws_s3.CompletedPart, pn)
@@ -658,10 +665,11 @@ func TestApi_scheduled_switch(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 	var repl *pb.Replication
@@ -698,10 +706,11 @@ func TestApi_scheduled_switch(t *testing.T) {
 
 	// start scheduled switch on init done:
 	replID := &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f1",
+		User:     user,
+		Bucket:   bucket,
+		ToBucket: bucket,
+		From:     "main",
+		To:       "f1",
 	}
 	_, err = apiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
 		ReplicationId: replID,
@@ -748,6 +757,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	// check that data is in sync
 	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: false,
@@ -781,6 +791,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	// now updates only in f1:
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: false,
@@ -887,10 +898,11 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	r.NoError(err)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "main",
-			To:     "f1",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "main",
+			To:       "f1",
 		})
 	})
 	var repl *pb.Replication
@@ -927,10 +939,11 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 
 	// start scheduled switch on init done with continue replication:
 	replID := &pb.ReplicationRequest{
-		User:   user,
-		Bucket: bucket,
-		From:   "main",
-		To:     "f1",
+		User:     user,
+		Bucket:   bucket,
+		ToBucket: bucket,
+		From:     "main",
+		To:       "f1",
 	}
 	_, err = apiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
 		ReplicationId: replID,
@@ -976,15 +989,17 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	}, waitInterval, retryInterval)
 	t.Cleanup(func() {
 		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			Bucket: bucket,
-			From:   "f1",
-			To:     "main",
+			User:     user,
+			Bucket:   bucket,
+			ToBucket: bucket,
+			From:     "f1",
+			To:       "main",
 		})
 	})
 	// check that data is in sync
 	diff, err := apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: false,
@@ -1061,6 +1076,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	// now f1 and main are in sync again
 	diff, err = apiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
+		ToBucket:  bucket,
 		From:      "main",
 		To:        "f1",
 		ShowMatch: false,
