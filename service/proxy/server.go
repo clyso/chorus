@@ -39,6 +39,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -90,13 +91,15 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
-	policySvc := policy.NewService(confRedis)
-
-	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
-
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
+	inspector := asynq.NewInspector(queueRedis)
+	defer inspector.Close()
+	queueSvc := tasks.NewQueueService(inspector)
+	policySvc := policy.NewService(confRedis, queueSvc)
+
+	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
 	s3Clients, err := s3client.New(ctx, conf.Storage, metricsSvc, tp)
 	if err != nil {

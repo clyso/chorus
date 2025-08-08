@@ -83,6 +83,9 @@ type Service interface {
 	IncReplEvents(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 	IncReplEventsDone(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 
+	IsInitialReplicationDone(ctx context.Context, id ReplicationID) (bool, error)
+	IsInitialAndEventReplicationDone(ctx context.Context, id ReplicationID) (bool, error)
+
 	PauseReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	ResumeReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	DeleteReplication(ctx context.Context, id entity.ReplicationStatusID) error
@@ -91,7 +94,7 @@ type Service interface {
 	DeleteBucketReplicationsByUser(ctx context.Context, user, from string, to string) ([]string, error)
 }
 
-func NewService(client redis.UniversalClient) *policySvc {
+func NewService(client redis.UniversalClient, queueSVC tasks.QueueService) *policySvc {
 	return &policySvc{
 		userRoutingPolicyStore:        store.NewUserRoutingPolicyStore(client),
 		bucketRoutingBlockStore:       store.NewRoutingBlockStore(client),
@@ -101,6 +104,7 @@ func NewService(client redis.UniversalClient) *policySvc {
 		replicationStatusStore:        store.NewReplicationStatusStore(client),
 		replicationSwitchStore:        store.NewReplicationSwitchInfoStore(client),
 		replicationSwitchHistoryStore: store.NewReplicationSwitchHistoryStore(client),
+		queueSVC:                      queueSVC,
 	}
 }
 
@@ -113,6 +117,61 @@ type policySvc struct {
 	replicationStatusStore        *store.ReplicationStatusStore
 	replicationSwitchStore        *store.ReplicationSwitchInfoStore
 	replicationSwitchHistoryStore *store.ReplicationSwitchHistoryStore
+	queueSVC                      tasks.QueueService
+}
+
+func (s *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id ReplicationID) (bool, error) {
+	policy, err := s.GetBucketReplicationPolicies(ctx, id.User, id.Bucket)
+	if err != nil {
+		return false, fmt.Errorf("get replication policies: %w", err)
+	}
+	if policy.From != id.From {
+		return false, dom.ErrNotFound
+	}
+	to := id.To
+	if id.ToBucket != nil {
+		to += ":" + *id.ToBucket
+	}
+	priority, ok := policy.To[ReplicationPolicyDest(to)]
+	if !ok {
+		return false, dom.ErrNotFound
+	}
+	queues := tasks.InitMigrationQueues(id.String(), priority)
+	queues = append(queues, tasks.EventMigrationQueues(id.String(), priority)...)
+	return s.allQueuesEmpty(ctx, queues)
+}
+
+func (s *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, error) {
+	for _, queueName := range queues {
+		empty, err := s.queueSVC.IsEmpty(ctx, queueName)
+		if err != nil {
+			return false, fmt.Errorf("get queue info for %s: %w", queueName, err)
+		}
+		if !empty {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (s *policySvc) IsInitialReplicationDone(ctx context.Context, id ReplicationID) (bool, error) {
+	policy, err := s.GetBucketReplicationPolicies(ctx, id.User, id.Bucket)
+	if err != nil {
+		return false, fmt.Errorf("get replication policies: %w", err)
+	}
+	if policy.From != id.From {
+		return false, dom.ErrNotFound
+	}
+	to := id.To
+	if id.ToBucket != nil {
+		to += ":" + *id.ToBucket
+	}
+	priority, ok := policy.To[ReplicationPolicyDest(to)]
+	if !ok {
+		return false, dom.ErrNotFound
+	}
+	queues := tasks.InitMigrationQueues(id.String(), priority)
+	return s.allQueuesEmpty(ctx, queues)
 }
 
 func (r *policySvc) ObjListStarted(ctx context.Context, id entity.ReplicationStatusID) error {

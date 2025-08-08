@@ -35,7 +35,7 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 
 	u1, u2 := "u1", "u2"
 	users := []string{u1, u2}
@@ -190,7 +190,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 
 	u1, u2 := "u1", "u2"
 	users := []string{u1, u2}
@@ -864,7 +864,7 @@ func Test_CustomDestBucket(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 
 	// setup
 	user := "user"

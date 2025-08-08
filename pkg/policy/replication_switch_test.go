@@ -368,7 +368,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -653,7 +653,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -867,7 +867,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -1234,7 +1234,7 @@ func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c)
+	svc := NewService(c, nil)
 
 	r := require.New(t)
 	list, err := svc.ListReplicationSwitchInfo(ctx)

@@ -31,8 +31,8 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 
-	// "github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -98,7 +98,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		if isDir {
 			subP := p
 			subP.Prefix = object.Key
-			subTask, err := tasks.NewTask(ctx, subP)
+			subTask, err := tasks.NewReplicationTask(ctx, subP, replicationID.String())
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to create list obj sub task: %w", err)
 			}
@@ -136,7 +136,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 		// 	continue
 		// }
-		task, err := tasks.NewTask(ctx, tasks.MigrateObjCopyPayload{
+		task, err := tasks.NewReplicationTask(ctx, tasks.MigrateObjCopyPayload{
 			Sync:   p.Sync,
 			Bucket: p.Bucket,
 			Obj: tasks.ObjPayload{
@@ -146,7 +146,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 				Size:        object.Size,
 				ContentType: object.ContentType,
 			},
-		})
+		}, replicationID.String())
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}
@@ -172,13 +172,13 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
 		p.Sync.InitDate()
 		// copy empty dir object
-		task, err := tasks.NewTask(ctx, tasks.MigrateObjCopyPayload{
+		task, err := tasks.NewReplicationTask(ctx, tasks.MigrateObjCopyPayload{
 			Sync:   p.Sync,
 			Bucket: p.Bucket,
 			Obj: tasks.ObjPayload{
 				Name: p.Prefix,
 			},
-		})
+		}, replicationID.String())
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}

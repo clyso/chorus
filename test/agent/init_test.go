@@ -52,6 +52,7 @@ func TestMain(m *testing.M) {
 	workerConf.RClone.LocalFileLimit.Enabled = false
 	workerConf.RClone.GlobalFileLimit.Enabled = false
 	workerConf.Features.ACL = false
+	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
 
 	agentConf, err = agent.GetConfig(config.Path("agent_config.yaml"))
 	if err != nil {

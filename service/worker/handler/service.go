@@ -35,6 +35,7 @@ import (
 type Config struct {
 	PauseRetryInterval  time.Duration `yaml:"pauseRetryInterval"`
 	SwitchRetryInterval time.Duration `yaml:"switchRetryInterval"`
+	QueueUpdateInterval time.Duration `yaml:"queueUpdateInterval"`
 }
 
 type svc struct {

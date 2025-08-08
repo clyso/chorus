@@ -91,7 +91,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
-	policySvc := policy.NewService(confRedis)
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
@@ -127,6 +126,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
+	inspector := asynq.NewInspector(queueRedis)
+	defer inspector.Close()
+	queueSvc := tasks.NewQueueService(inspector)
+	policySvc := policy.NewService(confRedis, queueSvc)
 
 	err = policy_helper.CreateMainFollowerPolicies(ctx, *conf.Storage, s3Clients, policySvc, taskClient)
 	if err != nil {
@@ -179,23 +182,25 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 				// highest priority
 				tasks.QueueAPI: 200,
 
-				tasks.QueueMigrateBucketListObjects: 100,
+				tasks.QueueMigrateBucketListObjects + "*": 100,
 
 				tasks.QueueConsistencyCheck: 12,
 
-				tasks.QueueMigrateObjCopyHighest5: 11,
-				tasks.QueueEventsHighest5:         10,
-				tasks.QueueMigrateObjCopy4:        9,
-				tasks.QueueEvents4:                8,
-				tasks.QueueMigrateObjCopy3:        7,
-				tasks.QueueEvents3:                6,
-				tasks.QueueMigrateObjCopy2:        5,
-				tasks.QueueEvents2:                4,
-				tasks.QueueMigrateObjCopyDefault1: 3,
-				tasks.QueueEventsDefault1:         2,
+				tasks.QueueMigrateObjCopyHighest5 + "*": 11,
+				tasks.QueueEventsHighest5 + "*":         10,
+				tasks.QueueMigrateObjCopy4 + "*":        9,
+				tasks.QueueEvents4 + "*":                8,
+				tasks.QueueMigrateObjCopy3 + "*":        7,
+				tasks.QueueEvents3 + "*":                6,
+				tasks.QueueMigrateObjCopy2 + "*":        5,
+				tasks.QueueEvents2 + "*":                4,
+				tasks.QueueMigrateObjCopyDefault1 + "*": 3,
+				tasks.QueueEventsDefault1 + "*":         2,
 				// lowest priority
 			},
-			StrictPriority: true,
+			StrictPriority:             true,
+			DynamicQueues:              true,
+			DynamicQueueUpdateInterval: conf.Worker.QueueUpdateInterval,
 		},
 	)
 
