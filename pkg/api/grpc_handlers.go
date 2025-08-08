@@ -476,14 +476,21 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			if err != nil {
 				return err
 			}
-			task, err := tasks.NewTask(ctx, tasks.BucketCreatePayload{
+			replicationID := policy.ReplicationID{
+				User:     req.User,
+				Bucket:   bucket,
+				From:     req.From,
+				To:       req.To,
+				ToBucket: nil,
+			}
+			task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 				Sync: tasks.Sync{
 					FromStorage: req.From,
 					ToStorage:   req.To,
 					ToBucket:    bucket,
 				},
 				Bucket: bucket,
-			})
+			}, replicationID.String())
 			if err != nil {
 				return err
 			}
@@ -541,14 +548,21 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 			}
 			return err
 		}
-		task, err := tasks.NewTask(ctx, tasks.BucketCreatePayload{
+		replicationID := policy.ReplicationID{
+			User:     req.User,
+			Bucket:   bucket.Name,
+			From:     req.From,
+			To:       req.To,
+			ToBucket: nil,
+		}
+		task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 			Sync: tasks.Sync{
 				FromStorage: req.From,
 				ToStorage:   req.To,
 				ToBucket:    bucket.Name,
 			},
 			Bucket: bucket.Name,
-		})
+		}, replicationID.String())
 		if err != nil {
 			return err
 		}
@@ -840,14 +854,21 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return err
 		}
 		// create task
-		task, err := tasks.NewTask(ctx, tasks.BucketCreatePayload{
+		replicationID := policy.ReplicationID{
+			User:     req.User,
+			Bucket:   req.FromBucket,
+			From:     req.FromStorage,
+			To:       req.ToStorage,
+			ToBucket: req.ToBucket,
+		}
+		task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 			Sync: tasks.Sync{
 				FromStorage: req.FromStorage,
 				ToStorage:   req.ToStorage,
 				ToBucket:    req.ToBucket,
 			},
 			Bucket: req.FromBucket,
-		})
+		}, replicationID.String())
 		if err != nil {
 			return err
 		}

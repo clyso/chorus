@@ -79,12 +79,18 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		zerolog.Ctx(ctx).Debug().Msg("zero-downtime switch in progress, skipping replication tasks")
 	}
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
+	replicationID := policy.ReplicationID{
+		User:   user,
+		Bucket: bucket,
+		From:   xctx.GetStorage(ctx),
+	}
 
 	switch t := task.(type) {
 	case *tasks.BucketCreatePayload:
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}
@@ -101,7 +107,8 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}
@@ -128,7 +135,8 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		}
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}
@@ -155,7 +163,8 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		}
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}
@@ -186,7 +195,8 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		}
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}
@@ -213,7 +223,8 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		}
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}
@@ -240,7 +251,8 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		}
 		for to, priority := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			payload, err := tasks.NewTask(ctx, *t, tasks.WithPriority(priority))
+			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
 			if err != nil {
 				return err
 			}

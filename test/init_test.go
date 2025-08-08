@@ -72,6 +72,7 @@ func TestMain(m *testing.M) {
 	workerConf.RClone.MemoryLimit.Enabled = false
 	workerConf.RClone.LocalFileLimit.Enabled = false
 	workerConf.RClone.GlobalFileLimit.Enabled = false
+	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
 	workerConf.Features.ACL = false
 	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"

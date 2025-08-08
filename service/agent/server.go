@@ -34,6 +34,7 @@ import (
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/rpc"
+	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
 )
@@ -78,11 +79,13 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
-	policySvc := policy.NewService(confRedis)
-
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
+	inspector := asynq.NewInspector(queueRedis)
+	defer inspector.Close()
+	queueSvc := tasks.NewQueueService(inspector)
+	policySvc := policy.NewService(confRedis, queueSvc)
 
 	replSvc := replication.New(taskClient, verSvc, policySvc)
 
