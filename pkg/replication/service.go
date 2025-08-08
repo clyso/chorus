@@ -116,7 +116,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				FromBucket:  bucket,
 				ToBucket:    t.ToBucket,
 			}
-			// incErr := s.policyService.AccountReplicationEvent(ctx, replicationID, t.GetDate())
 			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
@@ -145,7 +144,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				ToBucket:    t.ToBucket,
 			}
 			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -173,7 +171,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				ToBucket:    t.ToBucket,
 			}
 			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -205,7 +202,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				ToBucket:    t.ToBucket,
 			}
 			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -233,7 +229,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				ToBucket:    t.ToBucket,
 			}
 			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
@@ -261,7 +256,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				ToBucket:    t.ToBucket,
 			}
 			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			// incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
 			if incErr != nil {
 				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
