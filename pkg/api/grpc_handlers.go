@@ -410,7 +410,6 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 	}
 	ctx = log.WithUser(ctx, req.User)
 	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second*5), store.WithRetry(true))
-	// release, refresh, err := h.locker.Lock(ctx, lock.UserKey(req.User), lock.WithDuration(time.Second*5), lock.WithRetry(true))
 	if err != nil {
 		return nil, err
 	}
@@ -940,7 +939,6 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 		// TODO: support replication to different bucket name in a separate PR.
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
 	}
-	// req.ReplicationId.ToBucket = ""
 
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
@@ -999,7 +997,6 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 		// TODO: support replication to different bucket name in a separate PR.
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
 	}
-	// req.ReplicationId.ToBucket = ""
 
 	// obtain exclusive lock for the replication policy
 	policyID := pbToReplicationID(req.ReplicationId)
