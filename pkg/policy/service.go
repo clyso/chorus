@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -69,10 +70,10 @@ type Service interface {
 
 	GetBucketReplicationPolicies(ctx context.Context, id entity.BucketReplicationPolicyID) (*entity.StorageReplicationPolicies, error)
 	GetUserReplicationPolicies(ctx context.Context, user string) (*entity.StorageReplicationPolicies, error)
-	AddUserReplicationPolicy(ctx context.Context, user string, policy entity.UserReplicationPolicy, priority tasks.Priority) error
+	AddUserReplicationPolicy(ctx context.Context, user string, policy entity.UserReplicationPolicy) error
 	DeleteUserReplication(ctx context.Context, user string, policy entity.UserReplicationPolicy) error
 
-	AddBucketReplicationPolicy(ctx context.Context, id entity.ReplicationStatusID, priority tasks.Priority, agentURL *string) error
+	AddBucketReplicationPolicy(ctx context.Context, id entity.ReplicationStatusID, agentURL *string) error
 	GetReplicationPolicyInfo(ctx context.Context, id entity.ReplicationStatusID) (entity.ReplicationStatus, error)
 	ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatus, error)
 	IsReplicationPolicyExists(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
@@ -83,8 +84,8 @@ type Service interface {
 	IncReplEvents(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 	IncReplEventsDone(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 
-	IsInitialReplicationDone(ctx context.Context, id ReplicationID) (bool, error)
-	IsInitialAndEventReplicationDone(ctx context.Context, id ReplicationID) (bool, error)
+	IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
+	IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
 
 	PauseReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	ResumeReplication(ctx context.Context, id entity.ReplicationStatusID) error
@@ -120,24 +121,9 @@ type policySvc struct {
 	queueSVC                      tasks.QueueService
 }
 
-func (s *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id ReplicationID) (bool, error) {
-	policy, err := s.GetBucketReplicationPolicies(ctx, id.User, id.Bucket)
-	if err != nil {
-		return false, fmt.Errorf("get replication policies: %w", err)
-	}
-	if policy.From != id.From {
-		return false, dom.ErrNotFound
-	}
-	to := id.To
-	if id.ToBucket != nil {
-		to += ":" + *id.ToBucket
-	}
-	priority, ok := policy.To[ReplicationPolicyDest(to)]
-	if !ok {
-		return false, dom.ErrNotFound
-	}
-	queues := tasks.InitMigrationQueues(id.String(), priority)
-	queues = append(queues, tasks.EventMigrationQueues(id.String(), priority)...)
+func (s *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
+	queues := tasks.InitMigrationQueues(id)
+	queues = append(queues, tasks.EventMigrationQueues(id)...)
 	return s.allQueuesEmpty(ctx, queues)
 }
 
@@ -154,23 +140,8 @@ func (s *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, 
 	return true, nil
 }
 
-func (s *policySvc) IsInitialReplicationDone(ctx context.Context, id ReplicationID) (bool, error) {
-	policy, err := s.GetBucketReplicationPolicies(ctx, id.User, id.Bucket)
-	if err != nil {
-		return false, fmt.Errorf("get replication policies: %w", err)
-	}
-	if policy.From != id.From {
-		return false, dom.ErrNotFound
-	}
-	to := id.To
-	if id.ToBucket != nil {
-		to += ":" + *id.ToBucket
-	}
-	priority, ok := policy.To[ReplicationPolicyDest(to)]
-	if !ok {
-		return false, dom.ErrNotFound
-	}
-	queues := tasks.InitMigrationQueues(id.String(), priority)
+func (s *policySvc) IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
+	queues := tasks.InitMigrationQueues(id)
 	return s.allQueuesEmpty(ctx, queues)
 }
 
@@ -292,7 +263,7 @@ func (r *policySvc) GetBucketReplicationPolicies(ctx context.Context, id entity.
 	}
 
 	var fromStorage string
-	priorityMap := map[entity.ReplicationPolicyDestination]tasks.Priority{}
+	destinations := make([]entity.ReplicationPolicyDestination, 0, len(entries))
 	for _, entry := range entries {
 		if fromStorage == "" {
 			fromStorage = entry.Value.FromStorage
@@ -303,16 +274,12 @@ func (r *policySvc) GetBucketReplicationPolicies(ctx context.Context, id entity.
 		if fromStorage == entry.Value.ToStorage && id.FromBucket == entry.Value.ToBucket {
 			return nil, fmt.Errorf("%w: invalid replication policy key: from and to should be different: %+v", dom.ErrInternal, entries)
 		}
-		if entry.Score > uint8(tasks.PriorityHighest5) {
-			return nil, fmt.Errorf("%w: invalid replication policy key %q score: %d", dom.ErrInternal, entry, entry.Score)
-		}
-
 		destination := entity.NewBucketReplicationPolicyDestination(entry.Value.ToStorage, entry.Value.ToBucket)
-		priorityMap[destination] = tasks.Priority(entry.Score)
+		destinations = append(destinations, destination)
 	}
 	return &entity.StorageReplicationPolicies{
 		FromStorage:  fromStorage,
-		Destinations: priorityMap,
+		Destinations: destinations,
 	}, nil
 }
 
@@ -526,7 +493,7 @@ func (r *policySvc) GetUserReplicationPolicies(ctx context.Context, user string)
 	}
 
 	var fromStorage string
-	priorityMap := map[entity.ReplicationPolicyDestination]tasks.Priority{}
+	destinations := make([]entity.ReplicationPolicyDestination, 0, len(entries))
 	for _, entry := range entries {
 		if fromStorage == "" {
 			fromStorage = entry.Value.FromStorage
@@ -537,20 +504,16 @@ func (r *policySvc) GetUserReplicationPolicies(ctx context.Context, user string)
 		if fromStorage == entry.Value.ToStorage {
 			return nil, fmt.Errorf("%w: invalid replication policy key: from and to should be different: %+v", dom.ErrInternal, entries)
 		}
-		if entry.Score > uint8(tasks.PriorityHighest5) {
-			return nil, fmt.Errorf("%w: invalid replication policy key %q score: %d", dom.ErrInternal, entry, entry.Score)
-		}
-
 		destination := entity.NewUserReplicationPolicyDestination(entry.Value.ToStorage)
-		priorityMap[destination] = tasks.Priority(entry.Score)
+		destinations = append(destinations, destination)
 	}
 	return &entity.StorageReplicationPolicies{
 		FromStorage:  fromStorage,
-		Destinations: priorityMap,
+		Destinations: destinations,
 	}, nil
 }
 
-func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, user string, policy entity.UserReplicationPolicy, priority tasks.Priority) error {
+func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, user string, policy entity.UserReplicationPolicy) error {
 	if user == "" {
 		return fmt.Errorf("%w: user is required to add replication policy", dom.ErrInvalidArg)
 	}
@@ -562,9 +525,6 @@ func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, user string, p
 	}
 	if policy.FromStorage == policy.ToStorage {
 		return fmt.Errorf("%w: invalid replication policy: from and to should be different", dom.ErrInvalidArg)
-	}
-	if priority > tasks.PriorityHighest5 {
-		return fmt.Errorf("%w: invalid priority value", dom.ErrInvalidArg)
 	}
 
 	route, err := r.GetUserRoutingPolicy(ctx, user)
@@ -583,14 +543,15 @@ func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, user string, p
 		if policy.FromStorage != prev.FromStorage {
 			return fmt.Errorf("%w: all replication policies should have the same from value: got %s, current %s", dom.ErrInvalidArg, policy.FromStorage, prev.FromStorage)
 		}
-		if _, ok := prev.Destinations[entity.NewUserReplicationPolicyDestination(policy.ToStorage)]; ok {
+		alreadyExists := slices.Contains(prev.Destinations, entity.NewUserReplicationPolicyDestination(policy.ToStorage))
+		if alreadyExists {
 			return dom.ErrAlreadyExists
 		}
 	}
 
 	entry := store.ScoredSetEntry[entity.UserReplicationPolicy, uint8]{
 		Value: entity.NewUserReplicationPolicy(policy.FromStorage, policy.ToStorage),
-		Score: uint8(priority),
+		Score: uint8(1), // scores are not used anymore, set to 1 to not change redis data structure
 	}
 	affected, err := r.userReplicationPolicyStore.AddIfNotExists(ctx, user, entry)
 	if err != nil {
@@ -643,12 +604,9 @@ func (r *policySvc) DeleteBucketReplicationsByUser(ctx context.Context, user, fr
 	return deleted, nil
 }
 
-func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, id entity.ReplicationStatusID, priority tasks.Priority, agentURL *string) error {
+func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, id entity.ReplicationStatusID, agentURL *string) error {
 	if err := validate.ReplicationStatusID(id); err != nil {
 		return fmt.Errorf("unable to validate replication status id: %w", err)
-	}
-	if priority > tasks.PriorityHighest5 {
-		return fmt.Errorf("%w: invalid priority value", dom.ErrInvalidArg)
 	}
 
 	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(id.User, id.FromBucket)
@@ -669,14 +627,15 @@ func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, id entity.Re
 		if id.FromStorage != prev.FromStorage {
 			return fmt.Errorf("%w: all replication policies should have the same from value (u: %s b: %s): got %s, current %s", dom.ErrInvalidArg, id.User, id.FromBucket, id.FromStorage, prev.FromStorage)
 		}
-		if _, ok := prev.Destinations[entity.NewBucketReplicationPolicyDestination(id.ToStorage, id.ToBucket)]; ok {
+		alreadyExists := slices.Contains(prev.Destinations, entity.NewBucketReplicationPolicyDestination(id.ToStorage, id.ToBucket))
+		if alreadyExists {
 			return dom.ErrAlreadyExists
 		}
 	}
 
 	entry := store.ScoredSetEntry[entity.BucketReplicationPolicy, uint8]{
 		Value: entity.NewBucketReplicationPolicy(id.FromStorage, id.ToStorage, id.ToBucket),
-		Score: uint8(priority),
+		Score: uint8(1), // scores are not used anymore, set to 1 to not change redis data structure
 	}
 	affected, err := r.bucketReplicationPolicyStore.AddIfNotExists(ctx, bucketReplicationPolicyID, entry)
 	if err != nil {

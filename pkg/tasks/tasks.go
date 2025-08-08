@@ -27,6 +27,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 )
 
 // A list of task types.
@@ -57,78 +58,46 @@ const (
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 )
 
-type Priority uint8
-
-func (p Priority) EventQueue() string {
-	switch p {
-	case PriorityDefault1:
-		return QueueEventsDefault1
-	case Priority2:
-		return QueueEvents2
-	case Priority3:
-		return QueueEvents3
-	case Priority4:
-		return QueueEvents4
-	case PriorityHighest5:
-		return QueueEventsHighest5
-	}
-	return QueueEventsDefault1
-}
-
-func (p Priority) MigrationQueue() string {
-	switch p {
-	case PriorityDefault1:
-		return QueueMigrateObjCopyDefault1
-	case Priority2:
-		return QueueMigrateObjCopy2
-	case Priority3:
-		return QueueMigrateObjCopy3
-	case Priority4:
-		return QueueMigrateObjCopy4
-	case PriorityHighest5:
-		return QueueMigrateObjCopyHighest5
-	}
-	return QueueMigrateObjCopyDefault1
-}
-
-func (p Priority) ConsistencyCheckQueue() string {
-	return QueueConsistencyCheck
-}
+type Queue string
 
 const (
-	PriorityDefault1 Priority = iota
-	Priority2        Priority = iota
-	Priority3        Priority = iota
-	Priority4        Priority = iota
-	PriorityHighest5 Priority = iota
+	QueueAPI                      Queue = "api"
+	QueueMigrateListObjectsPrefix Queue = "migr_list_obj:"
+	QueueConsistencyCheck         Queue = "consistency_check"
+	QueueMigrateCopyObjectPrefix  Queue = "migr_copy_obj:"
+	QueueEventsPrefix             Queue = "event:"
 )
 
-const (
-	QueueEventsDefault1           = "events1"
-	QueueEvents2                  = "events2"
-	QueueEvents3                  = "events3"
-	QueueEvents4                  = "events4"
-	QueueEventsHighest5           = "events5"
-	QueueMigrateBucketListObjects = "migrate_bucket_list_obj"
-	QueueMigrateObjCopyDefault1   = "migrate_obj_copy1"
-	QueueMigrateObjCopy2          = "migrate_obj_copy2"
-	QueueMigrateObjCopy3          = "migrate_obj_copy3"
-	QueueMigrateObjCopy4          = "migrate_obj_copy4"
-	QueueMigrateObjCopyHighest5   = "migrate_obj_copy5"
-	QueueAPI                      = "api"
-	QueueConsistencyCheck         = "consistency_check"
-)
+// Priority defines the priority of the queues from highest to lowest.
+var Priority = map[string]int{
+	string(QueueAPI): 200, // highest priority
+	string(QueueMigrateListObjectsPrefix) + "*": 100,
+	string(QueueConsistencyCheck):               50,
+	string(QueueMigrateCopyObjectPrefix) + "*":  10,
+	string(QueueEventsPrefix) + "*":             5, // lowest priority
+}
 
-func InitMigrationQueues(id string, priority Priority) []string {
-	return []string{
-		QueueMigrateBucketListObjects + ":" + id,
-		priority.MigrationQueue() + ":" + id,
+func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) string {
+	switch queuePrefix {
+	case QueueMigrateCopyObjectPrefix,
+		QueueMigrateListObjectsPrefix,
+		QueueEventsPrefix:
+		return fmt.Sprintf("%s%s:%s:%s:%s", queuePrefix, id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket)
+	default:
+		panic(fmt.Sprintf("%s is not a replication queue prefix", queuePrefix))
 	}
 }
 
-func EventMigrationQueues(id string, priority Priority) []string {
+func InitMigrationQueues(id entity.ReplicationStatusID) []string {
 	return []string{
-		priority.EventQueue() + ":" + id,
+		replicationQueueName(QueueMigrateListObjectsPrefix, id),
+		replicationQueueName(QueueMigrateCopyObjectPrefix, id),
+	}
+}
+
+func EventMigrationQueues(id entity.ReplicationStatusID) []string {
+	return []string{
+		replicationQueueName(QueueEventsPrefix, id),
 	}
 }
 
@@ -312,7 +281,7 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
 	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
 	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload |
-	ListObjectVersionsPayload | MigrateVersionedObjectPayload](ctx context.Context, payload T, replicationID string, opts ...Opt) (*asynq.Task, error) {
+	ListObjectVersionsPayload | MigrateVersionedObjectPayload](ctx context.Context, payload T, replicationID entity.ReplicationStatusID) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -323,40 +292,36 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 			return nil, fmt.Errorf("%w: unable to add User to payload", err)
 		}
 	}
-	taskOpts := options{}
-	for _, o := range opts {
-		o.apply(&taskOpts)
-	}
 	taskType := ""
 	var optionList []asynq.Option
 	switch p := any(payload).(type) {
 	case BucketCreatePayload:
 		id := fmt.Sprintf("cb:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
 	case BucketDeletePayload:
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeBucketDelete
 	case ObjectSyncPayload:
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjectSync
 	case BucketSyncTagsPayload:
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeBucketSyncTags
 	case BucketSyncACLPayload:
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeBucketSyncACL
 	case ObjSyncTagsPayload:
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjectSyncTags
 	case ObjSyncACLPayload:
-		queue := taskOpts.priority.EventQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjectSyncACL
 	case MigrateBucketListObjectsPayload:
@@ -364,7 +329,7 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 		if p.Prefix != "" {
 			id += ":" + p.Prefix
 		}
-		queue := QueueMigrateBucketListObjects + ":" + replicationID
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeMigrateBucketListObjects
 	case MigrateObjCopyPayload:
@@ -372,17 +337,17 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 		if p.Obj.VersionID != "" {
 			id += ":" + p.Obj.VersionID
 		}
-		queue := taskOpts.priority.MigrationQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeMigrateObjCopy
 	case MigrateVersionedObjectPayload:
 		id := fmt.Sprintf("mgr:cov:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
-		queue := taskOpts.priority.MigrationQueue() + ":" + replicationID
+		queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeMigrateVersionedObject
 	case ListObjectVersionsPayload:
 		id := fmt.Sprintf("mgr:lov:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
-		queue := QueueMigrateBucketListObjects + ":" + replicationID
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeMigrateObjectListVersions
 	default:
@@ -393,7 +358,7 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 }
 
 func NewTask[T CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
-	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T, opts ...Opt) (*asynq.Task, error) {
+	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -404,66 +369,44 @@ func NewTask[T CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeR
 			return nil, fmt.Errorf("%w: unable to add User to payload", err)
 		}
 	}
-	taskOpts := options{}
-	for _, o := range opts {
-		o.apply(&taskOpts)
-	}
 	taskType := ""
 	var optionList []asynq.Option
 	switch p := any(payload).(type) {
 	case ZeroDowntimeReplicationSwitchPayload:
-		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(fmt.Sprintf("api:zdrs:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket))}
+		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(fmt.Sprintf("api:zdrs:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket))}
 		taskType = TypeApiZeroDowntimeSwitch
 	case SwitchWithDowntimePayload:
 		id := fmt.Sprintf("api:sd:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket)
-		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(id)}
+		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(id)}
 		taskType = TypeApiSwitchWithDowntime
 	case CostEstimationPayload:
-		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.Retention(costEstimationTaskRetention), asynq.TaskID(fmt.Sprintf("api:ce:%s:%s", p.FromStorage, p.ToStorage))}
+		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.Retention(costEstimationTaskRetention), asynq.TaskID(fmt.Sprintf("api:ce:%s:%s", p.FromStorage, p.ToStorage))}
 		taskType = TypeApiCostEstimation
 	case CostEstimationListPayload:
 		id := fmt.Sprintf("api:cel:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
 		if p.Prefix != "" {
 			id = fmt.Sprintf("api:cel:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
 		}
-		optionList = []asynq.Option{asynq.Queue(QueueAPI), asynq.TaskID(id)}
+		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(id)}
 		taskType = TypeApiCostEstimationList
 	case ConsistencyCheckPayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue())}
+		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck))}
 		taskType = TypeConsistencyCheck
 	case ConsistencyCheckListPayload:
 		id := fmt.Sprintf("cc:l:%s:%s:%s:%s", p.ID, p.Storage, p.Bucket, p.Prefix)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
+		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck)), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckList
 	case ConsistencyCheckReadinessPayload:
 		id := fmt.Sprintf("cc:r:%s", p.ID)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
+		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck)), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckReadiness
 	case ConsistencyCheckDeletePayload:
 		id := fmt.Sprintf("cc:d:%s", p.ID)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.ConsistencyCheckQueue()), asynq.TaskID(id)}
+		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck)), asynq.TaskID(id)}
 		taskType = TypeConsistencyCheckResult
 	default:
 		return nil, fmt.Errorf("%w: unknown task type %T", dom.ErrInvalidArg, p)
 	}
 
 	return asynq.NewTask(taskType, bytes, optionList...), nil
-}
-
-type options struct {
-	priority Priority
-}
-
-type Opt interface {
-	apply(*options)
-}
-
-type priorityOption Priority
-
-func (o priorityOption) apply(opts *options) {
-	opts.priority = Priority(o)
-}
-
-func WithPriority(p Priority) Opt {
-	return priorityOption(p)
 }

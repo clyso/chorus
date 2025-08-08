@@ -23,7 +23,6 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/store"
-	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func (r *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID entity.ReplicationStatusID, opts *entity.ReplicationSwitchDowntimeOpts) error {
@@ -71,12 +70,7 @@ func (r *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID ent
 	if len(policies.Destinations) != 1 {
 		return fmt.Errorf("%w: cannot create switch: existing bucket replication should have a single destination", dom.ErrInvalidArg)
 	}
-	var dest entity.ReplicationPolicyDestination
-	var prio tasks.Priority
-	for d, p := range policies.Destinations {
-		dest = d
-		prio = p
-	}
+	dest := policies.Destinations[0]
 	if dest.Storage != replID.ToStorage {
 		return fmt.Errorf("%w: cannot create downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
@@ -86,10 +80,9 @@ func (r *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID ent
 	}
 	switchID := entity.NewReplicationSwitchInfoID(replID.User, replID.FromBucket)
 	info := &entity.ReplicationSwitchInfo{
-		CreatedAt:           entity.TimeNow(),
-		ReplicationIDStr:    replIDStr,
-		LastStatus:          entity.StatusNotStarted,
-		ReplicationPriority: uint8(prio),
+		CreatedAt:        entity.TimeNow(),
+		ReplicationIDStr: replIDStr,
+		LastStatus:       entity.StatusNotStarted,
 	}
 	if opts != nil {
 		info.ReplicationSwitchDowntimeOpts = *opts
@@ -144,12 +137,7 @@ func (r *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	if len(policies.Destinations) != 1 {
 		return fmt.Errorf("%w: cannot create switch: existing bucket replication should have a single destination", dom.ErrInvalidArg)
 	}
-	var dest entity.ReplicationPolicyDestination
-	var prio tasks.Priority
-	for d, p := range policies.Destinations {
-		dest = d
-		prio = p
-	}
+	dest := policies.Destinations[0]
 	if dest.Storage != replID.ToStorage {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is not routed to destination", dom.ErrInvalidArg)
 	}
@@ -174,10 +162,9 @@ func (r *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	exec := r.replicationSwitchStore.TxExecutor()
 	txReplicationSwitchStore := r.replicationSwitchStore.WithExecutor(exec)
 	_ = txReplicationSwitchStore.SetOp(ctx, replicationSwitchID, entity.ReplicationSwitchInfo{
-		ReplicationIDStr:    replicationKey,
-		CreatedAt:           now,
-		LastStatus:          entity.StatusInProgress,
-		ReplicationPriority: uint8(prio),
+		ReplicationIDStr: replicationKey,
+		CreatedAt:        now,
+		LastStatus:       entity.StatusInProgress,
 	})
 	_ = txReplicationSwitchStore.SetStartedAtOp(ctx, replicationSwitchID, now)
 	_ = txReplicationSwitchStore.SetMultipartTTLOp(ctx, replicationSwitchID, opts.MultipartTTL)
@@ -360,7 +347,7 @@ func (r *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID entit
 			// TODO: Here to storage and from storage are changing places
 			// Why bucket was not present in policy?
 			bucketReplicationPolicy := entity.NewBucketReplicationPolicy(replID.ToStorage, replID.FromStorage, replID.ToBucket)
-			setEntry := *store.NewScoredSetEntry(bucketReplicationPolicy, existing.ReplicationPriority)
+			setEntry := *store.NewScoredSetEntry(bucketReplicationPolicy, uint8(1)) // scores are not used anymore, set to 1 to not change redis data structure
 			_ = txBucketReplicationPolicyStore.AddIfNotExistsOp(ctx, bucketReplicationPolicyID, setEntry)
 
 			replBackID := replID
