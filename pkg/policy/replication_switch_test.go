@@ -12,7 +12,6 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
-	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func timePtr(t time.Time) *time.Time {
@@ -205,7 +204,7 @@ func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
 	db := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
-	svc := NewService(client)
+	svc := NewService(client, nil)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -408,7 +407,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 
 			// create replication but to other destination
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDCopy, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDCopy, nil))
 			// try again and get error
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "replication not exists")
@@ -416,7 +415,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.Error(err, "switch was not created")
 
 			//create correct replication but now there are 2 destinations which is not allowed
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 			// try again and get error
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "only one destination allowed")
@@ -436,7 +435,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.NoError(c.FlushAll(ctx).Err())
 
 			//create replication with agent which is not allowed
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, stringPtr("http://example.com")))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, stringPtr("http://example.com")))
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "replication using agent")
 			_, err = svc.GetReplicationSwitchInfo(ctx, replID)
@@ -444,7 +443,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 
 			// check that similar replication without agent works
 			r.NoError(svc.DeleteReplication(ctx, replID))
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.NoError(err, "success")
 		})
@@ -457,7 +456,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 
 			// create replication with init not done
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 
 			// create switch with immediate start
 			immediateSwitch := &entity.ReplicationSwitchDowntimeOpts{}
@@ -471,7 +470,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 
 			// create replication
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 
 			// create switch
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -496,7 +495,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 			r.NoError(err)
 			r.Len(replications.Destinations, 1)
-			r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+			r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 			_, err = svc.GetInProgressZeroDowntimeSwitchInfo(ctx, entity.NewReplicationSwitchInfoID(replID.User, replID.FromBucket))
 			r.ErrorIs(err, dom.ErrNotFound, "no in progress switch zero downtime")
 
@@ -512,7 +511,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			replications, err = svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 			r.NoError(err)
 			r.Len(replications.Destinations, 1)
-			r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+			r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 		})
 	})
 	t.Run("update existing", func(t *testing.T) {
@@ -523,7 +522,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 
 			// create replication
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 
 			// create existing switch
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -577,7 +576,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r.NoError(c.FlushAll(ctx).Err())
 			// create replication
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 			// finish init replication
 			r.NoError(svc.ObjListStarted(ctx, replID))
 			r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
@@ -686,7 +685,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 
 		// create replication but to wrong destination
 		r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-		r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDCopy, tasks.Priority2, nil))
+		r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDCopy, nil))
 		// try again
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
 		r.Error(err, "replication not exists")
@@ -694,7 +693,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.Error(err, "switch was not created")
 
 		//create replication but now there are 2 destinations which is not allowed
-		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 		// try again
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
 		r.Error(err, "only one destination allowed")
@@ -729,7 +728,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 
 		// create replication
 		r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
 		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
@@ -743,7 +742,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.EqualValues(validSwitch.MultipartTTL, info.MultipartTTL)
 		r.EqualValues(replID, info.ReplID)
 		r.EqualValues(entity.StatusInProgress, info.Status)
-		r.EqualValues(tasks.Priority2, info.ReplicationPriority)
 
 		got, err := svc.GetReplicationSwitchInfo(ctx, replID)
 		r.NoError(err, "switch was created")
@@ -758,7 +756,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.True(got.IsZeroDowntime())
 		r.NotNil(got.LastStartedAt)
 		r.True(testTime.Equal(*got.LastStartedAt))
-		r.EqualValues(tasks.Priority2, got.ReplicationPriority)
 
 		// check that routing policy was changed
 		routeToStorage, err := svc.GetRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket))
@@ -801,7 +798,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 
 		// create replication
 		r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
 		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
@@ -945,7 +942,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 					replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 					r.NoError(err)
 					r.Len(replications.Destinations, 1)
-					r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+					r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 
 				} else {
 					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
@@ -982,7 +979,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 					replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 					r.NoError(err)
 					r.Len(replications.Destinations, 1)
-					r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+					r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 				} else {
 					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
 				}
@@ -1050,7 +1047,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 					replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 					r.NoError(err)
 					r.Len(replications.Destinations, 1)
-					r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+					r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 				} else {
 					r.ErrorIs(err, dom.ErrInvalidArg, "transition not allowed")
 				}
@@ -1088,7 +1085,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 					replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 					r.NoError(err)
 					r.Len(replications.Destinations, 1)
-					r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+					r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 				}
 			})
 		}
@@ -1103,7 +1100,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 
 	// create routing and replication
 	r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
-	r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, tasks.Priority2, nil))
+	r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
 	// create switch
 	err := svc.SetDowntimeReplicationSwitch(ctx, replID, opts)
 	r.NoError(err)
@@ -1122,7 +1119,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 	replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 	r.NoError(err)
 	r.Len(replications.Destinations, 1)
-	r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+	r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 
 	if status == entity.StatusNotStarted {
 		return
@@ -1144,7 +1141,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 		replications, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 		r.NoError(err)
 		r.Len(replications.Destinations, 1)
-		r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+		r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 		return
 	}
 
@@ -1165,7 +1162,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 	replications, err = svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 	r.NoError(err)
 	r.Len(replications.Destinations, 1)
-	r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+	r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 	if status == entity.StatusInProgress {
 		return
 	}
@@ -1179,7 +1176,6 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 	r.Equal(entity.StatusCheckInProgress, got.LastStatus)
 	r.NotNil(got.LastStartedAt)
 	r.Nil(got.DoneAt)
-	r.EqualValues(tasks.Priority2, got.ReplicationPriority)
 	// check that routing was blocked
 	_, err = svc.GetRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket))
 	r.ErrorIs(err, dom.ErrRoutingBlock)
@@ -1187,7 +1183,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 	replications, err = svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket))
 	r.NoError(err)
 	r.Len(replications.Destinations, 1)
-	r.Equal(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket)])
+	r.Equal(entity.NewBucketReplicationPolicyDestination(replID.ToStorage, replID.ToBucket), replications.Destinations[0])
 	if status == entity.StatusCheckInProgress {
 		return
 	}
@@ -1214,7 +1210,8 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 	if opts != nil && opts.ContinueReplication {
 		r.NoError(err)
 		r.Equal(replID.ToStorage, replications.FromStorage)
-		r.EqualValues(tasks.Priority2, replications.Destinations[entity.NewBucketReplicationPolicyDestination(replID.FromStorage, replID.FromBucket)])
+		r.Len(replications.Destinations, 1)
+		r.EqualValues(entity.NewBucketReplicationPolicyDestination(replID.FromStorage, replID.FromBucket), replications.Destinations[0])
 
 		replBackID := replID
 		replBackID.FromStorage, replBackID.ToStorage = replBackID.ToStorage, replBackID.FromStorage
@@ -1281,7 +1278,7 @@ func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
 	}
 	// create routing and replication for zero downtime switch
 	r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replIDZero.User, replIDZero.FromBucket), replIDZero.FromStorage, true))
-	r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDZero, tasks.Priority2, nil))
+	r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDZero, nil))
 	// finish init replication
 	r.NoError(svc.ObjListStarted(ctx, replIDZero))
 	r.NoError(svc.IncReplInitObjListed(ctx, replIDZero, 0, time.Now()))

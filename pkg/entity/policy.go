@@ -16,8 +16,6 @@ package entity
 
 import (
 	"time"
-
-	"github.com/clyso/chorus/pkg/tasks"
 )
 
 type BucketReplicationPolicyID struct {
@@ -124,5 +122,5 @@ func NewUserReplicationPolicyDestination(storage string) ReplicationPolicyDestin
 
 type StorageReplicationPolicies struct {
 	FromStorage  string
-	Destinations map[ReplicationPolicyDestination]tasks.Priority
+	Destinations []ReplicationPolicyDestination
 }

@@ -19,6 +19,7 @@ package log
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/buger/jsonparser"
 	"github.com/hibiken/asynq"
@@ -38,12 +39,7 @@ func WorkerMiddleware(cfg *Config, app, appID string) asynq.MiddlewareFunc {
 			f := xctx.Migration
 			if queue, ok := asynq.GetQueueName(ctx); ok {
 				builder = builder.Str("task_queue", queue)
-				switch queue {
-				case tasks.QueueEventsDefault1,
-					tasks.QueueEvents2,
-					tasks.QueueEvents3,
-					tasks.QueueEvents4,
-					tasks.QueueEventsHighest5:
+				if strings.HasPrefix(queue, string(tasks.QueueEventsPrefix)) {
 					f = xctx.Event
 				}
 			}

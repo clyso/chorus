@@ -115,11 +115,10 @@ func (w *ReplicationSwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 // Subset of SwitchInfo fields.
 // Used by proxy to route requests to correct bucket during zero downtime switch.
 type ZeroDowntimeSwitchInProgressInfo struct {
-	ReplID              ReplicationStatusID     `redis:"-"`
-	ReplicationIDStr    string                  `redis:"replicationID"`
-	Status              ReplicationSwitchStatus `redis:"lastStatus"`
-	MultipartTTL        time.Duration           `redis:"multipartTTL"`
-	ReplicationPriority uint8                   `redis:"replPriority,omitempty"`
+	ReplID           ReplicationStatusID     `redis:"-"`
+	ReplicationIDStr string                  `redis:"replicationID"`
+	Status           ReplicationSwitchStatus `redis:"lastStatus"`
+	MultipartTTL     time.Duration           `redis:"multipartTTL"`
 }
 
 func (s *ZeroDowntimeSwitchInProgressInfo) ReplicationID() ReplicationStatusID {
@@ -132,8 +131,6 @@ type ReplicationSwitchInfo struct {
 	ReplicationSwitchDowntimeOpts
 	// Options for zero downtime switch
 	ReplicationSwitchZeroDowntimeOpts
-	// Task priority of replication policy of this switch
-	ReplicationPriority uint8 `redis:"replPriority,omitempty"`
 	// ID of replication policy of this switch
 	ReplID           ReplicationStatusID `redis:"-"`
 	ReplicationIDStr string              `redis:"replicationID"`
