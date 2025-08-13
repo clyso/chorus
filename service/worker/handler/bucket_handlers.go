@@ -32,7 +32,6 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -44,13 +43,6 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
-	replicationID := policy.ReplicationID{
-		User:     xctx.GetUser(ctx),
-		Bucket:   p.Bucket,
-		From:     p.FromStorage,
-		To:       p.ToStorage,
-		ToBucket: p.ToBucket,
-	}
 
 	replicationID := entity.ReplicationStatusID{
 		User:        xctx.GetUser(ctx),
@@ -125,7 +117,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		},
 		Bucket: p.Bucket,
 		Prefix: "",
-	}, replicationID.String())
+	}, replicationID)
 	if err != nil {
 		return fmt.Errorf("create bucket: unable to create list obj task: %w", err)
 	}

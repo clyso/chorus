@@ -32,7 +32,6 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -98,7 +97,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		if isDir {
 			subP := p
 			subP.Prefix = object.Key
-			subTask, err := tasks.NewReplicationTask(ctx, subP, replicationID.String())
+			subTask, err := tasks.NewReplicationTask(ctx, subP, replicationID)
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to create list obj sub task: %w", err)
 			}
@@ -146,7 +145,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 				Size:        object.Size,
 				ContentType: object.ContentType,
 			},
-		}, replicationID.String())
+		}, replicationID)
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}
@@ -178,7 +177,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			Obj: tasks.ObjPayload{
 				Name: p.Prefix,
 			},
-		}, replicationID.String())
+		}, replicationID)
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}

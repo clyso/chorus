@@ -464,7 +464,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 				ToStorage:   req.To,
 				ToBucket:    bucket,
 			}
-			err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, req.AgentUrl)
+			err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, req.AgentUrl)
 			if err != nil {
 				if errors.Is(err, dom.ErrAlreadyExists) {
 					continue
@@ -476,13 +476,6 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			if err != nil {
 				return err
 			}
-			replicationID := policy.ReplicationID{
-				User:     req.User,
-				Bucket:   bucket,
-				From:     req.From,
-				To:       req.To,
-				ToBucket: nil,
-			}
 			task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 				Sync: tasks.Sync{
 					FromStorage: req.From,
@@ -490,7 +483,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 					ToBucket:    bucket,
 				},
 				Bucket: bucket,
-			}, replicationID.String())
+			}, replicationID)
 			if err != nil {
 				return err
 			}
@@ -529,7 +522,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 		return err
 	}
 	userReplicationPolicy := entity.NewUserReplicationPolicy(req.From, req.To)
-	err = h.policySvc.AddUserReplicationPolicy(ctx, req.User, userReplicationPolicy, tasks.PriorityDefault1)
+	err = h.policySvc.AddUserReplicationPolicy(ctx, req.User, userReplicationPolicy)
 	if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
 		return err
 	}
@@ -541,19 +534,12 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 			ToStorage:   req.To,
 			ToBucket:    bucket.Name,
 		}
-		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, nil)
+		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {
 				continue
 			}
 			return err
-		}
-		replicationID := policy.ReplicationID{
-			User:     req.User,
-			Bucket:   bucket.Name,
-			From:     req.From,
-			To:       req.To,
-			ToBucket: nil,
 		}
 		task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 			Sync: tasks.Sync{
@@ -562,7 +548,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 				ToBucket:    bucket.Name,
 			},
 			Bucket: bucket.Name,
-		}, replicationID.String())
+		}, replicationID)
 		if err != nil {
 			return err
 		}
@@ -600,7 +586,7 @@ func (h *handlers) ListUserReplications(ctx context.Context, _ *emptypb.Empty) (
 			}
 			return nil, err
 		}
-		for to := range policies.Destinations {
+		for _, to := range policies.Destinations {
 			res = append(res, &pb.UserReplication{
 				User: user,
 				From: policies.FromStorage,
@@ -844,7 +830,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			ToBucket:    req.ToBucket,
 		}
 		// create policy:
-		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, req.AgentUrl)
+		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, req.AgentUrl)
 		if err != nil {
 			return err
 		}
@@ -854,13 +840,6 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return err
 		}
 		// create task
-		replicationID := policy.ReplicationID{
-			User:     req.User,
-			Bucket:   req.FromBucket,
-			From:     req.FromStorage,
-			To:       req.ToStorage,
-			ToBucket: req.ToBucket,
-		}
 		task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 			Sync: tasks.Sync{
 				FromStorage: req.FromStorage,
@@ -868,7 +847,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 				ToBucket:    req.ToBucket,
 			},
 			Bucket: req.FromBucket,
-		}, replicationID.String())
+		}, replicationID)
 		if err != nil {
 			return err
 		}

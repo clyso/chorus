@@ -176,28 +176,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 				}
 				taskLogger.Warn().Err(err).Msg("process task failed. task will be retried")
 			}),
-			Logger:   stdLogger,
-			LogLevel: asynq.LogLevel(zerolog.GlobalLevel() + 1),
-			Queues: map[string]int{
-				// highest priority
-				tasks.QueueAPI: 200,
-
-				tasks.QueueMigrateBucketListObjects + "*": 100,
-
-				tasks.QueueConsistencyCheck: 12,
-
-				tasks.QueueMigrateObjCopyHighest5 + "*": 11,
-				tasks.QueueEventsHighest5 + "*":         10,
-				tasks.QueueMigrateObjCopy4 + "*":        9,
-				tasks.QueueEvents4 + "*":                8,
-				tasks.QueueMigrateObjCopy3 + "*":        7,
-				tasks.QueueEvents3 + "*":                6,
-				tasks.QueueMigrateObjCopy2 + "*":        5,
-				tasks.QueueEvents2 + "*":                4,
-				tasks.QueueMigrateObjCopyDefault1 + "*": 3,
-				tasks.QueueEventsDefault1 + "*":         2,
-				// lowest priority
-			},
+			Logger:                     stdLogger,
+			LogLevel:                   asynq.LogLevel(zerolog.GlobalLevel() + 1),
+			Queues:                     tasks.Priority,
 			StrictPriority:             true,
 			DynamicQueues:              true,
 			DynamicQueueUpdateInterval: conf.Worker.QueueUpdateInterval,
