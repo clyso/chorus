@@ -121,15 +121,15 @@ type policySvc struct {
 	queueSVC                      tasks.QueueService
 }
 
-func (s *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
+func (r *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
 	queues := tasks.InitMigrationQueues(id)
 	queues = append(queues, tasks.EventMigrationQueues(id)...)
-	return s.allQueuesEmpty(ctx, queues)
+	return r.allQueuesEmpty(ctx, queues)
 }
 
-func (s *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, error) {
+func (r *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, error) {
 	for _, queueName := range queues {
-		empty, err := s.queueSVC.IsEmpty(ctx, queueName)
+		empty, err := r.queueSVC.IsEmpty(ctx, queueName)
 		if err != nil {
 			return false, fmt.Errorf("get queue info for %s: %w", queueName, err)
 		}
@@ -140,9 +140,9 @@ func (s *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, 
 	return true, nil
 }
 
-func (s *policySvc) IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
+func (r *policySvc) IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
 	queues := tasks.InitMigrationQueues(id)
-	return s.allQueuesEmpty(ctx, queues)
+	return r.allQueuesEmpty(ctx, queues)
 }
 
 func (r *policySvc) ObjListStarted(ctx context.Context, id entity.ReplicationStatusID) error {

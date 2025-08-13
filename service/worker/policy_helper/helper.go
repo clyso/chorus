@@ -91,7 +91,7 @@ func createReplication(
 		return err
 	}
 	policy := entity.NewUserReplicationPolicy(from, to)
-	err = policySvc.AddUserReplicationPolicy(ctx, user, policy, tasks.PriorityDefault1)
+	err = policySvc.AddUserReplicationPolicy(ctx, user, policy)
 	if err != nil {
 		if errors.Is(err, dom.ErrAlreadyExists) {
 			return nil
@@ -115,19 +115,12 @@ func createReplication(
 			ToStorage:   to,
 			ToBucket:    bucket.Name,
 		}
-		err = policySvc.AddBucketReplicationPolicy(ctx, replicationID, tasks.PriorityDefault1, nil)
+		err = policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {
 				continue
 			}
 			return err
-		}
-		replicationID := policy.ReplicationID{
-			User:     user,
-			Bucket:   bucket.Name,
-			From:     from,
-			To:       to,
-			ToBucket: nil,
 		}
 		task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
 			Sync: tasks.Sync{
@@ -136,7 +129,7 @@ func createReplication(
 				ToBucket:    bucket.Name,
 			},
 			Bucket: bucket.Name,
-		}, replicationID.String())
+		}, replicationID)
 		if err != nil {
 			return err
 		}

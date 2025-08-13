@@ -495,12 +495,7 @@ func TestConsistency_2Storages_ListChecks(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		if listResponse == nil {
-			return false
-		}
-		if len(listResponse.Checks) != 1 {
-			return false
-		}
-		return true
+		isEmpty := listResponse == nil || len(listResponse.Checks) == 0
+		return isEmpty
 	}, ConsistencyWait, ConsistencyRetryIn)
 }

@@ -75,6 +75,7 @@ var Priority = map[string]int{
 	string(QueueConsistencyCheck):               50,
 	string(QueueMigrateCopyObjectPrefix) + "*":  10,
 	string(QueueEventsPrefix) + "*":             5, // lowest priority
+	"*":                                         1, // fallback for legacy queues
 }
 
 func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) string {

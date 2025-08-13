@@ -79,18 +79,18 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		zerolog.Ctx(ctx).Debug().Msg("zero-downtime switch in progress, skipping replication tasks")
 	}
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	replicationID := policy.ReplicationID{
-		User:   user,
-		Bucket: bucket,
-		From:   xctx.GetStorage(ctx),
+	replicationID := entity.ReplicationStatusID{
+		User:        user,
+		FromStorage: xctx.GetStorage(ctx),
+		FromBucket:  bucket,
 	}
 
 	switch t := task.(type) {
 	case *tasks.BucketCreatePayload:
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -105,10 +105,10 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			return err
 		}
 
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -133,10 +133,10 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		if err != nil {
 			return err
 		}
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -161,10 +161,10 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		if err != nil {
 			return err
 		}
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -193,10 +193,10 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		if err != nil {
 			return err
 		}
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -221,10 +221,10 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		if err != nil {
 			return err
 		}
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -249,10 +249,10 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		if err != nil {
 			return err
 		}
-		for to, priority := range replTo {
+		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
-			replicationID.To, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID.String(), tasks.WithPriority(priority))
+			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
+			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
 			if err != nil {
 				return err
 			}
@@ -278,7 +278,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 	return nil
 }
 
-func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[entity.ReplicationPolicyDestination]tasks.Priority, error) {
+func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) ([]entity.ReplicationPolicyDestination, error) {
 	replPolicy, err := s.getReplicationPolicy(ctx, task)
 	if err != nil {
 		return nil, err
@@ -304,8 +304,8 @@ func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) (map[ent
 	if switchReplicationID.FromStorage != task.GetFrom() {
 		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, switchReplicationID.FromStorage, task.GetFrom())
 	}
-	return map[entity.ReplicationPolicyDestination]tasks.Priority{
-		entity.NewUserReplicationPolicyDestination(switchReplicationID.ToStorage): tasks.Priority(replSwitch.ReplicationPriority),
+	return []entity.ReplicationPolicyDestination{
+		entity.NewUserReplicationPolicyDestination(switchReplicationID.ToStorage),
 	}, nil
 }
 
@@ -344,7 +344,7 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*e
 		}
 		return nil, err
 	}
-	for to, priority := range userPolicy.Destinations {
+	for _, to := range userPolicy.Destinations {
 		replicationID := entity.ReplicationStatusID{
 			User:        user,
 			FromStorage: userPolicy.FromStorage,
@@ -352,7 +352,7 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*e
 			FromBucket:  bucket,
 			ToBucket:    bucket,
 		}
-		err = s.policySvc.AddBucketReplicationPolicy(ctx, replicationID, priority, nil)
+		err = s.policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {
 				continue
