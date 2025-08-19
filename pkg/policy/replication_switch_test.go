@@ -12,6 +12,7 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func timePtr(t time.Time) *time.Time {
@@ -204,7 +205,9 @@ func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
 	db := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
-	svc := NewService(client, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(client, queuesMock)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -317,6 +320,8 @@ func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
 			if err := client.FlushAll(ctx).Err(); err != nil {
 				t.Fatalf("failed to flush Redis: %v", err)
 			}
+			// reset queues mock
+			tasks.Reset(queuesMock)
 
 			// Set initial state if provided
 			if tt.before != nil {
@@ -367,7 +372,9 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(c, queuesMock)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -400,6 +407,8 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
+			// reset queues mock
+			tasks.Reset(queuesMock)
 
 			// canot create switch for non-existing replication
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -408,6 +417,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			// create replication but to other destination
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDCopy, nil))
+			queuesMock.InitReplicationInProgress(replIDCopy)
 			// try again and get error
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "replication not exists")
@@ -416,6 +426,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 
 			//create correct replication but now there are 2 destinations which is not allowed
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+			queuesMock.InitReplicationInProgress(replID)
 			// try again and get error
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "only one destination allowed")
@@ -433,9 +444,12 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
+			// reset queues mock
+			tasks.Reset(queuesMock)
 
 			//create replication with agent which is not allowed
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, stringPtr("http://example.com")))
+			queuesMock.InitReplicationInProgress(replID)
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "replication using agent")
 			_, err = svc.GetReplicationSwitchInfo(ctx, replID)
@@ -444,6 +458,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			// check that similar replication without agent works
 			r.NoError(svc.DeleteReplication(ctx, replID))
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+			queuesMock.InitReplicationInProgress(replID)
 			err = svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.NoError(err, "success")
 		})
@@ -451,6 +466,9 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
+			// reset queues mock
+			tasks.Reset(queuesMock)
+			queuesMock.InitReplicationInProgress(replID)
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
 			r.Error(err, "replication not exists")
 
@@ -467,10 +485,13 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
+			// reset queues mock
+			tasks.Reset(queuesMock)
 
 			// create replication
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+			queuesMock.InitReplicationInProgress(replID)
 
 			// create switch
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -519,10 +540,13 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
+			// reset queues mock
+			tasks.Reset(queuesMock)
 
 			// create replication
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+			queuesMock.InitReplicationInProgress(replID)
 
 			// create existing switch
 			err := svc.SetDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -574,13 +598,17 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			r := require.New(t)
 			// cleanup redis
 			r.NoError(c.FlushAll(ctx).Err())
+			// reset queues mock
+			tasks.Reset(queuesMock)
 			// create replication
 			r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 			r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+			queuesMock.InitReplicationInProgress(replID)
 			// finish init replication
 			r.NoError(svc.ObjListStarted(ctx, replID))
-			r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
-			r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
+			queuesMock.InitReplicationDone(replID)
+			// r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
+			// r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
 
 			// create zero downtime switch
 			err := svc.AddZeroDowntimeReplicationSwitch(ctx, replID, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: 15*time.Minute + 30*time.Second})
@@ -618,7 +646,9 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 				t.Run(string(status), func(t *testing.T) {
 					r := require.New(t)
 					r.NoError(c.FlushAll(ctx).Err())
-					setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+					// reset queues mock
+					tasks.Reset(queuesMock)
+					setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 					if status == entity.StatusInProgress || status == entity.StatusCheckInProgress || status == entity.StatusDone {
 						// update not allowed
 						err := svc.SetDowntimeReplicationSwitch(ctx, replID, updated)
@@ -652,7 +682,9 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(c, queuesMock)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -678,6 +710,8 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r := require.New(t)
 		// cleanup redis
 		r.NoError(c.FlushAll(ctx).Err())
+		// reset queues mock
+		tasks.Reset(queuesMock)
 
 		// canot create switch for non-existing replication
 		err := svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -686,6 +720,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		// create replication but to wrong destination
 		r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 		r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDCopy, nil))
+		queuesMock.InitReplicationInProgress(replID)
 		// try again
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
 		r.Error(err, "replication not exists")
@@ -694,6 +729,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 
 		//create replication but now there are 2 destinations which is not allowed
 		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+		queuesMock.InitReplicationInProgress(replID)
 		// try again
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
 		r.Error(err, "only one destination allowed")
@@ -709,6 +745,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.NoError(svc.ObjListStarted(ctx, replID))
 		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
 		r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
+		queuesMock.InitReplicationDone(replID)
 
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
 		r.NoError(err, "replication not done")
@@ -722,6 +759,8 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r := require.New(t)
 		// cleanup redis
 		r.NoError(c.FlushAll(ctx).Err())
+		// reset queues mock
+		tasks.Reset(queuesMock)
 
 		_, err := svc.GetInProgressZeroDowntimeSwitchInfo(ctx, entity.NewReplicationSwitchInfoID(replID.User, replID.FromBucket))
 		r.ErrorIs(err, dom.ErrNotFound, "no in progress switch")
@@ -729,10 +768,12 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		// create replication
 		r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+		queuesMock.InitReplicationInProgress(replID)
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
 		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
 		r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
+		queuesMock.InitReplicationDone(replID)
 
 		// create switch
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -771,7 +812,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.True(repl.IsArchived)
 		r.NotNil(repl.ArchivedAt)
 		r.True(repl.ListingStarted)
-		r.True(repl.InitDone())
 		r.EqualValues(1, repl.InitObjListed)
 		r.EqualValues(1, repl.InitObjDone)
 		//delete metadata
@@ -795,14 +835,18 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r := require.New(t)
 		// cleanup redis
 		r.NoError(c.FlushAll(ctx).Err())
+		// reset queues mock
+		tasks.Reset(queuesMock)
 
 		// create replication
 		r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 		r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+		queuesMock.InitReplicationInProgress(replID)
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
 		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
 		r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
+		queuesMock.InitReplicationDone(replID)
 
 		// create switch
 		err := svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -864,7 +908,9 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(c, queuesMock)
 	replID := entity.ReplicationStatusID{
 		User:        "u",
 		FromBucket:  "b",
@@ -904,8 +950,10 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 				r := require.New(t)
 				// cleanup redis
 				r.NoError(c.FlushAll(ctx).Err())
+				// reset queues mock
+				tasks.Reset(queuesMock)
 				// create switch in status
-				setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+				setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 				// transition to not started not allowed for any status
 				r.ErrorIs(svc.UpdateDowntimeSwitchStatus(ctx, replID, entity.StatusNotStarted, "test", nil, nil), dom.ErrInvalidArg, "transition not allowed")
 			})
@@ -917,8 +965,10 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 				r := require.New(t)
 				// cleanup redis
 				r.NoError(c.FlushAll(ctx).Err())
+				// reset queues mock
+				tasks.Reset(queuesMock)
 				// create switch in status
-				setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+				setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 				now := entity.TimeNow()
 
 				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, entity.StatusInProgress, "test", &now, nil)
@@ -956,8 +1006,10 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 				r := require.New(t)
 				// cleanup redis
 				r.NoError(c.FlushAll(ctx).Err())
+				// reset queues mock
+				tasks.Reset(queuesMock)
 				// create switch in status
-				setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+				setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 
 				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, entity.StatusCheckInProgress, "test", nil, nil)
 				if status == entity.StatusInProgress {
@@ -992,8 +1044,10 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 				r := require.New(t)
 				// cleanup redis
 				r.NoError(c.FlushAll(ctx).Err())
+				// reset queues mock
+				tasks.Reset(queuesMock)
 				// create switch in status
-				setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+				setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 				now := entity.TimeNow()
 
 				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, entity.StatusDone, "test", nil, &now)
@@ -1025,8 +1079,10 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 				r := require.New(t)
 				// cleanup redis
 				r.NoError(c.FlushAll(ctx).Err())
+				// reset queues mock
+				tasks.Reset(queuesMock)
 				// create switch in status
-				setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+				setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 
 				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, entity.StatusSkipped, "test", nil, nil)
 				if status == entity.StatusNotStarted || status == entity.StatusSkipped || status == entity.StatusError {
@@ -1060,8 +1116,10 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 				r := require.New(t)
 				// cleanup redis
 				r.NoError(c.FlushAll(ctx).Err())
+				// reset queues mock
+				tasks.Reset(queuesMock)
 				// create switch in status
-				setupDowntimeSwitchState(t, svc, replID, validSwitch, status)
+				setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, status)
 
 				err := svc.UpdateDowntimeSwitchStatus(ctx, replID, entity.StatusError, "test", nil, nil)
 				// transition to error allowed from all except done
@@ -1093,7 +1151,7 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 
 }
 
-func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.ReplicationStatusID, opts *entity.ReplicationSwitchDowntimeOpts, status entity.ReplicationSwitchStatus) {
+func setupDowntimeSwitchState(t *testing.T, svc Service, queuesMock *tasks.QueueServiceMock, replID entity.ReplicationStatusID, opts *entity.ReplicationSwitchDowntimeOpts, status entity.ReplicationSwitchStatus) {
 	t.Helper()
 	ctx := context.TODO()
 	r := require.New(t)
@@ -1101,6 +1159,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 	// create routing and replication
 	r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replID.User, replID.FromBucket), replID.FromStorage, true))
 	r.NoError(svc.AddBucketReplicationPolicy(ctx, replID, nil))
+	queuesMock.InitReplicationInProgress(replID)
 	// create switch
 	err := svc.SetDowntimeReplicationSwitch(ctx, replID, opts)
 	r.NoError(err)
@@ -1218,7 +1277,6 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, replID entity.Replicati
 		repl, err := svc.GetReplicationPolicyInfo(ctx, replBackID)
 		r.NoError(err)
 		r.False(repl.IsArchived)
-		r.True(repl.InitDone())
 	} else {
 		r.ErrorIs(err, dom.ErrNotFound)
 	}
@@ -1231,7 +1289,9 @@ func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(c, queuesMock)
 
 	r := require.New(t)
 	list, err := svc.ListReplicationSwitchInfo(ctx)
@@ -1254,7 +1314,7 @@ func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
 		SkipBucketCheck:     true,
 		ContinueReplication: true,
 	}
-	setupDowntimeSwitchState(t, svc, replID, validSwitch, entity.StatusDone)
+	setupDowntimeSwitchState(t, svc, queuesMock, replID, validSwitch, entity.StatusDone)
 
 	list, err = svc.ListReplicationSwitchInfo(ctx)
 	r.NoError(err)
@@ -1279,10 +1339,12 @@ func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
 	// create routing and replication for zero downtime switch
 	r.NoError(svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(replIDZero.User, replIDZero.FromBucket), replIDZero.FromStorage, true))
 	r.NoError(svc.AddBucketReplicationPolicy(ctx, replIDZero, nil))
+	queuesMock.InitReplicationInProgress(replIDZero)
 	// finish init replication
 	r.NoError(svc.ObjListStarted(ctx, replIDZero))
 	r.NoError(svc.IncReplInitObjListed(ctx, replIDZero, 0, time.Now()))
 	r.NoError(svc.IncReplInitObjDone(ctx, replIDZero, 0, time.Now()))
+	queuesMock.InitReplicationDone(replIDZero)
 	// create switch
 	err = svc.AddZeroDowntimeReplicationSwitch(ctx, replIDZero, validSwitchZero)
 	r.NoError(err)

@@ -27,6 +27,7 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func Test_policySvc_UserRoutingPolicy(t *testing.T) {
@@ -189,7 +190,9 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(c, queuesMock)
 
 	u1, u2 := "u1", "u2"
 	users := []string{u1, u2}
@@ -200,6 +203,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	t.Run("args must be valid", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 
 		err := svc.AddUserReplicationPolicy(ctx, "", entity.NewUserReplicationPolicy("a", "a"))
 		r.ErrorIs(err, dom.ErrInvalidArg)
@@ -290,6 +294,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 		err = svc.AddBucketReplicationPolicy(ctx, rightReplicationID, nil)
 		r.NoError(err)
+		queuesMock.InitReplicationInProgress(rightReplicationID)
 		_, err = svc.GetReplicationPolicyInfo(ctx, rightReplicationID)
 		r.NoError(err)
 		_, err = svc.IsReplicationPolicyPaused(ctx, rightReplicationID)
@@ -320,6 +325,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	t.Run("returns not found", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 		for _, u := range users {
 			_, err := svc.GetUserReplicationPolicies(ctx, u)
 			r.ErrorIs(err, dom.ErrNotFound)
@@ -345,19 +351,11 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 				exists, err := svc.IsReplicationPolicyExists(ctx, replicationID12)
 				r.NoError(err)
 				r.False(exists)
-				_, err = svc.IsReplicationPolicyPaused(ctx, replicationID12)
-				r.ErrorIs(err, dom.ErrNotFound)
 				err = svc.IncReplEvents(ctx, replicationID12, time.Now())
 				r.ErrorIs(err, dom.ErrNotFound)
 				err = svc.IncReplEventsDone(ctx, replicationID12, time.Now())
 				r.ErrorIs(err, dom.ErrNotFound)
 				err = svc.IncReplInitObjListed(ctx, replicationID12, 5, time.Now())
-				r.ErrorIs(err, dom.ErrNotFound)
-				err = svc.IncReplInitObjDone(ctx, replicationID34, 5, time.Now())
-				r.ErrorIs(err, dom.ErrNotFound)
-				err = svc.PauseReplication(ctx, replicationID34)
-				r.ErrorIs(err, dom.ErrNotFound)
-				err = svc.ResumeReplication(ctx, replicationID34)
 				r.ErrorIs(err, dom.ErrNotFound)
 				err = svc.ObjListStarted(ctx, replicationID34)
 				r.ErrorIs(err, dom.ErrNotFound)
@@ -371,6 +369,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	t.Run("add user repl policy", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 
 		_, err := svc.GetUserReplicationPolicies(ctx, u1)
 		r.ErrorIs(err, dom.ErrNotFound)
@@ -417,6 +416,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	t.Run("add bucket repl policy", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 
 		replicationIDu1s1s2 := entity.ReplicationStatusID{
 			User:        u1,
@@ -477,7 +477,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		info, err := svc.GetReplicationPolicyInfo(ctx, replicationIDu1s1s2)
 		r.NoError(err)
 		r.False(info.CreatedAt.IsZero())
-		r.False(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
@@ -559,6 +558,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	t.Run("counters", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 
 		replicationID12 := entity.ReplicationStatusID{
 			User:        u1,
@@ -579,7 +579,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		info, err := svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.False(info.CreatedAt.IsZero())
-		r.False(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
@@ -593,7 +592,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err := svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.Zero(infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -607,7 +605,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.EqualValues(1, infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -626,7 +623,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.EqualValues(2, infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -641,7 +637,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.EqualValues(2, infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -655,7 +650,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.EqualValues(2, infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -668,7 +662,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.EqualValues(2, infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -684,7 +677,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		infoUpd, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.EqualValues(info.CreatedAt, infoUpd.CreatedAt)
-		r.False(infoUpd.IsPaused)
 		r.EqualValues(1, infoUpd.InitObjListed)
 		r.EqualValues(2, infoUpd.InitObjDone)
 		r.EqualValues(69, infoUpd.InitBytesListed)
@@ -701,6 +693,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 	t.Run("pause", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 
 		replicationID12 := entity.ReplicationStatusID{
 			User:        u1,
@@ -711,6 +704,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		}
 		err := svc.AddBucketReplicationPolicy(ctx, replicationID12, nil)
 		r.NoError(err)
+		queuesMock.InitReplicationInProgress(replicationID12)
 
 		res, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(u1, b1))
 		r.NoError(err)
@@ -721,44 +715,54 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		info, err := svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
 		r.False(info.CreatedAt.IsZero())
-		r.False(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
 		r.Zero(info.InitBytesDone)
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
+
+		paused, err := svc.IsReplicationPolicyPaused(ctx, replicationID12)
+		r.NoError(err)
+		r.False(paused)
 
 		err = svc.PauseReplication(ctx, replicationID12)
 		r.NoError(err)
 
 		info, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
-		r.True(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
 		r.Zero(info.InitBytesDone)
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
+
+		paused, err = svc.IsReplicationPolicyPaused(ctx, replicationID12)
+		r.NoError(err)
+		r.True(paused)
 
 		err = svc.ResumeReplication(ctx, replicationID12)
 		r.NoError(err)
 
 		info, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
 		r.NoError(err)
-		r.False(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
 		r.Zero(info.InitBytesDone)
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
+
+		paused, err = svc.IsReplicationPolicyPaused(ctx, replicationID12)
+		r.NoError(err)
+		r.False(paused)
 	})
 
 	t.Run("delete user repl", func(t *testing.T) {
 		r := require.New(t)
 		db.FlushAll()
+		tasks.Reset(queuesMock)
 
 		userReplicationPolicy1 := entity.NewUserReplicationPolicy(s1, s2)
 		err := svc.AddUserReplicationPolicy(ctx, u1, userReplicationPolicy1)
@@ -863,7 +867,9 @@ func Test_CustomDestBucket(t *testing.T) {
 	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
 	ctx := context.TODO()
 
-	svc := NewService(c, nil)
+	queuesMock := &tasks.QueueServiceMock{}
+	tasks.Reset(queuesMock)
+	svc := NewService(c, queuesMock)
 
 	// setup
 	user := "user"
@@ -901,9 +907,11 @@ func Test_CustomDestBucket(t *testing.T) {
 
 	err = svc.AddBucketReplicationPolicy(ctx, replicationIDDifferentBuckets, nil)
 	r.NoError(err, "repl to same storage but different bucket is allowed")
+	queuesMock.InitReplicationInProgress(replicationIDDifferentBuckets)
 
 	err = svc.AddBucketReplicationPolicy(ctx, replicationIDDifferentSrcDest, nil)
 	r.NoError(err, "repl to different storage and different bucket is allowed")
+	queuesMock.InitReplicationInProgress(replicationIDDifferentSrcDest)
 
 	err = svc.AddBucketReplicationPolicy(ctx, replicationIDDifferentSrcDest, nil)
 	r.Error(err, "already exists")
@@ -965,7 +973,6 @@ func Test_CustomDestBucket(t *testing.T) {
 	info, err := svc.GetReplicationPolicyInfo(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
 	r.False(info.CreatedAt.IsZero())
-	r.False(info.IsPaused)
 	r.Zero(info.InitObjListed)
 	r.Zero(info.InitObjDone)
 	r.Zero(info.InitBytesListed)

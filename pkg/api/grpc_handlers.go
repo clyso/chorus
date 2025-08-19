@@ -567,7 +567,15 @@ func (h *handlers) ListReplications(ctx context.Context, _ *emptypb.Empty) (*pb.
 	}
 	res := make([]*pb.Replication, 0, len(replications))
 	for k, v := range replications {
-		res = append(res, replicationToPb(k, v))
+		paused, err := h.policySvc.IsReplicationPolicyPaused(ctx, k)
+		if err != nil {
+			return nil, fmt.Errorf("unable to check replication policy paused state: %w", err)
+		}
+		initDone, err := h.policySvc.IsInitialReplicationDone(ctx, k)
+		if err != nil {
+			return nil, fmt.Errorf("unable to check initial replication done state: %w", err)
+		}
+		res = append(res, replicationToPb(k, v, paused, initDone))
 	}
 	sort.Slice(res, func(i, j int) bool {
 		return res[i].CreatedAt.AsTime().After(res[j].CreatedAt.AsTime())
@@ -757,7 +765,15 @@ func (h *handlers) StreamBucketReplication(req *pb.ReplicationRequest, server pb
 			if err != nil {
 				return err
 			}
-			pol := replicationToPb(replicationID, m)
+			paused, err := h.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
+			if err != nil {
+				return fmt.Errorf("unable to check replication policy paused state: %w", err)
+			}
+			initDone, err := h.policySvc.IsInitialReplicationDone(ctx, replicationID)
+			if err != nil {
+				return fmt.Errorf("unable to check initial replication done state: %w", err)
+			}
+			pol := replicationToPb(replicationID, m, paused, initDone)
 			if prev == nil || !proto.Equal(prev, pol) {
 				prev = pol
 				err = server.Send(pol)
@@ -917,8 +933,16 @@ func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationReques
 	if err != nil {
 		return nil, err
 	}
+	paused, err := h.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check replication policy paused state: %w", err)
+	}
+	initDone, err := h.policySvc.IsInitialReplicationDone(ctx, replicationID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check initial replication done state: %w", err)
+	}
 	// Convert the status to the protobuf representation and return it
-	return replicationToPb(replicationID, status), nil
+	return replicationToPb(replicationID, status, paused, initDone), nil
 }
 
 func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest) (*emptypb.Empty, error) {
