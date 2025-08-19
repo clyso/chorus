@@ -63,7 +63,11 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 			}
 			return err
 		}
-		if replStatus.IsPaused {
+		paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, policyID)
+		if err != nil {
+			return fmt.Errorf("unable to check if replication is paused: %w", err)
+		}
+		if paused {
 			// replication is paused - retry later
 			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 		}
@@ -149,7 +153,11 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 
 		// time to start switch according to schedule
 		// check if replication status conditions are met:
-		if !replStatus.InitDone() {
+		isInitDone, err := s.policySvc.IsInitialReplicationDone(ctx, id)
+		if err != nil {
+			return switchResult{}, fmt.Errorf("failed to check if initial replication is done: %w", err)
+		}
+		if !isInitDone {
 			if switchStatus.StartOnInitDone {
 				// retry later:
 				return switchResult{
@@ -167,8 +175,11 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 		}
 		// check if max event lag condition is met:
 		if maxLag, ok := switchStatus.GetMaxEventLag(); ok {
-			currentLag := replStatus.Events - replStatus.EventsDone
-			if currentLag > int64(maxLag) {
+			currentLag, err := s.policySvc.GetUnprocessedEventsCount(ctx, id)
+			if err != nil {
+				return switchResult{}, fmt.Errorf("failed to get unprocessed events count: %w", err)
+			}
+			if currentLag > int(maxLag) {
 				// lag is too big to start the switch:
 				// skip this switch iteration:
 				return switchResult{
@@ -193,7 +204,10 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 
 	// 2. Switch in progress - check migration queue drain progress and max duration to complete, cancel, or check it later:
 	case entity.StatusInProgress:
-		isQueueDrained := replStatus.EventsDone >= replStatus.Events
+		isQueueDrained, err := s.policySvc.IsInitialAndEventReplicationDone(ctx, id)
+		if err != nil {
+			return switchResult{}, fmt.Errorf("failed to check if initial and event replication is done: %w", err)
+		}
 		if !isQueueDrained {
 			// switch is still in progress, check if max duration exceeded:
 			if switchStatus.LastStartedAt == nil {
@@ -216,7 +230,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 			}, nil
 		}
 		// queue is drained, initiate bucket contents check:
-		_, _, err := s.checkBuckets(ctx, id, switchStatus.SkipBucketCheck)
+		_, _, err = s.checkBuckets(ctx, id, switchStatus.SkipBucketCheck)
 		if err != nil {
 			return switchResult{}, err
 		}

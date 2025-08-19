@@ -70,7 +70,6 @@ func NewBucketRoutingPolicyID(user string, bucket string) BucketRoutingPolicyID 
 
 type ReplicationStatus struct {
 	CreatedAt       time.Time `redis:"created_at"`
-	IsPaused        bool      `redis:"paused"`
 	IsArchived      bool      `redis:"archived"`
 	InitObjListed   int64     `redis:"obj_listed"`
 	InitObjDone     int64     `redis:"obj_done"`
@@ -88,10 +87,6 @@ type ReplicationStatus struct {
 	ListingStarted bool `redis:"listing_started"`
 
 	HasSwitch bool `redis:"-"`
-}
-
-func (r *ReplicationStatus) InitDone() bool {
-	return r.ListingStarted && r.InitDoneAt != nil && r.InitObjDone >= r.InitObjListed
 }
 
 type ReplicationStatusID struct {

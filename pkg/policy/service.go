@@ -77,7 +77,6 @@ type Service interface {
 	GetReplicationPolicyInfo(ctx context.Context, id entity.ReplicationStatusID) (entity.ReplicationStatus, error)
 	ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatus, error)
 	IsReplicationPolicyExists(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
-	IsReplicationPolicyPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
 	IncReplInitObjListed(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error
 	IncReplInitObjDone(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error
 	ObjListStarted(ctx context.Context, id entity.ReplicationStatusID) error
@@ -86,9 +85,11 @@ type Service interface {
 
 	IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
 	IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
+	GetUnprocessedEventsCount(ctx context.Context, id entity.ReplicationStatusID) (int, error)
 
 	PauseReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	ResumeReplication(ctx context.Context, id entity.ReplicationStatusID) error
+	IsReplicationPolicyPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
 	DeleteReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	// Archive replication. Will stop generating new events for this replication.
 	// Existing events will be processed and replication status metadata will be kept.
@@ -121,9 +122,25 @@ type policySvc struct {
 	queueSVC                      tasks.QueueService
 }
 
+func (r *policySvc) GetUnprocessedEventsCount(ctx context.Context, id entity.ReplicationStatusID) (int, error) {
+	res := 0
+	queues := tasks.EventMigrationQueues(id)
+	for _, queue := range queues {
+		size, err := r.queueSVC.UnprocessedCount(ctx, queue)
+		if err != nil {
+			if errors.Is(err, dom.ErrNotFound) {
+				// queue does not exist, so no events to process
+				continue
+			}
+			return 0, fmt.Errorf("unable to get unprocessed events count for %s: %w", queue, err)
+		}
+		res += size
+	}
+	return res, nil
+}
+
 func (r *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
-	queues := tasks.InitMigrationQueues(id)
-	queues = append(queues, tasks.EventMigrationQueues(id)...)
+	queues := tasks.AllReplicationQueues(id)
 	return r.allQueuesEmpty(ctx, queues)
 }
 
@@ -131,7 +148,12 @@ func (r *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, 
 	for _, queueName := range queues {
 		empty, err := r.queueSVC.IsEmpty(ctx, queueName)
 		if err != nil {
-			return false, fmt.Errorf("get queue info for %s: %w", queueName, err)
+			if errors.Is(err, dom.ErrNotFound) {
+				// since queues created on demand, it is possible that some queues are not created yet
+				// for example, event replication queue will be created on the first write request to chorus proxy
+				continue
+			}
+			return false, fmt.Errorf("empty queue check: unable to get queue info for %s: %w", queueName, err)
 		}
 		if !empty {
 			return false, nil
@@ -384,11 +406,15 @@ func (r *policySvc) IsReplicationPolicyPaused(ctx context.Context, id entity.Rep
 	if err := validate.ReplicationStatusID(id); err != nil {
 		return false, fmt.Errorf("unable to validate replication status id: %w", err)
 	}
-	paused, err := r.replicationStatusStore.GetPaused(ctx, id)
-	if err != nil {
-		return false, fmt.Errorf("unable to get replication policy paused: %w", err)
+	// use InitMigrationListObjQueue to check if initial migration is paused
+	// because it is the only queue which is always created even if bucket is empty
+	paused, err := r.queueSVC.IsPaused(ctx, tasks.InitMigrationListObjQueue(id))
+	if errors.Is(err, dom.ErrNotFound) {
+		// not found errors can only appear for backwards replication after switch.
+		// In this case there is not initial migration
+		return false, nil // queue does not exist, so replication is not paused
 	}
-	return paused, nil
+	return paused, err
 }
 
 func (r *policySvc) IncReplInitObjListed(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error {
@@ -671,23 +697,37 @@ func fromStrPtr(s *string) string {
 }
 
 func (r *policySvc) PauseReplication(ctx context.Context, id entity.ReplicationStatusID) error {
-	_, err := r.GetReplicationPolicyInfo(ctx, id)
-	if err != nil {
-		return fmt.Errorf("unable to get replication policy: %w", err)
+	if err := validate.ReplicationStatusID(id); err != nil {
+		return fmt.Errorf("pause replication: unable to validate replication status id: %w", err)
 	}
-	if err := r.replicationStatusStore.SetPaused(ctx, id); err != nil {
-		return fmt.Errorf("unable to set replication paused: %w", err)
+	for _, queue := range tasks.AllReplicationQueues(id) {
+		err := r.queueSVC.Pause(ctx, queue)
+		if err != nil {
+			if errors.Is(err, dom.ErrNotFound) {
+				// since queues created on demand, it is possible that some queues are not created yet
+				// for example, event replication queue will be created on the first write request to chorus proxy
+				continue
+			}
+			return fmt.Errorf("pause replication: unable to pause queue %s: %w", queue, err)
+		}
 	}
 	return nil
 }
 
 func (r *policySvc) ResumeReplication(ctx context.Context, id entity.ReplicationStatusID) error {
-	_, err := r.GetReplicationPolicyInfo(ctx, id)
-	if err != nil {
-		return fmt.Errorf("unable to get replication policy: %w", err)
+	if err := validate.ReplicationStatusID(id); err != nil {
+		return fmt.Errorf("resume replication: unable to validate replication status id: %w", err)
 	}
-	if err := r.replicationStatusStore.UnsetPaused(ctx, id); err != nil {
-		return fmt.Errorf("unable to set replication paused: %w", err)
+	for _, queue := range tasks.AllReplicationQueues(id) {
+		err := r.queueSVC.Resume(ctx, queue)
+		if err != nil {
+			if errors.Is(err, dom.ErrNotFound) {
+				// since queues created on demand, it is possible that some queues are not created yet
+				// for example, event replication queue will be created on the first write request to chorus proxy
+				continue
+			}
+			return fmt.Errorf("resume replication: unable to resume queue %s: %w", queue, err)
+		}
 	}
 	return nil
 }

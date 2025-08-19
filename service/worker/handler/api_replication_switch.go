@@ -75,7 +75,11 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 		}
 		return err
 	}
-	if replStatus.IsPaused {
+	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
+	if err != nil {
+		return fmt.Errorf("check replication paused state: %w", err)
+	}
+	if paused {
 		// replication is paused - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
@@ -96,8 +100,12 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 		zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch is not switch with downtime")
 		return nil
 	}
+	done, err := s.policySvc.IsInitialAndEventReplicationDone(ctx, policyID)
+	if err != nil {
+		return fmt.Errorf("check initial and event replication done: %w", err)
+	}
 	// check if replication switch can be finished:
-	if replStatus.EventsDone < replStatus.Events {
+	if !done {
 		// events queue is not drained yet - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 	}

@@ -91,15 +91,23 @@ func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) stri
 
 func InitMigrationQueues(id entity.ReplicationStatusID) []string {
 	return []string{
-		replicationQueueName(QueueMigrateListObjectsPrefix, id),
+		InitMigrationListObjQueue(id),
 		replicationQueueName(QueueMigrateCopyObjectPrefix, id),
 	}
+}
+
+func InitMigrationListObjQueue(id entity.ReplicationStatusID) string {
+	return replicationQueueName(QueueMigrateListObjectsPrefix, id)
 }
 
 func EventMigrationQueues(id entity.ReplicationStatusID) []string {
 	return []string{
 		replicationQueueName(QueueEventsPrefix, id),
 	}
+}
+
+func AllReplicationQueues(id entity.ReplicationStatusID) []string {
+	return append(InitMigrationQueues(id), EventMigrationQueues(id)...)
 }
 
 const (
@@ -298,7 +306,7 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 	switch p := any(payload).(type) {
 	case BucketCreatePayload:
 		id := fmt.Sprintf("cb:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeBucketCreate
 	case BucketDeletePayload:

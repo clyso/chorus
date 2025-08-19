@@ -58,7 +58,11 @@ func (r *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID ent
 		return fmt.Errorf("%w: cannot create downtime switch: given replication is agent based", dom.ErrInvalidArg)
 	}
 	forceStartNow := opts == nil || (opts.StartAt == nil && opts.Cron == nil && !opts.StartOnInitDone)
-	if forceStartNow && !policy.InitDone() {
+	isInitialReplicationDone, err := r.IsInitialReplicationDone(ctx, replID)
+	if err != nil {
+		return fmt.Errorf("unable to check initial replication done: %w", err)
+	}
+	if forceStartNow && !isInitialReplicationDone {
 		return fmt.Errorf("%w: cannot create downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
 
@@ -123,12 +127,21 @@ func (r *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	if policy.AgentURL != "" {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is agent based", dom.ErrInvalidArg)
 	}
-	if !policy.InitDone() {
+	isInitialReplicationDone, err := r.IsInitialReplicationDone(ctx, replID)
+	if err != nil {
+		return fmt.Errorf("unable to check initial replication done: %w", err)
+	}
+	if !isInitialReplicationDone {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
-	if policy.IsPaused {
+	paused, err := r.IsReplicationPolicyPaused(ctx, replID)
+	if err != nil {
+		return fmt.Errorf("unable to check replication policy paused state: %w", err)
+	}
+	if paused {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: replication is paused", dom.ErrInvalidArg)
 	}
+
 	bucketReplicationPolicyID := entity.NewBucketReplicationPolicyID(replID.User, replID.FromBucket)
 	policies, err := r.GetBucketReplicationPolicies(ctx, bucketReplicationPolicyID)
 	if err != nil {

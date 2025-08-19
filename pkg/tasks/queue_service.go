@@ -1,3 +1,17 @@
+// Copyright 2025 Clyso GmbH
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package tasks
 
 import (
@@ -6,16 +20,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/hibiken/asynq"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 type QueueService interface {
 	IsEmpty(ctx context.Context, queueName string) (bool, error)
+	UnprocessedCount(ctx context.Context, queueName string) (int, error)
 	IsPaused(ctx context.Context, queueName string) (bool, error)
 	Resume(ctx context.Context, queueName string) error
 	Pause(ctx context.Context, queueName string) error
-	Delete(ctx context.Context, queueName string, force bool) error
 }
 
 func NewQueueService(inspector *asynq.Inspector) *queueService {
@@ -30,41 +45,43 @@ type queueService struct {
 	inspector *asynq.Inspector
 }
 
-func (q *queueService) Delete(ctx context.Context, queueName string, force bool) error {
-	err := q.inspector.DeleteQueue(queueName, force)
-	if errors.Is(err, asynq.ErrQueueNotFound) {
-		return fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, queueName)
+func (q *queueService) UnprocessedCount(ctx context.Context, queueName string) (int, error) {
+	info, err := q.getInfo(ctx, queueName)
+	if err != nil {
+		return 0, err
 	}
-	if errors.Is(err, asynq.ErrQueueNotEmpty) {
-		return fmt.Errorf("%w: queue %s is not empty, cannot delete without force", dom.ErrInvalidArg, queueName)
-	}
-	return err
+	return unprocessedCount(info), nil
+}
+
+func unprocessedCount(info *asynq.QueueInfo) int {
+	return info.Pending + info.Active + info.Scheduled + info.Retry
 }
 
 func (q *queueService) IsEmpty(ctx context.Context, queueName string) (bool, error) {
-	info, err := q.inspector.GetQueueInfo(queueName)
+	info, err := q.getInfo(ctx, queueName)
 	if err != nil {
-		if strings.HasSuffix(err.Error(), "does not exist") {
-			return false, fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, queueName)
-		}
-		return false, fmt.Errorf("get queue info for %s: %w", queueName, err)
+		return false, err
 	}
-	return isQueueEmpty(info), nil
-}
-
-func isQueueEmpty(info *asynq.QueueInfo) bool {
-	return info.Pending == 0 && info.Active == 0 && info.Scheduled == 0 && info.Retry == 0
+	return unprocessedCount(info) == 0, nil
 }
 
 func (q *queueService) IsPaused(ctx context.Context, queueName string) (bool, error) {
-	info, err := q.inspector.GetQueueInfo(queueName)
+	info, err := q.getInfo(ctx, queueName)
 	if err != nil {
-		if errors.Is(err, asynq.ErrQueueNotFound) {
-			return false, fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, queueName)
-		}
-		return false, fmt.Errorf("get queue info for %s: %w", queueName, err)
+		return false, err
 	}
 	return info.Paused, nil
+}
+
+func (q *queueService) getInfo(_ context.Context, queueName string) (*asynq.QueueInfo, error) {
+	info, err := q.inspector.GetQueueInfo(queueName)
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "does not exist") {
+			return nil, fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, queueName)
+		}
+		return nil, fmt.Errorf("get queue info for %s: %w", queueName, err)
+	}
+	return info, nil
 }
 
 func (q *queueService) Pause(ctx context.Context, queueName string) error {

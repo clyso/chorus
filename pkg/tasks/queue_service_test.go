@@ -7,48 +7,12 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
-
-func Test_queueService_Delete(t *testing.T) {
-	ctx := t.Context()
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
-	inspector := asynq.NewInspectorFromRedisClient(c)
-	defer inspector.Close()
-	client := asynq.NewClientFromRedisClient(c)
-	defer client.Close()
-	qs := NewQueueService(inspector)
-
-	r := require.New(t)
-	queueName := "test-queue"
-
-	// delete non-existing queue
-	err := qs.Delete(ctx, queueName, false)
-	r.ErrorIs(err, dom.ErrNotFound, "expected error for non-existing queue")
-	err = qs.Delete(ctx, queueName, true)
-	r.ErrorIs(err, dom.ErrNotFound, "expected error for non-existing queue with force")
-
-	// create queue
-	_, err = client.EnqueueContext(ctx, asynq.NewTask("test-task", nil), asynq.Queue(queueName))
-	r.NoError(err, "failed to enqueue task to create queue")
-
-	// delete non-empty queue without force
-	empty, err := qs.IsEmpty(ctx, queueName)
-	r.NoError(err, "failed to check if queue is empty")
-	r.False(empty, "expected queue to not be empty before deletion")
-	err = qs.Delete(ctx, queueName, false)
-	r.ErrorIs(err, dom.ErrInvalidArg, "expected error for non-empty queue without force")
-	// delete non-empty queue with force
-	err = qs.Delete(ctx, queueName, true)
-	r.NoError(err, "failed to delete non-empty queue with force")
-	// check if queue exists
-	_, err = inspector.GetQueueInfo(queueName)
-	r.Error(err, "expected queue to be deleted")
-}
 
 func Test_queueService_IsEmpty(t *testing.T) {
 	ctx := t.Context()
