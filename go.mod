@@ -2,7 +2,7 @@ module github.com/clyso/chorus
 
 go 1.24.4
 
-replace github.com/hibiken/asynq => github.com/arttor/asynq v0.0.0-20250807142418-af27c2bd1e4a
+replace github.com/hibiken/asynq => github.com/clyso/asynq v0.0.0-20250820142900-23947c3d22b9
 
 require (
 	github.com/alicebob/miniredis/v2 v2.35.0
