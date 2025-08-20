@@ -194,23 +194,16 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 			}
 		}
 	}()
-	var (
-		path   = strings.Trim(req.URL.Path, "/")
-		parts  = strings.SplitN(path, "/", 2)
-		bucket = parts[0]
-		object = ""
-		newReq *http.Request
-	)
 
-	if len(parts) == 2 {
-		object = parts[1]
-	}
+	// Parse bucket and object using the s3 package helper
+	bucket, object := s3.ParseBucketAndObject(req)
+
+	var newReq *http.Request
 	url := *req.URL
-	// todo: support virtual host
-	// see: github.com/minio/minio-go/v7@v7.0.52/api.go:890
 	host := strings.TrimPrefix(c.conf.Address, "http://")
 	host = strings.TrimPrefix(host, "https://")
 	url.Host = host
+
 	url.Scheme = "http"
 	if c.conf.IsSecure {
 		url.Scheme = "https"
@@ -242,6 +235,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	for name, vals := range notToSign {
 		newReq.Header[name] = vals
 	}
+
 	_, doReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.DoReq", xctx.GetMethod(req.Context()).String()))
 	resp, err = c.c.Do(newReq)
 	doReqSpan.End()

@@ -28,9 +28,9 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 )
 
-func Serve(router Router, replSvc replication.Service) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func Serve(router Router, replSvc replication.Service) http.Handler {
+	// Use a custom handler function instead of ServeMux to avoid automatic redirects
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, span := otel.Tracer("").Start(r.Context(), "Route")
 		defer span.End()
 		r = r.WithContext(ctx)
@@ -74,5 +74,4 @@ func Serve(router Router, replSvc replication.Service) *http.ServeMux {
 			return
 		}
 	})
-	return mux
 }
