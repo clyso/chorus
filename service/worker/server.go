@@ -201,8 +201,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
 	mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
 	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
-	mux.HandleFunc(tasks.TypeApiCostEstimation, workerSvc.CostsEstimation)
-	mux.HandleFunc(tasks.TypeApiCostEstimationList, workerSvc.CostsEstimationList)
 	mux.HandleFunc(tasks.TypeConsistencyCheck, workerSvc.HandleConsistencyCheck)
 	mux.HandleFunc(tasks.TypeConsistencyCheckList, workerSvc.HandleConsistencyCheckList)
 	mux.HandleFunc(tasks.TypeConsistencyCheckReadiness, workerSvc.HandleConsistencyCheckReadiness)

@@ -89,6 +89,34 @@ type ReplicationStatus struct {
 	HasSwitch bool `redis:"-"`
 }
 
+type ReplicationStatusExtended struct {
+	*ReplicationStatus
+
+	// True if at least one of the queues is paused.
+	IsPaused bool
+	// Aggregated stats for initial migration queues.
+	InitMigration QueueStats
+	// Aggregated stats for event migration queues.
+	EventMigration QueueStats
+}
+
+func (r *ReplicationStatusExtended) InitDone() bool {
+	return r.ListingStarted && r.InitMigration.Unprocessed == 0
+}
+
+type QueueStats struct {
+	// Number of tasks left. Includes, new, in_progress, and retried tasks.
+	Unprocessed int
+	// Total number of successfully processed tasks.
+	Done int
+	// Failed  are tasks that exceeded maximum retries and were removed from the queue.
+	Failed int
+	// Age of the oldest pending task in the queue.
+	Latency time.Duration
+	// Approx bytes used by the queue and its tasks in Redis.
+	MemoryUsage int64
+}
+
 type ReplicationStatusID struct {
 	User        string
 	FromStorage string

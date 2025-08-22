@@ -67,21 +67,13 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
 	}
-	replStatus, err := s.policySvc.GetReplicationPolicyInfo(ctx, replicationID)
+	replStatus, err := s.policySvc.GetReplicationPolicyInfoExtended(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
 			return nil
 		}
 		return err
-	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		return fmt.Errorf("check replication paused state: %w", err)
-	}
-	if paused {
-		// replication is paused - retry later
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 	if !replStatus.IsArchived {
 		zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
@@ -100,10 +92,7 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 		zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch is not switch with downtime")
 		return nil
 	}
-	done, err := s.policySvc.IsInitialAndEventReplicationDone(ctx, policyID)
-	if err != nil {
-		return fmt.Errorf("check initial and event replication done: %w", err)
-	}
+	done := replStatus.InitDone() && replStatus.EventMigration.Unprocessed == 0
 	// check if replication switch can be finished:
 	if !done {
 		// events queue is not drained yet - retry later

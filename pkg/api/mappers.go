@@ -33,7 +33,7 @@ func tsToPb(ts *time.Time) *timestamppb.Timestamp {
 	return timestamppb.New(*ts)
 }
 
-func replicationToPb(id entity.ReplicationStatusID, value entity.ReplicationStatus, paused, initDone bool) *pb.Replication {
+func replicationToPb(id entity.ReplicationStatusID, value entity.ReplicationStatusExtended) *pb.Replication {
 	return &pb.Replication{
 		User:            id.User,
 		Bucket:          id.FromBucket,
@@ -41,8 +41,8 @@ func replicationToPb(id entity.ReplicationStatusID, value entity.ReplicationStat
 		To:              id.ToStorage,
 		ToBucket:        id.ToBucket,
 		CreatedAt:       timestamppb.New(value.CreatedAt),
-		IsPaused:        paused,
-		IsInitDone:      initDone,
+		IsPaused:        value.IsPaused,
+		IsInitDone:      value.InitDone(),
 		InitObjListed:   value.InitObjListed,
 		InitObjDone:     value.InitObjDone,
 		InitBytesListed: value.InitBytesListed,

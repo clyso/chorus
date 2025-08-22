@@ -8,15 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/entity"
-	"github.com/clyso/chorus/pkg/policy"
-	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
-	queueMock := &tasks.QueueServiceMock{}
-	tasks.Reset(queueMock)
-	policySvc := policy.NewService(nil, queueMock)
-	worker := &svc{policySvc: policySvc}
+	worker := &svc{}
 
 	now := time.Now()
 	hourAgo := now.Add(-time.Hour)
@@ -34,17 +29,21 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	for _, status := range []entity.ReplicationSwitchStatus{entity.StatusNotStarted, entity.StatusError, entity.StatusSkipped, ""} {
 		t.Run("from "+string(status)+" to in_progress", func(t *testing.T) {
 			r := require.New(t)
-			tasks.Reset(queueMock)
-			// init done
-			queueMock.InitReplicationDone(id)
 
-			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-				CreatedAt: hourAgo,
-				// init done
-				InitObjListed:  1,
-				InitObjDone:    1,
-				InitDoneAt:     &hourAgo,
-				ListingStarted: true,
+			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+				ReplicationStatus: &entity.ReplicationStatus{
+					CreatedAt:      hourAgo,
+					InitObjListed:  1,
+					InitObjDone:    1,
+					InitDoneAt:     &hourAgo,
+					ListingStarted: true,
+				},
+				IsPaused: false,
+				InitMigration: entity.QueueStats{
+					// init done
+					Unprocessed: 0,
+				},
+				EventMigration: entity.QueueStats{},
 			}, entity.ReplicationSwitchInfo{
 				ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 					Cron: stringPtr("@5minutes"),
@@ -61,17 +60,21 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		})
 		t.Run("from "+string(status)+" to error - already retried", func(t *testing.T) {
 			r := require.New(t)
-			tasks.Reset(queueMock)
-			// init done
-			queueMock.InitReplicationDone(id)
 
-			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-				CreatedAt: hourAgo,
-				// init done
-				InitObjListed:  1,
-				InitObjDone:    1,
-				InitDoneAt:     &hourAgo,
-				ListingStarted: true,
+			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+				ReplicationStatus: &entity.ReplicationStatus{
+					CreatedAt:      hourAgo,
+					InitObjListed:  1,
+					InitObjDone:    1,
+					InitDoneAt:     &hourAgo,
+					ListingStarted: true,
+				},
+				IsPaused: false,
+				InitMigration: entity.QueueStats{
+					// init done
+					Unprocessed: 0,
+				},
+				EventMigration: entity.QueueStats{},
 			}, entity.ReplicationSwitchInfo{
 				ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 					StartAt: &now,
@@ -95,10 +98,8 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		})
 		t.Run("from "+string(status)+" to retry later", func(t *testing.T) {
 			r := require.New(t)
-			tasks.Reset(queueMock)
-			queueMock.InitReplicationInProgress(id)
 
-			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{}, entity.ReplicationSwitchInfo{
+			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{}, entity.ReplicationSwitchInfo{
 				ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 					// run every hour
 					Cron: stringPtr("@hourly"),
@@ -114,15 +115,21 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		})
 		t.Run("from "+string(status)+" retry later - init not done", func(t *testing.T) {
 			r := require.New(t)
-			tasks.Reset(queueMock)
-			queueMock.InitReplicationInProgress(id)
 
-			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-				// init not done
-				CreatedAt:      hourAgo,
-				InitObjListed:  1,
-				InitObjDone:    0,
-				ListingStarted: true,
+			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+				ReplicationStatus: &entity.ReplicationStatus{
+					CreatedAt:      hourAgo,
+					InitObjListed:  1,
+					InitObjDone:    1,
+					InitDoneAt:     &hourAgo,
+					ListingStarted: true,
+				},
+				IsPaused: false,
+				InitMigration: entity.QueueStats{
+					// init not done
+					Unprocessed: 1,
+				},
+				EventMigration: entity.QueueStats{},
 			}, entity.ReplicationSwitchInfo{
 				ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 					// wait for init done
@@ -139,14 +146,21 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		})
 		t.Run("from "+string(status)+" to skipped - init not done", func(t *testing.T) {
 			r := require.New(t)
-			tasks.Reset(queueMock)
-			queueMock.InitReplicationInProgress(id)
 
-			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-				CreatedAt:      hourAgo,
-				InitObjListed:  1,
-				InitObjDone:    0,
-				ListingStarted: true,
+			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+				ReplicationStatus: &entity.ReplicationStatus{
+					CreatedAt:      hourAgo,
+					InitObjListed:  1,
+					InitObjDone:    1,
+					InitDoneAt:     &hourAgo,
+					ListingStarted: true,
+				},
+				IsPaused: false,
+				InitMigration: entity.QueueStats{
+					// init not done
+					Unprocessed: 1,
+				},
+				EventMigration: entity.QueueStats{},
 			}, entity.ReplicationSwitchInfo{
 				ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 					// skip if init not done
@@ -165,22 +179,24 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 		})
 		t.Run("from "+string(status)+" to skipped - event lag not met", func(t *testing.T) {
 			r := require.New(t)
-			tasks.Reset(queueMock)
-			// init done
-			queueMock.InitReplicationDone(id)
-			// event lag is 10
-			queueMock.EventReplicationLag(id, 10)
 
-			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-				CreatedAt: hourAgo,
-				// init done
-				InitObjListed:  1,
-				InitObjDone:    1,
-				InitDoneAt:     &hourAgo,
-				ListingStarted: true,
-				// event lag is 10
-				Events:     15,
-				EventsDone: 5,
+			nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+				ReplicationStatus: &entity.ReplicationStatus{
+					CreatedAt:      hourAgo,
+					InitObjListed:  1,
+					InitObjDone:    1,
+					InitDoneAt:     &hourAgo,
+					ListingStarted: true,
+				},
+				IsPaused: false,
+				InitMigration: entity.QueueStats{
+					// init done
+					Unprocessed: 0,
+				},
+				EventMigration: entity.QueueStats{
+					// event lag is 10
+					Unprocessed: 10,
+				},
 			}, entity.ReplicationSwitchInfo{
 				ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 					// skip if init not done
@@ -203,22 +219,24 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 
 	t.Run("in_progress wait queue drain", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue not drained
-		queueMock.EventReplicationInProgress(id)
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue not drained
-			Events:         1,
-			EventsDone:     0,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue not drained
+				Unprocessed: 1,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
@@ -235,22 +253,24 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("in_progress to error: drain timeout", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue not drained
-		queueMock.EventReplicationInProgress(id)
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue not drained
-			Events:         1,
-			EventsDone:     0,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue not drained
+				Unprocessed: 1,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
@@ -270,22 +290,24 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("in_progress to check_in_progress", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue drained
-		queueMock.EventReplicationDone(id)
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue drained
-			Events:         1,
-			EventsDone:     1,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue drained
+				Unprocessed: 0,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
@@ -303,24 +325,26 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("check_in_progress wait for check complete", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue drained
-		queueMock.EventReplicationDone(id)
 		// mock that check is still in progress
 		checkResultIsInProgress = true
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue drained
-			Events:         1,
-			EventsDone:     1,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue drained
+				Unprocessed: 0,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
@@ -338,24 +362,26 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("check_in_progress to error duration exceeded", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue drained
-		queueMock.EventReplicationDone(id)
 		// mock that check is still in progress
 		checkResultIsInProgress = true
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue drained
-			Events:         1,
-			EventsDone:     1,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue drained
+				Unprocessed: 0,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
@@ -375,25 +401,27 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("check_in_progress to error buckets not equal", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue drained
-		queueMock.EventReplicationDone(id)
 		// mock that check is done and not equal
 		checkResultIsInProgress = false
 		checkResultIsEqual = false
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue drained
-			Events:         1,
-			EventsDone:     1,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue drained
+				Unprocessed: 0,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron: stringPtr("@5minutes"),
@@ -411,25 +439,27 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("check_in_progress to done", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue drained
-		queueMock.EventReplicationDone(id)
 		// mock that check is done and buckets are equal
 		checkResultIsInProgress = false
 		checkResultIsEqual = true
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue drained
-			Events:         1,
-			EventsDone:     1,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue drained
+				Unprocessed: 0,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron:                stringPtr("@5minutes"),
@@ -448,22 +478,24 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 	})
 	t.Run("done to done", func(t *testing.T) {
 		r := require.New(t)
-		tasks.Reset(queueMock)
-		// init done
-		queueMock.InitReplicationDone(id)
-		// queue drained
-		queueMock.EventReplicationDone(id)
 
-		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatus{
-			CreatedAt: hourAgo,
-			// init done
-			InitObjListed: 1,
-			InitObjDone:   1,
-			// queue drained
-			Events:         1,
-			EventsDone:     1,
-			InitDoneAt:     &hourAgo,
-			ListingStarted: true,
+		nextState, err := worker.processSwitchWithDowntimeState(ctx, id, entity.ReplicationStatusExtended{
+			ReplicationStatus: &entity.ReplicationStatus{
+				CreatedAt:      hourAgo,
+				InitObjListed:  1,
+				InitObjDone:    1,
+				InitDoneAt:     &hourAgo,
+				ListingStarted: true,
+			},
+			IsPaused: false,
+			InitMigration: entity.QueueStats{
+				// init done
+				Unprocessed: 0,
+			},
+			EventMigration: entity.QueueStats{
+				// queue drained
+				Unprocessed: 0,
+			},
 		}, entity.ReplicationSwitchInfo{
 			ReplicationSwitchDowntimeOpts: entity.ReplicationSwitchDowntimeOpts{
 				Cron:                stringPtr("@5minutes"),

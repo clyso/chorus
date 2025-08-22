@@ -50,7 +50,7 @@ func (r *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID ent
 
 	// add new downtime switch
 	// validate corresponding replication state:
-	policy, err := r.GetReplicationPolicyInfo(ctx, replID)
+	policy, err := r.GetReplicationPolicyInfoExtended(ctx, replID)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policy: %w", err)
 	}
@@ -58,11 +58,7 @@ func (r *policySvc) SetDowntimeReplicationSwitch(ctx context.Context, replID ent
 		return fmt.Errorf("%w: cannot create downtime switch: given replication is agent based", dom.ErrInvalidArg)
 	}
 	forceStartNow := opts == nil || (opts.StartAt == nil && opts.Cron == nil && !opts.StartOnInitDone)
-	isInitialReplicationDone, err := r.IsInitialReplicationDone(ctx, replID)
-	if err != nil {
-		return fmt.Errorf("unable to check initial replication done: %w", err)
-	}
-	if forceStartNow && !isInitialReplicationDone {
+	if forceStartNow && !policy.InitDone() {
 		return fmt.Errorf("%w: cannot create downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
 
@@ -120,25 +116,17 @@ func (r *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		return dom.ErrAlreadyExists
 	}
 	// validate corresponding replication state:
-	policy, err := r.GetReplicationPolicyInfo(ctx, replID)
+	policy, err := r.GetReplicationPolicyInfoExtended(ctx, replID)
 	if err != nil {
 		return fmt.Errorf("unable to get replication policy: %w", err)
 	}
 	if policy.AgentURL != "" {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: given replication is agent based", dom.ErrInvalidArg)
 	}
-	isInitialReplicationDone, err := r.IsInitialReplicationDone(ctx, replID)
-	if err != nil {
-		return fmt.Errorf("unable to check initial replication done: %w", err)
-	}
-	if !isInitialReplicationDone {
+	if !policy.InitDone() {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: init replication is not done", dom.ErrInvalidArg)
 	}
-	paused, err := r.IsReplicationPolicyPaused(ctx, replID)
-	if err != nil {
-		return fmt.Errorf("unable to check replication policy paused state: %w", err)
-	}
-	if paused {
+	if policy.IsPaused {
 		return fmt.Errorf("%w: cannot create zero-downtime switch: replication is paused", dom.ErrInvalidArg)
 	}
 
