@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -27,40 +26,6 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/rclone"
-)
-
-var (
-	luaUpdateTsIfGreater = redis.NewScript(`local function YearInSec(y)
-  if ((y % 400) == 0) or (((y % 4) == 0) and ((y % 100) ~= 0)) then
-    return 31622400 -- 366 * 24 * 60 * 60
-  else
-    return 31536000 -- 365 * 24 * 60 * 60
-  end
-end
-local function IsLeapYear(y)
-  return ((y % 400) == 0) or (((y % 4) == 0) and ((y % 100) ~= 0))
-end
-
-local function unixtime(date)
-  local days = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-  local daysec = 86400
-  local y,m,d,h,mi,s = date:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)%..+") 
-  local time = 0
-  for n = 1970,(y - 1) do 
-    time = time + YearInSec(n)
-  end
-  for n = 1,(m - 1) do
-    time = time + (days[n] * daysec)
-  end
-  time = time + (d - 1) * daysec
-  if IsLeapYear(y) and (m + 0 > 2) then
-    time = time + daysec
-  end
-  return time + (h * 3600) + (mi * 60) + s
-end
-
-local prev = redis.call("hget", KEYS[1], ARGV[1])
-if not prev or unixtime(prev) < unixtime(ARGV[2]) then return redis.call("hset", KEYS[1], ARGV[1],ARGV[2]) else return 0 end`)
 )
 
 type UserRoutingPolicyStore struct {
@@ -253,114 +218,6 @@ func (r *ReplicationStatusStore) SetCreatedAt(ctx context.Context, id entity.Rep
 	return r.SetCreatedAtOp(ctx, id, value.UTC()).Get()
 }
 
-func (r *ReplicationStatusStore) SetInitDoneAtOp(ctx context.Context, id entity.ReplicationStatusID, value time.Time) OperationStatus {
-	return r.SetFieldIfExistsOp(ctx, id, "init_done_at", value.UTC())
-}
-
-func (r *ReplicationStatusStore) SetInitDoneAt(ctx context.Context, id entity.ReplicationStatusID, value time.Time) error {
-	return r.SetInitDoneAtOp(ctx, id, value.UTC()).Get()
-}
-
-func (r *ReplicationStatusStore) SetLastEmittedAtOp(ctx context.Context, id entity.ReplicationStatusID, value time.Time) OperationStatus {
-	return r.SetFieldIfExistsOp(ctx, id, "last_emitted_at", value.UTC())
-}
-
-func (r *ReplicationStatusStore) SetLastEmittedAt(ctx context.Context, id entity.ReplicationStatusID, value time.Time) error {
-	return r.SetLastEmittedAtOp(ctx, id, value.UTC()).Get()
-}
-
-func (r *ReplicationStatusStore) IncrementEventsOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[int64] {
-	return r.IncrementFieldIfExistsOp(ctx, id, "events")
-}
-
-func (r *ReplicationStatusStore) IncrementEvents(ctx context.Context, id entity.ReplicationStatusID) (int64, error) {
-	return r.IncrementEventsOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) IncrementEventsDoneOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[int64] {
-	return r.IncrementFieldIfExistsOp(ctx, id, "events_done")
-}
-
-func (r *ReplicationStatusStore) IncrementEventsDone(ctx context.Context, id entity.ReplicationStatusID) (int64, error) {
-	return r.IncrementEventsDoneOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) GetObjectsListedOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[int64] {
-	op := r.GetFieldOp(ctx, id, "obj_listed")
-
-	collectFunc := func() (int64, error) {
-		stringValue, err := op.Get()
-		if err != nil {
-			return 0, fmt.Errorf("unable to get field value: %w", err)
-		}
-		value, err := strconv.ParseInt(stringValue, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("unable to parse int value: %w", err)
-		}
-		return value, nil
-	}
-
-	return NewRedisOperationResult(collectFunc)
-}
-
-func (r *ReplicationStatusStore) GetObjectsListed(ctx context.Context, id entity.ReplicationStatusID) (int64, error) {
-	return r.GetObjectsListedOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) IncrementObjectsListedOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[int64] {
-	return r.IncrementFieldIfExistsOp(ctx, id, "obj_listed")
-}
-
-func (r *ReplicationStatusStore) IncrementObjectsListed(ctx context.Context, id entity.ReplicationStatusID) (int64, error) {
-	return r.IncrementObjectsListedOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) GetObjectsDoneOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[int64] {
-	op := r.GetFieldOp(ctx, id, "obj_done")
-
-	collectFunc := func() (int64, error) {
-		stringValue, err := op.Get()
-		if err != nil {
-			return 0, fmt.Errorf("unable to get field value: %w", err)
-		}
-		value, err := strconv.ParseInt(stringValue, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("unable to parse int value: %w", err)
-		}
-		return value, nil
-	}
-
-	return NewRedisOperationResult(collectFunc)
-}
-
-func (r *ReplicationStatusStore) GetObjectsDone(ctx context.Context, id entity.ReplicationStatusID) (int64, error) {
-	return r.GetObjectsDoneOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) IncrementObjectsDoneOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[int64] {
-	return r.IncrementFieldIfExistsOp(ctx, id, "obj_done")
-}
-
-func (r *ReplicationStatusStore) IncrementObjectsDone(ctx context.Context, id entity.ReplicationStatusID) (int64, error) {
-	return r.IncrementObjectsDoneOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) IncrementBytesListedOp(ctx context.Context, id entity.ReplicationStatusID, value int64) OperationResult[int64] {
-	return r.IncrementFieldByNIfExistsOp(ctx, id, "bytes_listed", value)
-}
-
-func (r *ReplicationStatusStore) IncrementBytesListed(ctx context.Context, id entity.ReplicationStatusID, value int64) (int64, error) {
-	return r.IncrementBytesListedOp(ctx, id, value).Get()
-}
-
-func (r *ReplicationStatusStore) IncrementBytesDoneOp(ctx context.Context, id entity.ReplicationStatusID, value int64) OperationResult[int64] {
-	return r.IncrementFieldByNIfExistsOp(ctx, id, "bytes_done", value)
-}
-
-func (r *ReplicationStatusStore) IncrementBytesDone(ctx context.Context, id entity.ReplicationStatusID, value int64) (int64, error) {
-	return r.IncrementBytesDoneOp(ctx, id, value).Get()
-}
-
 func (r *ReplicationStatusStore) SetArchievedOp(ctx context.Context, id entity.ReplicationStatusID) OperationStatus {
 	return r.SetFieldIfExistsOp(ctx, id, "archived", true)
 }
@@ -375,71 +232,6 @@ func (r *ReplicationStatusStore) SetArchievedAtOp(ctx context.Context, id entity
 
 func (r *ReplicationStatusStore) SetArchievedAt(ctx context.Context, id entity.ReplicationStatusID, value time.Time) error {
 	return r.SetArchievedAtOp(ctx, id, value.UTC()).Get()
-}
-
-func (r *ReplicationStatusStore) GetPausedOp(ctx context.Context, id entity.ReplicationStatusID) OperationResult[bool] {
-	op := r.GetFieldOp(ctx, id, "paused")
-
-	collectFunc := func() (bool, error) {
-		stringValue, err := op.Get()
-		if err != nil {
-			return false, fmt.Errorf("unable to get field value: %w", err)
-		}
-		value, err := strconv.ParseBool(stringValue)
-		if err != nil {
-			return false, fmt.Errorf("unable to parse bool value: %w", err)
-		}
-		return value, nil
-	}
-
-	return NewRedisOperationResult(collectFunc)
-}
-
-func (r *ReplicationStatusStore) GetPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
-	return r.GetPausedOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) SetPausedOp(ctx context.Context, id entity.ReplicationStatusID) OperationStatus {
-	return r.SetFieldIfExistsOp(ctx, id, "paused", true)
-}
-
-func (r *ReplicationStatusStore) SetPaused(ctx context.Context, id entity.ReplicationStatusID) error {
-	return r.SetPausedOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) UnsetPausedOp(ctx context.Context, id entity.ReplicationStatusID) OperationStatus {
-	return r.SetFieldIfExistsOp(ctx, id, "paused", false)
-}
-
-func (r *ReplicationStatusStore) UnsetPaused(ctx context.Context, id entity.ReplicationStatusID) error {
-	return r.UnsetPausedOp(ctx, id).Get()
-}
-
-func (r *ReplicationStatusStore) SetProcessedAtIfGreaterOp(ctx context.Context, id entity.ReplicationStatusID, value time.Time) OperationResult[uint64] {
-	key, err := r.MakeKey(id)
-	if err != nil {
-		return NewRedisFailedOperationResult[uint64](fmt.Errorf("unable to make key: %w", err))
-	}
-
-	cmd := luaUpdateTsIfGreater.Eval(ctx, r.client, []string{key}, "last_processed_at", value.UTC().Format(time.RFC3339Nano))
-
-	collectFunc := func() (uint64, error) {
-		result, err := cmd.Result()
-		if err != nil {
-			return 0, fmt.Errorf("unable to run script: %w", err)
-		}
-		affected, ok := result.(int64)
-		if !ok {
-			return 0, fmt.Errorf("unable to cast result: %w", err)
-		}
-		return uint64(affected), nil
-	}
-
-	return NewRedisOperationResult(collectFunc)
-}
-
-func (r *ReplicationStatusStore) SetProcessedAtIfGreater(ctx context.Context, id entity.ReplicationStatusID, value time.Time) (uint64, error) {
-	return r.SetProcessedAtIfGreaterOp(ctx, id, value).Get()
 }
 
 type ReplicationSwitchInfoStore struct {

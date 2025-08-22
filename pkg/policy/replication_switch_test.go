@@ -739,8 +739,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
-		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
-		r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
 		queuesMock.InitReplicationDone(replID)
 
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, replID, validSwitch)
@@ -767,8 +765,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		queuesMock.InitReplicationInProgress(replID)
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
-		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
-		r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
 		queuesMock.InitReplicationDone(replID)
 
 		// create switch
@@ -808,8 +804,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		r.True(repl.IsArchived)
 		r.NotNil(repl.ArchivedAt)
 		r.True(repl.ListingStarted)
-		r.EqualValues(1, repl.InitObjListed)
-		r.EqualValues(1, repl.InitObjDone)
 		//delete metadata
 		r.NoError(svc.DeleteReplication(ctx, replID))
 		_, err = svc.GetReplicationPolicyInfo(ctx, replID)
@@ -840,8 +834,6 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 		queuesMock.InitReplicationInProgress(replID)
 		// finish init replication
 		r.NoError(svc.ObjListStarted(ctx, replID))
-		r.NoError(svc.IncReplInitObjListed(ctx, replID, 0, time.Now()))
-		r.NoError(svc.IncReplInitObjDone(ctx, replID, 0, time.Now()))
 		queuesMock.InitReplicationDone(replID)
 
 		// create switch
@@ -1336,8 +1328,6 @@ func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
 	queuesMock.InitReplicationInProgress(replIDZero)
 	// finish init replication
 	r.NoError(svc.ObjListStarted(ctx, replIDZero))
-	r.NoError(svc.IncReplInitObjListed(ctx, replIDZero, 0, time.Now()))
-	r.NoError(svc.IncReplInitObjDone(ctx, replIDZero, 0, time.Now()))
 	queuesMock.InitReplicationDone(replIDZero)
 	// create switch
 	err = svc.AddZeroDowntimeReplicationSwitch(ctx, replIDZero, validSwitchZero)

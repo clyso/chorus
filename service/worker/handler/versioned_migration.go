@@ -144,9 +144,6 @@ func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entit
 			}
 			continue
 		}
-		if err := r.policySvc.IncReplInitObjListed(ctx, replicationID, info.Size, time.Now()); err != nil {
-			zerolog.Ctx(ctx).Err(err).Msg("unable to increment object listed metadata")
-		}
 	}
 
 	if err := r.objectVersionInfoStore.AddLeft(ctx, objectID, versionInfoList...); err != nil {
@@ -221,10 +218,6 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 				return r.copySvc.CopyObject(ctx, fromFile, toFile)
 			}); err != nil {
 				return fmt.Errorf("unable to copy object: %w", err)
-			}
-
-			if err := r.policySvc.IncReplInitObjDone(ctx, replicationID, info.Size, time.Now()); err != nil {
-				zerolog.Ctx(ctx).Err(err).Msg("unable to increment object done metadata")
 			}
 		}
 

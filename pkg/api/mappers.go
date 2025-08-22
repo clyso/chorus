@@ -43,20 +43,24 @@ func replicationToPb(id entity.ReplicationStatusID, value entity.ReplicationStat
 		CreatedAt:       timestamppb.New(value.CreatedAt),
 		IsPaused:        value.IsPaused,
 		IsInitDone:      value.InitDone(),
-		InitObjListed:   value.InitObjListed,
-		InitObjDone:     value.InitObjDone,
-		InitBytesListed: value.InitBytesListed,
-		InitBytesDone:   value.InitBytesDone,
-		Events:          value.Events,
-		EventsDone:      value.EventsDone,
-		InitDoneAt:      tsToPb(value.InitDoneAt),
-		LastEmittedAt:   tsToPb(value.LastEmittedAt),
-		LastProcessedAt: tsToPb(value.LastProcessedAt),
+		InitObjListed:   toListed(value.InitMigration),
+		InitObjDone:     int64(value.InitMigration.Done),
+		InitBytesListed: 0, //TODO: remove from api
+		InitBytesDone:   0, //TODO: remove from api
+		Events:          toListed(value.EventMigration),
+		EventsDone:      int64(value.EventMigration.Done),
+		InitDoneAt:      nil, //TODO: remove from api
+		LastEmittedAt:   nil, // TODO: change api to latency
+		LastProcessedAt: nil, // TODO: change api to latency
 		AgentUrl:        strPtr(value.AgentURL),
 		HasSwitch:       value.HasSwitch,
 		IsArchived:      value.IsArchived,
 		ArchivedAt:      tsToPb(value.ArchivedAt),
 	}
+}
+
+func toListed(in entity.QueueStats) int64 {
+	return int64(in.Unprocessed + in.Done + in.Failed)
 }
 
 func strPtr(s string) *string {

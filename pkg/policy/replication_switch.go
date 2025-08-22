@@ -362,8 +362,6 @@ func (r *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID entit
 				ListingStarted: true,
 				CreatedAt:      now,
 			})
-			// set time separately because of go-redis bug with *time.Time
-			_ = txReplicationStatusStore.SetInitDoneAtOp(ctx, replBackID, now)
 		}
 	}
 

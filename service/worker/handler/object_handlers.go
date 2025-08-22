@@ -27,7 +27,6 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
@@ -45,14 +44,6 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	ctx = log.WithObjName(ctx, p.Object.Name)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Object.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
-
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
 		return err
@@ -61,15 +52,6 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		logger.Debug().Err(err).Str(log.Storage, p.ToStorage).Msg("rate limit error")
 		return err
 	}
-	defer func() {
-		if err != nil {
-			return
-		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
-		if verErr != nil {
-			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
-		}
-	}()
 
 	objectLockID := entity.NewVersionedObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)

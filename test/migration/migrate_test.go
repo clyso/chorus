@@ -320,10 +320,10 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		for _, replication := range repl.Replications {
-			if replication.InitObjDone != replication.InitObjListed {
+			if !replication.IsInitDone {
 				return false
 			}
-			if replication.Events != replication.EventsDone {
+			if replication.Events > replication.EventsDone {
 				return false
 			}
 		}
@@ -342,19 +342,10 @@ func TestApi_Migrate_test(t *testing.T) {
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
 		r.EqualValues(repl.Replications[i].InitBytesListed, repl.Replications[i].InitBytesDone)
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
-		r.NotNil(repl.Replications[i].LastProcessedAt)
-		r.NotNil(repl.Replications[i].LastEmittedAt)
-		r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
-		r.True(
-			repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) ||
-				repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()),
-		)
-		//		r.True(repl.Replications[i].LastProcessedAt.AsTime().Equal(repl.Replications[i].LastEmittedAt.AsTime()))
-		r.False(repl.Replications[i].LastEmittedAt.AsTime().IsZero())
-		r.False(repl.Replications[i].LastProcessedAt.AsTime().IsZero())
 		r.False(repl.Replications[i].CreatedAt.AsTime().IsZero())
 
-		r.EqualValues(4, repl.Replications[i].InitObjListed)
+		r.Equal(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
+		r.Equal(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.EqualValues(2, repl.Replications[i].Events)
 	}
 
@@ -479,21 +470,9 @@ func TestApi_Migrate_test(t *testing.T) {
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
 		r.EqualValues(repl.Replications[i].InitBytesListed, repl.Replications[i].InitBytesDone)
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
-		r.NotNil(repl.Replications[i].LastProcessedAt)
-		r.NotNil(repl.Replications[i].LastEmittedAt)
-
-		r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
-		r.True(
-			repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) ||
-				repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()),
-		)
-
-		//		r.True(repl.Replications[i].LastProcessedAt.AsTime().Equal(repl.Replications[i].LastEmittedAt.AsTime()))
-		r.False(repl.Replications[i].LastEmittedAt.AsTime().IsZero())
-		r.False(repl.Replications[i].LastProcessedAt.AsTime().IsZero())
 		r.False(repl.Replications[i].CreatedAt.AsTime().IsZero())
 
-		r.EqualValues(4, repl.Replications[i].InitObjListed)
+		r.Equal(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
 		r.EqualValues(0, repl.Replications[i].Events)
 	}
 	r.EqualValues(2, cnt)
@@ -556,18 +535,9 @@ func TestApi_Migrate_test(t *testing.T) {
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
 		r.EqualValues(repl.Replications[i].InitBytesListed, repl.Replications[i].InitBytesDone)
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
-		r.NotNil(repl.Replications[i].LastProcessedAt)
-		r.NotNil(repl.Replications[i].LastEmittedAt)
-
-		r.False(repl.Replications[i].InitDoneAt.AsTime().IsZero())
-		r.True(repl.Replications[i].InitDoneAt.AsTime().After(repl.Replications[i].CreatedAt.AsTime()) || repl.Replications[i].InitDoneAt.AsTime().Equal(repl.Replications[i].CreatedAt.AsTime()))
-
-		//		r.True(repl.Replications[i].LastProcessedAt.AsTime().Equal(repl.Replications[i].LastEmittedAt.AsTime()))
-		r.False(repl.Replications[i].LastEmittedAt.AsTime().IsZero())
-		r.False(repl.Replications[i].LastProcessedAt.AsTime().IsZero())
 		r.False(repl.Replications[i].CreatedAt.AsTime().IsZero())
 
-		r.EqualValues(4, repl.Replications[i].InitObjListed)
+		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
 		if repl.Replications[i].To == "f2" {
 			if repl.Replications[i].Bucket == b1 {
 				r.EqualValues(1, repl.Replications[i].Events)

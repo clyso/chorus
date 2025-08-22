@@ -116,17 +116,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: t.FromStorage,
-				ToStorage:   t.ToStorage,
-				FromBucket:  bucket,
-				ToBucket:    t.ToBucket,
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
-			}
 		}
 	case *tasks.BucketSyncACLPayload:
 		_, err = s.versionSvc.IncrementBucketACL(ctx, t.Bucket, meta.ToDest(t.FromStorage, ""))
@@ -144,17 +133,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: t.FromStorage,
-				ToStorage:   t.ToStorage,
-				FromBucket:  bucket,
-				ToBucket:    t.ToBucket,
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
-			}
 		}
 	case *tasks.BucketSyncTagsPayload:
 		_, err = s.versionSvc.IncrementBucketTags(ctx, t.Bucket, meta.ToDest(t.FromStorage, ""))
@@ -171,17 +149,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			_, err = s.taskClient.EnqueueContext(ctx, payload)
 			if err != nil {
 				return err
-			}
-			replicationID := entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: t.FromStorage,
-				ToStorage:   t.ToStorage,
-				FromBucket:  bucket,
-				ToBucket:    t.ToBucket,
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
 		}
 	case *tasks.ObjectSyncPayload:
@@ -204,17 +171,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: t.FromStorage,
-				ToStorage:   t.ToStorage,
-				FromBucket:  bucket,
-				ToBucket:    t.ToBucket,
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
-			}
 		}
 	case *tasks.ObjSyncACLPayload:
 		_, err = s.versionSvc.IncrementACL(ctx, t.Object, meta.ToDest(t.FromStorage, ""))
@@ -232,17 +188,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			if err != nil {
 				return err
 			}
-			replicationID := entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: t.FromStorage,
-				ToStorage:   t.ToStorage,
-				FromBucket:  bucket,
-				ToBucket:    t.ToBucket,
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
-			}
 		}
 	case *tasks.ObjSyncTagsPayload:
 		_, err = s.versionSvc.IncrementTags(ctx, t.Object, meta.ToDest(t.FromStorage, ""))
@@ -259,17 +204,6 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 			_, err = s.taskClient.EnqueueContext(ctx, payload)
 			if err != nil {
 				return err
-			}
-			replicationID := entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: t.FromStorage,
-				ToStorage:   t.ToStorage,
-				FromBucket:  bucket,
-				ToBucket:    t.ToBucket,
-			}
-			incErr := s.policySvc.IncReplEvents(ctx, replicationID, t.GetDate())
-			if incErr != nil {
-				zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc repl event counter")
 			}
 		}
 	default:

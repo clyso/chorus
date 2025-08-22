@@ -78,11 +78,7 @@ type Service interface {
 	GetReplicationPolicyInfoExtended(ctx context.Context, id entity.ReplicationStatusID) (entity.ReplicationStatusExtended, error)
 	ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatusExtended, error)
 	IsReplicationPolicyExists(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
-	IncReplInitObjListed(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error
-	IncReplInitObjDone(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error
 	ObjListStarted(ctx context.Context, id entity.ReplicationStatusID) error
-	IncReplEvents(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
-	IncReplEventsDone(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 
 	PauseReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	ResumeReplication(ctx context.Context, id entity.ReplicationStatusID) error
@@ -430,109 +426,6 @@ func (r *policySvc) IsReplicationPolicyExists(ctx context.Context, id entity.Rep
 		return false, fmt.Errorf("unable to check if bucket replication store exists: %w", err)
 	}
 	return exists, nil
-}
-
-// func (r *policySvc) IsReplicationPolicyPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
-// 	if err := validate.ReplicationStatusID(id); err != nil {
-// 		return false, fmt.Errorf("unable to validate replication status id: %w", err)
-// 	}
-// 	// use InitMigrationListObjQueue to check if initial migration is paused
-// 	// because it is the only queue which is always created even if bucket is empty
-// 	paused, err := r.queueSVC.IsPaused(ctx, tasks.InitMigrationListObjQueue(id))
-// 	if errors.Is(err, dom.ErrNotFound) {
-// 		// not found errors can only appear for backwards replication after switch.
-// 		// In this case there is not initial migration
-// 		return false, nil // queue does not exist, so replication is not paused
-// 	}
-// 	return paused, err
-// }
-
-func (r *policySvc) IncReplInitObjListed(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error {
-	if err := validate.ReplicationStatusID(id); err != nil {
-		return fmt.Errorf("unable to validate replication status id: %w", err)
-	}
-	if _, err := r.replicationStatusStore.IncrementObjectsListed(ctx, id); err != nil {
-		return fmt.Errorf("unable to increment objects listed: %w", err)
-	}
-	if bytes == 0 {
-		return nil
-	}
-	if _, err := r.replicationStatusStore.IncrementBytesListed(ctx, id, int64(bytes)); err != nil {
-		return fmt.Errorf("unable to increment bytes listed: %w", err)
-	}
-	if err := r.replicationStatusStore.SetLastEmittedAt(ctx, id, eventTime); err != nil {
-		return fmt.Errorf("unable to set last emitted: %w", err)
-	}
-	return nil
-}
-
-func (r *policySvc) IncReplInitObjDone(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error {
-	if err := validate.ReplicationStatusID(id); err != nil {
-		return fmt.Errorf("unable to validate replication status id: %w", err)
-	}
-	if _, err := r.replicationStatusStore.IncrementObjectsDone(ctx, id); err != nil {
-		return fmt.Errorf("unable to increment objects done: %w", err)
-	}
-	if _, err := r.replicationStatusStore.IncrementBytesDone(ctx, id, int64(bytes)); err != nil {
-		return fmt.Errorf("unable to increment bytes done: %w", err)
-	}
-	r.updateProcessedAt(ctx, id, eventTime)
-
-	listed, err := r.replicationStatusStore.GetObjectsListed(ctx, id)
-	if err != nil {
-		return fmt.Errorf("unable to get objects listed: %w", err)
-	}
-	done, err := r.replicationStatusStore.GetObjectsDone(ctx, id)
-	if err != nil {
-		return fmt.Errorf("unable to get objects done: %w", err)
-	}
-
-	if listed > done {
-		return nil
-	}
-
-	if err := r.replicationStatusStore.SetInitDoneAt(ctx, id, time.Now()); err != nil {
-		return fmt.Errorf("unable to set init done at: %w", err)
-	}
-
-	return nil
-}
-
-func (r *policySvc) IncReplEvents(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error {
-	if err := validate.ReplicationStatusID(id); err != nil {
-		return fmt.Errorf("unable to validate replication status id: %w", err)
-	}
-	if _, err := r.replicationStatusStore.IncrementEvents(ctx, id); err != nil {
-		return fmt.Errorf("unable to increment events done: %w", err)
-	}
-
-	if err := r.replicationStatusStore.SetLastEmittedAt(ctx, id, eventTime); err != nil {
-		zerolog.Ctx(ctx).Err(err).Msg("unable to update last_emitted_at for event replication")
-	}
-
-	return nil
-}
-
-func (r *policySvc) IncReplEventsDone(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error {
-	if err := validate.ReplicationStatusID(id); err != nil {
-		return fmt.Errorf("unable to validate replication status id: %w", err)
-	}
-	if _, err := r.replicationStatusStore.IncrementEventsDone(ctx, id); err != nil {
-		return fmt.Errorf("unable to increment events done: %w", err)
-	}
-	r.updateProcessedAt(ctx, id, eventTime)
-	return nil
-}
-
-func (r *policySvc) updateProcessedAt(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) {
-	affected, err := r.replicationStatusStore.SetProcessedAtIfGreater(ctx, id, eventTime)
-	if err != nil {
-		zerolog.Ctx(ctx).Err(err).Msg("unable to update policy last_processed_at")
-		return
-	}
-	if affected == 0 {
-		zerolog.Ctx(ctx).Info().Msg("policy last_processed_at is not updated")
-	}
 }
 
 func (r *policySvc) GetUserReplicationPolicies(ctx context.Context, user string) (*entity.StorageReplicationPolicies, error) {
