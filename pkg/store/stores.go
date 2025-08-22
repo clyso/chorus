@@ -159,15 +159,14 @@ func Float64ToUint8Converter(value float64) (uint8, error) {
 }
 
 type BucketReplicationPolicyStore struct {
-	RedisIDKeySortedSet[entity.BucketReplicationPolicyID, entity.BucketReplicationPolicy, uint8]
+	RedisIDKeySet[entity.BucketReplicationPolicyID, entity.BucketReplicationPolicy]
 }
 
 func NewBucketReplicationPolicyStore(client redis.Cmdable) *BucketReplicationPolicyStore {
 	return &BucketReplicationPolicyStore{
-		*NewRedisIDKeySortedSet(client, "p:repl:bucket",
+		*NewRedisIDKeySet(client, "p:repl:bucket",
 			BucketReplicationPolicyIDToTokensConverter, TokensToBucketReplicationPolicyIDConverter,
-			BucketReplicationPolicyToStringConverter, StringToBucketReplicationPolicyConverter,
-			Uint8ToFloat64Converter, Float64ToUint8Converter),
+			BucketReplicationPolicyToStringConverter, StringToBucketReplicationPolicyConverter),
 	}
 }
 
