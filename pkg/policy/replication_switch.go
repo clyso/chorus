@@ -348,8 +348,7 @@ func (r *policySvc) UpdateDowntimeSwitchStatus(ctx context.Context, replID entit
 			// TODO: Here to storage and from storage are changing places
 			// Why bucket was not present in policy?
 			bucketReplicationPolicy := entity.NewBucketReplicationPolicy(replID.ToStorage, replID.FromStorage, replID.ToBucket)
-			setEntry := *store.NewScoredSetEntry(bucketReplicationPolicy, uint8(1)) // scores are not used anymore, set to 1 to not change redis data structure
-			_ = txBucketReplicationPolicyStore.AddIfNotExistsOp(ctx, bucketReplicationPolicyID, setEntry)
+			_, _ = txBucketReplicationPolicyStore.Add(ctx, bucketReplicationPolicyID, bucketReplicationPolicy)
 
 			replBackID := replID
 			replBackID.FromStorage, replBackID.ToStorage = replID.ToStorage, replID.FromStorage

@@ -302,7 +302,7 @@ func (r *policySvc) GetBucketReplicationPolicies(ctx context.Context, id entity.
 		return nil, fmt.Errorf("unable to validate bucket replication policy id: %w", err)
 	}
 
-	entries, err := r.bucketReplicationPolicyStore.GetAll(ctx, id)
+	entries, err := r.bucketReplicationPolicyStore.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get replication policies: %w", err)
 	}
@@ -314,15 +314,15 @@ func (r *policySvc) GetBucketReplicationPolicies(ctx context.Context, id entity.
 	destinations := make([]entity.ReplicationPolicyDestination, 0, len(entries))
 	for _, entry := range entries {
 		if fromStorage == "" {
-			fromStorage = entry.Value.FromStorage
-		} else if fromStorage != entry.Value.FromStorage {
+			fromStorage = entry.FromStorage
+		} else if fromStorage != entry.FromStorage {
 			return nil, fmt.Errorf("%w: invalid replication policy key: all keys should have same from: %+v", dom.ErrInternal, entries)
 		}
 
-		if fromStorage == entry.Value.ToStorage && id.FromBucket == entry.Value.ToBucket {
+		if fromStorage == entry.ToStorage && id.FromBucket == entry.ToBucket {
 			return nil, fmt.Errorf("%w: invalid replication policy key: from and to should be different: %+v", dom.ErrInternal, entries)
 		}
-		destination := entity.NewBucketReplicationPolicyDestination(entry.Value.ToStorage, entry.Value.ToBucket)
+		destination := entity.NewBucketReplicationPolicyDestination(entry.ToStorage, entry.ToBucket)
 		destinations = append(destinations, destination)
 	}
 	return &entity.StorageReplicationPolicies{
@@ -689,11 +689,8 @@ func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, id entity.Re
 		}
 	}
 
-	entry := store.ScoredSetEntry[entity.BucketReplicationPolicy, uint8]{
-		Value: entity.NewBucketReplicationPolicy(id.FromStorage, id.ToStorage, id.ToBucket),
-		Score: uint8(1), // scores are not used anymore, set to 1 to not change redis data structure
-	}
-	affected, err := r.bucketReplicationPolicyStore.AddIfNotExists(ctx, bucketReplicationPolicyID, entry)
+	entry := entity.NewBucketReplicationPolicy(id.FromStorage, id.ToStorage, id.ToBucket)
+	affected, err := r.bucketReplicationPolicyStore.Add(ctx, bucketReplicationPolicyID, entry)
 	if err != nil {
 		return err
 	}
