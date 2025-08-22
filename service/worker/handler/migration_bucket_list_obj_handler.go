@@ -133,11 +133,6 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			}
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		}
-		err = s.policySvc.IncReplInitObjListed(ctx, replicationID, uint64(object.Size), p.GetDate())
-		if err != nil {
-			return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)
-		}
-
 		err = s.storageSvc.SetLastListedObj(ctx, p, object.Key)
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to update last obj meta: %w", err)
@@ -164,11 +159,6 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			logger.Info().Msg("cannot enqueue task with duplicate id")
 		case err != nil:
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
-		default:
-			err = s.policySvc.IncReplInitObjListed(ctx, replicationID, 0, p.GetDate())
-			if err != nil {
-				return fmt.Errorf("migration bucket list obj: unable to inc obj listed meta: %w", err)
-			}
 		}
 	}
 	_ = s.storageSvc.DelLastListedObj(ctx, p)

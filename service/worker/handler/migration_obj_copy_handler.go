@@ -26,7 +26,6 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
@@ -44,14 +43,6 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	ctx = log.WithObjName(ctx, p.Obj.Name)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
-
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
 		return err
@@ -66,16 +57,6 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		Name:    p.Obj.Name,
 		Version: p.Obj.VersionID,
 	}
-	defer func() {
-		// complete obj migration meta if not err:
-		if err != nil {
-			return
-		}
-		metaErr := s.policySvc.IncReplInitObjDone(ctx, replicationID, uint64(p.Obj.Size), p.CreatedAt)
-		if metaErr != nil {
-			logger.Err(metaErr).Msg("migration obj copy: unable to inc obj done meta")
-		}
-	}()
 
 	objectLockID := entity.NewVersionedObjectLockID(p.ToStorage, p.ToBucket, p.Obj.Name, p.Obj.VersionID)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)

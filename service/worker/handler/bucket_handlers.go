@@ -270,28 +270,10 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
-
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
 		return err
 	}
-
-	defer func() {
-		if err != nil {
-			return
-		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
-		if verErr != nil {
-			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
-		}
-	}()
 
 	fromBucket, toBucket := p.Bucket, p.Bucket
 	if p.ToBucket != "" {
