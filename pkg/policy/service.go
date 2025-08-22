@@ -772,5 +772,13 @@ func (r *policySvc) DeleteReplication(ctx context.Context, id entity.Replication
 	if err := exec.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to execute group: %w", err)
 	}
+	queues := tasks.AllReplicationQueues(id)
+	for _, queue := range queues {
+		err := r.queueSvc.Delete(ctx, queue, true)
+		if err != nil && !errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Err(err).Msgf("unable to delete queue %s", queue)
+			continue
+		}
+	}
 	return nil
 }

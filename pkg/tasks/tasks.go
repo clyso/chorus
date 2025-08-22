@@ -75,40 +75,6 @@ var Priority = map[string]int{
 	"*":                                          1, // fallback for legacy queues
 }
 
-// func taskQueue[T Task](payload T) string {
-// 	switch any(payload).(type) {
-//
-// 	case ZeroDowntimeReplicationSwitchPayload,
-// 		SwitchWithDowntimePayload,
-// 		return string(QueueAPI)
-//
-// 	case BucketCreatePayload,
-// 		MigrateBucketListObjectsPayload,
-// 		ListObjectVersionsPayload:
-// 		return string(QueueMigrateListObjectsPrefix)
-//
-// 	case BucketDeletePayload,
-// 		ObjectSyncPayload,
-// 		BucketSyncTagsPayload,
-// 		BucketSyncACLPayload,
-// 		ObjSyncTagsPayload,
-// 		ObjSyncACLPayload:
-// 		return string(QueueEventsPrefix)
-//
-// 	case MigrateObjCopyPayload,
-// 		MigrateVersionedObjectPayload:
-// 		return string(QueueMigrateCopyObjectPrefix)
-//
-// 	case ConsistencyCheckPayload,
-// 		ConsistencyCheckListPayload,
-// 		ConsistencyCheckReadinessPayload,
-// 		ConsistencyCheckDeletePayload:
-// 		return string(QueueConsistencyCheck)
-// 	default:
-// 		panic(fmt.Sprintf("unknown task type %T", payload))
-// 	}
-// }
-
 func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) string {
 	switch queuePrefix {
 	case QueueMigrateCopyObjectPrefix,
@@ -122,13 +88,9 @@ func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) stri
 
 func InitMigrationQueues(id entity.ReplicationStatusID) []string {
 	return []string{
-		InitMigrationListObjQueue(id),
+		replicationQueueName(QueueMigrateListObjectsPrefix, id),
 		replicationQueueName(QueueMigrateCopyObjectPrefix, id),
 	}
-}
-
-func InitMigrationListObjQueue(id entity.ReplicationStatusID) string {
-	return replicationQueueName(QueueMigrateListObjectsPrefix, id)
 }
 
 func EventMigrationQueues(id entity.ReplicationStatusID) []string {
