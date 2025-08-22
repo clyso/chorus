@@ -26,6 +26,7 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/rclone"
 )
 
 var (
@@ -770,4 +771,49 @@ func NewBucketLocker(client redis.Cmdable, overlap time.Duration) *BucketLocker 
 			BucketLockIDToTokensConverter, TokensToBucketLockIDConverter,
 			overlap),
 	}
+}
+
+type ObjectVersionInfoStore struct {
+	RedisIDKeyList[entity.VersionedObjectID, rclone.ObjectVersionInfo]
+}
+
+func TokensToObjectVersionIDConverter(tokens []string) (entity.VersionedObjectID, error) {
+	return entity.VersionedObjectID{
+		Storage: tokens[0],
+		Bucket:  tokens[1],
+		Name:    tokens[2],
+	}, nil
+}
+
+func ObjectVersionIDToTokensConverter(id entity.VersionedObjectID) ([]string, error) {
+	return []string{id.Storage, id.Bucket, id.Name}, nil
+}
+
+func ObjectVersionInfoToStringConverter(value rclone.ObjectVersionInfo) (string, error) {
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("unable to marshal value: %w", err)
+	}
+	return string(bytes), nil
+}
+
+func StringToObjectVersionInfoConverter(value string) (rclone.ObjectVersionInfo, error) {
+	result := rclone.ObjectVersionInfo{}
+	if err := json.Unmarshal([]byte(value), &result); err != nil {
+		return rclone.ObjectVersionInfo{}, fmt.Errorf("unable to unmarshal value: %w", err)
+	}
+	return result, nil
+}
+
+func NewObjectVersionInfoStore(client redis.Cmdable) *ObjectVersionInfoStore {
+	return &ObjectVersionInfoStore{
+		*NewRedisIDKeyList[entity.VersionedObjectID, rclone.ObjectVersionInfo](
+			client, "p:repl:objectversion",
+			ObjectVersionIDToTokensConverter, TokensToObjectVersionIDConverter,
+			ObjectVersionInfoToStringConverter, StringToObjectVersionInfoConverter),
+	}
+}
+
+func (r *ObjectVersionInfoStore) WithExecutor(exec Executor[redis.Pipeliner]) *ObjectVersionInfoStore {
+	return NewObjectVersionInfoStore(exec.Get())
 }

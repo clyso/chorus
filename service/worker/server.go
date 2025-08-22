@@ -144,6 +144,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	objectLocker := store.NewObjectLocker(lockRedis, conf.Lock.Overlap)
 	bucketLocker := store.NewBucketLocker(lockRedis, conf.Lock.Overlap)
 
+	memoryLimiterSvc := rclone.NewMemoryLimiterSvc(memCalc, memLimiter, filesLimiter, metricsSvc)
+	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
+	copySvc := rclone.NewS3CopySvc(s3Clients, memoryLimiterSvc, limiter, metricsSvc)
+	versionedMigrationSvc := handler.NewVersionedMigrationSvc(&logger, policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
+	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(&logger, versionedMigrationSvc, taskClient)
+
 	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
@@ -201,6 +207,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
 	mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
 	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
+	mux.HandleFunc(tasks.TypeMigrateObjectListVersions, versionedMigrationCtrl.HandleObjectVersionList)
+	mux.HandleFunc(tasks.TypeMigrateVersionedObject, versionedMigrationCtrl.HandleVersionedObjectMigration)
 	mux.HandleFunc(tasks.TypeConsistencyCheck, workerSvc.HandleConsistencyCheck)
 	mux.HandleFunc(tasks.TypeConsistencyCheckList, workerSvc.HandleConsistencyCheckList)
 	mux.HandleFunc(tasks.TypeConsistencyCheckReadiness, workerSvc.HandleConsistencyCheckReadiness)

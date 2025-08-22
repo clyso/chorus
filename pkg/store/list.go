@@ -94,13 +94,13 @@ func (r *RedisIDKeyList[ID, V]) GetPage(ctx context.Context, id ID, pager Pager)
 	return r.GetPageOp(ctx, id, pager).Get()
 }
 
-func (r *RedisIDKeyList[ID, V]) GetOneOp(ctx context.Context, id ID, idx uint64) OperationResult[V] {
+func (r *RedisIDKeyList[ID, V]) getOneOp(ctx context.Context, id ID, idx int64) OperationResult[V] {
 	key, err := r.MakeKey(id)
 	if err != nil {
 		return NewRedisFailedOperationResult[V](fmt.Errorf("unable to make key: %w", err))
 	}
 
-	cmd := r.client.LIndex(ctx, key, int64(idx))
+	cmd := r.client.LIndex(ctx, key, idx)
 
 	collectFunc := func() (V, error) {
 		cmdVal, err := cmd.Result()
@@ -123,8 +123,28 @@ func (r *RedisIDKeyList[ID, V]) GetOneOp(ctx context.Context, id ID, idx uint64)
 	return NewRedisOperationResult(collectFunc)
 }
 
+func (r *RedisIDKeyList[ID, V]) GetOneOp(ctx context.Context, id ID, idx uint64) OperationResult[V] {
+	return r.getOneOp(ctx, id, int64(idx))
+}
+
 func (r *RedisIDKeyList[ID, V]) GetOne(ctx context.Context, id ID, idx uint64) (V, error) {
 	return r.GetOneOp(ctx, id, idx).Get()
+}
+
+func (r *RedisIDKeyList[ID, V]) GetLeftOp(ctx context.Context, id ID) OperationResult[V] {
+	return r.GetOneOp(ctx, id, 0)
+}
+
+func (r *RedisIDKeyList[ID, V]) GetLeft(ctx context.Context, id ID) (V, error) {
+	return r.GetLeftOp(ctx, id).Get()
+}
+
+func (r *RedisIDKeyList[ID, V]) GetRightOp(ctx context.Context, id ID) OperationResult[V] {
+	return r.getOneOp(ctx, id, -1)
+}
+
+func (r *RedisIDKeyList[ID, V]) GetRight(ctx context.Context, id ID) (V, error) {
+	return r.GetRightOp(ctx, id).Get()
 }
 
 func (r *RedisIDKeyList[ID, V]) AddLeftOp(ctx context.Context, id ID, values ...V) OperationStatus {

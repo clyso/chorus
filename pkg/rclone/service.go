@@ -48,6 +48,23 @@ type File struct {
 	Version string
 }
 
+func NewVersionedFile(storage string, bucket string, name string, version string) File {
+	return File{
+		Storage: storage,
+		Bucket:  bucket,
+		Name:    name,
+		Version: version,
+	}
+}
+
+func NewFile(storage string, bucket string, name string) File {
+	return File{
+		Storage: storage,
+		Bucket:  bucket,
+		Name:    name,
+	}
+}
+
 type CompareRes struct {
 	SrcStor  string
 	DestStor string
