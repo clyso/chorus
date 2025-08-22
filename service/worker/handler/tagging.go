@@ -51,17 +51,6 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
 	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
@@ -98,17 +87,6 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 		FromBucket:  p.Object.Bucket,
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
-	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)

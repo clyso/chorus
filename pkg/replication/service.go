@@ -90,7 +90,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}
@@ -108,7 +108,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}
@@ -136,7 +136,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}
@@ -164,7 +164,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}
@@ -196,7 +196,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}
@@ -224,7 +224,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}
@@ -252,7 +252,7 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		for _, to := range replTo {
 			t.SetTo(to.Storage, to.Bucket)
 			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, *t, replicationID)
+			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
 			if err != nil {
 				return err
 			}

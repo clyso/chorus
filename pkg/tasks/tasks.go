@@ -46,9 +46,6 @@ const (
 	TypeMigrateObjectListVersions = "migrate:object:list_versions"
 	TypeMigrateVersionedObject    = "migrate:object:copy_versioned"
 
-	TypeApiCostEstimation     = "api:cost_estimation"
-	TypeApiCostEstimationList = "api:cost_estimation:list"
-
 	TypeConsistencyCheck          = "consistency"
 	TypeConsistencyCheckList      = "consistency:list"
 	TypeConsistencyCheckReadiness = "consistency:readiness"
@@ -62,28 +59,62 @@ type Queue string
 
 const (
 	QueueAPI                      Queue = "api"
-	QueueMigrateListObjectsPrefix Queue = "migr_list_obj:"
+	QueueMigrateListObjectsPrefix Queue = "migr_list_obj"
 	QueueConsistencyCheck         Queue = "consistency_check"
-	QueueMigrateCopyObjectPrefix  Queue = "migr_copy_obj:"
-	QueueEventsPrefix             Queue = "event:"
+	QueueMigrateCopyObjectPrefix  Queue = "migr_copy_obj"
+	QueueEventsPrefix             Queue = "event"
 )
 
 // Priority defines the priority of the queues from highest to lowest.
 var Priority = map[string]int{
 	string(QueueAPI): 200, // highest priority
-	string(QueueMigrateListObjectsPrefix) + "*": 100,
-	string(QueueConsistencyCheck):               50,
-	string(QueueMigrateCopyObjectPrefix) + "*":  10,
-	string(QueueEventsPrefix) + "*":             5, // lowest priority
-	"*":                                         1, // fallback for legacy queues
+	string(QueueMigrateListObjectsPrefix) + ":*": 100,
+	string(QueueConsistencyCheck):                50,
+	string(QueueMigrateCopyObjectPrefix) + ":*":  10,
+	string(QueueEventsPrefix) + ":*":             5, // lowest priority
+	"*":                                          1, // fallback for legacy queues
 }
+
+// func taskQueue[T Task](payload T) string {
+// 	switch any(payload).(type) {
+//
+// 	case ZeroDowntimeReplicationSwitchPayload,
+// 		SwitchWithDowntimePayload,
+// 		return string(QueueAPI)
+//
+// 	case BucketCreatePayload,
+// 		MigrateBucketListObjectsPayload,
+// 		ListObjectVersionsPayload:
+// 		return string(QueueMigrateListObjectsPrefix)
+//
+// 	case BucketDeletePayload,
+// 		ObjectSyncPayload,
+// 		BucketSyncTagsPayload,
+// 		BucketSyncACLPayload,
+// 		ObjSyncTagsPayload,
+// 		ObjSyncACLPayload:
+// 		return string(QueueEventsPrefix)
+//
+// 	case MigrateObjCopyPayload,
+// 		MigrateVersionedObjectPayload:
+// 		return string(QueueMigrateCopyObjectPrefix)
+//
+// 	case ConsistencyCheckPayload,
+// 		ConsistencyCheckListPayload,
+// 		ConsistencyCheckReadinessPayload,
+// 		ConsistencyCheckDeletePayload:
+// 		return string(QueueConsistencyCheck)
+// 	default:
+// 		panic(fmt.Sprintf("unknown task type %T", payload))
+// 	}
+// }
 
 func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) string {
 	switch queuePrefix {
 	case QueueMigrateCopyObjectPrefix,
 		QueueMigrateListObjectsPrefix,
 		QueueEventsPrefix:
-		return fmt.Sprintf("%s%s:%s:%s:%s", queuePrefix, id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket)
+		return fmt.Sprintf("%s:%s:%s:%s:%s", queuePrefix, id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket)
 	default:
 		panic(fmt.Sprintf("%s is not a replication queue prefix", queuePrefix))
 	}
@@ -109,10 +140,6 @@ func EventMigrationQueues(id entity.ReplicationStatusID) []string {
 func AllReplicationQueues(id entity.ReplicationStatusID) []string {
 	return append(InitMigrationQueues(id), EventMigrationQueues(id)...)
 }
-
-const (
-	costEstimationTaskRetention = time.Second
-)
 
 type SyncTask interface {
 	GetFrom() string
@@ -154,21 +181,10 @@ func (t *Sync) GetDate() time.Time {
 	return t.CreatedAt
 }
 
-type CostEstimationPayload struct {
-	Sync
-}
-
 type ZeroDowntimeReplicationSwitchPayload struct {
 	Sync
 	Bucket string
 	User   string
-}
-
-type CostEstimationListPayload struct {
-	FromStorage string
-	ToStorage   string
-	Bucket      string
-	Prefix      string
 }
 
 type BucketSyncTagsPayload struct {
@@ -284,13 +300,21 @@ type SwitchWithDowntimePayload struct {
 	CreatedAt   time.Time
 }
 
-func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
-	BucketSyncTagsPayload | BucketSyncACLPayload |
-	ObjectSyncPayload | ObjSyncTagsPayload | ObjSyncACLPayload |
-	MigrateBucketListObjectsPayload | MigrateObjCopyPayload |
-	CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
-	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload |
-	ListObjectVersionsPayload | MigrateVersionedObjectPayload](ctx context.Context, payload T, replicationID entity.ReplicationStatusID) (*asynq.Task, error) {
+type ReplicationTask interface {
+	BucketCreatePayload |
+		BucketDeletePayload |
+		BucketSyncTagsPayload |
+		BucketSyncACLPayload |
+		ObjectSyncPayload |
+		ObjSyncTagsPayload |
+		ObjSyncACLPayload |
+		MigrateBucketListObjectsPayload |
+		MigrateObjCopyPayload |
+		ListObjectVersionsPayload |
+		MigrateVersionedObjectPayload
+}
+
+func NewReplicationTask[T ReplicationTask](ctx context.Context, replicationID entity.ReplicationStatusID, payload T) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -366,8 +390,16 @@ func NewReplicationTask[T BucketCreatePayload | BucketDeletePayload |
 	return asynq.NewTask(taskType, bytes, optionList...), nil
 }
 
-func NewTask[T CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeReplicationSwitchPayload | SwitchWithDowntimePayload |
-	ConsistencyCheckPayload | ConsistencyCheckListPayload | ConsistencyCheckReadinessPayload | ConsistencyCheckDeletePayload](ctx context.Context, payload T) (*asynq.Task, error) {
+type ApiTask interface {
+	ZeroDowntimeReplicationSwitchPayload |
+		SwitchWithDowntimePayload |
+		ConsistencyCheckPayload |
+		ConsistencyCheckListPayload |
+		ConsistencyCheckReadinessPayload |
+		ConsistencyCheckDeletePayload
+}
+
+func NewTask[T ApiTask](ctx context.Context, payload T) (*asynq.Task, error) {
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
@@ -388,16 +420,6 @@ func NewTask[T CostEstimationPayload | CostEstimationListPayload | ZeroDowntimeR
 		id := fmt.Sprintf("api:sd:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket)
 		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(id)}
 		taskType = TypeApiSwitchWithDowntime
-	case CostEstimationPayload:
-		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.Retention(costEstimationTaskRetention), asynq.TaskID(fmt.Sprintf("api:ce:%s:%s", p.FromStorage, p.ToStorage))}
-		taskType = TypeApiCostEstimation
-	case CostEstimationListPayload:
-		id := fmt.Sprintf("api:cel:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket)
-		if p.Prefix != "" {
-			id = fmt.Sprintf("api:cel:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
-		}
-		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(id)}
-		taskType = TypeApiCostEstimationList
 	case ConsistencyCheckPayload:
 		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck))}
 		taskType = TypeConsistencyCheck

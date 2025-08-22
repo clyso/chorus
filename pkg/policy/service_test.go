@@ -276,8 +276,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 			r.ErrorIs(err, dom.ErrInvalidArg)
 			_, err = svc.GetReplicationPolicyInfo(ctx, replicationID)
 			r.ErrorIs(err, dom.ErrInvalidArg)
-			_, err = svc.IsReplicationPolicyPaused(ctx, replicationID)
-			r.ErrorIs(err, dom.ErrInvalidArg)
 			err = svc.IncReplInitObjListed(ctx, replicationID, 0, time.Now())
 			r.ErrorIs(err, dom.ErrInvalidArg)
 			err = svc.IncReplInitObjDone(ctx, replicationID, 0, time.Now())
@@ -296,8 +294,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		queuesMock.InitReplicationInProgress(rightReplicationID)
 		_, err = svc.GetReplicationPolicyInfo(ctx, rightReplicationID)
-		r.NoError(err)
-		_, err = svc.IsReplicationPolicyPaused(ctx, rightReplicationID)
 		r.NoError(err)
 		err = svc.IncReplInitObjListed(ctx, rightReplicationID, 0, time.Now())
 		r.NoError(err)
@@ -492,7 +488,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.NoError(err)
 		r.Len(list, 1)
 		for id, status := range list {
-			r.EqualValues(info, status)
+			r.EqualValues(info, *status.ReplicationStatus)
 			r.EqualValues(u1, id.User)
 			r.EqualValues(b1, id.FromBucket)
 			r.EqualValues(s1, id.FromStorage)
@@ -712,41 +708,36 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.Len(res.Destinations, 1)
 		r.EqualValues(entity.NewBucketReplicationPolicyDestination(s2, b1), res.Destinations[0])
 
-		info, err := svc.GetReplicationPolicyInfo(ctx, replicationID12)
+		info, err := svc.GetReplicationPolicyInfoExtended(ctx, replicationID12)
 		r.NoError(err)
 		r.False(info.CreatedAt.IsZero())
+		r.False(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
 		r.Zero(info.InitBytesDone)
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
-
-		paused, err := svc.IsReplicationPolicyPaused(ctx, replicationID12)
-		r.NoError(err)
-		r.False(paused)
 
 		err = svc.PauseReplication(ctx, replicationID12)
 		r.NoError(err)
 
-		info, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
+		info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationID12)
 		r.NoError(err)
+		r.True(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
 		r.Zero(info.InitBytesDone)
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
-
-		paused, err = svc.IsReplicationPolicyPaused(ctx, replicationID12)
-		r.NoError(err)
-		r.True(paused)
 
 		err = svc.ResumeReplication(ctx, replicationID12)
 		r.NoError(err)
 
-		info, err = svc.GetReplicationPolicyInfo(ctx, replicationID12)
+		info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationID12)
 		r.NoError(err)
+		r.False(info.IsPaused)
 		r.Zero(info.InitObjListed)
 		r.Zero(info.InitObjDone)
 		r.Zero(info.InitBytesListed)
@@ -754,9 +745,6 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		r.Zero(info.Events)
 		r.Zero(info.EventsDone)
 
-		paused, err = svc.IsReplicationPolicyPaused(ctx, replicationID12)
-		r.NoError(err)
-		r.False(paused)
 	})
 
 	t.Run("delete user repl", func(t *testing.T) {
@@ -955,22 +943,22 @@ func Test_CustomDestBucket(t *testing.T) {
 	r.True(ok)
 
 	// check pause/resume:
-	ok, err = svc.IsReplicationPolicyPaused(ctx, replicationIDDifferentBuckets)
+	info, err := svc.GetReplicationPolicyInfoExtended(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
-	r.False(ok)
+	r.False(info.IsPaused)
 	err = svc.PauseReplication(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
-	ok, err = svc.IsReplicationPolicyPaused(ctx, replicationIDDifferentBuckets)
+	info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
-	r.True(ok)
+	r.True(info.IsPaused)
 	err = svc.ResumeReplication(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
-	ok, err = svc.IsReplicationPolicyPaused(ctx, replicationIDDifferentBuckets)
+	info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
-	r.False(ok)
+	r.False(info.IsPaused)
 
 	// check replication counters
-	info, err := svc.GetReplicationPolicyInfo(ctx, replicationIDDifferentBuckets)
+	info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
 	r.False(info.CreatedAt.IsZero())
 	r.Zero(info.InitObjListed)
@@ -995,7 +983,7 @@ func Test_CustomDestBucket(t *testing.T) {
 	err = svc.IncReplEventsDone(ctx, replicationIDDifferentBuckets, eventTime)
 	r.NoError(err)
 
-	info, err = svc.GetReplicationPolicyInfo(ctx, replicationIDDifferentBuckets)
+	info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationIDDifferentBuckets)
 	r.NoError(err)
 	r.EqualValues(1, info.InitObjListed)
 	r.EqualValues(1, info.InitObjDone)
@@ -1011,7 +999,7 @@ func Test_CustomDestBucket(t *testing.T) {
 	r.NoError(err)
 
 	// verify deletion
-	info, err = svc.GetReplicationPolicyInfo(ctx, replicationIDDifferentBuckets)
+	info, err = svc.GetReplicationPolicyInfoExtended(ctx, replicationIDDifferentBuckets)
 	r.ErrorIs(err, dom.ErrNotFound)
 
 	list, err = svc.ListReplicationPolicyInfo(ctx)

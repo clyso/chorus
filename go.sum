@@ -271,8 +271,8 @@ github.com/cloudsoda/go-smb2 v0.0.0-20250228001242-d4c70e6251cc h1:t8YjNUCt1DimB
 github.com/cloudsoda/go-smb2 v0.0.0-20250228001242-d4c70e6251cc/go.mod h1:CgWpFCFWzzEA5hVkhAc6DZZzGd3czx+BblvOzjmg6KA=
 github.com/cloudsoda/sddl v0.0.0-20250224235906-926454e91efc h1:0xCWmFKBmarCqqqLeM7jFBSw/Or81UEElFqO8MY+GDs=
 github.com/cloudsoda/sddl v0.0.0-20250224235906-926454e91efc/go.mod h1:uvR42Hb/t52HQd7x5/ZLzZEK8oihrFpgnodIJ1vte2E=
-github.com/clyso/asynq v0.0.0-20250820142900-23947c3d22b9 h1:O3M6aP3AbF/9sfdoD2jgMRebukFvo6+Npd/UHCZQl44=
-github.com/clyso/asynq v0.0.0-20250820142900-23947c3d22b9/go.mod h1:nUxVlWvCBocQZjGIMhZuQ3NkuVkZA5GbOwUhWYdcvwA=
+github.com/clyso/asynq v0.0.0-20250821155534-5a1f8d7cbff6 h1:JTs+M9Eiw/Xb/Ab+kUO5N8oJ3P62D5/zUU4EuXMzN1w=
+github.com/clyso/asynq v0.0.0-20250821155534-5a1f8d7cbff6/go.mod h1:nUxVlWvCBocQZjGIMhZuQ3NkuVkZA5GbOwUhWYdcvwA=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/colinmarc/hdfs/v2 v2.4.0 h1:v6R8oBx/Wu9fHpdPoJJjpGSUxo8NhHIwrwsfhFvU9W0=
 github.com/colinmarc/hdfs/v2 v2.4.0/go.mod h1:0NAO+/3knbMx6+5pCv+Hcbaz4xn/Zzbn9+WIib2rKVI=

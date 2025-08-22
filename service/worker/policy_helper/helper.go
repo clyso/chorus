@@ -122,14 +122,14 @@ func createReplication(
 			}
 			return err
 		}
-		task, err := tasks.NewReplicationTask(ctx, tasks.BucketCreatePayload{
+		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.BucketCreatePayload{
 			Sync: tasks.Sync{
 				FromStorage: from,
 				ToStorage:   to,
 				ToBucket:    bucket.Name,
 			},
 			Bucket: bucket.Name,
-		}, replicationID)
+		})
 		if err != nil {
 			return err
 		}

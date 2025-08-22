@@ -28,7 +28,6 @@ import (
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 
 	"github.com/clyso/chorus/pkg/log"
@@ -51,19 +50,8 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
 	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
 
-	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
+	if err := s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
 		return err
 	}
@@ -97,7 +85,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		if isDir {
 			subP := p
 			subP.Prefix = object.Key
-			subTask, err := tasks.NewReplicationTask(ctx, subP, replicationID)
+			subTask, err := tasks.NewReplicationTask(ctx, replicationID, subP)
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to create list obj sub task: %w", err)
 			}
@@ -135,7 +123,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 		// 	continue
 		// }
-		task, err := tasks.NewReplicationTask(ctx, tasks.MigrateObjCopyPayload{
+		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
 			Sync:   p.Sync,
 			Bucket: p.Bucket,
 			Obj: tasks.ObjPayload{
@@ -145,7 +133,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 				Size:        object.Size,
 				ContentType: object.ContentType,
 			},
-		}, replicationID)
+		})
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}
@@ -171,13 +159,13 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
 		p.Sync.InitDate()
 		// copy empty dir object
-		task, err := tasks.NewReplicationTask(ctx, tasks.MigrateObjCopyPayload{
+		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
 			Sync:   p.Sync,
 			Bucket: p.Bucket,
 			Obj: tasks.ObjPayload{
 				Name: p.Prefix,
 			},
-		}, replicationID)
+		})
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}

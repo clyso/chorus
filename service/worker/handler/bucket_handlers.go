@@ -51,17 +51,6 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
 	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
@@ -109,7 +98,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		return err
 	}
 	// 7. create list obj task
-	task, err := tasks.NewReplicationTask(ctx, tasks.MigrateBucketListObjectsPayload{
+	task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateBucketListObjectsPayload{
 		Sync: tasks.Sync{
 			FromStorage: p.FromStorage,
 			ToStorage:   p.ToStorage,
@@ -117,7 +106,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		},
 		Bucket: p.Bucket,
 		Prefix: "",
-	}, replicationID)
+	})
 	if err != nil {
 		return fmt.Errorf("create bucket: unable to create list obj task: %w", err)
 	}
@@ -282,17 +271,6 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 		FromBucket:  p.Bucket,
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
-	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)

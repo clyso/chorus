@@ -73,20 +73,43 @@ func Reset(q *QueueServiceMock) {
 	q.Paused = make(map[string]bool)
 }
 
-func (q *QueueServiceMock) UnprocessedCount(ctx context.Context, queueName string) (int, error) {
-	size, exists := q.Queues[queueName]
-	if !exists {
-		return 0, fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, queueName)
+func (q *QueueServiceMock) UnprocessedCount(ctx context.Context, ignoreNotfound bool, queueName ...string) (int, error) {
+	if len(queueName) == 0 {
+		return 0, fmt.Errorf("%w: no queues specified", dom.ErrInvalidArg)
 	}
-	return size, nil
+	result := 0
+	for _, name := range queueName {
+		size, exists := q.Queues[name]
+		if ignoreNotfound && !exists {
+			continue
+		}
+		if !exists {
+			return 0, fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, name)
+		}
+		result += size
+	}
+	return result, nil
+}
+
+func (q *QueueServiceMock) Stats(ctx context.Context, queueName string) (*QueueStats, error) {
+	count, err := q.UnprocessedCount(ctx, false, queueName)
+	if err != nil {
+		return nil, err
+	}
+	return &QueueStats{
+		Unprocessed: count,
+		Paused:      q.Paused[queueName],
+		// ignore other stats for mock
+	}, nil
+
 }
 
 func (q *QueueServiceMock) Delete(ctx context.Context, queueName string, force bool) error {
-	empty, err := q.IsEmpty(ctx, queueName)
+	count, err := q.UnprocessedCount(ctx, false, queueName)
 	if err != nil {
 		return err
 	}
-	if !force && !empty {
+	if !force && count > 0 {
 		return fmt.Errorf("%w: queue %s is not empty, cannot delete without force", dom.ErrInvalidArg, queueName)
 	}
 	delete(q.Queues, queueName)
@@ -94,16 +117,8 @@ func (q *QueueServiceMock) Delete(ctx context.Context, queueName string, force b
 	return nil
 }
 
-func (q *QueueServiceMock) IsEmpty(ctx context.Context, queueName string) (bool, error) {
-	size, exists := q.Queues[queueName]
-	if !exists {
-		return false, fmt.Errorf("%w: queue %s does not exist", dom.ErrNotFound, queueName)
-	}
-	return size == 0, nil
-}
-
 func (q *QueueServiceMock) IsPaused(ctx context.Context, queueName string) (bool, error) {
-	_, err := q.IsEmpty(ctx, queueName)
+	_, err := q.UnprocessedCount(ctx, false, queueName)
 	if err != nil {
 		return false, err
 	}
@@ -111,7 +126,7 @@ func (q *QueueServiceMock) IsPaused(ctx context.Context, queueName string) (bool
 }
 
 func (q *QueueServiceMock) Pause(ctx context.Context, queueName string) error {
-	_, err := q.IsEmpty(ctx, queueName)
+	_, err := q.UnprocessedCount(ctx, false, queueName)
 	if err != nil {
 		return err
 	}
@@ -120,7 +135,7 @@ func (q *QueueServiceMock) Pause(ctx context.Context, queueName string) error {
 }
 
 func (q *QueueServiceMock) Resume(ctx context.Context, queueName string) error {
-	_, err := q.IsEmpty(ctx, queueName)
+	_, err := q.UnprocessedCount(ctx, false, queueName)
 	if err != nil {
 		return err
 	}

@@ -52,17 +52,6 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
 	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
 
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")

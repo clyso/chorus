@@ -75,7 +75,8 @@ type Service interface {
 
 	AddBucketReplicationPolicy(ctx context.Context, id entity.ReplicationStatusID, agentURL *string) error
 	GetReplicationPolicyInfo(ctx context.Context, id entity.ReplicationStatusID) (entity.ReplicationStatus, error)
-	ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatus, error)
+	GetReplicationPolicyInfoExtended(ctx context.Context, id entity.ReplicationStatusID) (entity.ReplicationStatusExtended, error)
+	ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatusExtended, error)
 	IsReplicationPolicyExists(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
 	IncReplInitObjListed(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error
 	IncReplInitObjDone(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error
@@ -83,13 +84,8 @@ type Service interface {
 	IncReplEvents(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 	IncReplEventsDone(ctx context.Context, id entity.ReplicationStatusID, eventTime time.Time) error
 
-	IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
-	IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
-	GetUnprocessedEventsCount(ctx context.Context, id entity.ReplicationStatusID) (int, error)
-
 	PauseReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	ResumeReplication(ctx context.Context, id entity.ReplicationStatusID) error
-	IsReplicationPolicyPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error)
 	DeleteReplication(ctx context.Context, id entity.ReplicationStatusID) error
 	// Archive replication. Will stop generating new events for this replication.
 	// Existing events will be processed and replication status metadata will be kept.
@@ -106,7 +102,7 @@ func NewService(client redis.UniversalClient, queueSVC tasks.QueueService) *poli
 		replicationStatusStore:        store.NewReplicationStatusStore(client),
 		replicationSwitchStore:        store.NewReplicationSwitchInfoStore(client),
 		replicationSwitchHistoryStore: store.NewReplicationSwitchHistoryStore(client),
-		queueSVC:                      queueSVC,
+		queueSvc:                      queueSVC,
 	}
 }
 
@@ -119,52 +115,82 @@ type policySvc struct {
 	replicationStatusStore        *store.ReplicationStatusStore
 	replicationSwitchStore        *store.ReplicationSwitchInfoStore
 	replicationSwitchHistoryStore *store.ReplicationSwitchHistoryStore
-	queueSVC                      tasks.QueueService
+	queueSvc                      tasks.QueueService
 }
 
-func (r *policySvc) GetUnprocessedEventsCount(ctx context.Context, id entity.ReplicationStatusID) (int, error) {
-	res := 0
-	queues := tasks.EventMigrationQueues(id)
+func (r *policySvc) GetReplicationPolicyInfoExtended(ctx context.Context, id entity.ReplicationStatusID) (entity.ReplicationStatusExtended, error) {
+	replication, err := r.GetReplicationPolicyInfo(ctx, id)
+	if err != nil {
+		return entity.ReplicationStatusExtended{}, err
+	}
+	return r.fillExtendedReplicationStatus(ctx, id, &replication)
+}
+
+func (r *policySvc) fillExtendedReplicationStatus(ctx context.Context, id entity.ReplicationStatusID, status *entity.ReplicationStatus) (entity.ReplicationStatusExtended, error) {
+	result := entity.ReplicationStatusExtended{
+		ReplicationStatus: status,
+		IsPaused:          false,
+		InitMigration:     entity.QueueStats{},
+		EventMigration:    entity.QueueStats{},
+	}
+	// get initial migration queues stats
+	initQueues := tasks.InitMigrationQueues(id)
+	paused, initStats, err := r.buildQueueStats(ctx, initQueues)
+	if err != nil {
+		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get init migration queue stats: %w", err)
+	}
+	if paused {
+		result.IsPaused = true
+	}
+	result.InitMigration = initStats
+
+	// get event migration queues stats
+	eventQueues := tasks.EventMigrationQueues(id)
+	paused, eventStats, err := r.buildQueueStats(ctx, eventQueues)
+	if err != nil {
+		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get event migration queue stats: %w", err)
+	}
+	if paused {
+		result.IsPaused = true
+	}
+	result.EventMigration = eventStats
+
+	return result, nil
+}
+
+func (r *policySvc) buildQueueStats(ctx context.Context, queues []string) (bool, entity.QueueStats, error) {
+	isPaused := false
+	result := entity.QueueStats{
+		Unprocessed: 0,
+		Done:        0,
+		Failed:      0,
+		Latency:     0,
+		MemoryUsage: 0,
+	}
 	for _, queue := range queues {
-		size, err := r.queueSVC.UnprocessedCount(ctx, queue)
-		if err != nil {
-			if errors.Is(err, dom.ErrNotFound) {
-				// queue does not exist, so no events to process
-				continue
-			}
-			return 0, fmt.Errorf("unable to get unprocessed events count for %s: %w", queue, err)
+		stats, err := r.queueSvc.Stats(ctx, queue)
+		if errors.Is(err, dom.ErrNotFound) {
+			// queue does not exist, so no stats available
+			continue
 		}
-		res += size
-	}
-	return res, nil
-}
-
-func (r *policySvc) IsInitialAndEventReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
-	queues := tasks.AllReplicationQueues(id)
-	return r.allQueuesEmpty(ctx, queues)
-}
-
-func (r *policySvc) allQueuesEmpty(ctx context.Context, queues []string) (bool, error) {
-	for _, queueName := range queues {
-		empty, err := r.queueSVC.IsEmpty(ctx, queueName)
 		if err != nil {
-			if errors.Is(err, dom.ErrNotFound) {
-				// since queues created on demand, it is possible that some queues are not created yet
-				// for example, event replication queue will be created on the first write request to chorus proxy
-				continue
-			}
-			return false, fmt.Errorf("empty queue check: unable to get queue info for %s: %w", queueName, err)
+			return false, entity.QueueStats{}, fmt.Errorf("unable to get queue stats for %s: %w", queue, err)
 		}
-		if !empty {
-			return false, nil
+		if stats.Paused {
+			// if at least one queue is paused, we consider the whole replication as paused
+			isPaused = true
+		}
+		// sum up counters for all queues
+		result.Unprocessed += stats.Unprocessed
+		result.Done += stats.ProcessedTotal
+		result.Failed += stats.FailedTotal
+		result.MemoryUsage += stats.MemoryUsage
+		if result.Latency < stats.Latency {
+			// return the maximum latency across all queues
+			result.Latency = stats.Latency
 		}
 	}
-	return true, nil
-}
-
-func (r *policySvc) IsInitialReplicationDone(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
-	queues := tasks.InitMigrationQueues(id)
-	return r.allQueuesEmpty(ctx, queues)
+	return isPaused, result, nil
 }
 
 func (r *policySvc) ObjListStarted(ctx context.Context, id entity.ReplicationStatusID) error {
@@ -343,7 +369,7 @@ func (r *policySvc) GetReplicationPolicyInfo(ctx context.Context, id entity.Repl
 	return replication, nil
 }
 
-func (r *policySvc) ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatus, error) {
+func (r *policySvc) ListReplicationPolicyInfo(ctx context.Context) (map[entity.ReplicationStatusID]entity.ReplicationStatusExtended, error) {
 	replicationIDs, err := r.replicationStatusStore.GetAllIDs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get replication ids: %w", err)
@@ -365,15 +391,19 @@ func (r *policySvc) ListReplicationPolicyInfo(ctx context.Context) (map[entity.R
 
 	_ = exec.Exec(ctx)
 
-	replicationMap := make(map[entity.ReplicationStatusID]entity.ReplicationStatus, idCount)
+	replicationMap := make(map[entity.ReplicationStatusID]entity.ReplicationStatusExtended, idCount)
 	for i := 0; i < idCount; i++ {
 		replication, err := replicationStatusResults[i].Get()
 		if err != nil {
 			return nil, fmt.Errorf("unable to get result: %w", err)
 		}
+		result, err := r.fillExtendedReplicationStatus(ctx, replicationIDs[i], &replication)
+		if err != nil {
+			return nil, fmt.Errorf("unable to fill extended replication status: %w", err)
+		}
 		switchReplicationID, err := replicationSwitchResults[i].Get()
 		if errors.Is(err, dom.ErrNotFound) {
-			replicationMap[replicationIDs[i]] = replication
+			replicationMap[replicationIDs[i]] = result
 			continue
 		}
 		if err != nil {
@@ -386,7 +416,7 @@ func (r *policySvc) ListReplicationPolicyInfo(ctx context.Context) (map[entity.R
 		if replID == replicationIDs[i] {
 			replication.HasSwitch = true
 		}
-		replicationMap[replicationIDs[i]] = replication
+		replicationMap[replicationIDs[i]] = result
 	}
 
 	return replicationMap, nil
@@ -402,20 +432,20 @@ func (r *policySvc) IsReplicationPolicyExists(ctx context.Context, id entity.Rep
 	return exists, nil
 }
 
-func (r *policySvc) IsReplicationPolicyPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
-	if err := validate.ReplicationStatusID(id); err != nil {
-		return false, fmt.Errorf("unable to validate replication status id: %w", err)
-	}
-	// use InitMigrationListObjQueue to check if initial migration is paused
-	// because it is the only queue which is always created even if bucket is empty
-	paused, err := r.queueSVC.IsPaused(ctx, tasks.InitMigrationListObjQueue(id))
-	if errors.Is(err, dom.ErrNotFound) {
-		// not found errors can only appear for backwards replication after switch.
-		// In this case there is not initial migration
-		return false, nil // queue does not exist, so replication is not paused
-	}
-	return paused, err
-}
+// func (r *policySvc) IsReplicationPolicyPaused(ctx context.Context, id entity.ReplicationStatusID) (bool, error) {
+// 	if err := validate.ReplicationStatusID(id); err != nil {
+// 		return false, fmt.Errorf("unable to validate replication status id: %w", err)
+// 	}
+// 	// use InitMigrationListObjQueue to check if initial migration is paused
+// 	// because it is the only queue which is always created even if bucket is empty
+// 	paused, err := r.queueSVC.IsPaused(ctx, tasks.InitMigrationListObjQueue(id))
+// 	if errors.Is(err, dom.ErrNotFound) {
+// 		// not found errors can only appear for backwards replication after switch.
+// 		// In this case there is not initial migration
+// 		return false, nil // queue does not exist, so replication is not paused
+// 	}
+// 	return paused, err
+// }
 
 func (r *policySvc) IncReplInitObjListed(ctx context.Context, id entity.ReplicationStatusID, bytes uint64, eventTime time.Time) error {
 	if err := validate.ReplicationStatusID(id); err != nil {
@@ -701,7 +731,7 @@ func (r *policySvc) PauseReplication(ctx context.Context, id entity.ReplicationS
 		return fmt.Errorf("pause replication: unable to validate replication status id: %w", err)
 	}
 	for _, queue := range tasks.AllReplicationQueues(id) {
-		err := r.queueSVC.Pause(ctx, queue)
+		err := r.queueSvc.Pause(ctx, queue)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
 				// since queues created on demand, it is possible that some queues are not created yet
@@ -719,7 +749,7 @@ func (r *policySvc) ResumeReplication(ctx context.Context, id entity.Replication
 		return fmt.Errorf("resume replication: unable to validate replication status id: %w", err)
 	}
 	for _, queue := range tasks.AllReplicationQueues(id) {
-		err := r.queueSVC.Resume(ctx, queue)
+		err := r.queueSvc.Resume(ctx, queue)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
 				// since queues created on demand, it is possible that some queues are not created yet

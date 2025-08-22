@@ -52,17 +52,6 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
 	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
 
 	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
@@ -174,17 +163,6 @@ func (s *svc) HandleMigrationObjCopyHead(ctx context.Context, task *asynq.Task) 
 		FromBucket:  payload.Bucket,
 		ToStorage:   payload.ToStorage,
 		ToBucket:    payload.ToBucket,
-	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if errors.Is(err, dom.ErrNotFound) {
-		logger.Err(err).Msg("drop replication task: replication policy not found")
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("unable to get replication policy state: %w", err)
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	if err := s.limit.StorReq(ctx, payload.FromStorage); err != nil {

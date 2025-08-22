@@ -19,7 +19,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
@@ -49,17 +48,6 @@ func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
 		FromBucket:  p.Bucket,
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
-	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
@@ -98,17 +86,6 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 		FromBucket:  p.Object.Bucket,
 		ToStorage:   p.ToStorage,
 		ToBucket:    p.ToBucket,
-	}
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
 	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
