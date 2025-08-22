@@ -93,7 +93,7 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	objectLockID := entity.NewObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
+	objectLockID := entity.NewVersionedObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err

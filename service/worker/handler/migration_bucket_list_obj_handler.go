@@ -29,6 +29,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/features"
 
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -66,12 +67,12 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		return err
 	}
 
-	// versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
-	// if err != nil {
-	// 	return fmt.Errorf("unable to get bucket versioning config: %w", err)
-	// }
+	versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
+	if err != nil {
+		return fmt.Errorf("unable to get bucket versioning config: %w", err)
+	}
 
-	// shouldListVersions := versioningConfig.Enabled() && features.Versioning(ctx)
+	shouldListVersions := versioningConfig.Enabled() && features.Versioning(ctx)
 
 	objects := fromClient.S3().ListObjects(ctx, p.Bucket, mclient.ListObjectsOptions{StartAfter: lastObjName, Prefix: p.Prefix})
 	objectsNum := 0
@@ -102,27 +103,27 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			continue
 		}
 		p.Sync.InitDate()
-		// if shouldListVersions {
-		// 	task, err := tasks.NewTask(ctx, tasks.ListObjectVersionsPayload{
-		// 		Sync:   p.Sync,
-		// 		Bucket: p.Bucket,
-		// 		Prefix: object.Key,
-		// 	})
+		if shouldListVersions {
+			task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.ListObjectVersionsPayload{
+				Sync:   p.Sync,
+				Bucket: p.Bucket,
+				Prefix: object.Key,
+			})
 
-		// 	if err != nil {
-		// 		return fmt.Errorf("unable to create list object versions task: %w", err)
-		// 	}
-		// 	_, err = s.taskClient.EnqueueContext(ctx, task)
-		// 	if err != nil {
-		// 		if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-		// 			logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
-		// 			continue
-		// 		}
-		// 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
-		// 	}
+			if err != nil {
+				return fmt.Errorf("unable to create list object versions task: %w", err)
+			}
+			_, err = s.taskClient.EnqueueContext(ctx, task)
+			if err != nil {
+				if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
+					logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+					continue
+				}
+				return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
+			}
 
-		// 	continue
-		// }
+			continue
+		}
 		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
 			Sync:   p.Sync,
 			Bucket: p.Bucket,

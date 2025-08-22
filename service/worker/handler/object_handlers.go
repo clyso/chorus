@@ -71,7 +71,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		}
 	}()
 
-	objectLockID := entity.NewObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
+	objectLockID := entity.NewVersionedObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err

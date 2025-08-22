@@ -93,7 +93,7 @@ func TestApi_Migrate_Lock_test(t *testing.T) {
 	logger := log.GetLogger(&log.Config{Level: "info"}, "lock", "")
 	ctx := logger.WithContext(context.TODO())
 
-	objectLockID := entity.NewObjectLockID("stor", "test", "obj", "")
+	objectLockID := entity.NewVersionedObjectLockID("stor", "test", "obj", "")
 	lock, err := objectLocker.Lock(ctx, objectLockID, store.WithDuration(time.Millisecond*500))
 	r.NoError(err)
 	time.Sleep(time.Millisecond * 400)
