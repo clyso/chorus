@@ -17,7 +17,7 @@
 package rpc
 
 import (
-	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,17 +29,24 @@ import (
 func TestAgent(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	r := require.New(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
+	wg := sync.WaitGroup{}
+	wg.Add(3)
 	go func() {
+		defer wg.Done()
 		_ = AgentServe(ctx, c, "agent1", "s1")
 	}()
 	go func() {
+		defer wg.Done()
 		_ = AgentServe(ctx, c, "agent2", "s2")
 	}()
 	go func() {
+		defer wg.Done()
 		_ = AgentServe(ctx, c, "agent3", "s3")
 	}()
+	t.Cleanup(func() {
+		wg.Wait()
+	})
 	tst := AgentClient{c}
 	time.Sleep(50 * time.Millisecond)
 	res, err := tst.Ping(ctx)

@@ -2,7 +2,9 @@ package rpc
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -26,9 +28,16 @@ func TestProxyClient_GetCredentials(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	r := require.New(t)
 	ctx := t.Context()
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		_ = ProxyServe(ctx, c, &mockProxy{})
 	}()
+	t.Cleanup(func() {
+		wg.Wait()
+	})
+	time.Sleep(50 * time.Millisecond)
 	tst := ProxyClient{c}
 	res, err := tst.GetCredentials(ctx)
 	r.NoError(err)

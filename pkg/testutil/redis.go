@@ -16,7 +16,8 @@ package testutil
 
 import (
 	"context"
-	"flag"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -25,14 +26,16 @@ import (
 
 var (
 	extRedisAddr string
-	extRedisDB   int
 	useExtRedis  bool
 )
 
 func init() {
-	flag.StringVar(&extRedisAddr, "ext_redis_addr", "localhost:6379", "redis address to use in testing")
-	flag.IntVar(&extRedisDB, "ext_redis_db", 15, "redis db number to use in testing")
-	flag.BoolVar(&useExtRedis, "ext_redis", false, "use external redis instance in tests instead of miniredis")
+	useExtRedis, _ = strconv.ParseBool(os.Getenv("EXT_REDIS"))
+	if env := os.Getenv("EXT_REDIS_ADDR"); env != "" {
+		extRedisAddr = env
+	} else {
+		extRedisAddr = "localhost:6379"
+	}
 }
 
 func SetupRedisAddr(t testing.TB) string {
@@ -53,8 +56,8 @@ func SetupRedisAddr(t testing.TB) string {
 func SetupRedis(t testing.TB) (client redis.UniversalClient) {
 	t.Helper()
 	if useExtRedis {
-		client = redis.NewClient(&redis.Options{Addr: extRedisAddr})
-		err := client.FlushAll(context.Background()).Err()
+		client = redis.NewClient(&redis.Options{Addr: extRedisAddr, DB: 15})
+		err := client.FlushDB(context.Background()).Err()
 		if err != nil {
 			t.Fatalf("setup: failed to redis.FlushAll %s: %v", extRedisAddr, err)
 		}
@@ -63,6 +66,10 @@ func SetupRedis(t testing.TB) (client redis.UniversalClient) {
 		client = redis.NewClient(&redis.Options{Addr: db.Addr()})
 	}
 	t.Cleanup(func() {
+		// err := client.FlushDB(context.Background()).Err()
+		// if err != nil {
+		// 	t.Fatalf("setup: failed to redis.FlushAll %s: %v", extRedisAddr, err)
+		// }
 		client.Close()
 	})
 	return client
