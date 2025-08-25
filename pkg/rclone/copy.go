@@ -56,7 +56,6 @@ type CopySvc interface {
 }
 
 type S3CopySvc struct {
-	// logger         *zerolog.Logger
 	clientRegistry    s3client.Service
 	memoryLimiterSvc  LimiterSvc
 	requestLimiterSvc ratelimit.RPM

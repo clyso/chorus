@@ -127,6 +127,7 @@ func (r *RedisIDKeyList[ID, V]) GetOneOp(ctx context.Context, id ID, idx uint64)
 	return r.getOneOp(ctx, id, int64(idx))
 }
 
+// Get element at index
 func (r *RedisIDKeyList[ID, V]) GetOne(ctx context.Context, id ID, idx uint64) (V, error) {
 	return r.GetOneOp(ctx, id, idx).Get()
 }
@@ -135,6 +136,7 @@ func (r *RedisIDKeyList[ID, V]) GetLeftOp(ctx context.Context, id ID) OperationR
 	return r.GetOneOp(ctx, id, 0)
 }
 
+// Get first element from left end
 func (r *RedisIDKeyList[ID, V]) GetLeft(ctx context.Context, id ID) (V, error) {
 	return r.GetLeftOp(ctx, id).Get()
 }
@@ -143,6 +145,7 @@ func (r *RedisIDKeyList[ID, V]) GetRightOp(ctx context.Context, id ID) Operation
 	return r.getOneOp(ctx, id, -1)
 }
 
+// Get first element from right end
 func (r *RedisIDKeyList[ID, V]) GetRight(ctx context.Context, id ID) (V, error) {
 	return r.GetRightOp(ctx, id).Get()
 }

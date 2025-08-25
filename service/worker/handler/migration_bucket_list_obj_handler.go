@@ -116,7 +116,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			_, err = s.taskClient.EnqueueContext(ctx, task)
 			if err != nil {
 				if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-					logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+					logger.Info().Msg("cannot enqueue task with duplicate id")
 					continue
 				}
 				return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
@@ -141,7 +141,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		_, err = s.taskClient.EnqueueContext(ctx, task)
 		if err != nil {
 			if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-				logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+				logger.Info().Msg("cannot enqueue task with duplicate id")
 				continue
 			}
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
@@ -174,7 +174,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 		switch {
 		case errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict):
-			logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+			logger.Info().Msg("cannot enqueue task with duplicate id")
 		case err != nil:
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		default:
