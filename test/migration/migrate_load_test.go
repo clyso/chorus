@@ -17,10 +17,13 @@ import (
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/store"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/test/env"
 )
 
 func TestApi_Migrate_Load_test(t *testing.T) {
 	t.Skip()
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
 
 	const waitInterval = 180 * time.Second
 	const retryInterval = 3 * time.Second
@@ -32,17 +35,17 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 	objData := bytes.Repeat([]byte("A"), rand.Intn(1<<20)+32*1024)
 	for b := 0; b < bucketsNum; b++ {
 		bucketName := fmt.Sprintf("bucket-%d", b)
-		err := mainClient.MakeBucket(tstCtx, bucketName, mclient.MakeBucketOptions{})
+		err := e.MainClient.MakeBucket(tstCtx, bucketName, mclient.MakeBucketOptions{})
 		r.NoError(err)
 		for i := 0; i < objPerBucket; i++ {
 			objName := fmt.Sprintf("obj-%d", i)
-			_, err = mainClient.PutObject(tstCtx, bucketName, objName, bytes.NewReader(objData), int64(len(objData)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+			_, err = e.MainClient.PutObject(tstCtx, bucketName, objName, bytes.NewReader(objData), int64(len(objData)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
 			r.NoError(err)
 		}
 		t.Log(bucketName, "created")
 	}
 
-	_, err := apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+	_, err := e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		User:            user,
 		From:            "main",
 		To:              "f1",
@@ -54,7 +57,7 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 
 	// check that storages are in sync
 	r.Eventually(func() bool {
-		buckets, _ := f1Client.ListBuckets(tstCtx)
+		buckets, _ := e.F1Client.ListBuckets(tstCtx)
 		t.Log("f1 buckets", len(buckets))
 		return len(buckets) == bucketsNum
 	}, waitInterval, retryInterval)
@@ -63,7 +66,7 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 	for b := 0; b < bucketsNum; b++ {
 		bucketName := fmt.Sprintf("bucket-%d", b)
 		r.Eventually(func() bool {
-			objects, err := listObjects(f1Client, bucketName, "")
+			objects, err := listObjects(e.F1Client, bucketName, "")
 			if err != nil {
 				return false
 			}
@@ -72,7 +75,7 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 		}, waitInterval, retryInterval)
 	}
 
-	m, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	m, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
 
 	r.Len(m.Replications, bucketsNum)

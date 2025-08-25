@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
+	"github.com/clyso/chorus/pkg/testutil"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
@@ -24,11 +23,9 @@ func (m mockProxy) GetCredentials(_ context.Context) (*pb.GetProxyCredentialsRes
 }
 
 func TestProxyClient_GetCredentials(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	r := require.New(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go func() {
 		_ = ProxyServe(ctx, c, &mockProxy{})
 	}()

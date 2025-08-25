@@ -20,20 +20,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func Test_Version_svc(t *testing.T) {
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 
 	s := NewVersionService(c)
 
@@ -247,11 +242,7 @@ func Test_inc_version_during_switch(t *testing.T) {
 		ctx = context.Background()
 	)
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 	s := NewVersionService(c)
 
 	vers, err := s.GetObj(ctx, obj)
@@ -323,11 +314,7 @@ func Test_inc_version_during_switch(t *testing.T) {
 func Test_DeleteBucketMeta(t *testing.T) {
 	// setup
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 
 	s := NewVersionService(c)
 

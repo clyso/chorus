@@ -21,18 +21,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func Test_policySvc_UserRoutingPolicy(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	svc := NewService(c, nil)
@@ -45,7 +43,7 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 
 	t.Run("returns not found", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		for _, u := range users {
 			_, err := svc.GetUserRoutingPolicy(ctx, u)
 			r.ErrorIs(err, dom.ErrNotFound)
@@ -89,7 +87,7 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 
 	t.Run("add user policies", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 
 		err := svc.AddUserRoutingPolicy(ctx, u1, s1)
 		r.NoError(err)
@@ -145,7 +143,7 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 
 	t.Run("add bucket policies", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 
 		err := svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(u1, b1), s3, false)
 		r.NoError(err)
@@ -171,7 +169,7 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 
 	t.Run("cannot add policy if already exists", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 
 		err := svc.AddBucketRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(u1, b1), s3, false)
 		r.NoError(err)
@@ -186,8 +184,7 @@ func Test_policySvc_UserRoutingPolicy(t *testing.T) {
 }
 
 func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	queuesMock := &tasks.QueueServiceMock{}
@@ -202,7 +199,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("args must be valid", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 
 		err := svc.AddUserReplicationPolicy(ctx, "", entity.NewUserReplicationPolicy("a", "a"))
@@ -320,7 +317,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("returns not found", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 		for _, u := range users {
 			_, err := svc.GetUserReplicationPolicies(ctx, u)
@@ -364,7 +361,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("add user repl policy", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 
 		_, err := svc.GetUserReplicationPolicies(ctx, u1)
@@ -411,7 +408,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("add bucket repl policy", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 
 		replicationIDu1s1s2 := entity.ReplicationStatusID{
@@ -553,7 +550,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("counters", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 
 		replicationID12 := entity.ReplicationStatusID{
@@ -688,7 +685,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("pause", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 
 		replicationID12 := entity.ReplicationStatusID{
@@ -749,7 +746,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 	t.Run("delete user repl", func(t *testing.T) {
 		r := require.New(t)
-		db.FlushAll()
+		c.FlushAll(ctx)
 		tasks.Reset(queuesMock)
 
 		userReplicationPolicy1 := entity.NewUserReplicationPolicy(s1, s2)
@@ -851,8 +848,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 func Test_CustomDestBucket(t *testing.T) {
 	r := require.New(t)
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	queuesMock := &tasks.QueueServiceMock{}

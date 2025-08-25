@@ -5,14 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func timePtr(t time.Time) *time.Time {
@@ -202,8 +201,7 @@ func TestSwitchWithDowntime_IsTimeToStart(t *testing.T) {
 }
 
 func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
-	db := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	client := testutil.SetupRedis(t)
 	ctx := context.TODO()
 	queuesMock := &tasks.QueueServiceMock{}
 	tasks.Reset(queuesMock)
@@ -368,8 +366,7 @@ func TestPolicySvc_UpdateDowntimeSwitchOpts(t *testing.T) {
 }
 
 func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	queuesMock := &tasks.QueueServiceMock{}
@@ -678,8 +675,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 }
 
 func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	queuesMock := &tasks.QueueServiceMock{}
@@ -904,8 +900,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 }
 
 func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	queuesMock := &tasks.QueueServiceMock{}
@@ -1285,8 +1280,7 @@ func setupDowntimeSwitchState(t *testing.T, svc Service, queuesMock *tasks.Queue
 }
 
 func Test_policySvc_ListReplicationSwitchInfo(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	ctx := context.TODO()
 
 	queuesMock := &tasks.QueueServiceMock{}
