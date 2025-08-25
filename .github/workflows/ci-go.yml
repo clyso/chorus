@@ -26,7 +26,7 @@ jobs:
         with:
           go-version: "1.24"
       - name: make test
-        run: make test-ext-redis
+        run: make test
       - name: Run Proto Generation
         run: make proto-gen
       - name: Check for Uncommitted Changes

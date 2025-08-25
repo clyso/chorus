@@ -88,10 +88,6 @@ bench: bench-bin
 test: pretty
 	go test ./...
 
-.PHONY: test-ext-redis
-test-ext-redis: pretty
-	EXT_REDIS=true go test ./... -p 1
-
 .PHONY: proto-gen
 proto-gen:
 	cd proto; go tool buf generate --template "buf.gen.yaml" --config "buf.yaml"
