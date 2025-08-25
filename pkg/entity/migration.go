@@ -21,7 +21,15 @@ type ObjectLockID struct {
 	Version string
 }
 
-func NewObjectLockID(storage string, bucket string, name string, version string) ObjectLockID {
+func NewObjectLockID(storage string, bucket string, name string) ObjectLockID {
+	return ObjectLockID{
+		Storage: storage,
+		Bucket:  bucket,
+		Name:    name,
+	}
+}
+
+func NewVersionedObjectLockID(storage string, bucket string, name string, version string) ObjectLockID {
 	return ObjectLockID{
 		Storage: storage,
 		Bucket:  bucket,
@@ -39,5 +47,19 @@ func NewBucketLockID(storage string, bucket string) BucketLockID {
 	return BucketLockID{
 		Storage: storage,
 		Bucket:  bucket,
+	}
+}
+
+type VersionedObjectID struct {
+	Storage string
+	Bucket  string
+	Name    string
+}
+
+func NewVersionedObjectID(storage string, bucket string, name string) VersionedObjectID {
+	return VersionedObjectID{
+		Storage: storage,
+		Bucket:  bucket,
+		Name:    name,
 	}
 }

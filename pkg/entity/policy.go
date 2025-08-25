@@ -125,6 +125,16 @@ type ReplicationStatusID struct {
 	ToBucket    string
 }
 
+func NewReplicationStatusID(user string, fromStorage string, fromBucket string, toStorage string, toBucket string) ReplicationStatusID {
+	return ReplicationStatusID{
+		User:        user,
+		FromStorage: fromStorage,
+		FromBucket:  fromBucket,
+		ToStorage:   toStorage,
+		ToBucket:    toBucket,
+	}
+}
+
 type ReplicationPolicyDestination struct {
 	Storage string
 	Bucket  string

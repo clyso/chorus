@@ -15,10 +15,13 @@
 package gen
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
+	"slices"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
@@ -321,4 +324,66 @@ func (r *S3Filler) Fill(ctx context.Context, bucket string) error {
 	}
 
 	return nil
+}
+
+type S3Validator struct {
+	tree   *Tree[*GeneratedS3Object]
+	client *minio.Client
+}
+
+func NewS3Validator(tree *Tree[*GeneratedS3Object], client *minio.Client) *S3Filler {
+	return &S3Filler{
+		tree:   tree,
+		client: client,
+	}
+}
+
+func (r *S3Validator) Validator(ctx context.Context, bucket string) error {
+	for item := range r.tree.DepthFirstIterator().Must() {
+		versions := []string{}
+		objectList := r.client.ListObjects(ctx, bucket, minio.ListObjectsOptions{
+			WithVersions: true,
+			Prefix:       item.fullPath,
+		})
+		for object := range objectList {
+			versions = append(versions, object.VersionID)
+		}
+
+		slices.Reverse(versions)
+
+		for idx, reader := range item.ContentReaderIterator() {
+			object, err := r.client.GetObject(ctx, bucket, item.fullPath, minio.GetObjectOptions{
+				VersionID: versions[idx],
+			})
+			if err != nil {
+				return fmt.Errorf("unable to get object: %w", err)
+			}
+			defer object.Close()
+
+			if !r.readersHaveSameContent(reader, object) {
+				return fmt.Errorf("object %s version %s has different content", item.fullPath, versions[idx])
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *S3Validator) readersHaveSameContent(left io.Reader, right io.Reader) bool {
+	leftBuffer := make([]byte, 512)
+	rightBuffer := make([]byte, 512)
+	for {
+		_, leftErr := left.Read(leftBuffer)
+		_, rightErr := right.Read(rightBuffer)
+
+		if errors.Is(leftErr, io.EOF) && errors.Is(rightErr, io.EOF) {
+			return true
+		}
+		if leftErr != nil || rightErr != nil {
+			return false
+		}
+		if !bytes.Equal(leftBuffer, rightBuffer) {
+			return false
+		}
+	}
 }

@@ -110,6 +110,13 @@ type Pager struct {
 	Count uint64
 }
 
+func NewPager(from uint64, count uint64) Pager {
+	return Pager{
+		From:  from,
+		Count: count,
+	}
+}
+
 type Page[T any] struct {
 	Entries []T
 	Next    uint64
