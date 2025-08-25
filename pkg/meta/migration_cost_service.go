@@ -40,12 +40,12 @@ type MigrationCostService interface {
 	MigrationCostsIncJobDone(ctx context.Context, from, to string) error
 }
 
-func NewMigrationCostService(client *redis.Client) MigrationCostService {
+func NewMigrationCostService(client redis.UniversalClient) MigrationCostService {
 	return &migrationCostSvc{client: client}
 }
 
 type migrationCostSvc struct {
-	client *redis.Client
+	client redis.UniversalClient
 }
 
 func (s *migrationCostSvc) GetMigrationCosts(ctx context.Context, from, to string) (MigrationCosts, error) {

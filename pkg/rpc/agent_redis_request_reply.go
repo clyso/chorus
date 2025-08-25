@@ -61,6 +61,9 @@ func (a *AgentClient) Ping(ctx context.Context) ([]AgentInfo, error) {
 			case <-reqCtx.Done():
 				return
 			case msg, more := <-ps.Channel():
+				if !more {
+					return
+				}
 				msgArr := strings.Split(msg.Payload, "|")
 				if len(msgArr) != 2 {
 					zerolog.Ctx(reqCtx).Error().Msgf("agent client received invalid payload: %s", msg.Payload)
@@ -69,9 +72,6 @@ func (a *AgentClient) Ping(ctx context.Context) ([]AgentInfo, error) {
 				resCh <- AgentInfo{
 					URL:         msgArr[0],
 					FromStorage: msgArr[1],
-				}
-				if !more {
-					return
 				}
 			}
 		}
@@ -88,8 +88,11 @@ func (a *AgentClient) Ping(ctx context.Context) ([]AgentInfo, error) {
 	for {
 		select {
 		case res, more := <-resCh:
+			if !more {
+				return agents, nil
+			}
 			agents = append(agents, res)
-			if !more || len(agents) == int(received) {
+			if len(agents) == int(received) {
 				return agents, nil
 			}
 		case <-reqCtx.Done():

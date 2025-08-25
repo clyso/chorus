@@ -22,20 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func Test_svc_GetLastListedObj(t *testing.T) {
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 
 	storage := New(c)
 	ctx := context.Background()
@@ -121,11 +116,7 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 
 func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 
 	storage := New(c)
 	ctx := context.Background()
@@ -207,11 +198,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 
 func Test_svc_StoreUploadID(t *testing.T) {
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 
 	storage := New(c)
 	ctx := context.Background()
