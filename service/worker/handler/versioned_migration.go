@@ -38,14 +38,12 @@ const (
 )
 
 type VersionedMigrationCtrl struct {
-	logger     *zerolog.Logger
 	svc        *VersionedMigrationSvc
 	taskClient *asynq.Client
 }
 
-func NewVersionedMigrationCtrl(logger *zerolog.Logger, svc *VersionedMigrationSvc, taskClient *asynq.Client) *VersionedMigrationCtrl {
+func NewVersionedMigrationCtrl(svc *VersionedMigrationSvc, taskClient *asynq.Client) *VersionedMigrationCtrl {
 	return &VersionedMigrationCtrl{
-		logger:     logger,
 		svc:        svc,
 		taskClient: taskClient,
 	}
@@ -74,7 +72,7 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 
 	_, err = r.taskClient.EnqueueContext(ctx, migrateTask)
 	if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-		r.logger.Info().RawJSON("enqueue_task_payload", migrateTask.Payload()).Msg("cannot enqueue task with duplicate id")
+		zerolog.Ctx(ctx).Info().Msg("cannot enqueue task with duplicate id")
 	} else if err != nil {
 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 	}
@@ -99,8 +97,6 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 }
 
 type VersionedMigrationSvc struct {
-	logger *zerolog.Logger
-
 	policySvc policy.Service
 	copySvc   rclone.CopySvc
 
@@ -111,11 +107,10 @@ type VersionedMigrationSvc struct {
 	pauseRetryInterval time.Duration
 }
 
-func NewVersionedMigrationSvc(logger *zerolog.Logger, policySvc policy.Service, copySvc rclone.CopySvc,
+func NewVersionedMigrationSvc(policySvc policy.Service, copySvc rclone.CopySvc,
 	objectVersionInfoStore *store.ObjectVersionInfoStore, objectLocker *store.ObjectLocker,
 	pauseRetryInterval time.Duration) *VersionedMigrationSvc {
 	return &VersionedMigrationSvc{
-		logger:                 logger,
 		policySvc:              policySvc,
 		copySvc:                copySvc,
 		objectVersionInfoStore: objectVersionInfoStore,
@@ -150,7 +145,7 @@ func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entit
 			continue
 		}
 		if err := r.policySvc.IncReplInitObjListed(ctx, replicationID, info.Size, time.Now()); err != nil {
-			r.logger.Err(err).Msg("unable to increment object listed metadata")
+			zerolog.Ctx(ctx).Err(err).Msg("unable to increment object listed metadata")
 		}
 	}
 
@@ -229,7 +224,7 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 			}
 
 			if err := r.policySvc.IncReplInitObjDone(ctx, replicationID, info.Size, time.Now()); err != nil {
-				r.logger.Err(err).Msg("unable to increment object done metadata")
+				zerolog.Ctx(ctx).Err(err).Msg("unable to increment object done metadata")
 			}
 		}
 
@@ -241,7 +236,7 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 	}
 
 	if _, err := r.objectVersionInfoStore.Drop(ctx, versionedObjectID); err != nil {
-		r.logger.Err(err).Msg("unable to drop object version list")
+		zerolog.Ctx(ctx).Err(err).Msg("unable to drop object version list")
 	}
 
 	return nil

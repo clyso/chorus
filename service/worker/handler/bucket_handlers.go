@@ -114,7 +114,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 		return fmt.Errorf("create bucket: unable to enqueue list obj task: %w", err)
 	} else if err != nil {
-		logger.Info().RawJSON("enqueue_task_payload", task.Payload()).Msg("cannot enqueue task with duplicate id")
+		logger.Info().Msg("cannot enqueue task with duplicate id")
 	}
 	logger.Info().Msg("create bucket: created migration list obj task")
 

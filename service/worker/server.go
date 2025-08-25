@@ -147,8 +147,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	memoryLimiterSvc := rclone.NewMemoryLimiterSvc(memCalc, memLimiter, filesLimiter, metricsSvc)
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
 	copySvc := rclone.NewS3CopySvc(s3Clients, memoryLimiterSvc, limiter, metricsSvc)
-	versionedMigrationSvc := handler.NewVersionedMigrationSvc(&logger, policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
-	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(&logger, versionedMigrationSvc, taskClient)
+	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
+	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, taskClient)
 
 	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, objectLocker, bucketLocker, replicationStatusLocker)
 
