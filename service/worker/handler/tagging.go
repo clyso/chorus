@@ -27,7 +27,6 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
@@ -44,14 +43,6 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
-
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
 		return err
@@ -66,10 +57,6 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 	if err != nil {
 		return err
 	}
-	incErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
-	if incErr != nil {
-		zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc processed events")
-	}
 	return nil
 }
 
@@ -80,14 +67,6 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
-
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Object.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
 
 	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
 	if err != nil {
@@ -104,10 +83,6 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	err = s.syncObjectTagging(ctx, fromClient, toClient, p.Object.Bucket, p.Object.Name, p.ToBucket)
 	if err != nil {
 		return err
-	}
-	incErr := s.policySvc.IncReplEventsDone(ctx, replicationID, p.CreatedAt)
-	if incErr != nil {
-		zerolog.Ctx(ctx).Err(incErr).Msg("unable to inc processed events")
 	}
 	return nil
 }
