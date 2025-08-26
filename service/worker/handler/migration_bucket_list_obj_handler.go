@@ -29,7 +29,8 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/entity"
-	"github.com/clyso/chorus/pkg/features"
+
+	// "github.com/clyso/chorus/pkg/features"
 
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -67,13 +68,6 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		return err
 	}
 
-	versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
-	if err != nil {
-		return fmt.Errorf("unable to get bucket versioning config: %w", err)
-	}
-
-	shouldListVersions := versioningConfig.Enabled() && features.Versioning(ctx)
-
 	objects := fromClient.S3().ListObjects(ctx, p.Bucket, mclient.ListObjectsOptions{StartAfter: lastObjName, Prefix: p.Prefix})
 	objectsNum := 0
 	for object := range objects {
@@ -103,8 +97,10 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			continue
 		}
 		p.Sync.InitDate()
-		if shouldListVersions {
-			task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.ListObjectVersionsPayload{
+
+		var task *asynq.Task
+		if p.Versioned {
+			task, err = tasks.NewReplicationTask(ctx, replicationID, tasks.ListObjectVersionsPayload{
 				Sync:   p.Sync,
 				Bucket: p.Bucket,
 				Prefix: object.Key,
@@ -113,30 +109,21 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			if err != nil {
 				return fmt.Errorf("unable to create list object versions task: %w", err)
 			}
-			_, err = s.taskClient.EnqueueContext(ctx, task)
+		} else {
+			task, err = tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
+				Sync:   p.Sync,
+				Bucket: p.Bucket,
+				Obj: tasks.ObjPayload{
+					Name:        object.Key,
+					VersionID:   object.VersionID,
+					ETag:        object.ETag,
+					Size:        object.Size,
+					ContentType: object.ContentType,
+				},
+			})
 			if err != nil {
-				if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-					logger.Info().Msg("cannot enqueue task with duplicate id")
-					continue
-				}
-				return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
+				return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 			}
-
-			continue
-		}
-		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
-			Sync:   p.Sync,
-			Bucket: p.Bucket,
-			Obj: tasks.ObjPayload{
-				Name:        object.Key,
-				VersionID:   object.VersionID,
-				ETag:        object.ETag,
-				Size:        object.Size,
-				ContentType: object.ContentType,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 		}
 		_, err = s.taskClient.EnqueueContext(ctx, task)
 		if err != nil {
