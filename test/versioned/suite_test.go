@@ -374,7 +374,6 @@ var _ = Describe("Minio versioned migration", func() {
 })
 
 var _ = Describe("Ceph versioned migration", func() {
-
 	const (
 		CKeystoneUrlTemplate = "http://%s:%d/v3"
 
@@ -384,7 +383,6 @@ var _ = Describe("Ceph versioned migration", func() {
 		CCephDestInstance    = "ceph2"
 		CRedisInstance       = "redis"
 		CKeystoneSrcInstance = "keystone1"
-		// CKeystoneDestInstance = "keystone2"
 
 		CEC2CredsType = "ec2"
 
@@ -419,6 +417,8 @@ var _ = Describe("Ceph versioned migration", func() {
 	}
 
 	BeforeEach(func() {
+		Skip("skip ceph test, since runner can't run ceph yet")
+
 		ctx := context.WithoutCancel(testCtx)
 		localTestEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
 			CKeystoneSrcInstance: env.AsKeystone(),

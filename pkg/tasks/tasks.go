@@ -210,8 +210,9 @@ type MigrateVersionedObjectPayload struct {
 
 type MigrateBucketListObjectsPayload struct {
 	Sync
-	Bucket string
-	Prefix string
+	Bucket    string
+	Prefix    string
+	Versioned bool
 }
 
 type MigrateObjCopyPayload struct {

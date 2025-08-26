@@ -57,14 +57,18 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		return err
 	}
 
-	srcExists, err := fromClient.S3().BucketExists(ctx, p.Bucket)
-	if err != nil {
-		return err
+	srcExists := true
+	versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
+	if err != nil && mclient.ToErrorResponse(err).Code != "NoSuchBucket" {
+		return fmt.Errorf("unable to get bucket versioning config: %w", err)
 	}
+
 	if !srcExists {
 		zerolog.Ctx(ctx).Warn().Msg("skip bucket create: bucket not exists in source storage")
 		return nil
 	}
+
+	shouldListVersions := versioningConfig.Enabled() && features.Versioning(ctx)
 
 	// 1. create bucket
 	err = s.createBucketIfNotExists(ctx, toClient, p)
@@ -104,8 +108,9 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 			ToStorage:   p.ToStorage,
 			ToBucket:    p.ToBucket,
 		},
-		Bucket: p.Bucket,
-		Prefix: "",
+		Bucket:    p.Bucket,
+		Prefix:    "",
+		Versioned: shouldListVersions,
 	})
 	if err != nil {
 		return fmt.Errorf("create bucket: unable to create list obj task: %w", err)
