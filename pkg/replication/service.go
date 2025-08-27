@@ -323,8 +323,49 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*e
 	// if zero-downtime switch is in progress return empty replication policy
 	// to update obj version metadata and avoid creating replication tasks
 	replicationSwitchInfoID := entity.NewReplicationSwitchInfoID(user, bucket)
-	_, err = s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, replicationSwitchInfoID)
+	switchInfo, err := s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, replicationSwitchInfoID)
 	if err == nil {
+		// BUGFIX:
+		// 1. A is main, B is follower
+		// 2. User initiates multipart upload to A
+		// 3. User uploads some parts to A
+		// 4. User initiates zero-downtime switch from A to B
+		//     - reads goes to B or to A if object is not yet replicated
+		//     - non-multipart writes now go to B
+		//     - replication policy is archived: no copy from A to B
+		//
+		// 5. All writes except multipart now correctly routed to B
+		// 5. We dont create replication tasks for new writes
+		// 7. We handle UploadPart correctly and route to A
+		//    For UploadPart chorus never creates replication tasks because user can call AbortMultipartUpload
+		// 8. User calls CompleteMultipartUpload
+		//    -- we are here on this line of code --
+		// PROBLEM:
+		// - because replication policy is archived we dont create replication tasks
+		// - but we need to finish old multipart upload on A and replicate completed object to B
+		// SOLUTION:
+		//  lookup archived replication policy and create replication task from A to B
+		if xctx.GetMethod(ctx) == s3.CompleteMultipartUpload {
+			archivedPolicy, err := s.policySvc.GetReplicationPolicyInfo(ctx, switchInfo.ReplID)
+			if err != nil {
+				// should never happen
+				return nil, fmt.Errorf("%w: unable to get archived replication policy during CompleteMultipartUpload with zero-downtime switch in progress: %w", dom.ErrInternal, err)
+			}
+			if !archivedPolicy.IsArchived {
+				// should never happen
+				return nil, fmt.Errorf("%w: replication policy is not archived during CompleteMultipartUpload with zero-downtime switch in progress", dom.ErrInternal)
+			}
+			return &entity.StorageReplicationPolicies{
+				FromStorage: task.GetFrom(),
+				Destinations: []entity.ReplicationPolicyDestination{
+					{
+						Storage: switchInfo.ReplID.ToStorage,
+						Bucket:  switchInfo.ReplID.ToBucket,
+					},
+				},
+			}, nil
+		}
+
 		// no-error means that zero-downtime switch in progress.
 		// return replication policy without destinations
 		return &entity.StorageReplicationPolicies{

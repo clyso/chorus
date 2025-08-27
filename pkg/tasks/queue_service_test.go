@@ -6,22 +6,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func Test_queueService_UnprocessedCount(t *testing.T) {
 	ctx := t.Context()
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	inspector := asynq.NewInspectorFromRedisClient(c)
-	defer inspector.Close()
 	client := asynq.NewClientFromRedisClient(c)
-	defer client.Close()
+	t.Cleanup(func() {
+		client.Close()
+		inspector.Close()
+	})
 	qs := NewQueueService(inspector)
 
 	r := require.New(t)
@@ -66,7 +67,7 @@ func Test_queueService_UnprocessedCount(t *testing.T) {
 	r.Zero(count, "expected queue to be empty after archiving tasks")
 
 	t.Run("multiple queues", func(t *testing.T) {
-		db.FlushAll()
+		c.FlushAll(ctx)
 		r := require.New(t)
 		q1, q2 := "test-queue-1", "test-queue-2"
 		queues := []string{q1, q2}
@@ -116,8 +117,7 @@ func Test_queueService_UnprocessedCount(t *testing.T) {
 
 func Test_queueService_RetriedTasksCountAsUnprocessed(t *testing.T) {
 	ctx := t.Context()
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	inspector := asynq.NewInspectorFromRedisClient(c)
 	defer inspector.Close()
 	client := asynq.NewClientFromRedisClient(c)
@@ -132,7 +132,7 @@ func Test_queueService_RetriedTasksCountAsUnprocessed(t *testing.T) {
 	r.NoError(err, "failed to enqueue task to create queue")
 
 	//register a handler to return a retryable error
-	registerHandler(t, ctx, c, queueName, func(ctx context.Context, t *asynq.Task) error {
+	stop := registerHandler(t, ctx, c, queueName, func(ctx context.Context, t *asynq.Task) error {
 		return dom.ErrNotFound
 	})
 
@@ -143,6 +143,7 @@ func Test_queueService_RetriedTasksCountAsUnprocessed(t *testing.T) {
 		}
 		return info.Retry > 0
 	}, time.Second, 100*time.Millisecond, "expected task to be retried")
+	stop()
 
 	// check if queue is empty
 	count, err := qs.UnprocessedCount(ctx, false, queueName)
@@ -160,7 +161,7 @@ func Test_queueService_RetriedTasksCountAsUnprocessed(t *testing.T) {
 	r.Zero(count, "expected queue to be empty after archiving tasks")
 }
 
-func registerHandler(t *testing.T, ctx context.Context, redisClient redis.UniversalClient, queue string, handler asynq.HandlerFunc) {
+func registerHandler(t *testing.T, ctx context.Context, redisClient redis.UniversalClient, queue string, handler asynq.HandlerFunc) func() {
 	t.Helper()
 	srv := asynq.NewServerFromRedisClient(redisClient, asynq.Config{
 		Concurrency: 1,
@@ -179,16 +180,12 @@ func registerHandler(t *testing.T, ctx context.Context, redisClient redis.Univer
 	if err != nil {
 		t.Fatalf("failed to start server: %v", err)
 	}
-	go func() {
-		<-ctx.Done()
-		srv.Shutdown()
-	}()
+	return srv.Shutdown
 }
 
 func Test_queueService_PauseResume(t *testing.T) {
 	ctx := t.Context()
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	inspector := asynq.NewInspectorFromRedisClient(c)
 	defer inspector.Close()
 	client := asynq.NewClientFromRedisClient(c)
@@ -246,8 +243,7 @@ func Test_queueService_PauseResume(t *testing.T) {
 
 func Test_queueService_Stats(t *testing.T) {
 	ctx := t.Context()
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	inspector := asynq.NewInspectorFromRedisClient(c)
 	defer inspector.Close()
 	client := asynq.NewClientFromRedisClient(c)

@@ -17,30 +17,36 @@
 package rpc
 
 import (
-	"context"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func TestAgent(t *testing.T) {
-	db := miniredis.RunT(t)
-	c := redis.NewClient(&redis.Options{Addr: db.Addr()})
+	c := testutil.SetupRedis(t)
 	r := require.New(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
+	wg := sync.WaitGroup{}
+	wg.Add(3)
 	go func() {
+		defer wg.Done()
 		_ = AgentServe(ctx, c, "agent1", "s1")
 	}()
 	go func() {
+		defer wg.Done()
 		_ = AgentServe(ctx, c, "agent2", "s2")
 	}()
 	go func() {
+		defer wg.Done()
 		_ = AgentServe(ctx, c, "agent3", "s3")
 	}()
+	t.Cleanup(func() {
+		wg.Wait()
+	})
 	tst := AgentClient{c}
 	time.Sleep(50 * time.Millisecond)
 	res, err := tst.Ping(ctx)

@@ -158,7 +158,6 @@ func (r *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 		return fmt.Errorf("unable to make replication status key: %w", err)
 	}
 	now := entity.TimeNow()
-	bucketReplicationPolicy := entity.NewBucketReplicationPolicy(replID.FromStorage, replID.ToStorage, replID.ToBucket)
 	replicationSwitchID := entity.NewReplicationSwitchInfoID(replID.User, replID.FromBucket)
 	exec := r.replicationSwitchStore.TxExecutor()
 	txReplicationSwitchStore := r.replicationSwitchStore.WithExecutor(exec)
@@ -171,9 +170,15 @@ func (r *policySvc) AddZeroDowntimeReplicationSwitch(ctx context.Context, replID
 	_ = txReplicationSwitchStore.SetMultipartTTLOp(ctx, replicationSwitchID, opts.MultipartTTL)
 	_ = r.bucketRoutingPolicyStore.WithExecutor(exec).SetOp(ctx, bucketRoutingPolicyID, replID.ToStorage)
 
-	// archive replication
+	// archive replication:
+	// - remove replication destination from sorted set: proxy will stop replicating new events to old destination
+	bucketReplicationPolicy := entity.NewBucketReplicationPolicy(replID.FromStorage, replID.ToStorage, replID.ToBucket)
 	_ = r.bucketReplicationPolicyStore.WithExecutor(exec).RemoveOp(ctx, bucketReplicationPolicyID, bucketReplicationPolicy)
 	txReplicationStatusStore := r.replicationStatusStore.WithExecutor(exec)
+	// - keep replication status HSET for history, but mark it as archieved
+	// - archived replication may be used to resolve CompleteMultipartUpload, when parts were uploaded to old storage
+	//    before switch started. Now if proxy will receive CompleteMultipartUpload request, it will be able to
+	//   create replication tasky to sync this object to new storage after switch was completed.
 	_ = txReplicationStatusStore.SetArchievedOp(ctx, replID)
 	_ = txReplicationStatusStore.SetArchievedAtOp(ctx, replID, now)
 

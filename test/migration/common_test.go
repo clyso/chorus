@@ -17,14 +17,10 @@
 package migration
 
 import (
-	"encoding/base64"
-	"fmt"
+	"context"
 	"math/rand"
-	"strings"
 
 	mclient "github.com/minio/minio-go/v7"
-
-	"github.com/clyso/chorus/pkg/s3"
 )
 
 type testObj struct {
@@ -48,7 +44,7 @@ func getTestObj(name, bucket string) testObj {
 
 func listObjects(c *mclient.Client, bucket string, prefix string) ([]string, error) {
 	var res []string
-	objCh := c.ListObjects(tstCtx, bucket, mclient.ListObjectsOptions{Prefix: prefix, Recursive: true})
+	objCh := c.ListObjects(context.Background(), bucket, mclient.ListObjectsOptions{Prefix: prefix, Recursive: true})
 	for obj := range objCh {
 		if obj.Err != nil {
 			return nil, obj.Err
@@ -66,101 +62,10 @@ func listObjects(c *mclient.Client, bucket string, prefix string) ([]string, err
 	return res, nil
 }
 
-//func startMigration(from, to string) error {
-//	task, err := tasks.NewTask(tasks.MigrationStartPayload{
-//		FromStorage: from,
-//		ToStorage:   to,
-//	})
-//	if err != nil {
-//		return err
-//	}
-//	_, err = taskClient.EnqueueContext(tstCtx, task)
-//	return err
-//}
-
-func generateCredentials() s3.CredentialsV4 {
-	res := s3.CredentialsV4{}
-	const (
-		// Minimum length for MinIO access key.
-		accessKeyMinLen = 3
-
-		// Maximum length for MinIO access key.
-		// There is no max length enforcement for access keys
-		accessKeyMaxLen = 20
-
-		// Minimum length for MinIO secret key for both server
-		secretKeyMinLen = 8
-
-		// Maximum secret key length for MinIO, this
-		// is used when autogenerating new credentials.
-		// There is no max length enforcement for secret keys
-		secretKeyMaxLen = 40
-
-		// Alpha numeric table used for generating access keys.
-		alphaNumericTable = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-		// Total length of the alpha numeric table.
-		alphaNumericTableLen = byte(len(alphaNumericTable))
-	)
-	readBytes := func(size int) (data []byte, err error) {
-		data = make([]byte, size)
-		var n int
-		if n, err = rand.Read(data); err != nil {
-			return nil, err
-		} else if n != size {
-			panic(fmt.Errorf("Not enough data. Expected to read: %v bytes, got: %v bytes", size, n))
-		}
-		return data, nil
-	}
-
-	// Generate access key.
-	keyBytes, err := readBytes(accessKeyMaxLen)
-	if err != nil {
-		panic(err)
-	}
-	for i := 0; i < accessKeyMaxLen; i++ {
-		keyBytes[i] = alphaNumericTable[keyBytes[i]%alphaNumericTableLen]
-	}
-	res.AccessKeyID = string(keyBytes)
-
-	// Generate secret key.
-	keyBytes, err = readBytes(secretKeyMaxLen)
-	if err != nil {
-		panic(err)
-	}
-
-	res.SecretAccessKey = strings.ReplaceAll(string([]byte(base64.StdEncoding.EncodeToString(keyBytes))[:secretKeyMaxLen]),
-		"/", "+")
-
-	return res
-}
-
-func cleanup(buckets ...string) {
-	for _, bucket := range buckets {
-		objCh, _ := listObjects(mainClient, bucket, "")
-		for _, obj := range objCh {
-			_ = mainClient.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
-		}
-		_ = mainClient.RemoveBucket(tstCtx, bucket)
-
-		objCh, _ = listObjects(f1Client, bucket, "")
-		for _, obj := range objCh {
-			_ = f1Client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
-		}
-		_ = f1Client.RemoveBucket(tstCtx, bucket)
-
-		objCh, _ = listObjects(f2Client, bucket, "")
-		for _, obj := range objCh {
-			_ = f2Client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
-		}
-		_ = f2Client.RemoveBucket(tstCtx, bucket)
-	}
-}
-
 func rmBucket(client *mclient.Client, bucket string) error {
 	objs, _ := listObjects(client, bucket, "")
 	for _, obj := range objs {
-		_ = client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
+		_ = client.RemoveObject(context.Background(), bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
 	}
-	return client.RemoveBucket(tstCtx, bucket)
+	return client.RemoveBucket(context.Background(), bucket)
 }
