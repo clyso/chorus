@@ -17,8 +17,6 @@ import (
 func TestApi_Migrate_test(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const waitInterval = 15 * time.Second
-	const retryInterval = 100 * time.Millisecond
 
 	r := require.New(t)
 	buckets, err := e.MainClient.ListBuckets(tstCtx)
@@ -202,7 +200,7 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Eventually(func() bool {
 		buckets, _ = e.F1Client.ListBuckets(tstCtx)
 		return len(buckets) == 2
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	objects, err := listObjects(e.MainClient, b1, "")
 	r.NoError(err)
@@ -228,7 +226,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		}
 		resLen = len(objects)
 		return resLen == 4
-	}, waitInterval, retryInterval, resLen)
+	}, e.WaitLong, e.RetryLong, resLen)
 
 	r.Eventually(func() bool {
 		objects, err = listObjects(e.F1Client, b2, "")
@@ -237,7 +235,7 @@ func TestApi_Migrate_test(t *testing.T) {
 		}
 		resLen = len(objects)
 		return resLen == 4
-	}, waitInterval, retryInterval, resLen)
+	}, e.WaitLong, e.RetryLong, resLen)
 
 	proxyObj2, err := e.ProxyClient.GetObject(tstCtx, obj2.bucket, obj2.name, mclient.GetObjectOptions{})
 	r.NoError(err)
@@ -268,7 +266,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj1upd.data, mainObj1UpdBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		f1Obj1Upd, err := e.F1Client.GetObject(tstCtx, obj1upd.bucket, obj1upd.name, mclient.GetObjectOptions{})
@@ -280,7 +278,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj1upd.data, f1Obj1UpdBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    b1,
@@ -330,7 +328,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			}
 		}
 		return true
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
@@ -421,7 +419,7 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Eventually(func() bool {
 		buckets, _ = e.F2Client.ListBuckets(tstCtx)
 		return len(buckets) == 2
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		objects, err = listObjects(e.F2Client, b1, "")
@@ -429,7 +427,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return len(objects) == 4
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		objects, err = listObjects(e.F2Client, b2, "")
@@ -437,7 +435,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return len(objects) == 4
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		f2Obj1Upd, err := e.F2Client.GetObject(tstCtx, obj1upd.bucket, obj1upd.name, mclient.GetObjectOptions{})
@@ -449,7 +447,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj1upd.data, f2Obj1UpdBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		f2Obj4Upd, err := e.F2Client.GetObject(tstCtx, obj4upd.bucket, obj4upd.name, mclient.GetObjectOptions{})
@@ -461,7 +459,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj4upd.data, f2Obj4UpdBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
@@ -520,7 +518,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj9.data, objBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		obj, err = e.F1Client.GetObject(tstCtx, obj9.bucket, obj9.name, mclient.GetObjectOptions{})
@@ -532,7 +530,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj9.data, objBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		obj, err = e.F2Client.GetObject(tstCtx, obj9.bucket, obj9.name, mclient.GetObjectOptions{})
@@ -544,7 +542,7 @@ func TestApi_Migrate_test(t *testing.T) {
 			return false
 		}
 		return bytes.Equal(obj9.data, objBytes)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
 	r.NoError(err)

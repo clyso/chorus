@@ -40,9 +40,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
-		waitInterval  = 15 * time.Second
-		retryInterval = 100 * time.Millisecond
-		bucket        = "switch-bucket"
+		bucket = "switch-bucket"
 	)
 
 	r := require.New(t)
@@ -113,7 +111,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		}
 		started := repl.InitObjListed > 0
 		return started
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// perform updates after migration started
 	obj7 := getTestObj("photo/sept/obj7", bucket)
@@ -138,12 +136,12 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	r.Eventually(func() bool {
 		f1e, _ := e.F1Client.BucketExists(tstCtx, bucket)
 		return f1e
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		obsf1, _ := listObjects(e.F1Client, bucket, "")
 		return len(objects) == len(obsf1)
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// wait init replication is done
 	r.Eventually(func() bool {
@@ -152,7 +150,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			return false
 		}
 		return repl.IsInitDone
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
@@ -167,7 +165,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			return false
 		}
 		return diff.IsMatch
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	repl, err := e.ApiClient.GetReplication(tstCtx, replID)
 	r.NoError(err)
@@ -299,7 +297,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
-	}, waitInterval*3, retryInterval)
+	}, e.WaitLong*2, e.RetryLong)
 
 	repl = nil
 	repls, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
@@ -352,9 +350,7 @@ func TestApi_switch_multipart(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
-		waitInterval  = 15 * time.Second
-		retryInterval = 100 * time.Millisecond
-		bucket        = "switch-bucket-multipart"
+		bucket = "switch-bucket-multipart"
 	)
 
 	r := require.New(t)
@@ -419,7 +415,7 @@ func TestApi_switch_multipart(t *testing.T) {
 		}
 		started := repl.InitObjListed > 0
 		return started
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// perform updates after migration started
 	obj7 := getTestObj("photo/sept/obj7", bucket)
@@ -436,7 +432,7 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.Eventually(func() bool {
 		f1e, _ := e.F1Client.BucketExists(tstCtx, bucket)
 		return f1e
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	f1Stream, err := e.ApiClient.StreamBucketReplication(tstCtx, replID)
 	r.NoError(err)
@@ -447,7 +443,7 @@ func TestApi_switch_multipart(t *testing.T) {
 			return false
 		}
 		return m.IsInitDone
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
 		diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
@@ -462,7 +458,7 @@ func TestApi_switch_multipart(t *testing.T) {
 			return false
 		}
 		return diff.IsMatch
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// start multipart upload
 	// multipart upload
@@ -535,7 +531,7 @@ func TestApi_switch_multipart(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
-	}, waitInterval*3, retryInterval)
+	}, e.WaitLong*2, e.RetryLong)
 
 	for _, object := range objects {
 		objData, err := e.ProxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})
@@ -555,9 +551,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
-		waitInterval  = 15 * time.Second
-		retryInterval = 100 * time.Millisecond
-		bucket        = "switch-bucket-scheduled"
+		bucket = "switch-bucket-scheduled"
 	)
 
 	r := require.New(t)
@@ -627,7 +621,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 			}
 		}
 		return started
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// perform updates after migration started
 	obj7 := getTestObj("photo/sept/obj7", bucket)
@@ -671,7 +665,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket is blocked
 	_, err = e.ProxyClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
@@ -684,7 +678,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
-	}, waitInterval*2, retryInterval)
+	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
 	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
@@ -777,9 +771,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
-		waitInterval  = 15 * time.Second
-		retryInterval = 100 * time.Millisecond
-		bucket        = "switch-bucket-scheduled-continue"
+		bucket = "switch-bucket-scheduled-continue"
 	)
 
 	r := require.New(t)
@@ -849,7 +841,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 			}
 		}
 		return started
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// perform updates after migration started
 	obj7 := getTestObj("photo/sept/obj7", bucket)
@@ -893,7 +885,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket is blocked
 	_, err = e.ProxyClient.PutObject(tstCtx, obj4.bucket, obj4.name, bytes.NewReader(obj4.data), int64(len(obj4.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
@@ -906,7 +898,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 			return false
 		}
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
-	}, waitInterval*3, retryInterval)
+	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
 	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
@@ -982,7 +974,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 			return rr.Events == rr.EventsDone && rr.Events > 0
 		}
 		return false
-	}, waitInterval*2, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// now f1 and main are in sync again
 	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{

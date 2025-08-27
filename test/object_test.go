@@ -21,7 +21,6 @@ import (
 	"io"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/clyso/chorus/test/env"
 	mclient "github.com/minio/minio-go/v7"
@@ -54,7 +53,7 @@ func TestApi_Object_CRUD(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	objName := "obj-crud"
 	_, err = e.MainClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
@@ -99,7 +98,7 @@ func TestApi_Object_CRUD(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	obj, err = e.MainClient.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
 	r.NoError(err)
@@ -177,7 +176,7 @@ func TestApi_Object_CRUD(t *testing.T) {
 		}
 
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	err = e.ProxyClient.RemoveObject(tstCtx, bucket, objName, mclient.RemoveObjectOptions{})
 	r.NoError(err)
@@ -199,7 +198,7 @@ func TestApi_Object_CRUD(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 }
 
@@ -229,7 +228,7 @@ func TestApi_Object_Folder(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*20, time.Millisecond*100)
+	}, e.WaitLong, e.RetryLong)
 
 	objName := "folder/"
 	_, err = e.MainClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
@@ -274,5 +273,5 @@ func TestApi_Object_Folder(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 }

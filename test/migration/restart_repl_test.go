@@ -3,7 +3,6 @@ package migration
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
@@ -16,8 +15,6 @@ import (
 func Test_Restart_Replication(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const waitInterval = 5 * time.Second
-	const retryInterval = 50 * time.Millisecond
 
 	bucket := "restart"
 	r := require.New(t)
@@ -66,7 +63,7 @@ func Test_Restart_Replication(t *testing.T) {
 			return false
 		}
 		return reps.Replications[0].InitObjDone > 0
-	}, waitInterval, retryInterval)
+	}, e.WaitShort, e.RetryShort)
 
 	// add live event
 	obj3 := getTestObj("obj3", bucket)
@@ -83,7 +80,7 @@ func Test_Restart_Replication(t *testing.T) {
 			return false
 		}
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
-	}, waitInterval, retryInterval)
+	}, e.WaitShort, e.RetryShort)
 
 	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucket,
@@ -152,7 +149,7 @@ func Test_Restart_Replication(t *testing.T) {
 		}
 		stat := reps.Replications[0]
 		return stat.IsInitDone && stat.Events == stat.EventsDone
-	}, waitInterval, retryInterval)
+	}, e.WaitShort, e.RetryShort)
 
 	// check that sync was correct
 	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{

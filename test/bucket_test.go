@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/clyso/chorus/test/env"
 	mclient "github.com/minio/minio-go/v7"
@@ -75,7 +74,7 @@ func TestApi_MockBucket(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*2, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	_, err = e.F1Client.GetBucketLocation(tstCtx, bucket)
 	r.Error(err)
@@ -157,7 +156,7 @@ func TestApi_Bucket_CRUD(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*20, time.Millisecond*100)
+	}, e.WaitLong, e.RetryLong)
 
 	_, err = e.MainClient.GetBucketLocation(tstCtx, bucket)
 	r.NoError(err)
@@ -228,7 +227,7 @@ func TestApi_Bucket_List(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	err = e.ProxyClient.RemoveBucket(tstCtx, b1)
 	r.NoError(err)
@@ -254,7 +253,7 @@ func TestApi_Bucket_List(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*5, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	body1 := bytes.Repeat([]byte("1"), rand.Intn(1<<20)+32*1024)
 	body2 := bytes.Repeat([]byte("2"), rand.Intn(1<<20)+32*1024)
@@ -352,7 +351,7 @@ func TestApi_Bucket_List(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	remCh := make(chan mclient.ObjectInfo, len(objMap))
 	errCh := e.ProxyClient.RemoveObjects(tstCtx, b2, remCh, mclient.RemoveObjectsOptions{})
@@ -403,5 +402,5 @@ func TestApi_Bucket_List(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*10, time.Millisecond*100)
+	}, e.WaitLong, e.RetryLong)
 }

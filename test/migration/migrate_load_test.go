@@ -25,9 +25,6 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
-	const waitInterval = 180 * time.Second
-	const retryInterval = 3 * time.Second
-
 	const objPerBucket = 150
 	const bucketsNum = 10
 	r := require.New(t)
@@ -60,7 +57,7 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 		buckets, _ := e.F1Client.ListBuckets(tstCtx)
 		t.Log("f1 buckets", len(buckets))
 		return len(buckets) == bucketsNum
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 	t.Log("f1 buckets created")
 
 	for b := 0; b < bucketsNum; b++ {
@@ -72,7 +69,7 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 			}
 			t.Log(bucketName, len(objects))
 			return len(objects) == objPerBucket
-		}, waitInterval, retryInterval)
+		}, e.WaitLong, e.RetryLong)
 	}
 
 	m, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
