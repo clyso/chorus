@@ -1,6 +1,8 @@
 package migration
 
 import (
+	"net/http"
+	"net/http/httputil"
 	"testing"
 
 	mclient "github.com/minio/minio-go/v7"
@@ -8,18 +10,30 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/test/env"
 )
 
 func Test_api_storages(t *testing.T) {
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
 	r := require.New(t)
-	res, err := apiClient.GetStorages(tstCtx, &emptypb.Empty{})
+	res, err := e.ApiClient.GetStorages(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
 	r.Len(res.Storages, 3)
+	resp, err := http.Get(e.UrlHttpApi + "/storage")
+	r.NoError(err)
+	r.EqualValues(http.StatusOK, resp.StatusCode)
+	r.Positive(resp.ContentLength)
+
+	_, err = httputil.DumpResponse(resp, true)
+	r.NoError(err)
 }
 
 func Test_api_proxy_creds(t *testing.T) {
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
 	r := require.New(t)
-	res, err := apiClient.GetProxyCredentials(tstCtx, &emptypb.Empty{})
+	res, err := e.ApiClient.GetProxyCredentials(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
 	r.Contains(res.Address, "localhost")
 	r.Len(res.Credentials, 1)
@@ -31,11 +45,12 @@ func Test_api_proxy_creds(t *testing.T) {
 }
 
 func Test_api_list_replications(t *testing.T) {
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
 	r := require.New(t)
-	err := proxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
+	err := e.ProxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
 	r.NoError(err)
-	defer cleanup("replications")
-	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		User:            user,
 		From:            "main",
 		To:              "f1",
@@ -43,15 +58,7 @@ func Test_api_list_replications(t *testing.T) {
 		IsForAllBuckets: false,
 	})
 	r.NoError(err)
-	defer func() {
-		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-			User:   user,
-			From:   "main",
-			To:     "f1",
-			Bucket: "replications",
-		})
-	}()
-	res, err := apiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	res, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
 	r.Len(res.Replications, 1)
 	r.EqualValues("replications", res.Replications[0].Bucket)
@@ -61,13 +68,15 @@ func Test_api_list_replications(t *testing.T) {
 }
 
 func Test_api_get_replication(t *testing.T) {
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
 	r := require.New(t)
-	err := proxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
+	err := e.ProxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
 	r.NoError(err)
 	defer func() {
-		proxyClient.RemoveBucket(tstCtx, "replications")
+		e.ProxyClient.RemoveBucket(tstCtx, "replications")
 	}()
-	_, err = apiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		User:            user,
 		From:            "main",
 		To:              "f1",
@@ -76,7 +85,7 @@ func Test_api_get_replication(t *testing.T) {
 	})
 	r.NoError(err)
 	defer func() {
-		apiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
+		e.ApiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
 			User:     user,
 			From:     "main",
 			To:       "f1",
@@ -84,7 +93,7 @@ func Test_api_get_replication(t *testing.T) {
 			ToBucket: "replications",
 		})
 	}()
-	res, err := apiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
+	res, err := e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
 		User:     user,
 		From:     "main",
 		To:       "f1",
