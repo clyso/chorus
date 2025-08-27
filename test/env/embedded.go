@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -53,7 +54,30 @@ import (
 	"github.com/clyso/chorus/service/worker"
 )
 
-const user = "test"
+const (
+	user = "test"
+
+	retryShort = 100 * time.Millisecond
+	retryLong  = 500 * time.Millisecond
+)
+
+var (
+	// can override with make test TEST_WAIT_SHORT=10s
+	waitShort = getDurationEvar("TEST_WAIT_SHORT", 5*time.Second)
+	// can override with make test TEST_WAIT_LONG=60s
+	waitLong = getDurationEvar("TEST_WAIT_LONG", 20*time.Second)
+)
+
+func getDurationEvar(name string, defaultVal time.Duration) time.Duration {
+	if v := os.Getenv(name); v != "" {
+		dur, err := time.ParseDuration(v)
+		if err != nil {
+			panic(fmt.Sprintf("cannot parse duration from env var %s=%s: %v", name, v, err))
+		}
+		return dur
+	}
+	return defaultVal
+}
 
 type EmbeddedEnv struct {
 	MainClient     *mclient.Client
@@ -73,11 +97,24 @@ type EmbeddedEnv struct {
 	StorageSvc storage.Service
 
 	UrlHttpApi string
+
+	WaitShort  time.Duration
+	RetryShort time.Duration
+	WaitLong   time.Duration
+	RetryLong  time.Duration
 }
 
 func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Config) EmbeddedEnv {
 	t.Helper()
-	e := EmbeddedEnv{}
+
+	var err error
+	e := EmbeddedEnv{
+		WaitShort:  waitShort,
+		RetryShort: retryShort,
+		WaitLong:   waitLong,
+		RetryLong:  retryLong,
+	}
+
 	redisAddr := testutil.SetupRedisAddr(t)
 
 	proxyConf.Redis.Address = redisAddr

@@ -88,6 +88,10 @@ bench: bench-bin
 test: pretty
 	go test ./...
 
+.PHONY: test-ci
+test-ci: pretty
+	TEST_WAIT_SHORT=20s TEST_WAIT_LONG=80s go test ./... -p 1
+
 .PHONY: proto-gen
 proto-gen:
 	cd proto; go tool buf generate --template "buf.gen.yaml" --config "buf.yaml"

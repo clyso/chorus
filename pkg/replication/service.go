@@ -345,7 +345,9 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*e
 		// - but we need to finish old multipart upload on A and replicate completed object to B
 		// SOLUTION:
 		//  lookup archived replication policy and create replication task from A to B
-		if xctx.GetMethod(ctx) == s3.CompleteMultipartUpload {
+		wasRoutedToOldStorage := task.GetFrom() == switchInfo.ReplID.FromStorage
+		isCompleteMutlipart := xctx.GetMethod(ctx) == s3.CompleteMultipartUpload
+		if wasRoutedToOldStorage && isCompleteMutlipart {
 			archivedPolicy, err := s.policySvc.GetReplicationPolicyInfo(ctx, switchInfo.ReplID)
 			if err != nil {
 				// should never happen

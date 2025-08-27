@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/clyso/chorus/test/env"
 	mclient "github.com/minio/minio-go/v7"
@@ -38,7 +37,7 @@ func TestApi_Object_Multipart(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	objName := "obj-mp"
 	_, err = e.MainClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
@@ -115,7 +114,7 @@ func TestApi_Object_Multipart(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	obj, err = e.MainClient.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
 	r.NoError(err)

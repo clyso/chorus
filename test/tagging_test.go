@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/clyso/chorus/test/env"
 	mclient "github.com/minio/minio-go/v7"
@@ -40,7 +39,7 @@ func TestApi_Tagging_Bucket(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	tagging, err := e.ProxyClient.GetBucketTagging(tstCtx, bucket)
 	r.NoError(err)
@@ -78,7 +77,7 @@ func TestApi_Tagging_Bucket(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	objTag, err := e.ProxyClient.GetObjectTagging(tstCtx, bucket, oldObjName, mclient.GetObjectTaggingOptions{})
 	r.NoError(err)
@@ -116,7 +115,7 @@ func TestApi_Tagging_Bucket(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	objTag, err = e.ProxyClient.GetObjectTagging(tstCtx, bucket, oldObjName, mclient.GetObjectTaggingOptions{})
 	r.NoError(err)
@@ -162,7 +161,7 @@ func TestApi_Tagging_Object(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	objName := "obj-old"
 	source := bytes.Repeat([]byte("6"), rand.Intn(1<<20)+32*1024)
@@ -184,7 +183,7 @@ func TestApi_Tagging_Object(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*3, time.Millisecond*100)
+	}, e.WaitShort, e.RetryShort)
 
 	bTags, err := tags.NewTags(map[string]string{"mytag1": "foo", "mytag2": "bar"}, false)
 	r.NoError(err)
@@ -209,7 +208,7 @@ func TestApi_Tagging_Object(t *testing.T) {
 			return false
 		}
 		return true
-	}, time.Second*60, time.Millisecond*100)
+	}, e.WaitLong, e.RetryLong)
 
 	//todo: remove tagging not works
 	//err = proxyClient.RemoveObjectTagging(tstCtx, bucket, objName, mclient.RemoveObjectTaggingOptions{})

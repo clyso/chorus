@@ -21,7 +21,6 @@ import (
 	"context"
 	"math/rand"
 	"testing"
-	"time"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/test/env"
@@ -31,9 +30,6 @@ import (
 )
 
 const (
-	ConsistencyWait    = 20 * time.Second
-	ConsistencyRetryIn = 500 * time.Millisecond
-
 	ConsistencyCheckStorage1 = "main"
 	ConsistencyCheckStorage2 = "f1"
 
@@ -119,7 +115,7 @@ func TestConsistency_2Storages_Success(t *testing.T) {
 			return false
 		}
 		return true
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 
 	r.True(getCheckResponse.Check.Consistent)
 
@@ -176,7 +172,7 @@ func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
 			return false
 		}
 		return true
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 
 	r.False(getCheckResponse.Check.Consistent)
 
@@ -238,7 +234,7 @@ func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
 			return false
 		}
 		return true
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 
 	r.False(getCheckResponse.Check.Consistent)
 
@@ -304,7 +300,7 @@ func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
 			return false
 		}
 		return true
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 
 	r.False(getCheckResponse.Check.Consistent)
 
@@ -371,7 +367,7 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 			return false
 		}
 		return true
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 
 	r.False(getCheckResponse.Check.Consistent)
 
@@ -433,7 +429,7 @@ func TestConsistency_2Storages_ListChecks(t *testing.T) {
 			return false
 		}
 		return true
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 
 	_, err = e.ApiClient.DeleteConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{
 		Locations: locations,
@@ -447,5 +443,5 @@ func TestConsistency_2Storages_ListChecks(t *testing.T) {
 		}
 		isEmpty := listResponse == nil || len(listResponse.Checks) == 0
 		return isEmpty
-	}, ConsistencyWait, ConsistencyRetryIn)
+	}, e.WaitLong, e.RetryLong)
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"testing"
-	"time"
 
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
@@ -17,8 +16,6 @@ import (
 func TestApi_Migrate_CustomBucket(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const waitInterval = 15 * time.Second
-	const retryInterval = 100 * time.Millisecond
 
 	bucketSrc := "src-cb-test"
 	bucketDst := "dst-cb-test"
@@ -96,7 +93,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 			return false
 		}
 		return reps.Replications[0].InitObjListed > 0
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	// add live event
 	obj5 := getTestObj("obj5", bucketSrc)
@@ -113,7 +110,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 			return false
 		}
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
 		Bucket:    bucketSrc,
@@ -190,7 +187,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 			return false
 		}
 		return rep.IsInitDone && rep.InitObjDone > 4
-	}, waitInterval, retryInterval)
+	}, e.WaitLong, e.RetryLong)
 
 	//check that all 3 buckets are the same
 	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
