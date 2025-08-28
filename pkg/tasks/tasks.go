@@ -53,6 +53,16 @@ const (
 
 	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
+
+	// swift tasks:
+	TypeAccountUpdate           = "account:update"
+	TypeContainerUpdate         = "container:update"
+	TypeObjUpdate               = "obj:update"
+	TypeObjMetaUpdate           = "obj:meta:update"
+	TypeObjDelete               = "obj:del"
+	TypeSwiftAccountMigration   = "migrate:swift:account"
+	TypeSwiftContainerMigration = "migrate:swift:container"
+	TypeSwiftObjectMigration    = "migrate:swift:obj"
 )
 
 type Queue string
@@ -104,38 +114,55 @@ func AllReplicationQueues(id entity.ReplicationStatusID) []string {
 }
 
 type SyncTask interface {
-	GetFrom() string
+	GetFromStorage() string
 	GetToStorage() string
-	GetToBucket() string
-	SetFrom(from string)
-	SetTo(storage string, bucket string)
+	GetToBucket() *string
+	SetFrom(storage, account string)
+	SetTo(storage, account string, bucket string)
 	InitDate()
 	GetDate() time.Time
+	GetFromAccount() string
+	GetToAccount() string
 }
 
 type Sync struct {
 	FromStorage string
+	FromAccount string
 	ToStorage   string
+	ToAccount   string
 	ToBucket    string
 	CreatedAt   time.Time
 }
 
-func (t *Sync) GetFrom() string {
+func (t *Sync) GetFromAccount() string {
+	return t.FromAccount
+}
+
+func (t *Sync) GetToAccount() string {
+	return t.ToAccount
+}
+
+func (t *Sync) GetFromStorage() string {
 	return t.FromStorage
 }
+
 func (t *Sync) GetToStorage() string {
 	return t.ToStorage
 }
 func (t *Sync) GetToBucket() string {
 	return t.ToBucket
 }
-func (t *Sync) SetFrom(from string) {
-	t.FromStorage = from
+
+func (t *Sync) SetFrom(storage, account string) {
+	t.FromStorage, t.FromAccount = storage, account
 }
-func (t *Sync) SetTo(storage string, bucket string) {
+
+func (t *Sync) SetTo(storage, account string, bucket string) {
 	t.ToStorage = storage
+	t.ToAccount = account
 	t.ToBucket = bucket
 }
+
 func (t *Sync) InitDate() {
 	t.CreatedAt = time.Now().UTC()
 }
@@ -263,6 +290,85 @@ type SwitchWithDowntimePayload struct {
 	CreatedAt   time.Time
 }
 
+type AccountUpdatePayload struct {
+	Sync
+	// Date of the server response. Not Account modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Account Updates
+	Date string
+}
+
+type ContainerUpdatePayload struct {
+	Sync
+	Bucket string
+	// Date of the server response. Not Container modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Container Updates
+	Date string
+}
+
+type ObjectMetaUpdatePayload struct {
+	Sync
+	Bucket string
+	Object string
+	// Date of the server response. Not Object modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object Meta Updates
+	Date string
+}
+
+type ObjectUpdatePayload struct {
+	Sync
+	Bucket       string
+	Object       string
+	VersionID    string
+	Etag         string
+	LastModified string
+}
+
+type ObjectDeletePayload struct {
+	Sync
+	Bucket    string
+	Object    string
+	VersionID string
+	// Date of the server response. Not Object deletion date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object delete
+	Date            string
+	DeleteMultipart bool
+}
+
+type SwiftAccountMigrationPayload struct {
+	FromStorage string
+	ToStorage   string
+	FromAccount string
+	ToAccount   string
+}
+
+type SwiftContainerMigrationPayload struct {
+	FromStorage  string
+	FromAccount  string
+	FromContaier string
+	ToStorage    string
+	ToAccount    string
+	ToContaier   string
+}
+
+type SwiftObjectMigrationPayload struct {
+	FromStorage  string
+	FromAccount  string
+	FromContaier string
+	ToStorage    string
+	ToAccount    string
+	ToContaier   string
+
+	ObjName         string
+	ObjVersion      string
+	ObjEtag         string
+	ObjSize         int64
+	ObjLastModified string
+}
+
 type ReplicationTask interface {
 	BucketCreatePayload |
 		BucketDeletePayload |
@@ -320,6 +426,41 @@ func NewReplicationTask[T ReplicationTask](ctx context.Context, replicationID en
 		queue := replicationQueueName(QueueEventsPrefix, replicationID)
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjectSyncACL
+	case AccountUpdatePayload:
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
+		taskType = TypeAccountUpdate
+	case ContainerUpdatePayload:
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
+		taskType = TypeContainerUpdate
+	case ObjectUpdatePayload:
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
+		taskType = TypeObjUpdate
+	case ObjectMetaUpdatePayload:
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
+		taskType = TypeObjMetaUpdate
+	case ObjectDeletePayload:
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
+		taskType = TypeObjDelete
+	case SwiftAccountMigrationPayload:
+		id := fmt.Sprintf("mgr:swift:a:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount)
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+		taskType = TypeSwiftAccountMigration
+	case SwiftContainerMigrationPayload:
+		id := fmt.Sprintf("mgr:swift:c:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier)
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+		taskType = TypeSwiftContainerMigration
+	case SwiftObjectMigrationPayload:
+		id := fmt.Sprintf("mgr:swift:o:%s:%s:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier, p.ObjName, p.ObjVersion)
+		queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+		taskType = TypeSwiftObjectMigration
 	case MigrateBucketListObjectsPayload:
 		id := fmt.Sprintf("mgr:lo:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
 		if p.Prefix != "" {
