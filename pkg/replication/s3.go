@@ -38,30 +38,30 @@ type Service interface {
 }
 
 func New(taskClient *asynq.Client, versionSvc meta.VersionService, policySvc policy.Service) Service {
-	return &svc{
+	return &s3SVC{
 		taskClient: taskClient,
 		versionSvc: versionSvc,
 		policySvc:  policySvc,
 	}
 }
 
-type svc struct {
+type s3SVC struct {
 	taskClient *asynq.Client
 	versionSvc meta.VersionService
 	policySvc  policy.Service
 }
 
-func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
+func (s *s3SVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 	if task == nil {
 		zerolog.Ctx(ctx).Info().Msg("replication task is nil")
 		return nil
 	}
 	zerolog.Ctx(ctx).Debug().Msg("creating replication task")
 	task.InitDate()
-	if task.GetFrom() == "" {
+	if task.GetFromStorage() == "" {
 		storage := xctx.GetStorage(ctx)
 		zerolog.Ctx(ctx).Warn().Msgf("replication task from storage not set, using storage from context: %s", storage)
-		task.SetFrom(storage)
+		task.SetFrom(storage, "")
 	}
 
 	// 1. find repl rule(-s)
