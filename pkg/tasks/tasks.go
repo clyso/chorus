@@ -44,6 +44,16 @@ const (
 
 	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
+
+	// swift tasks:
+	TypeAccountUpdate           = "account:update"
+	TypeContainerUpdate         = "container:update"
+	TypeObjUpdate               = "obj:update"
+	TypeObjMetaUpdate           = "obj:meta:update"
+	TypeObjDelete               = "obj:del"
+	TypeSwiftAccountMigration   = "migrate:swift:account"
+	TypeSwiftContainerMigration = "migrate:swift:container"
+	TypeSwiftObjectMigration    = "migrate:swift:obj"
 )
 
 type TaskPayload interface {
@@ -197,4 +207,91 @@ type ConsistencyCheckReadinessPayload struct {
 
 type ConsistencyCheckDeletePayload struct {
 	ID string
+}
+
+type SwitchWithDowntimePayload struct {
+	FromStorage string
+	ToStorage   string
+	User        string
+	Bucket      string
+	CreatedAt   time.Time
+}
+
+type AccountUpdatePayload struct {
+	Sync
+	// Date of the server response. Not Account modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Account Updates
+	Date string
+}
+
+type ContainerUpdatePayload struct {
+	Sync
+	Bucket string
+	// Date of the server response. Not Container modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Container Updates
+	Date string
+}
+
+type ObjectMetaUpdatePayload struct {
+	Sync
+	Bucket string
+	Object string
+	// Date of the server response. Not Object modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object Meta Updates
+	Date string
+}
+
+type ObjectUpdatePayload struct {
+	Sync
+	Bucket       string
+	Object       string
+	VersionID    string
+	Etag         string
+	LastModified string
+}
+
+type ObjectDeletePayload struct {
+	Sync
+	Bucket    string
+	Object    string
+	VersionID string
+	// Date of the server response. Not Object deletion date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object delete
+	Date            string
+	DeleteMultipart bool
+}
+
+type SwiftAccountMigrationPayload struct {
+	FromStorage string
+	ToStorage   string
+	FromAccount string
+	ToAccount   string
+}
+
+type SwiftContainerMigrationPayload struct {
+	FromStorage  string
+	FromAccount  string
+	FromContaier string
+	ToStorage    string
+	ToAccount    string
+	ToContaier   string
+}
+
+type SwiftObjectMigrationPayload struct {
+	FromStorage  string
+	FromAccount  string
+	FromContaier string
+	ToStorage    string
+	ToAccount    string
+	ToContaier   string
+
+	ObjName         string
+	ObjVersion      string
+	ObjEtag         string
+	ObjSize         int64
+	ObjLastModified string
 }

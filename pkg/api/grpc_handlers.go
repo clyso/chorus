@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
+	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -41,6 +43,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
@@ -78,6 +81,8 @@ type handlers struct {
 	storages                *s3.StorageConfig
 	s3clients               s3client.Service
 	queueSvc                tasks.QueueService
+	swiftClients            swift.Client
+	taskClient              *asynq.Client
 	rclone                  rclone.Service
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
@@ -390,6 +395,53 @@ func (h *handlers) ListBucketsForReplication(ctx context.Context, req *pb.ListBu
 		}
 	}
 	return res, nil
+}
+
+func (h *handlers) AddSwiftAccountReplication(ctx context.Context, req *pb.SwiftAccountReplicationRequest) (*emptypb.Empty, error) {
+	// validate request:
+	if _, ok := h.storages.Storages[req.FromStorage]; !ok {
+		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.FromStorage)
+	}
+	if _, ok := h.storages.Storages[req.ToStorage]; !ok {
+		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ToStorage)
+	}
+	fromClient, err := h.swiftClients.For(ctx, req.FromStorage, req.Account)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift client for storage %s and account %s: %w", req.FromStorage, req.Account, err)
+	}
+	err = accounts.Get(ctx, fromClient, accounts.GetOpts{}).Err
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift account %s on storage %s: %w", req.Account, req.FromStorage, err)
+	}
+	toClient, err := h.swiftClients.For(ctx, req.ToStorage, req.Account)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift client for storage %s and account %s: %w", req.ToStorage, req.Account, err)
+	}
+	err = accounts.Get(ctx, toClient, accounts.GetOpts{}).Err
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift account %s on storage %s: %w", req.Account, req.ToStorage, err)
+	}
+
+	// create account replication policy:
+	err = h.policySvc.AddUserReplicationPolicy(ctx, req.Account, req.FromStorage, req.ToStorage, tasks.PriorityDefault1)
+	if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
+		return nil, fmt.Errorf("unable to add swift account replication policy: %w", err)
+	}
+	// create task for replication:
+	task, err := tasks.NewTask(ctx, tasks.SwiftAccountMigrationPayload{
+		FromStorage: req.FromStorage,
+		ToStorage:   req.ToStorage,
+		FromAccount: req.Account,
+		ToAccount:   req.Account,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create swift account replication task: %w", err)
+	}
+	_, err = h.taskClient.EnqueueContext(ctx, task)
+	if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		return nil, fmt.Errorf("unable to enqueue swift account replication task: %w", err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationRequest) (*emptypb.Empty, error) {

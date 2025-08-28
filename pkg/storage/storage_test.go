@@ -246,3 +246,71 @@ func Test_StoreUploadID(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 }
+
+func Test_svc_LastListedContainer(t *testing.T) {
+	r := require.New(t)
+	red := miniredis.RunT(t)
+
+	c := redis.NewClient(&redis.Options{
+		Addr: red.Addr(),
+	})
+	storage := New(c)
+	ctx := context.Background()
+
+	task := tasks.SwiftAccountMigrationPayload{
+		FromStorage: "a",
+		ToStorage:   "b",
+		FromAccount: "c",
+		ToAccount:   "d",
+	}
+
+	res, err := storage.GetLastListedContainer(ctx, task)
+	r.NoError(err, "no error if no container is set")
+	r.Empty(res, "no container set, should return empty string")
+
+	err = storage.SetLastListedContainer(ctx, task, "container1")
+	r.NoError(err, "no error if container is set")
+
+	res, err = storage.GetLastListedContainer(ctx, task)
+	r.NoError(err, "no error if container is retrieved")
+	r.Equal("container1", res, "should return the set container")
+
+	other := []tasks.SwiftAccountMigrationPayload{
+		{
+			FromStorage: "aa",
+			ToStorage:   "b",
+			FromAccount: "c",
+			ToAccount:   "d",
+		},
+		{
+			FromStorage: "a",
+			ToStorage:   "bb",
+			FromAccount: "c",
+			ToAccount:   "d",
+		},
+		{
+			FromStorage: "a",
+			ToStorage:   "b",
+			FromAccount: "cc",
+			ToAccount:   "d",
+		},
+		{
+			FromStorage: "a",
+			ToStorage:   "b",
+			FromAccount: "c",
+			ToAccount:   "dd",
+		},
+	}
+	for _, o := range other {
+		res, err = storage.GetLastListedContainer(ctx, o)
+		r.NoError(err, "no error if other container is retrieved %+v", o)
+		r.Empty(res, "should return empty string for other tasks %+v", o)
+	}
+
+	err = storage.DelLastListedContainer(ctx, task)
+	r.NoError(err, "no error if container is deleted")
+
+	res, err = storage.GetLastListedContainer(ctx, task)
+	r.NoError(err, "no error if container is retrieved after deletion")
+	r.Empty(res, "should return empty string after deletion")
+}

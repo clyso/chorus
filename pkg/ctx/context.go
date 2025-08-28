@@ -23,9 +23,11 @@ import (
 
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 )
 
 type methodKey struct{}
+type storTypeKey struct{}
 type objectKey struct{}
 type bucketKey struct{}
 type storageKey struct{}
@@ -35,6 +37,7 @@ type userKey struct{}
 type routingPolicyKey struct{}
 type replicationsKey struct{}
 type inProgressZeroDowntimeKey struct{}
+type accKey struct{}
 
 type Flow string
 
@@ -50,6 +53,24 @@ func SetMethod(ctx context.Context, in s3.Method) context.Context {
 
 func GetMethod(ctx context.Context) s3.Method {
 	res, _ := ctx.Value(methodKey{}).(s3.Method)
+	return res
+}
+
+func SetSwiftMethod(ctx context.Context, in swift.Method) context.Context {
+	return context.WithValue(ctx, methodKey{}, in)
+}
+
+func GetSwiftMethod(ctx context.Context) swift.Method {
+	res, _ := ctx.Value(methodKey{}).(swift.Method)
+	return res
+}
+
+func SetStorType(ctx context.Context, in s3.StorageType) context.Context {
+	return context.WithValue(ctx, storTypeKey{}, in)
+}
+
+func GetStorType(ctx context.Context) s3.StorageType {
+	res, _ := ctx.Value(storTypeKey{}).(s3.StorageType)
 	return res
 }
 
@@ -179,4 +200,21 @@ func SetInProgressZeroDowntime(ctx context.Context, r entity.ReplicationSwitchIn
 		panic("cannot set empty in progress zero downtime switch info to ctx")
 	}
 	return context.WithValue(ctx, inProgressZeroDowntimeKey{}, &r)
+}
+
+func GetAccount(ctx context.Context) string {
+	k, _ := ctx.Value(accKey{}).(string)
+	return k
+}
+
+func SetAccount(ctx context.Context, acc string) context.Context {
+	if acc == "" {
+		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty account to ctx")
+		return ctx
+	}
+	if prev := GetAccount(ctx); prev != "" {
+		zerolog.Ctx(ctx).Warn().Msgf("cannot set account %s, ctx already contains account %s", acc, prev)
+		return ctx
+	}
+	return context.WithValue(ctx, accKey{}, acc)
 }
