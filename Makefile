@@ -2,6 +2,9 @@ GIT_COMMIT=$(shell git log -1 --format=%H)
 GIT_TAG=$(shell git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 BUILD_DATE=$(shell date -Is -u)
 
+TEST_WAIT_SHORT=5s
+TEST_WAIT_LONG=20s
+
 .PHONY: all
 all: agent chorus proxy worker chorctl bench
 
@@ -86,11 +89,7 @@ bench: bench-bin
 
 .PHONY: test
 test: pretty
-	go test ./...
-
-.PHONY: test-ci
-test-ci: pretty
-	TEST_WAIT_SHORT=20s TEST_WAIT_LONG=80s go test ./... -p 1
+	TEST_WAIT_SHORT=$(TEST_WAIT_SHORT) TEST_WAIT_LONG=$(TEST_WAIT_LONG) go test ./...
 
 .PHONY: proto-gen
 proto-gen:

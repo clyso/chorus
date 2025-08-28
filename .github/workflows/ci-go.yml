@@ -21,7 +21,7 @@ jobs:
         with:
           go-version: "1.24"
       - name: make test
-        run: make test-ci
+        run: make test TEST_WAIT_SHORT=20s TEST_WAIT_LONG=80s
       - name: Run Proto Generation
         run: make proto-gen
       - name: Check for Uncommitted Changes
