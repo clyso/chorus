@@ -427,31 +427,39 @@ func NewReplicationTask[T ReplicationTask](ctx context.Context, replicationID en
 		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjectSyncACL
 	case AccountUpdatePayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeAccountUpdate
 	case ContainerUpdatePayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeContainerUpdate
 	case ObjectUpdatePayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjUpdate
 	case ObjectMetaUpdatePayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjMetaUpdate
 	case ObjectDeletePayload:
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.EventQueue())}
+		queue := replicationQueueName(QueueEventsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue)}
 		taskType = TypeObjDelete
 	case SwiftAccountMigrationPayload:
 		id := fmt.Sprintf("mgr:swift:a:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeSwiftAccountMigration
 	case SwiftContainerMigrationPayload:
 		id := fmt.Sprintf("mgr:swift:c:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeSwiftContainerMigration
 	case SwiftObjectMigrationPayload:
 		id := fmt.Sprintf("mgr:swift:o:%s:%s:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier, p.ObjName, p.ObjVersion)
-		optionList = []asynq.Option{asynq.Queue(taskOpts.priority.MigrationQueue()), asynq.TaskID(id)}
+		queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
+		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
 		taskType = TypeSwiftObjectMigration
 	case MigrateBucketListObjectsPayload:
 		id := fmt.Sprintf("mgr:lo:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)

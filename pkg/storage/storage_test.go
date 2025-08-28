@@ -257,11 +257,7 @@ func Test_svc_StoreUploadID(t *testing.T) {
 
 func Test_svc_LastListedContainer(t *testing.T) {
 	r := require.New(t)
-	red := miniredis.RunT(t)
-
-	c := redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	})
+	c := testutil.SetupRedis(t)
 	storage := New(c)
 	ctx := context.Background()
 
