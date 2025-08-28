@@ -295,3 +295,39 @@ type SwiftObjectMigrationPayload struct {
 	ObjSize         int64
 	ObjLastModified string
 }
+
+// case AccountUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeAccountUpdate
+// case ContainerUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeContainerUpdate
+// case ObjectUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeObjUpdate
+// case ObjectMetaUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeObjMetaUpdate
+// case ObjectDeletePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeObjDelete
+// case SwiftAccountMigrationPayload:
+// 	id := fmt.Sprintf("mgr:swift:a:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount)
+// 	queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+// 	taskType = TypeSwiftAccountMigration
+// case SwiftContainerMigrationPayload:
+// 	id := fmt.Sprintf("mgr:swift:c:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier)
+// 	queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+// 	taskType = TypeSwiftContainerMigration
+// case SwiftObjectMigrationPayload:
+// 	id := fmt.Sprintf("mgr:swift:o:%s:%s:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier, p.ObjName, p.ObjVersion)
+// 	queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+// 	taskType = TypeSwiftObjectMigration
