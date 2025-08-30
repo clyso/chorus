@@ -44,7 +44,6 @@ func init() {
 	workerConf.Worker.PauseRetryInterval = time.Millisecond * 500
 	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
 	workerConf.Storage.CreateRouting = true
-	workerConf.Storage.CreateReplication = false
 
 	proxyConf, err = proxy.GetConfig()
 	if err != nil {
@@ -54,7 +53,6 @@ func init() {
 	proxyConf.Features.Tagging = false
 	proxyConf.Log.Level = "warn"
 	proxyConf.Storage.CreateRouting = true
-	proxyConf.Storage.CreateReplication = false
 }
 
 const (

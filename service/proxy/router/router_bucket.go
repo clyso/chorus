@@ -18,27 +18,20 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tasks.BucketCreatePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
-	if err != nil {
-		return
-	}
+	bucket := xctx.GetBucket(ctx)
+	storage = xctx.GetRoutingPolicy(ctx)
 
 	client, err := r.clients.GetByName(ctx, storage)
 	if err != nil {
@@ -57,22 +50,18 @@ func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tas
 	}
 
 	// create task:
-	task = &tasks.BucketCreatePayload{Bucket: bucket, Location: reqBody.Location, Sync: tasks.Sync{FromStorage: storage, ToBucket: bucket}}
+	task = &tasks.BucketCreatePayload{
+		Bucket:   bucket,
+		Location: reqBody.Location,
+	}
 
 	return
 }
 
 func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tasks.BucketDeletePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	bucketRoutingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, bucketRoutingPolicyID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
-		}
-		return nil, nil, "", false, err
-	}
+	bucket := xctx.GetBucket(ctx)
+	storage = xctx.GetRoutingPolicy(ctx)
 
 	client, err := r.clients.GetByName(ctx, storage)
 	if err != nil {
@@ -91,16 +80,8 @@ func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tas
 
 func (r *router) listBuckets(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	user := xctx.GetUser(ctx)
 
-	storage, err = r.policySvc.GetUserRoutingPolicy(ctx, user)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			// todo: call all storages and merge buckets????
-			return nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
-		}
-		return nil, "", false, err
-	}
+	storage = xctx.GetRoutingPolicy(ctx)
 	client, err := r.clients.GetByName(ctx, storage)
 	if err != nil {
 		return nil, "", false, err

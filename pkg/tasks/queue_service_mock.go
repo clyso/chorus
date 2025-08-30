@@ -29,6 +29,10 @@ type QueueServiceMock struct {
 	Paused map[string]bool
 }
 
+func (q *QueueServiceMock) EnqueueTask(ctx context.Context, task any) error {
+	return nil
+}
+
 // InitReplicationInProgress test helper to initialize queues for replication in progress
 func (q *QueueServiceMock) InitReplicationInProgress(id entity.ReplicationStatusID) {
 	queues := InitMigrationQueues(id)

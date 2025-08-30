@@ -84,13 +84,13 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	defer taskClient.Close()
 	inspector := asynq.NewInspector(queueRedis)
 	defer inspector.Close()
-	queueSvc := tasks.NewQueueService(inspector)
+	queueSvc := tasks.NewQueueService(taskClient, inspector)
 	policySvc := policy.NewService(confRedis, queueSvc)
 
-	replSvc := replication.New(taskClient, verSvc, policySvc)
+	replSvc := replication.New(queueSvc, verSvc)
 
 	notificationHandler := notifications.NewHandler(conf.FromStorage, replSvc)
-	httpHandler := trace.HttpMiddleware(tp, HTTPHandler(notificationHandler))
+	httpHandler := trace.HttpMiddleware(tp, HTTPHandler(policySvc, notificationHandler))
 	if conf.Metrics.Enabled {
 		httpHandler = metrics.AgentMiddleware(httpHandler)
 	}

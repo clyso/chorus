@@ -17,8 +17,6 @@
 package router
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
 
 	mclient "github.com/minio/minio-go/v7"
@@ -26,22 +24,15 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
-func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
+func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
-	routingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, routingPolicyID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
-		}
-		return nil, nil, "", false, err
-	}
+	bucket, object := xctx.GetBucket(ctx), xctx.GetObject(ctx)
+
+	storage = xctx.GetRoutingPolicy(ctx)
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
@@ -67,36 +58,27 @@ func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []t
 
 	taskList = append(taskList, &tasks.ObjectSyncPayload{
 		Object:  obj,
-		Sync:    tasks.Sync{FromStorage: storage},
 		ObjSize: objSize,
 	})
 	if hasACLChanged(req) {
 		taskList = append(taskList, &tasks.ObjSyncACLPayload{
 			Object: obj,
-			Sync:   tasks.Sync{FromStorage: storage},
 		})
 	}
 	if hasTagsChanged(req) {
 		taskList = append(taskList, &tasks.ObjSyncTagsPayload{
 			Object: obj,
-			Sync:   tasks.Sync{FromStorage: storage},
 		})
 	}
 
 	return
 }
 
-func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
+func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	routingPolicyID := entity.NewBucketRoutingPolicyID(user, bucket)
-	storage, err = r.policySvc.GetRoutingPolicy(ctx, routingPolicyID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			return nil, nil, "", false, fmt.Errorf("%w: routing policy not configured: %w", dom.ErrPolicy, err)
-		}
-		return nil, nil, "", false, err
-	}
+	bucket := xctx.GetBucket(ctx)
+
+	storage = xctx.GetRoutingPolicy(ctx)
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
@@ -135,17 +117,15 @@ func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList
 			}
 			taskList = append(taskList, &tasks.ObjectSyncPayload{
 				Object:  object.toDom(bucket),
-				Sync:    tasks.Sync{FromStorage: storage},
 				Deleted: true,
 			})
 		}
 	} else {
 		// normal mode: use deleted obj list from response
-		taskList = make([]tasks.SyncTask, len(respBody.Deleted))
+		taskList = make([]tasks.ReplicationTask, len(respBody.Deleted))
 		for i, object := range respBody.Deleted {
 			taskList[i] = &tasks.ObjectSyncPayload{
 				Object:  object.toDom(bucket),
-				Sync:    tasks.Sync{FromStorage: storage},
 				Deleted: true,
 			}
 		}

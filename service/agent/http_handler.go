@@ -18,6 +18,7 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -26,11 +27,15 @@ import (
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/notifications"
+	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/util"
 )
 
-func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
+func HTTPHandler(policySvc policy.Service, handler *notifications.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		bytes, err := io.ReadAll(req.Body)
@@ -52,9 +57,30 @@ func HTTPHandler(handler *notifications.Handler) http.HandlerFunc {
 				zerolog.Ctx(ctx).Err(err).Msg("skip notification with invalid id")
 				continue
 			}
+			bucket := record.S3.Bucket.Name
+			object := record.S3.Object.Key
 			reqCtx := xctx.SetUser(ctx, user)
-			reqCtx = xctx.SetBucket(reqCtx, record.S3.Bucket.Name)
-			reqCtx = xctx.SetObject(reqCtx, record.S3.Object.Key)
+			reqCtx = xctx.SetBucket(reqCtx, bucket)
+			reqCtx = xctx.SetObject(reqCtx, object)
+
+			replicationPolicies, err := policySvc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(user, bucket))
+			if err != nil && !errors.Is(err, dom.ErrNotFound) {
+				util.WriteError(ctx, w, err)
+				return
+			}
+			var replications []entity.ReplicationStatusID
+			for _, replTo := range replicationPolicies.Destinations {
+				replications = append(replications, entity.ReplicationStatusID{
+					User:        user,
+					FromStorage: replicationPolicies.FromStorage,
+					FromBucket:  bucket,
+					ToStorage:   replTo.Storage,
+					ToBucket:    replTo.Bucket,
+				})
+			}
+			if len(replications) != 0 {
+				ctx = xctx.SetReplications(ctx, replications)
+			}
 			methodArr := strings.Split(record.EventName, ":")
 			switch methodArr[len(methodArr)-1] {
 			case "Put", "Post":

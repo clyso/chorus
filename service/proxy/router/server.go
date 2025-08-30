@@ -56,7 +56,7 @@ func Serve(router Router, replSvc replication.Service) *http.ServeMux {
 			replCtx, cancel := log.StartNew(ctx)
 			defer cancel()
 			for _, task := range taskList {
-				replErr := replSvc.Replicate(replCtx, task)
+				replErr := replSvc.Replicate(replCtx, storage, task)
 				if replErr != nil {
 					logger.Err(replErr).Msg("unable to handle replication")
 				}

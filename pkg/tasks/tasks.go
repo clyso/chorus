@@ -17,15 +17,8 @@
 package tasks
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/buger/jsonparser"
-	"github.com/hibiken/asynq"
-
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 )
@@ -55,122 +48,104 @@ const (
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 )
 
-type Queue string
-
-const (
-	QueueAPI                      Queue = "api"
-	QueueMigrateListObjectsPrefix Queue = "migr_list_obj"
-	QueueConsistencyCheck         Queue = "consistency_check"
-	QueueMigrateCopyObjectPrefix  Queue = "migr_copy_obj"
-	QueueEventsPrefix             Queue = "event"
-)
-
-// Priority defines the priority of the queues from highest to lowest.
-var Priority = map[string]int{
-	string(QueueAPI): 200, // highest priority
-	string(QueueMigrateListObjectsPrefix) + ":*": 100,
-	string(QueueConsistencyCheck):                50,
-	string(QueueMigrateCopyObjectPrefix) + ":*":  10,
-	string(QueueEventsPrefix) + ":*":             5, // lowest priority
-	"*":                                          1, // fallback for legacy queues
+type TaskPayload interface {
+	BucketCreatePayload |
+		BucketDeletePayload |
+		BucketSyncTagsPayload |
+		BucketSyncACLPayload |
+		ObjectSyncPayload |
+		ObjSyncTagsPayload |
+		ObjSyncACLPayload |
+		MigrateBucketListObjectsPayload |
+		MigrateObjCopyPayload |
+		ListObjectVersionsPayload |
+		MigrateVersionedObjectPayload |
+		ZeroDowntimeReplicationSwitchPayload |
+		SwitchWithDowntimePayload |
+		ConsistencyCheckPayload |
+		ConsistencyCheckListPayload |
+		ConsistencyCheckReadinessPayload |
+		ConsistencyCheckDeletePayload
 }
 
-func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) string {
-	switch queuePrefix {
-	case QueueMigrateCopyObjectPrefix,
-		QueueMigrateListObjectsPrefix,
-		QueueEventsPrefix:
-		return fmt.Sprintf("%s:%s:%s:%s:%s", queuePrefix, id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket)
-	default:
-		panic(fmt.Sprintf("%s is not a replication queue prefix", queuePrefix))
+type ReplicationTask interface {
+	SetReplicationID(id entity.ReplicationStatusID)
+	GetReplicationID() entity.ReplicationStatusID
+	EvaluateToBucket(bucket string) string
+	validate() error
+}
+
+type ReplicationID struct {
+	entity.ReplicationStatusID
+}
+
+var _ ReplicationTask = (*ReplicationID)(nil)
+
+func (t *ReplicationID) GetReplicationID() entity.ReplicationStatusID {
+	return t.ReplicationStatusID
+}
+
+func (t *ReplicationID) SetReplicationID(id entity.ReplicationStatusID) {
+	t.ReplicationStatusID = id
+}
+
+func (t *ReplicationID) validate() error {
+	if t.FromStorage == "" {
+		return fmt.Errorf("%w: invalid task replication id %+v: FromStorage required", dom.ErrInvalidArg, t.ReplicationStatusID)
 	}
-}
-
-func InitMigrationQueues(id entity.ReplicationStatusID) []string {
-	return []string{
-		replicationQueueName(QueueMigrateListObjectsPrefix, id),
-		replicationQueueName(QueueMigrateCopyObjectPrefix, id),
+	if t.ToStorage == "" {
+		return fmt.Errorf("%w: invalid task replication id %+v: ToStorage required", dom.ErrInvalidArg, t.ReplicationStatusID)
 	}
-}
-
-func EventMigrationQueues(id entity.ReplicationStatusID) []string {
-	return []string{
-		replicationQueueName(QueueEventsPrefix, id),
+	// FromBucket and ToBucket should be either both set or both empty
+	if (t.FromBucket == "") != (t.ToBucket == "") {
+		return fmt.Errorf("%w: invalid task replication id %+v: FromBucket and ToBucket should be either both set or both empty", dom.ErrInvalidArg, t.ReplicationStatusID)
 	}
+	return nil
 }
 
-func AllReplicationQueues(id entity.ReplicationStatusID) []string {
-	return append(InitMigrationQueues(id), EventMigrationQueues(id)...)
-}
-
-type SyncTask interface {
-	GetFrom() string
-	GetToStorage() string
-	GetToBucket() string
-	SetFrom(from string)
-	SetTo(storage string, bucket string)
-	InitDate()
-	GetDate() time.Time
-}
-
-type Sync struct {
-	FromStorage string
-	ToStorage   string
-	ToBucket    string
-	CreatedAt   time.Time
-}
-
-func (t *Sync) GetFrom() string {
-	return t.FromStorage
-}
-func (t *Sync) GetToStorage() string {
-	return t.ToStorage
-}
-func (t *Sync) GetToBucket() string {
+func (t *ReplicationID) EvaluateToBucket(taskBucket string) string {
+	if t.FromBucket == "" {
+		// user replication policy
+		// keep bucket name the same
+		return taskBucket
+	}
+	if t.FromBucket != taskBucket {
+		// should not happen
+		panic(fmt.Sprintf("replication task bucket name is different from source bucket name: expected %s, got %s", t.FromBucket, taskBucket))
+	}
+	if t.ToBucket == "" {
+		// should never happen. If FromBucket is set, ToBucket must be set too.
+		return taskBucket
+	}
 	return t.ToBucket
-}
-func (t *Sync) SetFrom(from string) {
-	t.FromStorage = from
-}
-func (t *Sync) SetTo(storage string, bucket string) {
-	t.ToStorage = storage
-	t.ToBucket = bucket
-}
-func (t *Sync) InitDate() {
-	t.CreatedAt = time.Now().UTC()
-}
-func (t *Sync) GetDate() time.Time {
-	return t.CreatedAt
 }
 
 type ZeroDowntimeReplicationSwitchPayload struct {
-	Sync
-	Bucket string
-	User   string
+	ReplicationID
 }
 
 type BucketSyncTagsPayload struct {
 	Bucket string
-	Sync
+	ReplicationID
 }
 
 type ObjSyncTagsPayload struct {
 	Object dom.Object
-	Sync
+	ReplicationID
 }
 
 type BucketSyncACLPayload struct {
 	Bucket string
-	Sync
+	ReplicationID
 }
 
 type ObjSyncACLPayload struct {
 	Object dom.Object
-	Sync
+	ReplicationID
 }
 
 type BucketCreatePayload struct {
-	Sync
+	ReplicationID
 	Bucket   string
 	Location string
 	//Storage  string
@@ -178,7 +153,7 @@ type BucketCreatePayload struct {
 
 type ObjectSyncPayload struct {
 	Object dom.Object
-	Sync
+	ReplicationID
 
 	//FromVersion int64
 	ObjSize int64
@@ -186,7 +161,7 @@ type ObjectSyncPayload struct {
 }
 
 type BucketDeletePayload struct {
-	Sync
+	ReplicationID
 	Bucket string
 	//Storage string
 }
@@ -197,26 +172,26 @@ type ObjInfo struct {
 }
 
 type ListObjectVersionsPayload struct {
-	Sync
+	ReplicationID
 	Bucket string
 	Prefix string
 }
 
 type MigrateVersionedObjectPayload struct {
-	Sync
+	ReplicationID
 	Bucket string
 	Prefix string
 }
 
 type MigrateBucketListObjectsPayload struct {
-	Sync
+	ReplicationID
 	Bucket    string
 	Prefix    string
 	Versioned bool
 }
 
 type MigrateObjCopyPayload struct {
-	Sync
+	ReplicationID
 	Bucket string
 	Obj    ObjPayload
 }
@@ -256,151 +231,5 @@ type ConsistencyCheckDeletePayload struct {
 }
 
 type SwitchWithDowntimePayload struct {
-	FromStorage string
-	ToStorage   string
-	User        string
-	Bucket      string
-	CreatedAt   time.Time
-}
-
-type ReplicationTask interface {
-	BucketCreatePayload |
-		BucketDeletePayload |
-		BucketSyncTagsPayload |
-		BucketSyncACLPayload |
-		ObjectSyncPayload |
-		ObjSyncTagsPayload |
-		ObjSyncACLPayload |
-		MigrateBucketListObjectsPayload |
-		MigrateObjCopyPayload |
-		ListObjectVersionsPayload |
-		MigrateVersionedObjectPayload
-}
-
-func NewReplicationTask[T ReplicationTask](ctx context.Context, replicationID entity.ReplicationStatusID, payload T) (*asynq.Task, error) {
-	bytes, err := json.Marshal(&payload)
-	if err != nil {
-		return nil, err
-	}
-	if xctx.GetUser(ctx) != "" {
-		bytes, err = jsonparser.Set(bytes, []byte(`"`+xctx.GetUser(ctx)+`"`), "User")
-		if err != nil {
-			return nil, fmt.Errorf("%w: unable to add User to payload", err)
-		}
-	}
-	taskType := ""
-	var optionList []asynq.Option
-	switch p := any(payload).(type) {
-	case BucketCreatePayload:
-		id := fmt.Sprintf("cb:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
-		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
-		taskType = TypeBucketCreate
-	case BucketDeletePayload:
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue)}
-		taskType = TypeBucketDelete
-	case ObjectSyncPayload:
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue)}
-		taskType = TypeObjectSync
-	case BucketSyncTagsPayload:
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue)}
-		taskType = TypeBucketSyncTags
-	case BucketSyncACLPayload:
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue)}
-		taskType = TypeBucketSyncACL
-	case ObjSyncTagsPayload:
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue)}
-		taskType = TypeObjectSyncTags
-	case ObjSyncACLPayload:
-		queue := replicationQueueName(QueueEventsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue)}
-		taskType = TypeObjectSyncACL
-	case MigrateBucketListObjectsPayload:
-		id := fmt.Sprintf("mgr:lo:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
-		if p.Prefix != "" {
-			id += ":" + p.Prefix
-		}
-		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
-		taskType = TypeMigrateBucketListObjects
-	case MigrateObjCopyPayload:
-		id := fmt.Sprintf("mgr:co:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket, p.Obj.Name)
-		if p.Obj.VersionID != "" {
-			id += ":" + p.Obj.VersionID
-		}
-		queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
-		taskType = TypeMigrateObjCopy
-	case MigrateVersionedObjectPayload:
-		id := fmt.Sprintf("mgr:cov:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
-		queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
-		taskType = TypeMigrateVersionedObject
-	case ListObjectVersionsPayload:
-		id := fmt.Sprintf("mgr:lov:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
-		queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
-		optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
-		taskType = TypeMigrateObjectListVersions
-	default:
-		return nil, fmt.Errorf("%w: unknown task type %T", dom.ErrInvalidArg, p)
-	}
-
-	return asynq.NewTask(taskType, bytes, optionList...), nil
-}
-
-type ApiTask interface {
-	ZeroDowntimeReplicationSwitchPayload |
-		SwitchWithDowntimePayload |
-		ConsistencyCheckPayload |
-		ConsistencyCheckListPayload |
-		ConsistencyCheckReadinessPayload |
-		ConsistencyCheckDeletePayload
-}
-
-func NewTask[T ApiTask](ctx context.Context, payload T) (*asynq.Task, error) {
-	bytes, err := json.Marshal(&payload)
-	if err != nil {
-		return nil, err
-	}
-	if xctx.GetUser(ctx) != "" {
-		bytes, err = jsonparser.Set(bytes, []byte(`"`+xctx.GetUser(ctx)+`"`), "User")
-		if err != nil {
-			return nil, fmt.Errorf("%w: unable to add User to payload", err)
-		}
-	}
-	taskType := ""
-	var optionList []asynq.Option
-	switch p := any(payload).(type) {
-	case ZeroDowntimeReplicationSwitchPayload:
-		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(fmt.Sprintf("api:zdrs:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket))}
-		taskType = TypeApiZeroDowntimeSwitch
-	case SwitchWithDowntimePayload:
-		id := fmt.Sprintf("api:sd:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.User, p.Bucket)
-		optionList = []asynq.Option{asynq.Queue(string(QueueAPI)), asynq.TaskID(id)}
-		taskType = TypeApiSwitchWithDowntime
-	case ConsistencyCheckPayload:
-		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck))}
-		taskType = TypeConsistencyCheck
-	case ConsistencyCheckListPayload:
-		id := fmt.Sprintf("cc:l:%s:%s:%s:%s", p.ID, p.Storage, p.Bucket, p.Prefix)
-		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck)), asynq.TaskID(id)}
-		taskType = TypeConsistencyCheckList
-	case ConsistencyCheckReadinessPayload:
-		id := fmt.Sprintf("cc:r:%s", p.ID)
-		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck)), asynq.TaskID(id)}
-		taskType = TypeConsistencyCheckReadiness
-	case ConsistencyCheckDeletePayload:
-		id := fmt.Sprintf("cc:d:%s", p.ID)
-		optionList = []asynq.Option{asynq.Queue(string(QueueConsistencyCheck)), asynq.TaskID(id)}
-		taskType = TypeConsistencyCheckResult
-	default:
-		return nil, fmt.Errorf("%w: unknown task type %T", dom.ErrInvalidArg, p)
-	}
-
-	return asynq.NewTask(taskType, bytes, optionList...), nil
+	ReplicationID
 }

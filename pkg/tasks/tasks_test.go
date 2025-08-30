@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +40,6 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		r.NoError(json.Unmarshal(oldJson, &p))
 		r.EqualValues(oldTask.FromStorage, p.FromStorage)
 		r.EqualValues(oldTask.ToStorage, p.ToStorage)
-		r.EqualValues(oldTask.CreatedAt.Unix(), p.CreatedAt.Unix())
 		r.EqualValues(oldTask.Bucket, p.Bucket)
 		r.EqualValues(oldTask.Location, p.Location)
 		r.Empty(p.ToBucket)
@@ -49,8 +49,10 @@ func Test_custom_bucket_compatibility(t *testing.T) {
 		r := require.New(t)
 		bucket := "bucket"
 		src := BucketCreatePayload{
-			Sync: Sync{
-				ToBucket: bucket,
+			ReplicationID: ReplicationID{
+				ReplicationStatusID: entity.ReplicationStatusID{
+					ToBucket: bucket,
+				},
 			},
 		}
 		srcJson, err := json.Marshal(&src)
