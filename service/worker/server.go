@@ -128,10 +128,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	defer taskClient.Close()
 	inspector := asynq.NewInspector(queueRedis)
 	defer inspector.Close()
-	queueSvc := tasks.NewQueueService(inspector)
+	queueSvc := tasks.NewQueueService(taskClient, inspector)
 	policySvc := policy.NewService(confRedis, queueSvc)
 
-	err = policy_helper.CreateMainFollowerPolicies(ctx, *conf.Storage, s3Clients, policySvc, taskClient)
+	err = policy_helper.CreateMainFollowerRouting(ctx, *conf.Storage, policySvc)
 	if err != nil {
 		return fmt.Errorf("%w: unable to create defaul main-follower policies", err)
 	}
@@ -148,9 +148,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
 	copySvc := rclone.NewS3CopySvc(s3Clients, memoryLimiterSvc, limiter, metricsSvc)
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
-	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, taskClient)
+	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -234,7 +234,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		handlers := api.GrpcHandlers(conf.Storage, s3Clients, taskClient, rc, policySvc, versionSvc, storageSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), replicationStatusLocker, userLocker, &app)
+		handlers := api.GrpcHandlers(conf.Storage, s3Clients, queueSvc, rc, policySvc, versionSvc, storageSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), replicationStatusLocker, userLocker, &app)
 		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, app)
 		if err != nil {
 			return err

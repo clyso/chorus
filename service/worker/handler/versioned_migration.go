@@ -38,14 +38,14 @@ const (
 )
 
 type VersionedMigrationCtrl struct {
-	svc        *VersionedMigrationSvc
-	taskClient *asynq.Client
+	svc      *VersionedMigrationSvc
+	queueSvc tasks.QueueService
 }
 
-func NewVersionedMigrationCtrl(svc *VersionedMigrationSvc, taskClient *asynq.Client) *VersionedMigrationCtrl {
+func NewVersionedMigrationCtrl(svc *VersionedMigrationSvc, queueSvc tasks.QueueService) *VersionedMigrationCtrl {
 	return &VersionedMigrationCtrl{
-		svc:        svc,
-		taskClient: taskClient,
+		svc:      svc,
+		queueSvc: queueSvc,
 	}
 }
 
@@ -65,15 +65,9 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 	}
 
 	migratePayload := tasks.MigrateVersionedObjectPayload(listVersionsPayload)
-	migrateTask, err := tasks.NewReplicationTask(ctx, replicationID, migratePayload)
-	if err != nil {
-		return fmt.Errorf("unable to enqueue consistency obj task: %w", err)
-	}
 
-	_, err = r.taskClient.EnqueueContext(ctx, migrateTask)
-	if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-		zerolog.Ctx(ctx).Info().Msg("cannot enqueue task with duplicate id")
-	} else if err != nil {
+	err := r.queueSvc.EnqueueTask(ctx, migratePayload)
+	if err != nil {
 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 	}
 

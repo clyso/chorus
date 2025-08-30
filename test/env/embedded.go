@@ -168,7 +168,6 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		IsMain:      false,
 	}
 	proxyConf.Storage.CreateRouting = true
-	proxyConf.Storage.CreateReplication = true
 
 	workerConf.Storage.Storages = proxyConf.Storage.Storages
 	// deep copy proxy config

@@ -48,12 +48,9 @@ func (h *Handler) PutObject(ctx context.Context, n ObjCreated) error {
 			Bucket: n.Bucket,
 			Name:   n.ObjKey,
 		},
-		Sync: tasks.Sync{
-			FromStorage: h.fromStorage,
-		},
 		ObjSize: n.ObjSize,
 	}
-	return h.replSvc.Replicate(ctx, &task)
+	return h.replSvc.Replicate(ctx, h.fromStorage, &task)
 }
 
 type ObjDeleted struct {
@@ -67,10 +64,7 @@ func (h *Handler) DeleteObject(ctx context.Context, n ObjDeleted) error {
 			Bucket: n.Bucket,
 			Name:   n.ObjKey,
 		},
-		Sync: tasks.Sync{
-			FromStorage: h.fromStorage,
-		},
 		Deleted: true,
 	}
-	return h.replSvc.Replicate(ctx, &task)
+	return h.replSvc.Replicate(ctx, h.fromStorage, &task)
 }

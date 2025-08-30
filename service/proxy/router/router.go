@@ -20,13 +20,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hibiken/asynq"
-
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -35,21 +32,17 @@ import (
 )
 
 type Router interface {
-	Route(r *http.Request) (resp *http.Response, task []tasks.SyncTask, storage string, isApiErr bool, err error)
+	Route(r *http.Request) (resp *http.Response, task []tasks.ReplicationTask, storage string, isApiErr bool, err error)
 }
 
 func NewRouter(
 	clients s3client.Service,
-	taskClient *asynq.Client,
 	versionSvc meta.VersionService,
-	policySvc policy.Service,
 	storageSvc storage.Service,
 	limit ratelimit.RPM) Router {
 	return &router{
 		clients:    clients,
-		taskClient: taskClient,
 		versionSvc: versionSvc,
-		policySvc:  policySvc,
 		storageSvc: storageSvc,
 		limit:      limit,
 	}
@@ -57,20 +50,18 @@ func NewRouter(
 
 type router struct {
 	clients    s3client.Service
-	taskClient *asynq.Client
 	versionSvc meta.VersionService
-	policySvc  policy.Service
 	storageSvc storage.Service
 	limit      ratelimit.RPM
 }
 
-func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
+func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	var (
 		ctx    = req.Context()
 		method = xctx.GetMethod(req.Context())
 		bucket = xctx.GetBucket(ctx)
 		object = xctx.GetObject(ctx)
-		task   tasks.SyncTask
+		task   tasks.ReplicationTask
 	)
 
 	switch method {
@@ -124,7 +115,6 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 		resp, storage, isApiErr, err = r.commonWrite(req)
 		task = &tasks.ObjectSyncPayload{
 			Object:  dom.Object{Bucket: bucket, Name: object},
-			Sync:    tasks.Sync{FromStorage: storage},
 			Deleted: true,
 		}
 	case s3.DeleteObjects:
@@ -144,9 +134,8 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 		err = dom.ErrNotImplemented
 	}
 	if err == nil && task != nil {
-		task.SetFrom(storage)
 		if taskList == nil {
-			taskList = []tasks.SyncTask{task}
+			taskList = []tasks.ReplicationTask{task}
 		}
 	}
 

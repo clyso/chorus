@@ -27,7 +27,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -37,15 +36,13 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("ZeroDowntimeReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
-	ctx = log.WithBucket(ctx, p.Bucket)
-
-	policyID := entity.ReplicationStatusID{
-		User:        p.User,
-		FromBucket:  p.Bucket,
-		FromStorage: p.FromStorage,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
+	// switch not allowed for custom bucket name:
+	if p.FromBucket != p.ToBucket {
+		// should never happen
+		return fmt.Errorf("invalid switch with downtime task: from and to bucket must be equal: %w", asynq.SkipRetry)
 	}
+	ctx = log.WithBucket(ctx, p.FromBucket)
+	policyID := p.GetReplicationID()
 
 	// acquire exclusive lock to switch task:
 	lock, err := s.replicationstatusLocker.Lock(ctx, policyID)
@@ -54,19 +51,14 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 	}
 	defer lock.Release(ctx)
 	return lock.Do(ctx, time.Second*2, func() error {
-		return s.handleZeroDowntimeReplicationSwitch(ctx, policyID, p)
+		return s.handleZeroDowntimeReplicationSwitch(ctx, p)
 	})
 }
 
-func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID entity.ReplicationStatusID, p tasks.ZeroDowntimeReplicationSwitchPayload) error {
+func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p tasks.ZeroDowntimeReplicationSwitchPayload) error {
 	// get latest replication and switch state and execute switch state machine:
-	replicationID := entity.ReplicationStatusID{
-		User:        p.User,
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
+	replicationID := p.GetReplicationID()
+
 	replStatus, err := s.policySvc.GetReplicationPolicyInfoExtended(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
@@ -78,7 +70,7 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 	if !replStatus.IsArchived {
 		zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
 	}
-	switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, policyID)
+	switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, replicationID)
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {
 			zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
@@ -98,7 +90,7 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 		// events queue is not drained yet - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 	}
-	existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.User, p.Bucket)
+	existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.User, p.FromBucket)
 	if err != nil {
 		return err
 	}
@@ -108,5 +100,5 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, policyID 
 	}
 	// all good - finish zero downtime replication switch:
 
-	return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, policyID)
+	return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, replicationID)
 }

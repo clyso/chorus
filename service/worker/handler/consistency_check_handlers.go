@@ -17,7 +17,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -61,16 +60,11 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 			ID:              payload.ID,
 		}
 
-		task, err := tasks.NewTask(ctx, listTask)
-		if err != nil {
-			return fmt.Errorf("unable to create consistency check list task: %w", err)
-		}
-
 		if err := s.storageSvc.IncrementConsistencyCheckScheduledCounter(ctx, payload.ID, 1); err != nil {
 			return fmt.Errorf("unable to increment consistency check scheduled counter: %w", err)
 		}
 
-		if _, err := s.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		if err := s.queueSvc.EnqueueTask(ctx, listTask); err != nil {
 			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
 
@@ -88,11 +82,7 @@ func (s *svc) HandleConsistencyCheck(ctx context.Context, t *asynq.Task) (err er
 		return fmt.Errorf("unable to record consistency check readiness: %w", err)
 	}
 
-	task, err := tasks.NewTask(ctx, readinessTask)
-	if err != nil {
-		return fmt.Errorf("unable to create consistency check readiness task: %w", err)
-	}
-	if _, err := s.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+	if err := s.queueSvc.EnqueueTask(ctx, readinessTask); err != nil {
 		return fmt.Errorf("unable to enqueue consistency check readiness task: %w", err)
 	}
 
@@ -207,16 +197,11 @@ func (s *svc) checkConsistencyForListedObject(ctx context.Context, payload *task
 }
 
 func (s *svc) checkConsistencyForDirectory(ctx context.Context, payload *tasks.ConsistencyCheckListPayload) error {
-	task, err := tasks.NewTask(ctx, *payload)
-	if err != nil {
-		return fmt.Errorf("unable to enqueue consistency obj task: %w", err)
-	}
-
 	if err := s.storageSvc.IncrementConsistencyCheckScheduledCounter(ctx, payload.ID, 1); err != nil {
 		return fmt.Errorf("unable to increment consistency check scheduled counter: %w", err)
 	}
 
-	if _, err = s.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+	if err := s.queueSvc.EnqueueTask(ctx, *payload); err != nil {
 		return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 	}
 

@@ -117,5 +117,14 @@ func StartNew(from context.Context) (context.Context, context.CancelFunc) {
 	if t := xctx.GetTraceID(from); t != "" {
 		ctx = xctx.SetTraceID(ctx, t)
 	}
+	if rp := xctx.GetRoutingPolicy(from); rp != "" {
+		ctx = xctx.SetRoutingPolicy(ctx, rp)
+	}
+	if reps := xctx.GetReplications(from); len(reps) != 0 {
+		ctx = xctx.SetReplications(ctx, reps)
+	}
+	if switchInfo := xctx.GetInProgressZeroDowntime(from); switchInfo != nil {
+		ctx = xctx.SetInProgressZeroDowntime(ctx, *switchInfo)
+	}
 	return ctx, cancel
 }

@@ -19,7 +19,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -102,11 +101,9 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 		return err
 	}
 	// 7. create list obj task
-	task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateBucketListObjectsPayload{
-		Sync: tasks.Sync{
-			FromStorage: p.FromStorage,
-			ToStorage:   p.ToStorage,
-			ToBucket:    p.ToBucket,
+	err = s.queueSvc.EnqueueTask(ctx, tasks.MigrateBucketListObjectsPayload{
+		ReplicationID: tasks.ReplicationID{
+			ReplicationStatusID: replicationID,
 		},
 		Bucket:    p.Bucket,
 		Prefix:    "",
@@ -114,12 +111,6 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	})
 	if err != nil {
 		return fmt.Errorf("create bucket: unable to create list obj task: %w", err)
-	}
-	_, err = s.taskClient.EnqueueContext(ctx, task)
-	if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-		return fmt.Errorf("create bucket: unable to enqueue list obj task: %w", err)
-	} else if err != nil {
-		logger.Info().Msg("cannot enqueue task with duplicate id")
 	}
 	logger.Info().Msg("create bucket: created migration list obj task")
 

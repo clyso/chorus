@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -52,7 +51,7 @@ const (
 	defaultZeroDowntimeMultipartTTL = time.Hour
 )
 
-func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskClient *asynq.Client,
+func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, queueSvc tasks.QueueService,
 	rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService,
 	storageSvc storage.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient,
 	notificationSvc *notifications.Service, replicationStatusLocker *store.ReplicationStatusLocker,
@@ -61,7 +60,7 @@ func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, taskCl
 		storages:                storages,
 		rclone:                  rclone,
 		s3clients:               s3clients,
-		taskClient:              taskClient,
+		queueSvc:                queueSvc,
 		policySvc:               policySvc,
 		versionSvc:              versionSvc,
 		storageSvc:              storageSvc,
@@ -79,7 +78,7 @@ var _ pb.ChorusServer = &handlers{}
 type handlers struct {
 	storages                *s3.StorageConfig
 	s3clients               s3client.Service
-	taskClient              *asynq.Client
+	queueSvc                tasks.QueueService
 	rclone                  rclone.Service
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
@@ -119,12 +118,7 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.Consistenc
 		ID:        consistencyCheckID,
 		Locations: locations,
 	}
-
-	task, err := tasks.NewTask(ctx, consistencyCheckTask)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create consistency check task: %w", err)
-	}
-	if _, err := h.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+	if err := h.queueSvc.EnqueueTask(ctx, consistencyCheckTask); err != nil {
 		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)
 	}
 
@@ -303,11 +297,7 @@ func (h *handlers) DeleteConsistencyCheckReport(ctx context.Context, req *pb.Con
 		ID: consistencyCheckID,
 	}
 
-	task, err := tasks.NewTask(ctx, deleteConsistencyCheckReportTask)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create consistency check readiness task: %w", err)
-	}
-	if _, err := h.taskClient.EnqueueContext(ctx, task); err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+	if err := h.queueSvc.EnqueueTask(ctx, deleteConsistencyCheckReportTask); err != nil {
 		return nil, fmt.Errorf("unable to enqueue consistency check deletion task: %w", err)
 	}
 
@@ -476,19 +466,14 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			if err != nil {
 				return err
 			}
-			task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.BucketCreatePayload{
-				Sync: tasks.Sync{
-					FromStorage: req.From,
-					ToStorage:   req.To,
-					ToBucket:    bucket,
+			err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
+				ReplicationID: tasks.ReplicationID{
+					ReplicationStatusID: replicationID,
 				},
-				Bucket: bucket,
+				Bucket:   bucket,
+				Location: "",
 			})
 			if err != nil {
-				return err
-			}
-			_, err = h.taskClient.EnqueueContext(ctx, task)
-			if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 				return err
 			}
 		}
@@ -541,19 +526,13 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 			}
 			return err
 		}
-		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.BucketCreatePayload{
-			Sync: tasks.Sync{
-				FromStorage: req.From,
-				ToStorage:   req.To,
-				ToBucket:    bucket.Name,
+		err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
+			ReplicationID: tasks.ReplicationID{
+				ReplicationStatusID: replicationID,
 			},
 			Bucket: bucket.Name,
 		})
 		if err != nil {
-			return err
-		}
-		_, err = h.taskClient.EnqueueContext(ctx, task)
-		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return err
 		}
 	}
@@ -840,19 +819,13 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return err
 		}
 		// create task
-		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.BucketCreatePayload{
-			Sync: tasks.Sync{
-				FromStorage: req.FromStorage,
-				ToStorage:   req.ToStorage,
-				ToBucket:    req.ToBucket,
+		err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
+			ReplicationID: tasks.ReplicationID{
+				ReplicationStatusID: replicationID,
 			},
 			Bucket: req.FromBucket,
 		})
 		if err != nil {
-			return err
-		}
-		_, err = h.taskClient.EnqueueContext(ctx, task)
-		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return err
 		}
 		return nil
@@ -957,18 +930,12 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}
 		// create switch task
-		task, err := tasks.NewTask(ctx, tasks.SwitchWithDowntimePayload{
-			FromStorage: req.ReplicationId.From,
-			ToStorage:   req.ReplicationId.To,
-			User:        req.ReplicationId.User,
-			Bucket:      req.ReplicationId.Bucket,
-			CreatedAt:   time.Now(),
+		err = h.queueSvc.EnqueueTask(ctx, tasks.SwitchWithDowntimePayload{
+			ReplicationID: tasks.ReplicationID{
+				ReplicationStatusID: policyID,
+			},
 		})
 		if err != nil {
-			return err
-		}
-		_, err = h.taskClient.EnqueueContext(ctx, task)
-		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return fmt.Errorf("unable to enqueue switch task: %w", err)
 		}
 		return nil
@@ -1023,21 +990,12 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 			return fmt.Errorf("unable to store switch metadata: %w", err)
 		}
 		// create switch task
-		task, err := tasks.NewTask(ctx, tasks.ZeroDowntimeReplicationSwitchPayload{
-			Sync: tasks.Sync{
-				FromStorage: req.ReplicationId.From,
-				ToStorage:   req.ReplicationId.To,
-				ToBucket:    req.ReplicationId.ToBucket,
-				CreatedAt:   time.Now(),
+		err = h.queueSvc.EnqueueTask(ctx, tasks.ZeroDowntimeReplicationSwitchPayload{
+			ReplicationID: tasks.ReplicationID{
+				ReplicationStatusID: policyID,
 			},
-			Bucket: req.ReplicationId.Bucket,
-			User:   req.ReplicationId.User,
 		})
 		if err != nil {
-			return err
-		}
-		_, err = h.taskClient.EnqueueContext(ctx, task)
-		if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return err
 		}
 		return nil

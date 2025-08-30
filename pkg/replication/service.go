@@ -21,51 +21,41 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
 type Service interface {
-	Replicate(ctx context.Context, task tasks.SyncTask) error
+	Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error
 }
 
-func New(taskClient *asynq.Client, versionSvc meta.VersionService, policySvc policy.Service) Service {
+func New(queueSvc tasks.QueueService, versionSvc meta.VersionService) Service {
 	return &svc{
-		taskClient: taskClient,
+		queueSvc:   queueSvc,
 		versionSvc: versionSvc,
-		policySvc:  policySvc,
 	}
 }
 
 type svc struct {
-	taskClient *asynq.Client
+	queueSvc   tasks.QueueService
 	versionSvc meta.VersionService
-	policySvc  policy.Service
 }
 
-func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
+func (s *svc) Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error {
 	if task == nil {
 		zerolog.Ctx(ctx).Info().Msg("replication task is nil")
 		return nil
 	}
 	zerolog.Ctx(ctx).Debug().Msg("creating replication task")
-	task.InitDate()
-	if task.GetFrom() == "" {
-		storage := xctx.GetStorage(ctx)
-		zerolog.Ctx(ctx).Warn().Msgf("replication task from storage not set, using storage from context: %s", storage)
-		task.SetFrom(storage)
-	}
 
 	// 1. find repl rule(-s)
-	replTo, err := s.getDestinations(ctx, task)
+	incVersions, replications, err := s.getDestinations(ctx, routedTo)
 	if err != nil {
 		if errors.Is(err, dom.ErrPolicy) {
 			zerolog.Ctx(ctx).Info().Err(err).Msg("skip Replicate: replication is not configured")
@@ -73,192 +63,94 @@ func (s *svc) Replicate(ctx context.Context, task tasks.SyncTask) error {
 		}
 		return err
 	}
-	if len(replTo) == 0 {
-		// no followers and no error means that zero-downtime switch is in progress
-		// update obj version metadata without creating replication tasks
-		zerolog.Ctx(ctx).Debug().Msg("zero-downtime switch in progress, skipping replication tasks")
-	}
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	replicationID := entity.ReplicationStatusID{
-		User:        user,
-		FromStorage: xctx.GetStorage(ctx),
-		FromBucket:  bucket,
+	if !incVersions {
+		if len(replications) == 0 {
+			zerolog.Ctx(ctx).Info().Err(err).Msg("skip Replicate: replication is not configured")
+			return nil
+		} else {
+			// if we replicate, we have to increment source versions
+			// should never happen: sanity check for logic error
+			return fmt.Errorf("%w: replication destinations found but not incrementing source versions", dom.ErrInternal)
+		}
+
 	}
 
+	// 2. increment versions in source storage
 	switch t := task.(type) {
 	case *tasks.BucketCreatePayload:
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-				return err
-			}
-		}
+	// no version increment needed
 	case *tasks.BucketDeletePayload:
 		err = s.versionSvc.DeleteBucketAll(ctx, t.Bucket)
 		if err != nil {
 			return err
 		}
-
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
-		}
 	case *tasks.BucketSyncACLPayload:
-		_, err = s.versionSvc.IncrementBucketACL(ctx, t.Bucket, meta.ToDest(t.FromStorage, ""))
+		_, err = s.versionSvc.IncrementBucketACL(ctx, t.Bucket, meta.ToDest(routedTo, ""))
 		if err != nil {
 			return err
-		}
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
 		}
 	case *tasks.BucketSyncTagsPayload:
-		_, err = s.versionSvc.IncrementBucketTags(ctx, t.Bucket, meta.ToDest(t.FromStorage, ""))
+		_, err = s.versionSvc.IncrementBucketTags(ctx, t.Bucket, meta.ToDest(routedTo, ""))
 		if err != nil {
 			return err
-		}
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
 		}
 	case *tasks.ObjectSyncPayload:
 		if t.Deleted {
 			err = s.versionSvc.DeleteObjAll(ctx, t.Object)
 		} else {
-			_, err = s.versionSvc.IncrementObj(ctx, t.Object, meta.ToDest(t.FromStorage, ""))
+			_, err = s.versionSvc.IncrementObj(ctx, t.Object, meta.ToDest(routedTo, ""))
 		}
 		if err != nil {
 			return err
-		}
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
 		}
 	case *tasks.ObjSyncACLPayload:
-		_, err = s.versionSvc.IncrementACL(ctx, t.Object, meta.ToDest(t.FromStorage, ""))
+		_, err = s.versionSvc.IncrementACL(ctx, t.Object, meta.ToDest(routedTo, ""))
 		if err != nil {
 			return err
-		}
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
 		}
 	case *tasks.ObjSyncTagsPayload:
-		_, err = s.versionSvc.IncrementTags(ctx, t.Object, meta.ToDest(t.FromStorage, ""))
+		_, err = s.versionSvc.IncrementTags(ctx, t.Object, meta.ToDest(routedTo, ""))
 		if err != nil {
 			return err
-		}
-		for _, to := range replTo {
-			t.SetTo(to.Storage, to.Bucket)
-			replicationID.ToStorage, replicationID.ToBucket = to.Storage, to.Bucket
-			payload, err := tasks.NewReplicationTask(ctx, replicationID, *t)
-			if err != nil {
-				return err
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, payload)
-			if err != nil {
-				return err
-			}
 		}
 	default:
 		return fmt.Errorf("%w: unsupported replication task type %T", dom.ErrInternal, task)
 	}
+	// 3. fan out tasks for each destination
+	for _, replID := range replications {
+		task.SetReplicationID(replID)
+		err := s.queueSvc.EnqueueTask(ctx, task)
+		if err != nil {
+			return fmt.Errorf("unable to fan out replication task to %+v: %w", replID, err)
+		}
+	}
+
 	return nil
 }
 
-func (s *svc) getDestinations(ctx context.Context, task tasks.SyncTask) ([]entity.ReplicationPolicyDestination, error) {
-	replPolicy, err := s.getReplicationPolicy(ctx, task)
-	if err != nil {
-		return nil, err
+func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.ReplicationStatusID, err error) {
+	destinations := xctx.GetReplications(ctx)
+	if len(destinations) != 0 {
+		// normal flow increment source version and replicate to all followers
+		return true, destinations, nil
 	}
-	if replPolicy.FromStorage == task.GetFrom() {
-		return replPolicy.Destinations, nil
-	}
-	// Policy source storage is different from task source storage.
-	// This only possible if switch is in progress, and we got CompleteMultipartUpload request.
-	if _, ok := task.(*tasks.ObjectSyncPayload); !ok || (xctx.GetMethod(ctx) != s3.UndefinedMethod && xctx.GetMethod(ctx) != s3.CompleteMultipartUpload) {
-		zerolog.Ctx(ctx).Warn().Msgf("routing policy from %q is different from task %q", replPolicy.FromStorage, task.GetFrom())
+	// no destinations means only two things:
+	// 1. replication is not configured - no need to do anything
+	// 2. zero-downtime switch is in progress
+	//    - increment source version only if request routed to main storage
+	//    - replicate only for dangling multipart uploads to old main storage
+
+	inProgressZeroDowntimeSwitch := xctx.GetInProgressZeroDowntime(ctx)
+	if inProgressZeroDowntimeSwitch == nil {
+		// do nothing - replication was not configured
+		return false, nil, nil
 	}
 
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-
-	// construct previous replication destination based on switch info:
-	replicationSwitchInfoID := entity.NewReplicationSwitchInfoID(user, bucket)
-	replSwitch, err := s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, replicationSwitchInfoID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: no in-progress zero-downtime switch for replication task with invalid from storage", err)
-	}
-	switchReplicationID := replSwitch.ReplicationID()
-	if switchReplicationID.FromStorage != task.GetFrom() {
-		return nil, fmt.Errorf("%w: replication switch OldMain %s not match with task from storage %s", dom.ErrInternal, switchReplicationID.FromStorage, task.GetFrom())
-	}
-	return []entity.ReplicationPolicyDestination{
-		entity.NewUserReplicationPolicyDestination(switchReplicationID.ToStorage),
-	}, nil
-}
-
-func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*entity.StorageReplicationPolicies, error) {
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
-	// bucketPolicy, err := s.policySvc.GetBucketReplicationPolicies(ctx, user, bucket)
-	bucketReplicationPolicyID := entity.NewBucketReplicationPolicyID(user, bucket)
-	bucketPolicies, err := s.policySvc.GetBucketReplicationPolicies(ctx, bucketReplicationPolicyID)
-	if err == nil {
-		return bucketPolicies, nil
-	}
-	if !errors.Is(err, dom.ErrNotFound) {
-		return nil, err
-	}
-	// if zero-downtime switch is in progress return empty replication policy
-	// to update obj version metadata and avoid creating replication tasks
-	replicationSwitchInfoID := entity.NewReplicationSwitchInfoID(user, bucket)
-	switchInfo, err := s.policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, replicationSwitchInfoID)
-	if err == nil {
+	// zero-downtime switch is in progress
+	// check if we need to replicate dangling multipart upload to old main storage
+	wasRoutedToOldStorage := routedTo == inProgressZeroDowntimeSwitch.ReplID.FromStorage
+	isCompleteMutlipart := xctx.GetMethod(ctx) == s3.CompleteMultipartUpload
+	if wasRoutedToOldStorage && isCompleteMutlipart {
 		// BUGFIX:
 		// 1. A is main, B is follower
 		// 2. User initiates multipart upload to A
@@ -277,71 +169,12 @@ func (s *svc) getReplicationPolicy(ctx context.Context, task tasks.SyncTask) (*e
 		// PROBLEM:
 		// - because replication policy is archived we dont create replication tasks
 		// - but we need to finish old multipart upload on A and replicate completed object to B
-		// SOLUTION:
-		//  lookup archived replication policy and create replication task from A to B
-		wasRoutedToOldStorage := task.GetFrom() == switchInfo.ReplID.FromStorage
-		isCompleteMutlipart := xctx.GetMethod(ctx) == s3.CompleteMultipartUpload
-		if wasRoutedToOldStorage && isCompleteMutlipart {
-			archivedPolicy, err := s.policySvc.GetReplicationPolicyInfo(ctx, switchInfo.ReplID)
-			if err != nil {
-				// should never happen
-				return nil, fmt.Errorf("%w: unable to get archived replication policy during CompleteMultipartUpload with zero-downtime switch in progress: %w", dom.ErrInternal, err)
-			}
-			if !archivedPolicy.IsArchived {
-				// should never happen
-				return nil, fmt.Errorf("%w: replication policy is not archived during CompleteMultipartUpload with zero-downtime switch in progress", dom.ErrInternal)
-			}
-			return &entity.StorageReplicationPolicies{
-				FromStorage: task.GetFrom(),
-				Destinations: []entity.ReplicationPolicyDestination{
-					{
-						Storage: switchInfo.ReplID.ToStorage,
-						Bucket:  switchInfo.ReplID.ToBucket,
-					},
-				},
-			}, nil
-		}
-
-		// no-error means that zero-downtime switch in progress.
-		// return replication policy without destinations
-		return &entity.StorageReplicationPolicies{
-			FromStorage: task.GetFrom(),
+		return true, []entity.ReplicationStatusID{
+			inProgressZeroDowntimeSwitch.ReplID,
 		}, nil
 	}
 
-	// policy not found. Create new bucket policy from user policy only for CreateBucket method
-	if _, ok := task.(*tasks.BucketCreatePayload); !ok {
-		return nil, fmt.Errorf("%w: replication policy not configured: %w", dom.ErrPolicy, err)
-	}
-
-	userPolicy, err := s.policySvc.GetUserReplicationPolicies(ctx, user)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			return nil, fmt.Errorf("%w: user replication policy not configured: %w", dom.ErrPolicy, err)
-		}
-		return nil, err
-	}
-	for _, to := range userPolicy.Destinations {
-		replicationID := entity.ReplicationStatusID{
-			User:        user,
-			FromStorage: userPolicy.FromStorage,
-			ToStorage:   to.Storage,
-			FromBucket:  bucket,
-			ToBucket:    bucket,
-		}
-		err = s.policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
-		if err != nil {
-			if errors.Is(err, dom.ErrAlreadyExists) {
-				continue
-			}
-			return nil, err
-		}
-	}
-
-	bucketPolicies, err = s.policySvc.GetBucketReplicationPolicies(ctx, bucketReplicationPolicyID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get bucket replication policies: %w", err)
-	}
-
-	return bucketPolicies, nil
+	// no-error means that zero-downtime switch in progress.
+	// increment version in routed storage and skip creating replication tasks
+	return true, nil, nil
 }

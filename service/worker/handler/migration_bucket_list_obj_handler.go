@@ -19,18 +19,12 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/hibiken/asynq"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
-
-	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/entity"
-
-	// "github.com/clyso/chorus/pkg/features"
 
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -45,13 +39,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
 
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
+	replicationID := p.GetReplicationID()
 
 	if err := s.limit.StorReq(ctx, p.FromStorage); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
@@ -80,15 +68,8 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		if isDir {
 			subP := p
 			subP.Prefix = object.Key
-			subTask, err := tasks.NewReplicationTask(ctx, replicationID, subP)
-			if err != nil {
-				return fmt.Errorf("migration bucket list obj: unable to create list obj sub task: %w", err)
-			}
-			_, err = s.taskClient.EnqueueContext(ctx, subTask)
-			if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
+			if err = s.queueSvc.EnqueueTask(ctx, subP); err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to enqueue list obj sub task: %w", err)
-			} else if err != nil {
-				logger.Info().Interface("enqueue_task_payload", subP).Msg("cannot enqueue task with duplicate id")
 			}
 			err = s.storageSvc.SetLastListedObj(ctx, p, object.Key)
 			if err != nil {
@@ -96,23 +77,20 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			}
 			continue
 		}
-		p.Sync.InitDate()
 
-		var task *asynq.Task
 		if p.Versioned {
-			task, err = tasks.NewReplicationTask(ctx, replicationID, tasks.ListObjectVersionsPayload{
-				Sync:   p.Sync,
-				Bucket: p.Bucket,
-				Prefix: object.Key,
+			err = s.queueSvc.EnqueueTask(ctx, tasks.ListObjectVersionsPayload{
+				ReplicationID: p.ReplicationID,
+				Bucket:        p.Bucket,
+				Prefix:        object.Key,
 			})
-
 			if err != nil {
 				return fmt.Errorf("unable to create list object versions task: %w", err)
 			}
 		} else {
-			task, err = tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
-				Sync:   p.Sync,
-				Bucket: p.Bucket,
+			err = s.queueSvc.EnqueueTask(ctx, tasks.MigrateObjCopyPayload{
+				ReplicationID: p.ReplicationID,
+				Bucket:        p.Bucket,
 				Obj: tasks.ObjPayload{
 					Name:        object.Key,
 					VersionID:   object.VersionID,
@@ -125,14 +103,6 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 				return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 			}
 		}
-		_, err = s.taskClient.EnqueueContext(ctx, task)
-		if err != nil {
-			if errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict) {
-				logger.Info().Msg("cannot enqueue task with duplicate id")
-				continue
-			}
-			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
-		}
 		err = s.storageSvc.SetLastListedObj(ctx, p, object.Key)
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to update last obj meta: %w", err)
@@ -140,24 +110,15 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	}
 
 	if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
-		p.Sync.InitDate()
 		// copy empty dir object
-		task, err := tasks.NewReplicationTask(ctx, replicationID, tasks.MigrateObjCopyPayload{
-			Sync:   p.Sync,
-			Bucket: p.Bucket,
+		err = s.queueSvc.EnqueueTask(ctx, tasks.MigrateObjCopyPayload{
+			ReplicationID: p.ReplicationID,
+			Bucket:        p.Bucket,
 			Obj: tasks.ObjPayload{
 				Name: p.Prefix,
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
-		}
-		_, err = s.taskClient.EnqueueContext(ctx, task)
-
-		switch {
-		case errors.Is(err, asynq.ErrDuplicateTask) || errors.Is(err, asynq.ErrTaskIDConflict):
-			logger.Info().Msg("cannot enqueue task with duplicate id")
-		case err != nil:
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		}
 	}

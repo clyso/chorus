@@ -33,6 +33,7 @@ type QueueService interface {
 	Pause(ctx context.Context, queueName string) error
 	Delete(ctx context.Context, queueName string, force bool) error
 	Stats(ctx context.Context, queueName string) (*QueueStats, error)
+	EnqueueTask(ctx context.Context, task any) error
 }
 
 type QueueStats struct {
@@ -58,9 +59,10 @@ type QueueStats struct {
 	Latency time.Duration
 }
 
-func NewQueueService(inspector *asynq.Inspector) *queueService {
+func NewQueueService(client *asynq.Client, inspector *asynq.Inspector) *queueService {
 	return &queueService{
 		inspector: inspector,
+		client:    client,
 	}
 }
 
@@ -68,6 +70,11 @@ var _ QueueService = (*queueService)(nil)
 
 type queueService struct {
 	inspector *asynq.Inspector
+	client    *asynq.Client
+}
+
+func (q *queueService) EnqueueTask(ctx context.Context, task any) error {
+	return enqueueAny(ctx, q.client, task)
 }
 
 func (q *queueService) Stats(ctx context.Context, queueName string) (*QueueStats, error) {
