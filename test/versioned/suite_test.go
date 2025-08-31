@@ -245,7 +245,8 @@ var _ = Describe("Minio versioned migration", func() {
 				PauseRetryInterval:  time.Millisecond * 500,
 			},
 			Storage: &s3.StorageConfig{
-				CreateRouting: true,
+				CreateRouting:     true,
+				CreateReplication: false,
 				Storages: map[string]s3.Storage{
 					CMinioSrcInstance: {
 						Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
@@ -555,7 +556,8 @@ var _ = Describe("Ceph versioned migration", func() {
 				PauseRetryInterval:  time.Millisecond * 500,
 			},
 			Storage: &s3.StorageConfig{
-				CreateRouting: true,
+				CreateRouting:     true,
+				CreateReplication: false,
 				Storages: map[string]s3.Storage{
 					CCephSrcInstance: {
 						Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),

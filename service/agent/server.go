@@ -87,7 +87,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	queueSvc := tasks.NewQueueService(taskClient, inspector)
 	policySvc := policy.NewService(confRedis, queueSvc)
 
-	replSvc := replication.New(queueSvc, verSvc)
+	replSvc := replication.New(queueSvc, verSvc, policySvc)
 
 	notificationHandler := notifications.NewHandler(conf.FromStorage, replSvc)
 	httpHandler := trace.HttpMiddleware(tp, HTTPHandler(policySvc, notificationHandler))

@@ -56,9 +56,10 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 	}
 
 	user := xctx.GetUser(ctx)
+	fromBucket, toBucket := listVersionsPayload.FromToBuckets(listVersionsPayload.Bucket)
 
-	objectVersionID := entity.NewVersionedObjectID(listVersionsPayload.FromStorage, listVersionsPayload.Bucket, listVersionsPayload.Prefix)
-	replicationID := entity.NewReplicationStatusID(user, listVersionsPayload.FromStorage, listVersionsPayload.Bucket, listVersionsPayload.ToStorage, listVersionsPayload.ToBucket)
+	objectVersionID := entity.NewVersionedObjectID(listVersionsPayload.Replication.FromStorage, fromBucket, listVersionsPayload.Prefix)
+	replicationID := entity.NewReplicationStatusID(user, listVersionsPayload.Replication.FromStorage, fromBucket, listVersionsPayload.Replication.ToStorage, toBucket)
 
 	if err := r.svc.ListVersions(ctx, objectVersionID, replicationID); err != nil {
 		return fmt.Errorf("unable to list obejct versions: %w", err)
@@ -81,7 +82,8 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 	}
 
 	user := xctx.GetUser(ctx)
-	replicationID := entity.NewReplicationStatusID(user, migratePayload.FromStorage, migratePayload.Bucket, migratePayload.ToStorage, migratePayload.ToBucket)
+	fromBucket, toBucket := migratePayload.FromToBuckets(migratePayload.Bucket)
+	replicationID := entity.NewReplicationStatusID(user, migratePayload.Replication.FromStorage, fromBucket, migratePayload.Replication.ToStorage, toBucket)
 
 	if err := r.svc.MigrateVersions(ctx, replicationID, migratePayload.Prefix); err != nil {
 		return fmt.Errorf("unable to migrate object version: %w", err)

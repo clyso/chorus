@@ -42,18 +42,19 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("BucketSyncTagsPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
 	if err != nil {
 		return err
 	}
 
-	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.ToStorage, p.ToBucket))
+	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.Replication.ToStorage, toBucket))
 	if err != nil {
 		return err
 	}
 	defer lock.Release(ctx)
-	err = s.syncBucketTagging(ctx, fromClient, toClient, p.Bucket, p.ToBucket)
+	err = s.syncBucketTagging(ctx, fromClient, toClient, fromBucket, toBucket)
 	if err != nil {
 		return err
 	}
@@ -67,20 +68,21 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
+	fromBucket, toBucket := p.FromToBuckets(p.Object.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
 	if err != nil {
 		return err
 	}
 
-	objectLockID := entity.NewVersionedObjectLockID(p.ToStorage, p.ToBucket, p.Object.Name, p.Object.Version)
+	objectLockID := entity.NewVersionedObjectLockID(p.Replication.ToStorage, toBucket, p.Object.Name, p.Object.Version)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err
 	}
 	defer lock.Release(ctx)
 
-	err = s.syncObjectTagging(ctx, fromClient, toClient, p.Object.Bucket, p.Object.Name, p.ToBucket)
+	err = s.syncObjectTagging(ctx, fromClient, toClient, fromBucket, p.Object.Name, toBucket)
 	if err != nil {
 		return err
 	}

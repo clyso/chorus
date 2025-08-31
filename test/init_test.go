@@ -42,6 +42,7 @@ func init() {
 	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"
 	workerConf.Storage.CreateRouting = true
+	workerConf.Storage.CreateReplication = true
 
 	proxyConf, err = proxy.GetConfig()
 	if err != nil {
@@ -51,4 +52,5 @@ func init() {
 	proxyConf.Features.Tagging = false
 	proxyConf.Log.Level = "warn"
 	proxyConf.Storage.CreateRouting = true
+	proxyConf.Storage.CreateReplication = true
 }

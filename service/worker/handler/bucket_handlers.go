@@ -26,9 +26,7 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -42,22 +40,17 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 
-	replicationID := entity.ReplicationStatusID{
-		User:        xctx.GetUser(ctx),
-		FromStorage: p.FromStorage,
-		FromBucket:  p.Bucket,
-		ToStorage:   p.ToStorage,
-		ToBucket:    p.ToBucket,
-	}
+	replicationID := p.Replication
 
-	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
 	if err != nil {
 		return err
 	}
 
 	srcExists := true
-	versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, p.Bucket)
+	versioningConfig, err := fromClient.S3().GetBucketVersioning(ctx, fromBucket)
 	if err != nil && mclient.ToErrorResponse(err).Code != "NoSuchBucket" {
 		return fmt.Errorf("unable to get bucket versioning config: %w", err)
 	}
@@ -76,12 +69,12 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 
 	// 2. copy tags
-	err = s.syncBucketTagging(ctx, fromClient, toClient, p.Bucket, p.ToBucket)
+	err = s.syncBucketTagging(ctx, fromClient, toClient, fromBucket, toBucket)
 	if err != nil {
 		return err
 	}
 	// 3. copy ACL
-	err = s.syncBucketACL(ctx, fromClient, toClient, p.Bucket, p.ToBucket)
+	err = s.syncBucketACL(ctx, fromClient, toClient, fromBucket, toBucket)
 	if err != nil {
 		return err
 	}
@@ -103,7 +96,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	// 7. create list obj task
 	err = s.queueSvc.EnqueueTask(ctx, tasks.MigrateBucketListObjectsPayload{
 		ReplicationID: tasks.ReplicationID{
-			ReplicationStatusID: replicationID,
+			Replication: replicationID,
 		},
 		Bucket:    p.Bucket,
 		Prefix:    "",
@@ -122,13 +115,11 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Client, p tasks.BucketCreatePayload) error {
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
-	toBucketName := p.Bucket
-	if p.ToBucket != "" {
-		toBucketName = p.ToBucket
-	}
+	_, toBucket := p.FromToBuckets(p.Bucket)
+
 	// check if bucket already exists:
 	_, err := toClient.AWS().HeadBucketWithContext(ctx, &s3.HeadBucketInput{
-		Bucket: &toBucketName,
+		Bucket: &toBucket,
 	})
 	if err == nil {
 		// already exists
@@ -137,7 +128,7 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 
 	// create bucket
 	_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
-		Bucket: &toBucketName,
+		Bucket: &toBucket,
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
 			LocationConstraint: &p.Location,
 		},
@@ -149,7 +140,7 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 		}
 		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
 		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
-			Bucket: &toBucketName,
+			Bucket: &toBucket,
 			CreateBucketConfiguration: &s3.CreateBucketConfiguration{
 				LocationConstraint: &defaultRegion,
 			},
@@ -170,10 +161,7 @@ func (s *svc) bucketCopyLC(ctx context.Context, fromClient, toClient s3client.Cl
 		logger.Info().Msg("create bucket: lifecycle sync is disabled")
 		return nil
 	}
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != "" {
-		toBucket = p.ToBucket
-	}
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 
 	fromLC, err := fromClient.S3().GetBucketLifecycle(ctx, fromBucket)
 	if err != nil {
@@ -200,10 +188,7 @@ func (s *svc) bucketCopyPolicy(ctx context.Context, fromClient, toClient s3clien
 		logger.Info().Msg("create bucket: policy sync is disabled")
 		return nil
 	}
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != "" {
-		toBucket = p.ToBucket
-	}
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 
 	fromPolicy, err := fromClient.S3().GetBucketPolicy(ctx, fromBucket)
 	if err != nil {
@@ -230,10 +215,7 @@ func (s *svc) bucketCopyVersioning(ctx context.Context, fromClient, toClient s3c
 		logger.Info().Msg("create bucket: versioning sync is disabled")
 		return nil
 	}
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != "" {
-		toBucket = p.ToBucket
-	}
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 
 	fromVer, err := fromClient.S3().GetBucketVersioning(ctx, fromBucket)
 	if err != nil {
@@ -261,15 +243,12 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
 	if err != nil {
 		return err
 	}
 
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != "" {
-		toBucket = p.ToBucket
-	}
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 	srcExists, err := fromClient.S3().BucketExists(ctx, fromBucket)
 	if err != nil {
 		return err

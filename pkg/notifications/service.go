@@ -26,9 +26,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/minio/minio-go/v7/pkg/notification"
 
+	"slices"
+
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3client"
-	"slices"
 )
 
 type Service struct {
