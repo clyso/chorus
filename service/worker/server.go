@@ -131,7 +131,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	queueSvc := tasks.NewQueueService(taskClient, inspector)
 	policySvc := policy.NewService(confRedis, queueSvc)
 
-	err = policy_helper.CreateMainFollowerRouting(ctx, *conf.Storage, policySvc)
+	err = policy_helper.CreateMainFollowerPolicies(ctx, *conf.Storage, s3Clients, policySvc, queueSvc)
 	if err != nil {
 		return fmt.Errorf("%w: unable to create defaul main-follower policies", err)
 	}

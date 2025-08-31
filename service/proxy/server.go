@@ -108,7 +108,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("s3 clients connected")
 
 	routeSvc := router.NewRouter(s3Clients, verSvc, storageSvc, limiter)
-	replSvc := replication.New(queueSvc, verSvc)
+	replSvc := replication.New(queueSvc, verSvc, policySvc)
 	proxyMux := router.Serve(routeSvc, replSvc)
 	authCheck := auth.Middleware(conf.Auth, conf.Storage.Storages)
 	var handler http.Handler

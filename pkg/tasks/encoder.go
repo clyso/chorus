@@ -1,3 +1,17 @@
+// Copyright 2025 Clyso GmbH
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package tasks
 
 import (
@@ -8,9 +22,10 @@ import (
 	"strings"
 
 	"github.com/buger/jsonparser"
+	"github.com/hibiken/asynq"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/hibiken/asynq"
 )
 
 // encoder contains metadata for task payload.
@@ -145,7 +160,7 @@ func enqueueAny(ctx context.Context, taskClient *asynq.Client, payload any) erro
 var (
 	bucketCreate = encoder[BucketCreatePayload]{
 		taskID: func(p BucketCreatePayload) string {
-			return toTaskID("cb", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket)
+			return toTaskID("cb", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket)
 		},
 		queue: func(p BucketCreatePayload) string {
 			return initMigrationListQueue(&p)
@@ -197,7 +212,7 @@ var (
 	}
 	migrateBucketListObjects = encoder[MigrateBucketListObjectsPayload]{
 		taskID: func(p MigrateBucketListObjectsPayload) string {
-			return toTaskID("mgr:lo", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket, p.Prefix)
+			return toTaskID("mgr:lo", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket, p.Prefix)
 		},
 		queue: func(p MigrateBucketListObjectsPayload) string {
 			return initMigrationListQueue(&p)
@@ -206,7 +221,7 @@ var (
 	}
 	migrateObjCopy = encoder[MigrateObjCopyPayload]{
 		taskID: func(p MigrateObjCopyPayload) string {
-			return toTaskID("mgr:co", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket, p.Obj.Name, p.Obj.VersionID)
+			return toTaskID("mgr:co", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket, p.Obj.Name, p.Obj.VersionID)
 		},
 		queue: func(p MigrateObjCopyPayload) string {
 			return initMigrationCopyQueue(&p)
@@ -215,7 +230,7 @@ var (
 	}
 	listObjectVersions = encoder[ListObjectVersionsPayload]{
 		taskID: func(p ListObjectVersionsPayload) string {
-			return toTaskID("mgr:lov", p.FromStorage, p.ToStorage, p.Bucket, p.Prefix)
+			return toTaskID("mgr:lov", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Prefix)
 		},
 		queue: func(p ListObjectVersionsPayload) string {
 			return initMigrationListQueue(&p)
@@ -224,7 +239,7 @@ var (
 	}
 	migrateVersionedObject = encoder[MigrateVersionedObjectPayload]{
 		taskID: func(p MigrateVersionedObjectPayload) string {
-			return toTaskID("mgr:cov", p.FromStorage, p.ToStorage, p.Bucket, p.ToBucket, p.Prefix)
+			return toTaskID("mgr:cov", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket, p.Prefix)
 		},
 		queue: func(p MigrateVersionedObjectPayload) string {
 			return initMigrationCopyQueue(&p)
@@ -233,7 +248,7 @@ var (
 	}
 	zeroDowntimeReplicationSwitch = encoder[ZeroDowntimeReplicationSwitchPayload]{
 		taskID: func(p ZeroDowntimeReplicationSwitchPayload) string {
-			return toTaskID("api:zdrs", p.FromStorage, p.ToStorage, p.User, p.FromBucket)
+			return toTaskID("api:zdrs", p.Replication.FromStorage, p.Replication.ToStorage, p.Replication.User, p.Replication.FromBucket)
 		},
 		queue: func(p ZeroDowntimeReplicationSwitchPayload) string {
 			return string(QueueAPI)
@@ -242,7 +257,7 @@ var (
 	}
 	switchWithDowntime = encoder[SwitchWithDowntimePayload]{
 		taskID: func(p SwitchWithDowntimePayload) string {
-			return toTaskID("api:sd", p.FromStorage, p.ToStorage, p.User, p.FromBucket)
+			return toTaskID("api:sd", p.Replication.FromStorage, p.Replication.ToStorage, p.Replication.User, p.Replication.FromBucket)
 		},
 		queue: func(p SwitchWithDowntimePayload) string {
 			return string(QueueAPI)

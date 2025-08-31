@@ -27,6 +27,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
+	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -35,16 +36,18 @@ type Service interface {
 	Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error
 }
 
-func New(queueSvc tasks.QueueService, versionSvc meta.VersionService) Service {
+func New(queueSvc tasks.QueueService, versionSvc meta.VersionService, policySvc policy.Service) Service {
 	return &svc{
 		queueSvc:   queueSvc,
 		versionSvc: versionSvc,
+		policySvc:  policySvc,
 	}
 }
 
 type svc struct {
 	queueSvc   tasks.QueueService
 	versionSvc meta.VersionService
+	policySvc  policy.Service
 }
 
 func (s *svc) Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error {
@@ -134,16 +137,19 @@ func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVer
 		// normal flow increment source version and replicate to all followers
 		return true, destinations, nil
 	}
-	// no destinations means only two things:
-	// 1. replication is not configured - no need to do anything
-	// 2. zero-downtime switch is in progress
+	// no destinations means only 3 things:
+	// 1. bucket replication is not configured and user replication is not configured - no need to do anything
+	// 2. bucket replication is not configured BUT user replication is here - create bucket replication for CreateBucket request - Remove in next PR
+	// 3. bucket replication is archived because zero-downtime switch is in progress
 	//    - increment source version only if request routed to main storage
 	//    - replicate only for dangling multipart uploads to old main storage
 
 	inProgressZeroDowntimeSwitch := xctx.GetInProgressZeroDowntime(ctx)
 	if inProgressZeroDowntimeSwitch == nil {
+		// TODO: remove this function in the next PR after implementing new user replication policies
+		return s.createBucketReplicationFromUserReplication(ctx, routedTo)
 		// do nothing - replication was not configured
-		return false, nil, nil
+		// return false, nil, nil
 	}
 
 	// zero-downtime switch is in progress
@@ -177,4 +183,45 @@ func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVer
 	// no-error means that zero-downtime switch in progress.
 	// increment version in routed storage and skip creating replication tasks
 	return true, nil, nil
+}
+
+func (s *svc) createBucketReplicationFromUserReplication(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.ReplicationStatusID, err error) {
+	if xctx.GetMethod(ctx) != s3.CreateBucket {
+		return false, nil, nil
+	}
+	user := xctx.GetUser(ctx)
+	bucket := xctx.GetBucket(ctx)
+	// bucket replication not found. Create new bucket policy from user policy only for CreateBucket method
+
+	userPolicy, err := s.policySvc.GetUserReplicationPolicies(ctx, user)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			// user replication not configured.
+			return false, nil, nil
+		}
+		return false, nil, err
+	}
+	if userPolicy.FromStorage != routedTo {
+		// should never happen
+		return false, nil, fmt.Errorf("%w: user replication policy source storage %s does not match routed to storage %s", dom.ErrInternal, userPolicy.FromStorage, routedTo)
+	}
+	destinations := make([]entity.ReplicationStatusID, 0, len(userPolicy.Destinations))
+	for _, to := range userPolicy.Destinations {
+		replicationID := entity.ReplicationStatusID{
+			User:        user,
+			FromStorage: userPolicy.FromStorage,
+			ToStorage:   to.Storage,
+			FromBucket:  bucket,
+			ToBucket:    bucket,
+		}
+		destinations = append(destinations, replicationID)
+		err = s.policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
+		if err != nil {
+			if errors.Is(err, dom.ErrAlreadyExists) {
+				continue
+			}
+			return false, nil, fmt.Errorf("unable to add bucket replication policy from user policy: %w", err)
+		}
+	}
+	return true, destinations, nil
 }

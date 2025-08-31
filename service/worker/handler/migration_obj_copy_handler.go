@@ -42,13 +42,14 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	ctx = log.WithBucket(ctx, p.Bucket)
 	ctx = log.WithObjName(ctx, p.Obj.Name)
 	logger := zerolog.Ctx(ctx)
+	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
 
-	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.Replication.FromStorage); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.Replication.FromStorage).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ToStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.ToStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.Replication.ToStorage); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.Replication.ToStorage).Msg("rate limit error")
 		return err
 	}
 
@@ -58,7 +59,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		Version: p.Obj.VersionID,
 	}
 
-	objectLockID := entity.NewVersionedObjectLockID(p.ToStorage, p.ToBucket, p.Obj.Name, p.Obj.VersionID)
+	objectLockID := entity.NewVersionedObjectLockID(p.Replication.ToStorage, toBucket, p.Obj.Name, p.Obj.VersionID)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err
@@ -68,25 +69,21 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	if err != nil {
 		return fmt.Errorf("migration obj copy: unable to get obj meta: %w", err)
 	}
-	destVersionKey := meta.ToDest(p.ToStorage, p.ToBucket)
-	fromVer, toVer := objMeta[meta.ToDest(p.FromStorage, "")], objMeta[destVersionKey]
+	destVersionKey := meta.ToDest(p.Replication.ToStorage, toBucket)
+	fromVer, toVer := objMeta[meta.ToDest(p.Replication.FromStorage, "")], objMeta[destVersionKey]
 
 	if fromVer != 0 && fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("migration obj copy: identical from/to obj version: skip copy")
 		return nil
 	}
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != "" {
-		toBucket = p.ToBucket
-	}
 	// 1. sync obj meta and content
 	err = lock.Do(ctx, time.Second*2, func() error {
 		return s.rc.CopyTo(ctx, rclone.File{
-			Storage: p.FromStorage,
+			Storage: p.Replication.FromStorage,
 			Bucket:  fromBucket,
 			Name:    p.Obj.Name,
 		}, rclone.File{
-			Storage: p.ToStorage,
+			Storage: p.Replication.ToStorage,
 			Bucket:  toBucket,
 			Name:    p.Obj.Name,
 		}, p.Obj.Size)
@@ -99,19 +96,19 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		return fmt.Errorf("migration obj copy: unable to copy with rclone: %w", err)
 	}
 
-	fromClient, toClient, err := s.getClients(ctx, p.FromStorage, p.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
 	if err != nil {
-		return fmt.Errorf("migration obj copy: unable to get %q s3 client: %w: %w", p.FromStorage, err, asynq.SkipRetry)
+		return fmt.Errorf("migration obj copy: unable to get %q s3 client: %w: %w", p.Replication.FromStorage, err, asynq.SkipRetry)
 	}
 
 	// 2. sync obj ACL
-	err = s.syncObjectACL(ctx, fromClient, toClient, p.Bucket, p.Obj.Name, p.ToBucket)
+	err = s.syncObjectACL(ctx, fromClient, toClient, fromBucket, p.Obj.Name, toBucket)
 	if err != nil {
 		return err
 	}
 
 	// 3. sync obj tags
-	err = s.syncObjectTagging(ctx, fromClient, toClient, p.Bucket, p.Obj.Name, p.ToBucket)
+	err = s.syncObjectTagging(ctx, fromClient, toClient, fromBucket, p.Obj.Name, toBucket)
 	if err != nil {
 		return err
 	}

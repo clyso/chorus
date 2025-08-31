@@ -22,15 +22,21 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/s3client"
+	"github.com/clyso/chorus/pkg/tasks"
 )
 
-func CreateMainFollowerRouting(
+func CreateMainFollowerPolicies(
 	ctx context.Context,
 	conf s3.StorageConfig,
-	policySvc policy.Service) error {
+	clients s3client.Service,
+	policySvc policy.Service,
+	queueSvc tasks.QueueService) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -41,15 +47,21 @@ func CreateMainFollowerRouting(
 				return createRouting(ctx, policySvc, user, conf.Main())
 			})
 		}
+		if conf.CreateReplication {
+			for _, to := range conf.Followers() {
+				toCopy := to
+				g.Go(func() error {
+					return createReplication(ctx, clients, policySvc, queueSvc, user, conf.Main(), toCopy)
+				})
+			}
+		}
 	}
 	return g.Wait()
 }
-
 func createRouting(
 	ctx context.Context,
 	policySvc policy.Service,
 	user, main string) error {
-
 	err := policySvc.AddUserRoutingPolicy(ctx, user, main)
 	if err != nil {
 		if errors.Is(err, dom.ErrAlreadyExists) {
@@ -58,5 +70,65 @@ func createRouting(
 		return err
 	}
 
+	return nil
+}
+
+func createReplication(
+	ctx context.Context,
+	clients s3client.Service,
+	policySvc policy.Service,
+	queueSvc tasks.QueueService,
+	user, from, to string) error {
+	_, err := policySvc.GetUserReplicationPolicies(ctx, user)
+	if err == nil {
+		// already exists
+		return nil
+	}
+	if !errors.Is(err, dom.ErrNotFound) {
+		return err
+	}
+	policy := entity.NewUserReplicationPolicy(from, to)
+	err = policySvc.AddUserReplicationPolicy(ctx, user, policy)
+	if err != nil {
+		if errors.Is(err, dom.ErrAlreadyExists) {
+			return nil
+		}
+		return err
+	}
+	ctx = xctx.SetUser(ctx, user)
+	client, err := clients.GetByName(ctx, from)
+	if err != nil {
+		return err
+	}
+	buckets, err := client.S3().ListBuckets(ctx)
+	if err != nil {
+		return err
+	}
+	for _, bucket := range buckets {
+		replicationID := entity.ReplicationStatusID{
+			User:        user,
+			FromStorage: from,
+			FromBucket:  bucket.Name,
+			ToStorage:   to,
+			ToBucket:    bucket.Name,
+		}
+		err = policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
+		if err != nil {
+			if errors.Is(err, dom.ErrAlreadyExists) {
+				continue
+			}
+			return err
+		}
+		task := tasks.BucketCreatePayload{
+			ReplicationID: tasks.ReplicationID{
+				Replication: replicationID,
+			},
+			Bucket: bucket.Name,
+		}
+		err = queueSvc.EnqueueTask(ctx, task)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

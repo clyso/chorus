@@ -468,7 +468,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			}
 			err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
 				ReplicationID: tasks.ReplicationID{
-					ReplicationStatusID: replicationID,
+					Replication: replicationID,
 				},
 				Bucket:   bucket,
 				Location: "",
@@ -528,7 +528,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 		}
 		err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
 			ReplicationID: tasks.ReplicationID{
-				ReplicationStatusID: replicationID,
+				Replication: replicationID,
 			},
 			Bucket: bucket.Name,
 		})
@@ -821,7 +821,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 		// create task
 		err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
 			ReplicationID: tasks.ReplicationID{
-				ReplicationStatusID: replicationID,
+				Replication: replicationID,
 			},
 			Bucket: req.FromBucket,
 		})
@@ -932,7 +932,7 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 		// create switch task
 		err = h.queueSvc.EnqueueTask(ctx, tasks.SwitchWithDowntimePayload{
 			ReplicationID: tasks.ReplicationID{
-				ReplicationStatusID: policyID,
+				Replication: policyID,
 			},
 		})
 		if err != nil {
@@ -992,7 +992,7 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 		// create switch task
 		err = h.queueSvc.EnqueueTask(ctx, tasks.ZeroDowntimeReplicationSwitchPayload{
 			ReplicationID: tasks.ReplicationID{
-				ReplicationStatusID: policyID,
+				Replication: policyID,
 			},
 		})
 		if err != nil {

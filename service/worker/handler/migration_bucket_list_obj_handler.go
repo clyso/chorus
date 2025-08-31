@@ -41,14 +41,14 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 	replicationID := p.GetReplicationID()
 
-	if err := s.limit.StorReq(ctx, p.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
+	if err := s.limit.StorReq(ctx, p.Replication.FromStorage); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.Replication.FromStorage).Msg("rate limit error")
 		return err
 	}
 
-	fromClient, err := s.clients.GetByName(ctx, p.FromStorage)
+	fromClient, err := s.clients.GetByName(ctx, p.Replication.FromStorage)
 	if err != nil {
-		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.FromStorage, err, asynq.SkipRetry)
+		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.Replication.FromStorage, err, asynq.SkipRetry)
 	}
 
 	lastObjName, err := s.storageSvc.GetLastListedObj(ctx, p)

@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/entity"
 )
 
 func Test_toTaskID(t *testing.T) {
@@ -43,7 +44,7 @@ func Test_toTaskID(t *testing.T) {
 func Test_encode_BucketCreate(t *testing.T) {
 	in := BucketCreatePayload{
 		ReplicationID: ReplicationID{
-			ReplicationStatusID: entity.ReplicationStatusID{
+			Replication: entity.ReplicationStatusID{
 				User:        "u",
 				FromStorage: "fs",
 				FromBucket:  "fb",
@@ -68,7 +69,7 @@ func Test_encode_BucketCreate(t *testing.T) {
 func Test_encode_BucketDelete(t *testing.T) {
 	in := BucketDeletePayload{
 		ReplicationID: ReplicationID{
-			ReplicationStatusID: entity.ReplicationStatusID{
+			Replication: entity.ReplicationStatusID{
 				User:        "u",
 				FromStorage: "fs",
 				FromBucket:  "fb",

@@ -36,19 +36,19 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 	storage := New(c)
 	ctx := context.Background()
 	s1 := tasks.ReplicationID{
-		ReplicationStatusID: entity.ReplicationStatusID{
+		Replication: entity.ReplicationStatusID{
 			FromStorage: "a",
 			ToStorage:   "b",
 		},
 	}
 	s2 := tasks.ReplicationID{
-		ReplicationStatusID: entity.ReplicationStatusID{
+		Replication: entity.ReplicationStatusID{
 			FromStorage: "b",
 			ToStorage:   "c",
 		},
 	}
 	s3 := tasks.ReplicationID{
-		ReplicationStatusID: entity.ReplicationStatusID{
+		Replication: entity.ReplicationStatusID{
 			FromStorage: "asdf",
 			ToStorage:   "asdf",
 		},
@@ -100,7 +100,7 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 			}
 		}
 	}
-	r.NoError(storage.CleanLastListedObj(ctx, s1.FromStorage, s1.ToStorage, b1, ""))
+	r.NoError(storage.CleanLastListedObj(ctx, s1.Replication.FromStorage, s1.Replication.ToStorage, b1, ""))
 	for storIdx, stor := range stors {
 		for buckIdx, buck := range bucks {
 			for prefIdx, pref := range prefs {
@@ -110,7 +110,7 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 					Prefix:        pref,
 				})
 				r.NoError(err)
-				if buck == b1 && stor.ToStorage == s1.ToStorage && stor.FromStorage == s1.FromStorage {
+				if buck == b1 && stor.Replication.ToStorage == s1.Replication.ToStorage && stor.Replication.FromStorage == s1.Replication.FromStorage {
 					r.Empty(res)
 					break
 				}
@@ -131,7 +131,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 
 	noDestBuckNoPrefix := tasks.MigrateBucketListObjectsPayload{
 		ReplicationID: tasks.ReplicationID{
-			ReplicationStatusID: entity.ReplicationStatusID{
+			Replication: entity.ReplicationStatusID{
 				FromStorage: "a",
 				ToStorage:   "b",
 				ToBucket:    "c",
@@ -143,7 +143,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 	r.NoError(storage.SetLastListedObj(ctx, noDestBuckNoPrefix, "nbnp"))
 	noDestBuckWithPrefix := tasks.MigrateBucketListObjectsPayload{
 		ReplicationID: tasks.ReplicationID{
-			ReplicationStatusID: entity.ReplicationStatusID{
+			Replication: entity.ReplicationStatusID{
 				FromStorage: "a",
 				ToStorage:   "b",
 				ToBucket:    "c",
@@ -155,7 +155,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 	r.NoError(storage.SetLastListedObj(ctx, noDestBuckWithPrefix, "nbwp"))
 	withDestBuckNoPrefix := tasks.MigrateBucketListObjectsPayload{
 		ReplicationID: tasks.ReplicationID{
-			ReplicationStatusID: entity.ReplicationStatusID{
+			Replication: entity.ReplicationStatusID{
 				FromStorage: "a",
 				ToStorage:   "b",
 				ToBucket:    destBuck,
@@ -167,7 +167,7 @@ func Test_GetLastListedObjWithCustomDestBucket(t *testing.T) {
 	r.NoError(storage.SetLastListedObj(ctx, withDestBuckNoPrefix, "wbnp"))
 	withDestBuckWithPrefix := tasks.MigrateBucketListObjectsPayload{
 		ReplicationID: tasks.ReplicationID{
-			ReplicationStatusID: entity.ReplicationStatusID{
+			Replication: entity.ReplicationStatusID{
 				FromStorage: "a",
 				ToStorage:   "b",
 				ToBucket:    destBuck,

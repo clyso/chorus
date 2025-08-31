@@ -71,53 +71,53 @@ type TaskPayload interface {
 type ReplicationTask interface {
 	SetReplicationID(id entity.ReplicationStatusID)
 	GetReplicationID() entity.ReplicationStatusID
-	EvaluateToBucket(bucket string) string
+	FromToBuckets(taskBucket string) (from, to string)
 	validate() error
 }
 
 type ReplicationID struct {
-	entity.ReplicationStatusID
+	Replication entity.ReplicationStatusID
 }
 
 var _ ReplicationTask = (*ReplicationID)(nil)
 
 func (t *ReplicationID) GetReplicationID() entity.ReplicationStatusID {
-	return t.ReplicationStatusID
+	return t.Replication
 }
 
 func (t *ReplicationID) SetReplicationID(id entity.ReplicationStatusID) {
-	t.ReplicationStatusID = id
+	t.Replication = id
 }
 
 func (t *ReplicationID) validate() error {
-	if t.FromStorage == "" {
-		return fmt.Errorf("%w: invalid task replication id %+v: FromStorage required", dom.ErrInvalidArg, t.ReplicationStatusID)
+	if t.Replication.FromStorage == "" {
+		return fmt.Errorf("%w: invalid task replication id %+v: FromStorage required", dom.ErrInvalidArg, t.Replication)
 	}
-	if t.ToStorage == "" {
-		return fmt.Errorf("%w: invalid task replication id %+v: ToStorage required", dom.ErrInvalidArg, t.ReplicationStatusID)
+	if t.Replication.ToStorage == "" {
+		return fmt.Errorf("%w: invalid task replication id %+v: ToStorage required", dom.ErrInvalidArg, t.Replication)
 	}
 	// FromBucket and ToBucket should be either both set or both empty
-	if (t.FromBucket == "") != (t.ToBucket == "") {
-		return fmt.Errorf("%w: invalid task replication id %+v: FromBucket and ToBucket should be either both set or both empty", dom.ErrInvalidArg, t.ReplicationStatusID)
+	if (t.Replication.FromBucket == "") != (t.Replication.ToBucket == "") {
+		return fmt.Errorf("%w: invalid task replication id %+v: FromBucket and ToBucket should be either both set or both empty", dom.ErrInvalidArg, t.Replication)
 	}
 	return nil
 }
 
-func (t *ReplicationID) EvaluateToBucket(taskBucket string) string {
-	if t.FromBucket == "" {
+func (t *ReplicationID) FromToBuckets(taskBucket string) (from, to string) {
+	if t.Replication.FromBucket == "" {
 		// user replication policy
 		// keep bucket name the same
-		return taskBucket
+		return taskBucket, taskBucket
 	}
-	if t.FromBucket != taskBucket {
+	if t.Replication.FromBucket != taskBucket {
 		// should not happen
-		panic(fmt.Sprintf("replication task bucket name is different from source bucket name: expected %s, got %s", t.FromBucket, taskBucket))
+		panic(fmt.Sprintf("replication task bucket name is different from source bucket name: expected %s, got %s", t.Replication.FromBucket, taskBucket))
 	}
-	if t.ToBucket == "" {
+	if t.Replication.ToBucket == "" {
 		// should never happen. If FromBucket is set, ToBucket must be set too.
-		return taskBucket
+		return taskBucket, taskBucket
 	}
-	return t.ToBucket
+	return taskBucket, t.Replication.ToBucket
 }
 
 type ZeroDowntimeReplicationSwitchPayload struct {

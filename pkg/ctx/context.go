@@ -127,7 +127,7 @@ func SetUser(ctx context.Context, u string) context.Context {
 		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty user to ctx")
 		return ctx
 	}
-	if prev := GetUser(ctx); prev != "" {
+	if prev := GetUser(ctx); prev != "" && prev != u {
 		zerolog.Ctx(ctx).Warn().Msgf("cannot set user %s, ctx already contains user %s", u, prev)
 		return ctx
 	}

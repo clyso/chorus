@@ -37,11 +37,11 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 		return fmt.Errorf("ZeroDowntimeReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	// switch not allowed for custom bucket name:
-	if p.FromBucket != p.ToBucket {
+	if p.Replication.FromBucket != p.Replication.ToBucket {
 		// should never happen
 		return fmt.Errorf("invalid switch with downtime task: from and to bucket must be equal: %w", asynq.SkipRetry)
 	}
-	ctx = log.WithBucket(ctx, p.FromBucket)
+	ctx = log.WithBucket(ctx, p.Replication.FromBucket)
 	policyID := p.GetReplicationID()
 
 	// acquire exclusive lock to switch task:
@@ -90,7 +90,7 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p tasks.Z
 		// events queue is not drained yet - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 	}
-	existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.User, p.FromBucket)
+	existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.Replication.User, p.Replication.FromBucket)
 	if err != nil {
 		return err
 	}
