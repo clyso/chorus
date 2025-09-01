@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hibiken/asynq"
 
@@ -58,6 +59,13 @@ func (e encoder[T]) Encode(ctx context.Context, payload T) (*asynq.Task, error) 
 		}
 		optionList = append(optionList, asynq.TaskID(id))
 	}
+
+	// Even though the internal asynq task presentation allows infinite tasks by setting the timeout
+	// to 0 (see asynqs TaskMessage struct in internal/base/base.go), asynq.NewTask() prevents this
+	// by setting a default timeout of 30 minutes if no deadline and a timeout of 0 is configured.
+	// Since golangs time.Duration has no value for infinity, we just set a timeout of 100 years here,
+	// which is most likely long enough for most tasks.
+	optionList = append(optionList, asynq.Timeout(100*24*365*time.Hour))
 	return asynq.NewTask(e.taskType, bytes, optionList...), nil
 }
 
