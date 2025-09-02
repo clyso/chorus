@@ -39,7 +39,7 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwitchWithDowntimePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
-	policyID := p.GetReplicationID()
+	policyID := p.ID
 
 	lock, err := s.replicationstatusLocker.Lock(ctx, policyID)
 	if err != nil {

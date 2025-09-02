@@ -41,14 +41,14 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 	replicationID := p.GetReplicationID()
 
-	if err := s.limit.StorReq(ctx, p.Replication.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.Replication.FromStorage).Msg("rate limit error")
+	if err := s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
 
-	fromClient, err := s.clients.GetByName(ctx, p.Replication.FromStorage)
+	fromClient, err := s.clients.GetByName(ctx, p.ID.FromStorage())
 	if err != nil {
-		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.Replication.FromStorage, err, asynq.SkipRetry)
+		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.ID.FromStorage(), err, asynq.SkipRetry)
 	}
 
 	lastObjName, err := s.storageSvc.GetLastListedObj(ctx, p)
@@ -79,18 +79,18 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		}
 
 		if p.Versioned {
-			err = s.queueSvc.EnqueueTask(ctx, tasks.ListObjectVersionsPayload{
-				ReplicationID: p.ReplicationID,
-				Bucket:        p.Bucket,
-				Prefix:        object.Key,
-			})
+			task := tasks.ListObjectVersionsPayload{
+				Bucket: p.Bucket,
+				Prefix: object.Key,
+			}
+			task.SetReplicationID(replicationID)
+			err = s.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return fmt.Errorf("unable to create list object versions task: %w", err)
 			}
 		} else {
-			err = s.queueSvc.EnqueueTask(ctx, tasks.MigrateObjCopyPayload{
-				ReplicationID: p.ReplicationID,
-				Bucket:        p.Bucket,
+			task := tasks.MigrateObjCopyPayload{
+				Bucket: p.Bucket,
 				Obj: tasks.ObjPayload{
 					Name:        object.Key,
 					VersionID:   object.VersionID,
@@ -98,7 +98,9 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 					Size:        object.Size,
 					ContentType: object.ContentType,
 				},
-			})
+			}
+			task.SetReplicationID(replicationID)
+			err = s.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 			}
@@ -111,13 +113,14 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 
 	if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
 		// copy empty dir object
-		err = s.queueSvc.EnqueueTask(ctx, tasks.MigrateObjCopyPayload{
-			ReplicationID: p.ReplicationID,
-			Bucket:        p.Bucket,
+		task := tasks.MigrateObjCopyPayload{
+			Bucket: p.Bucket,
 			Obj: tasks.ObjPayload{
 				Name: p.Prefix,
 			},
-		})
+		}
+		task.SetReplicationID(replicationID)
+		err = s.queueSvc.EnqueueTask(ctx, task)
 		if err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		}
@@ -125,7 +128,13 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	_ = s.storageSvc.DelLastListedObj(ctx, p)
 
 	if p.Prefix == "" {
-		err = s.policySvc.ObjListStarted(ctx, replicationID)
+		// TODO: this conversion will be removed in the next PR when policy svc will be refactored to use universal replication ID
+		bucketReplID, ok := replicationID.AsBucketID()
+		if !ok {
+			// not possible
+			panic("invalid replication ID type")
+		}
+		err = s.policySvc.ObjListStarted(ctx, bucketReplID)
 		if err != nil {
 			logger.Err(err).Msg("migration bucket list obj: unable to set ObjListStarted")
 		}

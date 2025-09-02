@@ -40,14 +40,14 @@ func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("BucketSyncACLPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
-	fromBucket, toBucket := p.FromToBuckets(p.Bucket)
+	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}
 
-	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.Replication.ToStorage, toBucket))
+	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.ID.ToStorage(), toBucket))
 	if err != nil {
 		return err
 	}
@@ -67,14 +67,14 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
-	fromBucket, toBucket := p.FromToBuckets(p.Object.Bucket)
+	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}
 
-	objectLockID := entity.NewVersionedObjectLockID(p.Replication.ToStorage, toBucket, p.Object.Name, p.Object.Version)
+	objectLockID := entity.NewVersionedObjectLockID(p.ID.ToStorage(), toBucket, p.Object.Name, p.Object.Version)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err

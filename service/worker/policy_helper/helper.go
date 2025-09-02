@@ -120,11 +120,9 @@ func createReplication(
 			return err
 		}
 		task := tasks.BucketCreatePayload{
-			ReplicationID: tasks.ReplicationID{
-				Replication: replicationID,
-			},
 			Bucket: bucket.Name,
 		}
+		task.SetReplicationID(entity.IDFromBucketReplication(replicationID))
 		err = queueSvc.EnqueueTask(ctx, task)
 		if err != nil {
 			return err

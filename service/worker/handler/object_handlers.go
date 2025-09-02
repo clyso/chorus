@@ -43,18 +43,18 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
 	logger := zerolog.Ctx(ctx)
-	fromBucket, toBucket := p.FromToBuckets(p.Object.Bucket)
+	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
-	if err = s.limit.StorReq(ctx, p.Replication.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.Replication.FromStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.Replication.ToStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.Replication.ToStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
 
-	objectLockID := entity.NewVersionedObjectLockID(p.Replication.ToStorage, toBucket, p.Object.Name, p.Object.Version)
+	objectLockID := entity.NewVersionedObjectLockID(p.ID.ToStorage(), toBucket, p.Object.Name, p.Object.Version)
 	lock, err := s.objectLocker.Lock(ctx, objectLockID)
 	if err != nil {
 		return err
@@ -69,8 +69,8 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		return s.objectDelete(ctx, p)
 	}
 
-	destVersionKey := meta.ToDest(p.Replication.ToStorage, toBucket)
-	fromVer, toVer := objMeta[meta.ToDest(p.Replication.FromStorage, "")], objMeta[destVersionKey]
+	destVersionKey := meta.ToDest(p.ID.ToStorage(), toBucket)
+	fromVer, toVer := objMeta[meta.ToDest(p.ID.FromStorage(), "")], objMeta[destVersionKey]
 	if fromVer <= toVer {
 		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("object sync: identical from/to obj version: skip copy")
 		return nil
@@ -78,11 +78,11 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 
 	err = lock.Do(ctx, time.Second*2, func() error {
 		return s.rc.CopyTo(ctx, rclone.File{
-			Storage: p.Replication.FromStorage,
+			Storage: p.ID.FromStorage(),
 			Bucket:  fromBucket,
 			Name:    p.Object.Name,
 		}, rclone.File{
-			Storage: p.Replication.ToStorage,
+			Storage: p.ID.ToStorage(),
 			Bucket:  toBucket,
 			Name:    p.Object.Name,
 		}, p.ObjSize)
@@ -104,7 +104,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 }
 
 func (s *svc) objectDelete(ctx context.Context, p tasks.ObjectSyncPayload) (err error) {
-	fromClient, toClient, err := s.getClients(ctx, p.Replication.FromStorage, p.Replication.ToStorage)
+	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (s *svc) objectDelete(ctx context.Context, p tasks.ObjectSyncPayload) (err 
 		return nil
 	}
 
-	toBucket, _ := p.FromToBuckets(p.Object.Bucket)
+	_, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 	err = toClient.S3().RemoveObject(ctx, toBucket, p.Object.Name, mclient.RemoveObjectOptions{VersionID: p.Object.Version})
 	return
 }

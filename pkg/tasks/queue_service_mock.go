@@ -34,7 +34,7 @@ func (q *QueueServiceMock) EnqueueTask(ctx context.Context, task any) error {
 }
 
 // InitReplicationInProgress test helper to initialize queues for replication in progress
-func (q *QueueServiceMock) InitReplicationInProgress(id entity.ReplicationStatusID) {
+func (q *QueueServiceMock) InitReplicationInProgress(id entity.UniversalReplicationID) {
 	queues := InitMigrationQueues(id)
 	for _, queue := range queues {
 		q.Queues[queue] = 1 // not empty
@@ -42,7 +42,7 @@ func (q *QueueServiceMock) InitReplicationInProgress(id entity.ReplicationStatus
 }
 
 // InitReplicationDone test helper to make init replication queues empty
-func (q *QueueServiceMock) InitReplicationDone(id entity.ReplicationStatusID) {
+func (q *QueueServiceMock) InitReplicationDone(id entity.UniversalReplicationID) {
 	queues := InitMigrationQueues(id)
 	for _, queue := range queues {
 		q.Queues[queue] = 0 // empty
@@ -50,14 +50,14 @@ func (q *QueueServiceMock) InitReplicationDone(id entity.ReplicationStatusID) {
 }
 
 // EventReplicationInProgress test helper to make event replication queue non-empty
-func (q *QueueServiceMock) EventReplicationInProgress(id entity.ReplicationStatusID) {
+func (q *QueueServiceMock) EventReplicationInProgress(id entity.UniversalReplicationID) {
 	queues := EventMigrationQueues(id)
 	for _, queue := range queues {
 		q.Queues[queue] = 1 // not empty
 	}
 }
 
-func (q *QueueServiceMock) EventReplicationLag(id entity.ReplicationStatusID, lag int) {
+func (q *QueueServiceMock) EventReplicationLag(id entity.UniversalReplicationID, lag int) {
 	queues := EventMigrationQueues(id)
 	for _, queue := range queues {
 		q.Queues[queue] = lag
@@ -65,7 +65,7 @@ func (q *QueueServiceMock) EventReplicationLag(id entity.ReplicationStatusID, la
 }
 
 // EventReplicationDone test helper to make event replication queue empty
-func (q *QueueServiceMock) EventReplicationDone(id entity.ReplicationStatusID) {
+func (q *QueueServiceMock) EventReplicationDone(id entity.UniversalReplicationID) {
 	queues := EventMigrationQueues(id)
 	for _, queue := range queues {
 		q.Queues[queue] = 0 // empty

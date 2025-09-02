@@ -87,15 +87,15 @@ func initPolicyContext(ctx context.Context, policySvc policy.Service) (context.C
 		return nil, err
 	}
 	if replicationPolicies != nil {
-		var replications []entity.ReplicationStatusID
+		var replications []entity.UniversalReplicationID
 		for _, replTo := range replicationPolicies.Destinations {
-			replications = append(replications, entity.ReplicationStatusID{
+			replications = append(replications, entity.IDFromBucketReplication(entity.ReplicationStatusID{
 				User:        user,
 				FromStorage: replicationPolicies.FromStorage,
 				FromBucket:  bucket,
 				ToStorage:   replTo.Storage,
 				ToBucket:    replTo.Bucket,
-			})
+			}))
 		}
 		if len(replications) != 0 {
 			ctx = xctx.SetReplications(ctx, replications)

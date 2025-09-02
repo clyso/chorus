@@ -160,12 +160,12 @@ func SetRoutingPolicy(ctx context.Context, p string) context.Context {
 	return context.WithValue(ctx, routingPolicyKey{}, p)
 }
 
-func GetReplications(ctx context.Context) []entity.ReplicationStatusID {
-	r, _ := ctx.Value(replicationsKey{}).([]entity.ReplicationStatusID)
+func GetReplications(ctx context.Context) []entity.UniversalReplicationID {
+	r, _ := ctx.Value(replicationsKey{}).([]entity.UniversalReplicationID)
 	return r
 }
 
-func SetReplications(ctx context.Context, r []entity.ReplicationStatusID) context.Context {
+func SetReplications(ctx context.Context, r []entity.UniversalReplicationID) context.Context {
 	return context.WithValue(ctx, replicationsKey{}, r)
 }
 

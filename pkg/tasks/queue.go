@@ -51,30 +51,30 @@ var Priority = map[string]int{
 	"*":                                          1, // fallback for legacy queues
 }
 
-func replicationQueueName(queuePrefix Queue, id entity.ReplicationStatusID) string {
+func replicationQueueName(queuePrefix Queue, id entity.UniversalReplicationID) string {
 	switch queuePrefix {
 	case QueueMigrateCopyObjectPrefix,
 		QueueMigrateListObjectsPrefix,
 		QueueEventsPrefix:
-		return fmt.Sprintf("%s:%s:%s:%s:%s", queuePrefix, id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket)
+		return fmt.Sprintf("%s:%s", queuePrefix, id.AsString())
 	default:
 		panic(fmt.Sprintf("%s is not a replication queue prefix", queuePrefix))
 	}
 }
 
-func InitMigrationQueues(id entity.ReplicationStatusID) []string {
+func InitMigrationQueues(id entity.UniversalReplicationID) []string {
 	return []string{
 		replicationQueueName(QueueMigrateListObjectsPrefix, id),
 		replicationQueueName(QueueMigrateCopyObjectPrefix, id),
 	}
 }
 
-func EventMigrationQueues(id entity.ReplicationStatusID) []string {
+func EventMigrationQueues(id entity.UniversalReplicationID) []string {
 	return []string{
 		replicationQueueName(QueueEventsPrefix, id),
 	}
 }
 
-func AllReplicationQueues(id entity.ReplicationStatusID) []string {
+func AllReplicationQueues(id entity.UniversalReplicationID) []string {
 	return append(InitMigrationQueues(id), EventMigrationQueues(id)...)
 }

@@ -40,15 +40,16 @@ type encoder[T TaskPayload] struct {
 }
 
 func (e encoder[T]) Encode(ctx context.Context, payload T) (*asynq.Task, error) {
+	// Ensure that replication ID is set for replication tasks.
+	if replTask, ok := any(&payload).(ReplicationTask); ok {
+		id := replTask.GetReplicationID()
+		if id.IsEmpty() {
+			return nil, fmt.Errorf("%w: replicationID is not set to replication task: %#v. Use task.SetReplicationID() method", dom.ErrInternal, payload)
+		}
+	}
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
-	}
-	if replTask, ok := any(payload).(ReplicationTask); ok {
-		err = replTask.validate()
-		if err != nil {
-			return nil, err
-		}
 	}
 	if xctx.GetUser(ctx) != "" {
 		// TODO: remove and test. Should be redundant because user is already presented in replicationID in task payload
@@ -153,14 +154,14 @@ func enqueueAny(ctx context.Context, taskClient *asynq.Client, payload any) erro
 	case ConsistencyCheckDeletePayload:
 		return consistencyCheckDelete.Enqueue(ctx, taskClient, p)
 	default:
-		return fmt.Errorf("%w: unknown payload type %T", dom.ErrInternal, payload)
+		return fmt.Errorf("%w: unsupported payload type %T. Define encoder[%T] instance in pkg/tasks/encoder.go and add it to encodeAny switch statement", dom.ErrNotImplemented, payload, payload)
 	}
 }
 
 var (
 	bucketCreate = encoder[BucketCreatePayload]{
 		taskID: func(p BucketCreatePayload) string {
-			return toTaskID("cb", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket)
+			return toTaskID("cb", p.ID.AsString(), p.Bucket)
 		},
 		queue: func(p BucketCreatePayload) string {
 			return initMigrationListQueue(&p)
@@ -212,7 +213,7 @@ var (
 	}
 	migrateBucketListObjects = encoder[MigrateBucketListObjectsPayload]{
 		taskID: func(p MigrateBucketListObjectsPayload) string {
-			return toTaskID("mgr:lo", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket, p.Prefix)
+			return toTaskID("mgr:lo", p.ID.AsString(), p.Bucket, p.Prefix)
 		},
 		queue: func(p MigrateBucketListObjectsPayload) string {
 			return initMigrationListQueue(&p)
@@ -221,7 +222,7 @@ var (
 	}
 	migrateObjCopy = encoder[MigrateObjCopyPayload]{
 		taskID: func(p MigrateObjCopyPayload) string {
-			return toTaskID("mgr:co", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket, p.Obj.Name, p.Obj.VersionID)
+			return toTaskID("mgr:co", p.ID.AsString(), p.Bucket, p.Obj.Name, p.Obj.VersionID)
 		},
 		queue: func(p MigrateObjCopyPayload) string {
 			return initMigrationCopyQueue(&p)
@@ -230,7 +231,7 @@ var (
 	}
 	listObjectVersions = encoder[ListObjectVersionsPayload]{
 		taskID: func(p ListObjectVersionsPayload) string {
-			return toTaskID("mgr:lov", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Prefix)
+			return toTaskID("mgr:lov", p.ID.AsString(), p.Bucket, p.Prefix)
 		},
 		queue: func(p ListObjectVersionsPayload) string {
 			return initMigrationListQueue(&p)
@@ -239,7 +240,7 @@ var (
 	}
 	migrateVersionedObject = encoder[MigrateVersionedObjectPayload]{
 		taskID: func(p MigrateVersionedObjectPayload) string {
-			return toTaskID("mgr:cov", p.Replication.FromStorage, p.Replication.ToStorage, p.Bucket, p.Replication.ToBucket, p.Prefix)
+			return toTaskID("mgr:cov", p.ID.AsString(), p.Bucket, p.Prefix)
 		},
 		queue: func(p MigrateVersionedObjectPayload) string {
 			return initMigrationCopyQueue(&p)
@@ -248,7 +249,7 @@ var (
 	}
 	zeroDowntimeReplicationSwitch = encoder[ZeroDowntimeReplicationSwitchPayload]{
 		taskID: func(p ZeroDowntimeReplicationSwitchPayload) string {
-			return toTaskID("api:zdrs", p.Replication.FromStorage, p.Replication.ToStorage, p.Replication.User, p.Replication.FromBucket)
+			return toTaskID("api:zdrs", p.ID.FromStorage, p.ID.FromBucket, p.ID.ToStorage, p.ID.ToBucket)
 		},
 		queue: func(p ZeroDowntimeReplicationSwitchPayload) string {
 			return string(QueueAPI)
@@ -257,7 +258,7 @@ var (
 	}
 	switchWithDowntime = encoder[SwitchWithDowntimePayload]{
 		taskID: func(p SwitchWithDowntimePayload) string {
-			return toTaskID("api:sd", p.Replication.FromStorage, p.Replication.ToStorage, p.Replication.User, p.Replication.FromBucket)
+			return toTaskID("api:sd", p.ID.FromStorage, p.ID.FromBucket, p.ID.ToStorage, p.ID.ToBucket)
 		},
 		queue: func(p SwitchWithDowntimePayload) string {
 			return string(QueueAPI)

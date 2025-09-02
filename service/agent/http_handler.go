@@ -68,18 +68,20 @@ func HTTPHandler(policySvc policy.Service, handler *notifications.Handler) http.
 				util.WriteError(ctx, w, err)
 				return
 			}
-			var replications []entity.ReplicationStatusID
-			for _, replTo := range replicationPolicies.Destinations {
-				replications = append(replications, entity.ReplicationStatusID{
-					User:        user,
-					FromStorage: replicationPolicies.FromStorage,
-					FromBucket:  bucket,
-					ToStorage:   replTo.Storage,
-					ToBucket:    replTo.Bucket,
-				})
-			}
-			if len(replications) != 0 {
-				ctx = xctx.SetReplications(ctx, replications)
+			if replicationPolicies != nil {
+				var replications []entity.UniversalReplicationID
+				for _, replTo := range replicationPolicies.Destinations {
+					replications = append(replications, entity.IDFromBucketReplication(entity.ReplicationStatusID{
+						User:        user,
+						FromStorage: replicationPolicies.FromStorage,
+						FromBucket:  bucket,
+						ToStorage:   replTo.Storage,
+						ToBucket:    replTo.Bucket,
+					}))
+				}
+				if len(replications) != 0 {
+					ctx = xctx.SetReplications(ctx, replications)
+				}
 			}
 			methodArr := strings.Split(record.EventName, ":")
 			switch methodArr[len(methodArr)-1] {

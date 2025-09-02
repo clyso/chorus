@@ -42,50 +42,47 @@ func Test_toTaskID(t *testing.T) {
 }
 
 func Test_encode_BucketCreate(t *testing.T) {
-	in := BucketCreatePayload{
-		ReplicationID: ReplicationID{
-			Replication: entity.ReplicationStatusID{
-				User:        "u",
-				FromStorage: "fs",
-				FromBucket:  "fb",
-				ToStorage:   "ts",
-				ToBucket:    "tb",
-			},
-		},
-		Bucket:   "b",
+	r := require.New(t)
+	expect := BucketCreatePayload{
+		Bucket:   "fb",
 		Location: "l",
 	}
-	r := require.New(t)
-	task, err := bucketCreate.Encode(context.Background(), in)
+	_, err := bucketCreate.Encode(context.Background(), expect)
+	t.Log(err)
+	r.Error(err, " should fail without replication ID")
+
+	expect.SetReplicationID(entity.IDFromBucketReplication(entity.ReplicationStatusID{
+		User:        "u",
+		FromStorage: "fs",
+		FromBucket:  "fb",
+		ToStorage:   "ts",
+		ToBucket:    "tb",
+	}))
+
+	// encode
+	task, err := bucketCreate.Encode(context.Background(), expect)
 	r.NoError(err)
 	r.Equal(TypeBucketCreate, task.Type())
 	payload := task.Payload()
+	// decode back
 	got := BucketCreatePayload{}
 	err = json.Unmarshal(payload, &got)
 	r.NoError(err)
-	r.EqualValues(in, got)
-}
 
-func Test_encode_BucketDelete(t *testing.T) {
-	in := BucketDeletePayload{
-		ReplicationID: ReplicationID{
-			Replication: entity.ReplicationStatusID{
-				User:        "u",
-				FromStorage: "fs",
-				FromBucket:  "fb",
-				ToStorage:   "ts",
-				ToBucket:    "tb",
-			},
-		},
-		Bucket: "b",
-	}
-	r := require.New(t)
-	task, err := bucketDelete.Encode(context.Background(), in)
-	r.NoError(err)
-	r.Equal(TypeBucketDelete, task.Type())
-	payload := task.Payload()
-	got := BucketDeletePayload{}
-	err = json.Unmarshal(payload, &got)
-	r.NoError(err)
-	r.EqualValues(in, got)
+	// check that all fields preserved
+	r.EqualValues(expect.ID.AsString(), got.ID.AsString())
+	r.EqualValues(expect.Bucket, got.Bucket)
+	r.EqualValues(expect.Location, got.Location)
+	r.EqualValues(expect.ID.FromStorage(), got.ID.FromStorage())
+	r.EqualValues("fs", got.ID.FromStorage())
+	r.EqualValues(expect.ID.ToStorage(), got.ID.ToStorage())
+	r.EqualValues("ts", got.ID.ToStorage())
+	r.EqualValues(expect.ID.User(), got.ID.User())
+	r.EqualValues("u", got.ID.User())
+	expectFromBucket, expectToBucket := expect.ID.FromToBuckets(expect.Bucket)
+	gotFromBucket, gotToBucket := got.ID.FromToBuckets(got.Bucket)
+	r.EqualValues(expectFromBucket, gotFromBucket)
+	r.EqualValues(expectToBucket, gotToBucket)
+	r.EqualValues("fb", gotFromBucket)
+	r.EqualValues("tb", gotToBucket)
 }
