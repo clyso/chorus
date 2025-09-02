@@ -133,7 +133,8 @@ func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor st
 }
 
 func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error {
-	key := fmt.Sprintf("s:%s:%s:%s:%s", task.Replication.FromStorage, task.Replication.ToStorage, task.Bucket, task.Replication.ToBucket)
+	fromBucket, toBucket := task.ID.FromToBuckets(task.Bucket)
+	key := fmt.Sprintf("s:%s:%s:%s:%s", task.ID.FromStorage(), task.ID.ToStorage(), fromBucket, toBucket)
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -141,7 +142,8 @@ func (s *svc) DelLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 }
 
 func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) (string, error) {
-	key := fmt.Sprintf("s:%s:%s:%s:%s", task.Replication.FromStorage, task.Replication.ToStorage, task.Bucket, task.Replication.ToBucket)
+	fromBucket, toBucket := task.ID.FromToBuckets(task.Bucket)
+	key := fmt.Sprintf("s:%s:%s:%s:%s", task.ID.FromStorage(), task.ID.ToStorage(), fromBucket, toBucket)
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}
@@ -153,7 +155,8 @@ func (s *svc) GetLastListedObj(ctx context.Context, task tasks.MigrateBucketList
 }
 
 func (s *svc) SetLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload, val string) error {
-	key := fmt.Sprintf("s:%s:%s:%s:%s", task.Replication.FromStorage, task.Replication.ToStorage, task.Bucket, task.Replication.ToBucket)
+	fromBucket, toBucket := task.ID.FromToBuckets(task.Bucket)
+	key := fmt.Sprintf("s:%s:%s:%s:%s", task.ID.FromStorage(), task.ID.ToStorage(), fromBucket, toBucket)
 	if task.Prefix != "" {
 		key += ":" + task.Prefix
 	}

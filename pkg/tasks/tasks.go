@@ -17,8 +17,6 @@
 package tasks
 
 import (
-	"fmt"
-
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 )
@@ -69,91 +67,64 @@ type TaskPayload interface {
 }
 
 type ReplicationTask interface {
-	SetReplicationID(id entity.ReplicationStatusID)
-	GetReplicationID() entity.ReplicationStatusID
-	FromToBuckets(taskBucket string) (from, to string)
-	validate() error
+	SetReplicationID(id entity.UniversalReplicationID)
+	GetReplicationID() entity.UniversalReplicationID
 }
 
-type ReplicationID struct {
-	Replication entity.ReplicationStatusID
+type replicationID struct {
+	ID entity.UniversalReplicationID
 }
 
-var _ ReplicationTask = (*ReplicationID)(nil)
-
-func (t *ReplicationID) GetReplicationID() entity.ReplicationStatusID {
-	return t.Replication
+func (r *replicationID) GetReplicationID() entity.UniversalReplicationID {
+	return r.ID
 }
 
-func (t *ReplicationID) SetReplicationID(id entity.ReplicationStatusID) {
-	t.Replication = id
+func (r *replicationID) SetReplicationID(id entity.UniversalReplicationID) {
+	r.ID = id
 }
 
-func (t *ReplicationID) validate() error {
-	if t.Replication.FromStorage == "" {
-		return fmt.Errorf("%w: invalid task replication id %+v: FromStorage required", dom.ErrInvalidArg, t.Replication)
-	}
-	if t.Replication.ToStorage == "" {
-		return fmt.Errorf("%w: invalid task replication id %+v: ToStorage required", dom.ErrInvalidArg, t.Replication)
-	}
-	// FromBucket and ToBucket should be either both set or both empty
-	if (t.Replication.FromBucket == "") != (t.Replication.ToBucket == "") {
-		return fmt.Errorf("%w: invalid task replication id %+v: FromBucket and ToBucket should be either both set or both empty", dom.ErrInvalidArg, t.Replication)
-	}
-	return nil
-}
-
-func (t *ReplicationID) FromToBuckets(taskBucket string) (from, to string) {
-	if t.Replication.FromBucket == "" {
-		// user replication policy
-		// keep bucket name the same
-		return taskBucket, taskBucket
-	}
-	if t.Replication.FromBucket != taskBucket {
-		// should not happen
-		panic(fmt.Sprintf("replication task bucket name is different from source bucket name: expected %s, got %s", t.Replication.FromBucket, taskBucket))
-	}
-	if t.Replication.ToBucket == "" {
-		// should never happen. If FromBucket is set, ToBucket must be set too.
-		return taskBucket, taskBucket
-	}
-	return taskBucket, t.Replication.ToBucket
-}
+var _ ReplicationTask = (*replicationID)(nil)
 
 type ZeroDowntimeReplicationSwitchPayload struct {
-	ReplicationID
+	// TODO: use entity.UniversalReplicationID in the next PR
+	ID entity.ReplicationStatusID
+}
+
+type SwitchWithDowntimePayload struct {
+	// TODO: use entity.UniversalReplicationID in the next PR
+	ID entity.ReplicationStatusID
 }
 
 type BucketSyncTagsPayload struct {
+	replicationID
 	Bucket string
-	ReplicationID
 }
 
 type ObjSyncTagsPayload struct {
+	replicationID
 	Object dom.Object
-	ReplicationID
 }
 
 type BucketSyncACLPayload struct {
+	replicationID
 	Bucket string
-	ReplicationID
 }
 
 type ObjSyncACLPayload struct {
+	replicationID
 	Object dom.Object
-	ReplicationID
 }
 
 type BucketCreatePayload struct {
-	ReplicationID
+	replicationID
 	Bucket   string
 	Location string
 	//Storage  string
 }
 
 type ObjectSyncPayload struct {
+	replicationID
 	Object dom.Object
-	ReplicationID
 
 	//FromVersion int64
 	ObjSize int64
@@ -161,7 +132,7 @@ type ObjectSyncPayload struct {
 }
 
 type BucketDeletePayload struct {
-	ReplicationID
+	replicationID
 	Bucket string
 	//Storage string
 }
@@ -172,26 +143,26 @@ type ObjInfo struct {
 }
 
 type ListObjectVersionsPayload struct {
-	ReplicationID
+	replicationID
 	Bucket string
 	Prefix string
 }
 
 type MigrateVersionedObjectPayload struct {
-	ReplicationID
+	replicationID
 	Bucket string
 	Prefix string
 }
 
 type MigrateBucketListObjectsPayload struct {
-	ReplicationID
+	replicationID
 	Bucket    string
 	Prefix    string
 	Versioned bool
 }
 
 type MigrateObjCopyPayload struct {
-	ReplicationID
+	replicationID
 	Bucket string
 	Obj    ObjPayload
 }
@@ -228,8 +199,4 @@ type ConsistencyCheckReadinessPayload struct {
 
 type ConsistencyCheckDeletePayload struct {
 	ID string
-}
-
-type SwitchWithDowntimePayload struct {
-	ReplicationID
 }

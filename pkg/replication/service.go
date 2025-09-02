@@ -131,7 +131,7 @@ func (s *svc) Replicate(ctx context.Context, routedTo string, task tasks.Replica
 	return nil
 }
 
-func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.ReplicationStatusID, err error) {
+func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.UniversalReplicationID, err error) {
 	destinations := xctx.GetReplications(ctx)
 	if len(destinations) != 0 {
 		// normal flow increment source version and replicate to all followers
@@ -175,8 +175,8 @@ func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVer
 		// PROBLEM:
 		// - because replication policy is archived we dont create replication tasks
 		// - but we need to finish old multipart upload on A and replicate completed object to B
-		return true, []entity.ReplicationStatusID{
-			inProgressZeroDowntimeSwitch.ReplID,
+		return true, []entity.UniversalReplicationID{
+			entity.IDFromBucketReplication(inProgressZeroDowntimeSwitch.ReplID),
 		}, nil
 	}
 
@@ -185,7 +185,7 @@ func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVer
 	return true, nil, nil
 }
 
-func (s *svc) createBucketReplicationFromUserReplication(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.ReplicationStatusID, err error) {
+func (s *svc) createBucketReplicationFromUserReplication(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.UniversalReplicationID, err error) {
 	if xctx.GetMethod(ctx) != s3.CreateBucket {
 		return false, nil, nil
 	}
@@ -205,7 +205,7 @@ func (s *svc) createBucketReplicationFromUserReplication(ctx context.Context, ro
 		// should never happen
 		return false, nil, fmt.Errorf("%w: user replication policy source storage %s does not match routed to storage %s", dom.ErrInternal, userPolicy.FromStorage, routedTo)
 	}
-	destinations := make([]entity.ReplicationStatusID, 0, len(userPolicy.Destinations))
+	destinations := make([]entity.UniversalReplicationID, 0, len(userPolicy.Destinations))
 	for _, to := range userPolicy.Destinations {
 		replicationID := entity.ReplicationStatusID{
 			User:        user,
@@ -214,7 +214,7 @@ func (s *svc) createBucketReplicationFromUserReplication(ctx context.Context, ro
 			FromBucket:  bucket,
 			ToBucket:    bucket,
 		}
-		destinations = append(destinations, replicationID)
+		destinations = append(destinations, entity.IDFromBucketReplication(replicationID))
 		err = s.policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
 		if err != nil {
 			if errors.Is(err, dom.ErrAlreadyExists) {

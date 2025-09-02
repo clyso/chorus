@@ -280,7 +280,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 
 		err = svc.AddBucketReplicationPolicy(ctx, rightReplicationID, nil)
 		r.NoError(err)
-		queuesMock.InitReplicationInProgress(rightReplicationID)
+		queuesMock.InitReplicationInProgress(entity.IDFromBucketReplication(rightReplicationID))
 		_, err = svc.GetReplicationPolicyInfo(ctx, rightReplicationID)
 		r.NoError(err)
 		err = svc.PauseReplication(ctx, rightReplicationID)
@@ -533,7 +533,7 @@ func Test_policySvc_BucketReplicationPolicies(t *testing.T) {
 		}
 		err := svc.AddBucketReplicationPolicy(ctx, replicationID12, nil)
 		r.NoError(err)
-		queuesMock.InitReplicationInProgress(replicationID12)
+		queuesMock.InitReplicationInProgress(entity.IDFromBucketReplication(replicationID12))
 
 		res, err := svc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(u1, b1))
 		r.NoError(err)
@@ -709,11 +709,11 @@ func Test_CustomDestBucket(t *testing.T) {
 
 	err = svc.AddBucketReplicationPolicy(ctx, replicationIDDifferentBuckets, nil)
 	r.NoError(err, "repl to same storage but different bucket is allowed")
-	queuesMock.InitReplicationInProgress(replicationIDDifferentBuckets)
+	queuesMock.InitReplicationInProgress(entity.IDFromBucketReplication(replicationIDDifferentBuckets))
 
 	err = svc.AddBucketReplicationPolicy(ctx, replicationIDDifferentSrcDest, nil)
 	r.NoError(err, "repl to different storage and different bucket is allowed")
-	queuesMock.InitReplicationInProgress(replicationIDDifferentSrcDest)
+	queuesMock.InitReplicationInProgress(entity.IDFromBucketReplication(replicationIDDifferentSrcDest))
 
 	err = svc.AddBucketReplicationPolicy(ctx, replicationIDDifferentSrcDest, nil)
 	r.Error(err, "already exists")

@@ -130,7 +130,7 @@ func (r *policySvc) fillExtendedReplicationStatus(ctx context.Context, id entity
 		EventMigration:    entity.QueueStats{},
 	}
 	// get initial migration queues stats
-	initQueues := tasks.InitMigrationQueues(id)
+	initQueues := tasks.InitMigrationQueues(entity.IDFromBucketReplication(id))
 	paused, initStats, err := r.buildQueueStats(ctx, initQueues)
 	if err != nil {
 		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get init migration queue stats: %w", err)
@@ -141,7 +141,7 @@ func (r *policySvc) fillExtendedReplicationStatus(ctx context.Context, id entity
 	result.InitMigration = initStats
 
 	// get event migration queues stats
-	eventQueues := tasks.EventMigrationQueues(id)
+	eventQueues := tasks.EventMigrationQueues(entity.IDFromBucketReplication(id))
 	paused, eventStats, err := r.buildQueueStats(ctx, eventQueues)
 	if err != nil {
 		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get event migration queue stats: %w", err)
@@ -620,7 +620,7 @@ func (r *policySvc) PauseReplication(ctx context.Context, id entity.ReplicationS
 	if err := validate.ReplicationStatusID(id); err != nil {
 		return fmt.Errorf("pause replication: unable to validate replication status id: %w", err)
 	}
-	for _, queue := range tasks.AllReplicationQueues(id) {
+	for _, queue := range tasks.AllReplicationQueues(entity.IDFromBucketReplication(id)) {
 		err := r.queueSvc.Pause(ctx, queue)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
@@ -638,7 +638,7 @@ func (r *policySvc) ResumeReplication(ctx context.Context, id entity.Replication
 	if err := validate.ReplicationStatusID(id); err != nil {
 		return fmt.Errorf("resume replication: unable to validate replication status id: %w", err)
 	}
-	for _, queue := range tasks.AllReplicationQueues(id) {
+	for _, queue := range tasks.AllReplicationQueues(entity.IDFromBucketReplication(id)) {
 		err := r.queueSvc.Resume(ctx, queue)
 		if err != nil {
 			if errors.Is(err, dom.ErrNotFound) {
@@ -662,7 +662,7 @@ func (r *policySvc) DeleteReplication(ctx context.Context, id entity.Replication
 	if err := exec.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to execute group: %w", err)
 	}
-	queues := tasks.AllReplicationQueues(id)
+	queues := tasks.AllReplicationQueues(entity.IDFromBucketReplication(id))
 	for _, queue := range queues {
 		err := r.queueSvc.Delete(ctx, queue, true)
 		if err != nil && !errors.Is(err, dom.ErrNotFound) {

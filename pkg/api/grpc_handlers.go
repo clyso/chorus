@@ -466,13 +466,12 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 			if err != nil {
 				return err
 			}
-			err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
-				ReplicationID: tasks.ReplicationID{
-					Replication: replicationID,
-				},
+			task := tasks.BucketCreatePayload{
 				Bucket:   bucket,
 				Location: "",
-			})
+			}
+			task.SetReplicationID(entity.IDFromBucketReplication(replicationID))
+			err = h.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return err
 			}
@@ -526,12 +525,11 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 			}
 			return err
 		}
-		err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
-			ReplicationID: tasks.ReplicationID{
-				Replication: replicationID,
-			},
+		task := tasks.BucketCreatePayload{
 			Bucket: bucket.Name,
-		})
+		}
+		task.SetReplicationID(entity.IDFromBucketReplication(replicationID))
+		err = h.queueSvc.EnqueueTask(ctx, task)
 		if err != nil {
 			return err
 		}
@@ -819,12 +817,11 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 			return err
 		}
 		// create task
-		err = h.queueSvc.EnqueueTask(ctx, tasks.BucketCreatePayload{
-			ReplicationID: tasks.ReplicationID{
-				Replication: replicationID,
-			},
+		task := tasks.BucketCreatePayload{
 			Bucket: req.FromBucket,
-		})
+		}
+		task.SetReplicationID(entity.IDFromBucketReplication(replicationID))
+		err = h.queueSvc.EnqueueTask(ctx, task)
 		if err != nil {
 			return err
 		}
@@ -931,9 +928,7 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 		}
 		// create switch task
 		err = h.queueSvc.EnqueueTask(ctx, tasks.SwitchWithDowntimePayload{
-			ReplicationID: tasks.ReplicationID{
-				Replication: policyID,
-			},
+			ID: policyID,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to enqueue switch task: %w", err)
@@ -991,9 +986,7 @@ func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchB
 		}
 		// create switch task
 		err = h.queueSvc.EnqueueTask(ctx, tasks.ZeroDowntimeReplicationSwitchPayload{
-			ReplicationID: tasks.ReplicationID{
-				Replication: policyID,
-			},
+			ID: policyID,
 		})
 		if err != nil {
 			return err

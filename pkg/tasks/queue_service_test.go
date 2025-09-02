@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/testutil"
 )
 
@@ -295,4 +296,41 @@ func Test_queueService_Stats(t *testing.T) {
 	r.Equal(info.FailedTotal, stats.FailedTotal, "expected stats failed total to match inspector info")
 	r.Equal(info.ProcessedTotal, stats.ProcessedTotal, "expected stats processed total to match inspector info")
 	r.Equal(info.MemoryUsage, stats.MemoryUsage, "expected stats memory usage to match inspector info")
+}
+
+func Test_queueService_Enqueue(t *testing.T) {
+	ctx := t.Context()
+	c := testutil.SetupRedis(t)
+	inspector := asynq.NewInspectorFromRedisClient(c)
+	defer inspector.Close()
+	client := asynq.NewClientFromRedisClient(c)
+	defer client.Close()
+	qs := NewQueueService(client, inspector)
+
+	r := require.New(t)
+
+	err := qs.EnqueueTask(ctx, entity.UniversalReplicationID{})
+	r.ErrorIs(err, dom.ErrNotImplemented, "expected error for unsupported payload type")
+
+	payload := BucketCreatePayload{
+		replicationID: replicationID{},
+		Bucket:        "",
+		Location:      "",
+	}
+	err = qs.EnqueueTask(ctx, payload)
+	r.ErrorIs(err, dom.ErrInternal, "expected error when replication ID is not set")
+	err = qs.EnqueueTask(ctx, &payload)
+	r.ErrorIs(err, dom.ErrInternal, "expected error when replication ID is not set")
+
+	payload.SetReplicationID(entity.IDFromBucketReplication(entity.ReplicationStatusID{
+		User:        "u",
+		FromStorage: "fs",
+		FromBucket:  "fb",
+		ToStorage:   "ts",
+		ToBucket:    "tb",
+	}))
+	err = qs.EnqueueTask(ctx, payload)
+	r.NoError(err, "expected no error when replication ID is set")
+	err = qs.EnqueueTask(ctx, &payload)
+	r.NoError(err, "expected no error when replication ID is set")
 }
