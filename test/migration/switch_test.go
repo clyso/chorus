@@ -299,15 +299,15 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
 	}, e.WaitLong*2, e.RetryLong)
 
-	repl = nil
-	repls, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
-	r.NoError(err)
-	for i, rr := range repls.Replications {
-		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
-			repl = repls.Replications[i]
-			break
+	r.Eventually(func() bool {
+		// wait for completion of multipart uploads to old storage started before switch.
+		repl, err = e.ApiClient.GetReplication(tstCtx, replID)
+		if err != nil {
+			return false
 		}
-	}
+		return repl.Events == repl.EventsDone
+	}, e.WaitLong, e.RetryLong)
+
 	r.NotNil(repl)
 	r.True(repl.HasSwitch)
 	r.True(repl.IsInitDone)
@@ -532,6 +532,15 @@ func TestApi_switch_multipart(t *testing.T) {
 		}
 		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
 	}, e.WaitLong*2, e.RetryLong)
+
+	r.Eventually(func() bool {
+		// wait for completion of multipart uploads to old storage started before switch.
+		repl, err := e.ApiClient.GetReplication(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return repl.Events == repl.EventsDone
+	}, e.WaitLong, e.RetryLong)
 
 	for _, object := range objects {
 		objData, err := e.ProxyClient.GetObject(tstCtx, bucket, object.name, mclient.GetObjectOptions{})

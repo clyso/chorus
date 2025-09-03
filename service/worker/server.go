@@ -278,5 +278,8 @@ func retryDelay(n int, err error, task *asynq.Task) time.Duration {
 	if errors.As(err, &rlErr) {
 		return rlErr.RetryIn
 	}
-	return asynq.DefaultRetryDelayFunc(n, err, task)
+	return ErrRetryDelayFunc(n, err, task)
 }
+
+// override in e2e test for short retry
+var ErrRetryDelayFunc = asynq.DefaultRetryDelayFunc

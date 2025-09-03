@@ -114,6 +114,12 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		WaitLong:   waitLong,
 		RetryLong:  retryLong,
 	}
+	worker.ErrRetryDelayFunc = func(n int, e error, t *asynq.Task) time.Duration {
+		return retryLong
+	}
+	t.Cleanup(func() {
+		worker.ErrRetryDelayFunc = asynq.DefaultRetryDelayFunc
+	})
 
 	redisAddr := testutil.SetupRedisAddr(t)
 
@@ -196,6 +202,16 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	ctx := t.Context()
 	ctx = xctx.SetUser(ctx, user)
 
+	// do deep copy of configs before passing to goroutines to avoid panic on concurrent hashmap usage:
+	proxyConfCopy, err := deepCopyStruct(proxyConf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workerConfCopy, err := deepCopyStruct(workerConf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	wg, ctx := errgroup.WithContext(ctx)
 	wg.Go(func() error {
 		app := dom.AppInfo{
@@ -203,7 +219,7 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 			App:     "proxy",
 			AppID:   xid.New().String(),
 		}
-		return proxy.Start(ctx, app, proxyConf)
+		return proxy.Start(ctx, app, proxyConfCopy)
 	})
 	wg.Go(func() error {
 		app := dom.AppInfo{
@@ -211,7 +227,7 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 			App:     "worker",
 			AppID:   xid.New().String(),
 		}
-		return worker.Start(ctx, app, workerConf)
+		return worker.Start(ctx, app, workerConfCopy)
 	})
 	t.Cleanup(func() {
 		err := wg.Wait()
@@ -381,4 +397,14 @@ func newAWSClient(conf s3.Storage) *aws_s3.S3 {
 		panic(err)
 	}
 	return aws_s3.New(ses)
+}
+
+// generic parameter function to deepcopy struct using yaml marshal/unmarshal
+func deepCopyStruct[T any](in T) (out T, err error) {
+	b, err := yaml.Marshal(in)
+	if err != nil {
+		return out, err
+	}
+	err = yaml.Unmarshal(b, &out)
+	return out, err
 }
