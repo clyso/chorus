@@ -31,7 +31,6 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
-	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/notifications"
 	"github.com/clyso/chorus/pkg/policy"
@@ -345,8 +344,7 @@ func (h *handlers) GetProxyCredentials(ctx context.Context, _ *emptypb.Empty) (*
 }
 
 func (h *handlers) ListBucketsForReplication(ctx context.Context, req *pb.ListBucketsForReplicationRequest) (*pb.ListBucketsForReplicationResponse, error) {
-	ctx = log.WithUser(ctx, req.User)
-	client, err := h.s3clients.GetByName(ctx, req.From)
+	client, err := h.s3clients.GetByName(ctx, req.User, req.From)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +396,6 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 	if req.From == req.To {
 		return nil, fmt.Errorf("%w: from and to should be different", dom.ErrInvalidArg)
 	}
-	ctx = log.WithUser(ctx, req.User)
 	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second*5), store.WithRetry(true))
 	if err != nil {
 		return nil, err
@@ -417,7 +414,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 		if len(req.Buckets) == 0 {
 			return fmt.Errorf("%w: buckets not set", dom.ErrInvalidArg)
 		}
-		client, err := h.s3clients.GetByName(ctx, req.From)
+		client, err := h.s3clients.GetByName(ctx, req.User, req.From)
 		if err != nil {
 			return err
 		}
@@ -497,7 +494,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 		// ignore not found
 		return err
 	}
-	client, err := h.s3clients.GetByName(ctx, req.From)
+	client, err := h.s3clients.GetByName(ctx, req.User, req.From)
 	if err != nil {
 		return err
 	}
@@ -575,7 +572,6 @@ func (h *handlers) ListUserReplications(ctx context.Context, _ *emptypb.Empty) (
 }
 
 func (h *handlers) DeleteUserReplication(ctx context.Context, req *pb.DeleteUserReplicationRequest) (*emptypb.Empty, error) {
-	ctx = log.WithUser(ctx, req.User)
 	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
@@ -647,7 +643,6 @@ func (h *handlers) ResumeReplication(ctx context.Context, req *pb.ReplicationReq
 }
 
 func (h *handlers) DeleteReplication(ctx context.Context, req *pb.ReplicationRequest) (*emptypb.Empty, error) {
-	ctx = log.WithUser(ctx, req.User)
 	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second), store.WithRetry(true))
 	if err != nil {
 		return nil, err
@@ -695,9 +690,8 @@ func (h *handlers) CompareBucket(ctx context.Context, req *pb.CompareBucketReque
 	if _, ok := h.storages.Storages[req.To].Credentials[req.User]; !ok {
 		return nil, fmt.Errorf("%w: invalid User", dom.ErrInvalidArg)
 	}
-	ctx = log.WithUser(ctx, req.User)
 
-	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.From, req.To, req.Bucket, req.ToBucket)
+	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.User, req.From, req.To, req.Bucket, req.ToBucket)
 	if err != nil {
 		return nil, err
 	}
@@ -773,7 +767,6 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 	if _, ok := h.storages.Storages[req.FromStorage].Credentials[req.User]; !ok {
 		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.User)
 	}
-	ctx = log.WithUser(ctx, req.User)
 	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second*5), store.WithRetry(true))
 	if err != nil {
 		return nil, err
@@ -781,7 +774,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 	defer lock.Release(ctx)
 	// obtain lock and try to add replication policy
 	err = lock.Do(ctx, time.Second*5, func() error {
-		client, err := h.s3clients.GetByName(ctx, req.FromStorage)
+		client, err := h.s3clients.GetByName(ctx, req.User, req.FromStorage)
 		if err != nil {
 			return err
 		}
@@ -875,7 +868,6 @@ func (h *handlers) createAgentBucketNotification(ctx context.Context, replicatio
 }
 
 func (h *handlers) GetReplication(ctx context.Context, req *pb.ReplicationRequest) (*pb.Replication, error) {
-	ctx = log.WithUser(ctx, req.User)
 	replicationID := entity.ReplicationStatusID{
 		User:        req.User,
 		FromStorage: req.From,

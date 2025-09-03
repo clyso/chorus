@@ -18,10 +18,8 @@ package log
 
 import (
 	"context"
-	"errors"
 	"strings"
 
-	"github.com/buger/jsonparser"
 	"github.com/hibiken/asynq"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
@@ -52,15 +50,6 @@ func WorkerMiddleware(cfg *Config, app, appID string) asynq.MiddlewareFunc {
 			}
 			if retryCnt, ok := asynq.GetRetryCount(ctx); ok {
 				builder = builder.Int("task_retry_count", retryCnt)
-			}
-
-			u, err := jsonparser.GetString(t.Payload(), "User")
-			if err != nil && !errors.Is(err, jsonparser.KeyPathNotFoundError) {
-				l.Err(err).Msg("unable to get user meta from task payload")
-			}
-			if u != "" {
-				builder = builder.Str(user, u)
-				ctx = xctx.SetUser(ctx, u)
 			}
 
 			newLogger := builder.Logger()

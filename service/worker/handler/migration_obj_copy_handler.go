@@ -78,7 +78,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 	// 1. sync obj meta and content
 	err = lock.Do(ctx, time.Second*2, func() error {
-		return s.rc.CopyTo(ctx, rclone.File{
+		return s.rc.CopyTo(ctx, p.ID.User(), rclone.File{
 			Storage: p.ID.FromStorage(),
 			Bucket:  fromBucket,
 			Name:    p.Obj.Name,
@@ -96,7 +96,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		return fmt.Errorf("migration obj copy: unable to copy with rclone: %w", err)
 	}
 
-	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
+	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return fmt.Errorf("migration obj copy: unable to get %q s3 client: %w: %w", p.ID.FromStorage(), err, asynq.SkipRetry)
 	}

@@ -73,13 +73,13 @@ func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
 	}
 }
 
-func (s *svc) getClients(ctx context.Context, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {
-	fromClient, err = s.clients.GetByName(ctx, fromStorage)
+func (s *svc) getClients(ctx context.Context, user, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {
+	fromClient, err = s.clients.GetByName(ctx, user, fromStorage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", fromStorage, err, asynq.SkipRetry)
 	}
 
-	toClient, err = s.clients.GetByName(ctx, toStorage)
+	toClient, err = s.clients.GetByName(ctx, user, toStorage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", toStorage, err, asynq.SkipRetry)
 	}

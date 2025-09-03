@@ -21,10 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/buger/jsonparser"
 	"github.com/hibiken/asynq"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 )
 
@@ -50,13 +48,6 @@ func (e encoder[T]) Encode(ctx context.Context, payload T) (*asynq.Task, error) 
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
-	}
-	if xctx.GetUser(ctx) != "" {
-		// TODO: remove and test. Should be redundant because user is already presented in replicationID in task payload
-		bytes, err = jsonparser.Set(bytes, []byte(`"`+xctx.GetUser(ctx)+`"`), "User")
-		if err != nil {
-			return nil, fmt.Errorf("%w: unable to add User to payload", err)
-		}
 	}
 	queue := e.queue(payload)
 	optionList := []asynq.Option{asynq.Queue(queue)}

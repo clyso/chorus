@@ -83,9 +83,9 @@ func (f File) path() string {
 }
 
 type Service interface {
-	CopyTo(ctx context.Context, from, to File, size int64) error
+	CopyTo(ctx context.Context, user string, from, to File, size int64) error
 
-	Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket string) (*CompareRes, error)
+	Compare(ctx context.Context, listMatch bool, user, from, to, fromBucket string, toBucket string) (*CompareRes, error)
 }
 
 func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mamCalc *MemCalculator, memLimiter, fileLimiter ratelimit.Semaphore) (Service, error) {
@@ -157,16 +157,16 @@ func (s *svc) getConf(storage, user string) (*configmap.Map, error) {
 	return res, nil
 }
 
-func (s *svc) Compare(ctx context.Context, listMatch bool, from, to, fromBucket string, toBucket string) (*CompareRes, error) {
+func (s *svc) Compare(ctx context.Context, listMatch bool, user, from, to, fromBucket string, toBucket string) (*CompareRes, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "rclone.Compare")
 	span.SetAttributes(attribute.String("bucket", fromBucket), attribute.String("from", from), attribute.String("to", to))
 	defer span.End()
 
-	src, err := s.getFS(ctx, from, fromBucket)
+	src, err := s.getFS(ctx, user, from, fromBucket)
 	if err != nil {
 		return nil, err
 	}
-	dest, err := s.getFS(ctx, to, toBucket)
+	dest, err := s.getFS(ctx, user, to, toBucket)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func readFileNames(in []byte) []string {
 	return res
 }
 
-func (s *svc) CopyTo(ctx context.Context, from, to File, size int64) (err error) {
+func (s *svc) CopyTo(ctx context.Context, user string, from, to File, size int64) (err error) {
 	ctx, span := otel.Tracer("").Start(ctx, "rclone.CopyTo")
 	span.SetAttributes(attribute.String("bucket", from.Bucket), attribute.String("object", from.Name),
 		attribute.String("from", from.Storage), attribute.String("to", to.Storage), attribute.Int64("size", size))
@@ -260,11 +260,11 @@ func (s *svc) CopyTo(ctx context.Context, from, to File, size int64) (err error)
 		}
 	}()
 
-	src, err := s.getFS(ctx, from.Storage, from.Bucket)
+	src, err := s.getFS(ctx, user, from.Storage, from.Bucket)
 	if err != nil {
 		return err
 	}
-	dest, err := s.getFS(ctx, to.Storage, to.Bucket)
+	dest, err := s.getFS(ctx, user, to.Storage, to.Bucket)
 	if err != nil {
 		return err
 	}
@@ -279,8 +279,8 @@ func (s *svc) CopyTo(ctx context.Context, from, to File, size int64) (err error)
 	return
 }
 
-func (s *svc) getFS(ctx context.Context, storage, bucket string) (fs.Fs, error) {
-	storageConf, err := s.getConf(storage, xctx.GetUser(ctx))
+func (s *svc) getFS(ctx context.Context, user, storage, bucket string) (fs.Fs, error) {
+	storageConf, err := s.getConf(storage, user)
 	if err != nil {
 		return nil, err
 	}

@@ -30,10 +30,11 @@ import (
 
 func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tasks.BucketCreatePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -60,10 +61,11 @@ func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tas
 
 func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tasks.BucketDeletePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -81,8 +83,9 @@ func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tas
 func (r *router) listBuckets(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 
+	user := xctx.GetUser(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, "", false, err
 	}
