@@ -11,7 +11,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.22.2
 	github.com/bsm/redislock v0.9.4
-	github.com/buger/jsonparser v1.1.1
 	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0

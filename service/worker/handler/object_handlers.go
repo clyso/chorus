@@ -77,7 +77,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	}
 
 	err = lock.Do(ctx, time.Second*2, func() error {
-		return s.rc.CopyTo(ctx, rclone.File{
+		return s.rc.CopyTo(ctx, p.ID.User(), rclone.File{
 			Storage: p.ID.FromStorage(),
 			Bucket:  fromBucket,
 			Name:    p.Object.Name,
@@ -104,7 +104,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 }
 
 func (s *svc) objectDelete(ctx context.Context, p tasks.ObjectSyncPayload) (err error) {
-	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
+	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}

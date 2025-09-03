@@ -24,7 +24,6 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/policy"
@@ -55,7 +54,7 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	user := xctx.GetUser(ctx)
+	user := listVersionsPayload.ID.User()
 	fromBucket, toBucket := listVersionsPayload.ID.FromToBuckets(listVersionsPayload.Bucket)
 
 	objectVersionID := entity.NewVersionedObjectID(listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.Prefix)
@@ -81,7 +80,7 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	user := xctx.GetUser(ctx)
+	user := migratePayload.ID.User()
 	fromBucket, toBucket := migratePayload.ID.FromToBuckets(migratePayload.Bucket)
 	replicationID := entity.NewReplicationStatusID(user, migratePayload.ID.FromStorage(), fromBucket, migratePayload.ID.ToStorage(), toBucket)
 
@@ -128,7 +127,7 @@ func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entit
 		shouldSkipFirstListings = true
 	}
 
-	versionInfoList, err := r.copySvc.GetVersionInfo(ctx, toFile)
+	versionInfoList, err := r.copySvc.GetVersionInfo(ctx, replicationID.User, toFile)
 	if err != nil {
 		return fmt.Errorf("unable to get version info: %w", err)
 	}
@@ -158,7 +157,7 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 
 	var destinationIsEmpty bool
 	var shouldClearDestination bool
-	migratedObjectVersionInfo, err := r.copySvc.GetLastMigratedVersionInfo(ctx, toFile)
+	migratedObjectVersionInfo, err := r.copySvc.GetLastMigratedVersionInfo(ctx, replicationID.User, toFile)
 	switch {
 	case errors.Is(err, dom.ErrNotFound):
 		destinationIsEmpty = true
@@ -186,7 +185,7 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 	}
 
 	if shouldClearDestination {
-		if err := r.copySvc.DeleteDestinationObject(ctx, toFile); err != nil {
+		if err := r.copySvc.DeleteDestinationObject(ctx, replicationID.User, toFile); err != nil {
 			return fmt.Errorf("unable to delete destination object: %w", err)
 		}
 	}
@@ -211,7 +210,7 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 			toFile := rclone.NewVersionedFile(replicationID.ToStorage, replicationID.ToBucket, prefix, info.Version)
 
 			if err = lock.Do(ctx, time.Second*2, func() error {
-				return r.copySvc.CopyObject(ctx, fromFile, toFile)
+				return r.copySvc.CopyObject(ctx, replicationID.User, fromFile, toFile)
 			}); err != nil {
 				return fmt.Errorf("unable to copy object: %w", err)
 			}

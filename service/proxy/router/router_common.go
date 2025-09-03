@@ -30,6 +30,7 @@ import (
 
 func (r *router) commonRead(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 	storage, err = r.adjustObjReadRoute(ctx, storage)
 	if err != nil {
@@ -38,7 +39,7 @@ func (r *router) commonRead(req *http.Request) (resp *http.Response, storage str
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -52,11 +53,12 @@ func (r *router) commonRead(req *http.Request) (resp *http.Response, storage str
 
 func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, "", false, err
 	}

@@ -41,7 +41,7 @@ func NewService(clients s3client.Service) *Service {
 }
 
 func (s *Service) SubscribeToBucketNotifications(ctx context.Context, storage, user, bucket, agentURL string) error {
-	client, err := s.clients.GetByName(ctx, storage)
+	client, err := s.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (s *Service) SubscribeToBucketNotifications(ctx context.Context, storage, u
 }
 
 func (s *Service) DeleteBucketNotification(ctx context.Context, storage, user, bucket string) error {
-	client, err := s.clients.GetByName(ctx, storage)
+	client, err := s.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return err
 	}

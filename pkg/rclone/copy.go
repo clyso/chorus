@@ -49,10 +49,10 @@ type ObjectVersionInfo struct {
 }
 
 type CopySvc interface {
-	GetVersionInfo(ctx context.Context, to File) ([]ObjectVersionInfo, error)
-	DeleteDestinationObject(ctx context.Context, to File) error
-	GetLastMigratedVersionInfo(ctx context.Context, to File) (ObjectVersionInfo, error)
-	CopyObject(ctx context.Context, from File, to File) error
+	GetVersionInfo(ctx context.Context, user string, to File) ([]ObjectVersionInfo, error)
+	DeleteDestinationObject(ctx context.Context, user string, to File) error
+	GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (ObjectVersionInfo, error)
+	CopyObject(ctx context.Context, user string, from File, to File) error
 }
 
 type S3CopySvc struct {
@@ -71,8 +71,8 @@ func NewS3CopySvc(clientRegistry s3client.Service, memoryLimiterSvc LimiterSvc, 
 	}
 }
 
-func (r *S3CopySvc) GetVersionInfo(ctx context.Context, to File) ([]ObjectVersionInfo, error) {
-	storageClient, err := r.clientRegistry.GetByName(ctx, to.Storage)
+func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([]ObjectVersionInfo, error) {
+	storageClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get %s storage client: %w", to.Storage, err)
 	}
@@ -103,8 +103,8 @@ func (r *S3CopySvc) GetVersionInfo(ctx context.Context, to File) ([]ObjectVersio
 	return result, nil
 }
 
-func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, to File) (ObjectVersionInfo, error) {
-	toClient, err := r.clientRegistry.GetByName(ctx, to.Storage)
+func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (ObjectVersionInfo, error) {
+	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
 	if err != nil {
 		return ObjectVersionInfo{}, fmt.Errorf("unable to get to client: %w", err)
 	}
@@ -137,8 +137,8 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, to File) (Ob
 	}, nil
 }
 
-func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, to File) error {
-	toClient, err := r.clientRegistry.GetByName(ctx, to.Storage)
+func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, user string, to File) error {
+	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
 	}
@@ -153,12 +153,12 @@ func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, to File) error 
 	return nil
 }
 
-func (r *S3CopySvc) CopyObject(ctx context.Context, from File, to File) error {
-	fromClient, err := r.clientRegistry.GetByName(ctx, from.Storage)
+func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to File) error {
+	fromClient, err := r.clientRegistry.GetByName(ctx, user, from.Storage)
 	if err != nil {
 		return fmt.Errorf("unable to get from client: %w", err)
 	}
-	toClient, err := r.clientRegistry.GetByName(ctx, to.Storage)
+	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
 	}
@@ -262,7 +262,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, from File, to File) error {
 	}
 
 	if features.ACL(ctx) {
-		if err := r.CopyACLs(ctx, from, to); err != nil {
+		if err := r.CopyACLs(ctx, user, from, to); err != nil {
 			return fmt.Errorf("unable to copy acl %w", err)
 		}
 	}
@@ -280,12 +280,12 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, from File, to File) error {
 	return nil
 }
 
-func (r *S3CopySvc) CopyACLs(ctx context.Context, from File, to File) error {
-	fromClient, err := r.clientRegistry.GetByName(ctx, from.Storage)
+func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to File) error {
+	fromClient, err := r.clientRegistry.GetByName(ctx, user, from.Storage)
 	if err != nil {
 		return fmt.Errorf("unable to get from client: %w", err)
 	}
-	toClient, err := r.clientRegistry.GetByName(ctx, to.Storage)
+	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
 	}

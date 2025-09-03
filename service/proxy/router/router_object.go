@@ -30,13 +30,13 @@ import (
 
 func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
-	bucket, object := xctx.GetBucket(ctx), xctx.GetObject(ctx)
+	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 
 	storage = xctx.GetRoutingPolicy(ctx)
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -76,13 +76,14 @@ func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []t
 
 func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
 
 	storage = xctx.GetRoutingPolicy(ctx)
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, nil, "", false, err
 	}

@@ -104,7 +104,7 @@ func (s *svc) HandleConsistencyCheckList(ctx context.Context, t *asynq.Task) (er
 		return fmt.Errorf("unable to get rate limit for storage: %w", err)
 	}
 
-	storageClient, err := s.clients.GetByName(ctx, payload.Storage)
+	storageClient, err := s.clients.GetByName(ctx, payload.User, payload.Storage)
 	if err != nil {
 		return fmt.Errorf("unable to get %q s3 client: %w", payload.Storage, err)
 	}

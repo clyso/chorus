@@ -64,7 +64,7 @@ func (r *router) completeMultipartUpload(req *http.Request) (resp *http.Response
 		return
 	}
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -118,7 +118,7 @@ func (r *router) abortMultipartUpload(req *http.Request) (resp *http.Response, s
 		return
 	}
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -134,11 +134,12 @@ func (r *router) abortMultipartUpload(req *http.Request) (resp *http.Response, s
 
 func (r *router) listMultipartUploads(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	storage, err = r.routeListMultipart(req)
 	if err != nil {
 		return
 	}
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -148,12 +149,13 @@ func (r *router) listMultipartUploads(req *http.Request) (resp *http.Response, s
 
 func (r *router) uploadPart(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
+	user := xctx.GetUser(ctx)
 	storage, _, err = r.routeMultipart(req)
 	if err != nil {
 		return
 	}
 
-	client, err := r.clients.GetByName(ctx, storage)
+	client, err := r.clients.GetByName(ctx, user, storage)
 	if err != nil {
 		return nil, "", false, err
 	}

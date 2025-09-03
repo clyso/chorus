@@ -25,7 +25,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
@@ -33,7 +32,7 @@ import (
 )
 
 type Service interface {
-	GetByName(ctx context.Context, storageName string) (Client, error)
+	GetByName(ctx context.Context, user, storageName string) (Client, error)
 	DefaultRegion() string
 }
 
@@ -76,14 +75,8 @@ func clientName(storage, user string) string {
 	return storage + ":" + user
 }
 
-func (s *svc) getClient(ctx context.Context, storage string) (Client, error) {
-	user := xctx.GetUser(ctx)
-	if user == "" {
-		zerolog.Ctx(ctx).Error().Str(log.Storage, storage).Msg("storage user is missing from ctx")
-		return nil, fmt.Errorf("%w: no user in context", dom.ErrInternal)
-	}
-
-	c, ok := s._clients[clientName(storage, xctx.GetUser(ctx))]
+func (s *svc) getClient(ctx context.Context, user, storage string) (Client, error) {
+	c, ok := s._clients[clientName(storage, user)]
 	if !ok {
 		return nil, fmt.Errorf("%w: storage %q, user %q not exists", dom.ErrInvalidStorageConfig, storage, user)
 	}
@@ -98,9 +91,9 @@ func (s *svc) DefaultRegion() string {
 	return s.conf.DefaultRegion
 }
 
-func (s *svc) GetByName(ctx context.Context, storageName string) (Client, error) {
+func (s *svc) GetByName(ctx context.Context, user, storageName string) (Client, error) {
 	logger := zerolog.Ctx(ctx).With().Str(log.Storage, storageName).Logger()
-	c, err := s.getClient(ctx, storageName)
+	c, err := s.getClient(ctx, user, storageName)
 	if err != nil {
 		return nil, err
 	}

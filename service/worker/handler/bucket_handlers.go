@@ -44,7 +44,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 
 	replicationID := p.ID
 
-	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
+	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (s *svc) HandleBucketDelete(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
+	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}

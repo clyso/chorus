@@ -42,7 +42,7 @@ func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
 	ctx = log.WithBucket(ctx, p.Bucket)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
+	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	ctx = log.WithObjName(ctx, p.Object.Name)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
-	fromClient, toClient, err := s.getClients(ctx, p.ID.FromStorage(), p.ID.ToStorage())
+	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}

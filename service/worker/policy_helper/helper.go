@@ -22,7 +22,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/policy"
@@ -95,8 +94,7 @@ func createReplication(
 		}
 		return err
 	}
-	ctx = xctx.SetUser(ctx, user)
-	client, err := clients.GetByName(ctx, from)
+	client, err := clients.GetByName(ctx, user, from)
 	if err != nil {
 		return err
 	}
