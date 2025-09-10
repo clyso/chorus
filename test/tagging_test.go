@@ -13,7 +13,7 @@ import (
 
 func TestApi_Tagging_Bucket(t *testing.T) {
 	t.Skip("fake s3 does not support bucket tagging")
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	bucket := "bucket-tag"
 	r := require.New(t)
@@ -134,7 +134,7 @@ func TestApi_Tagging_Bucket(t *testing.T) {
 
 func TestApi_Tagging_Object(t *testing.T) {
 	t.Skip("fake s3 does not support bucket tagging")
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	bucket := "bucket-tag-obj"

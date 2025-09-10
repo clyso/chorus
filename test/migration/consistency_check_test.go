@@ -74,7 +74,7 @@ func consistencyCheckSetup2Storages(ctx context.Context, e *env.EmbeddedEnv, r *
 }
 
 func TestConsistency_2Storages_Success(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	locations := []*pb.MigrateLocation{
 		{
@@ -128,7 +128,7 @@ func TestConsistency_2Storages_Success(t *testing.T) {
 }
 
 func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	locations := []*pb.MigrateLocation{
 		{
@@ -188,7 +188,7 @@ func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
 }
 
 func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	locations := []*pb.MigrateLocation{
 		{
@@ -256,7 +256,7 @@ func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
 }
 
 func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	locations := []*pb.MigrateLocation{
 		{
@@ -317,7 +317,7 @@ func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
 }
 
 func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	locations := []*pb.MigrateLocation{
@@ -385,7 +385,7 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 }
 
 func TestConsistency_2Storages_ListChecks(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	locations := []*pb.MigrateLocation{
 		{

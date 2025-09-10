@@ -14,7 +14,7 @@ import (
 )
 
 func Test_api_storages(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	res, err := e.ApiClient.GetStorages(tstCtx, &emptypb.Empty{})
@@ -30,7 +30,7 @@ func Test_api_storages(t *testing.T) {
 }
 
 func Test_api_proxy_creds(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, newProxyConf := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	res, err := e.ApiClient.GetProxyCredentials(tstCtx, &emptypb.Empty{})
@@ -40,12 +40,12 @@ func Test_api_proxy_creds(t *testing.T) {
 	r.EqualValues(res.Credentials[0].Alias, user)
 	r.NotEmpty(res.Credentials[0].AccessKey)
 	r.NotEmpty(res.Credentials[0].SecretKey)
-	r.EqualValues(res.Credentials[0].AccessKey, proxyConf.Storage.Storages[proxyConf.Auth.UseStorage].Credentials[user].AccessKeyID)
-	r.EqualValues(res.Credentials[0].SecretKey, proxyConf.Storage.Storages[proxyConf.Auth.UseStorage].Credentials[user].SecretAccessKey)
+	r.EqualValues(res.Credentials[0].AccessKey, newProxyConf.Storage.Storages[newProxyConf.Auth.UseStorage].Credentials[user].AccessKeyID)
+	r.EqualValues(res.Credentials[0].SecretKey, newProxyConf.Storage.Storages[newProxyConf.Auth.UseStorage].Credentials[user].SecretAccessKey)
 }
 
 func Test_api_list_replications(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	err := e.ProxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
@@ -68,7 +68,7 @@ func Test_api_list_replications(t *testing.T) {
 }
 
 func Test_api_get_replication(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	err := e.ProxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})

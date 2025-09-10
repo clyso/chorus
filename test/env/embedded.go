@@ -103,10 +103,18 @@ type EmbeddedEnv struct {
 	RetryLong  time.Duration
 }
 
-func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Config) EmbeddedEnv {
+func SetupEmbedded(t testing.TB, workerConfIn *worker.Config, proxyConfIn *proxy.Config) (EmbeddedEnv, *worker.Config, *proxy.Config) {
 	t.Helper()
+	// deep copy configs to avoid concurrent write access in parallel tests
+	proxyConf, err := deepCopyStruct(proxyConfIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workerConf, err := deepCopyStruct(workerConfIn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	var err error
 	e := EmbeddedEnv{
 		WaitShort:  waitShort,
 		RetryShort: retryShort,
@@ -253,7 +261,7 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		panic(err)
 	}
 	e.ApiClient = pb.NewChorusClient(grpcConn)
-	return e
+	return e, workerConf, proxyConf
 }
 
 func getRandomPort() (int, string) {
