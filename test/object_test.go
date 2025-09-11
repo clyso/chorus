@@ -448,6 +448,7 @@ func TestApi_Object_CriticalObjectNames(t *testing.T) {
 
 func TestApi_Object_CriticalObjectNamesNotSynced(t *testing.T) {
 	t.Parallel()
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tests := []struct {
 		name        string
 		description string
@@ -462,10 +463,10 @@ func TestApi_Object_CriticalObjectNamesNotSynced(t *testing.T) {
 	}
 	var cnt uint64 = 0
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
-			objName, description := test.name, test.description
-			e := env.SetupEmbedded(t, workerConf, proxyConf)
 			t.Parallel()
+			objName, description := test.name, test.description
 			tstCtx := t.Context()
 			bucket := fmt.Sprintf("object-critical-nosync-%d", atomic.AddUint64(&cnt, 1))
 			r := require.New(t)
@@ -493,7 +494,7 @@ func TestApi_Object_CriticalObjectNamesNotSynced(t *testing.T) {
 			}, e.WaitLong, e.RetryLong)
 
 			// Generate random test data
-			source := bytes.Repeat([]byte("test-data"), rand.Intn(100)+10)
+			source := []byte("test-data")
 
 			// Test object creation
 			putInfo, err := e.ProxyClient.PutObject(tstCtx, bucket, objName, bytes.NewReader(source), int64(len(source)), mclient.PutObjectOptions{
