@@ -207,7 +207,7 @@ func (r *ReplicationStatusStore) SetListingStartedOp(ctx context.Context, id ent
 }
 
 func (r *ReplicationStatusStore) SetListingStarted(ctx context.Context, id entity.ReplicationStatusID) error {
-	return r.SetListingStartedOp(ctx, id).Get()
+	return r.SetListingStartedOp(ctx, id).Err()
 }
 
 func (r *ReplicationStatusStore) SetCreatedAtOp(ctx context.Context, id entity.ReplicationStatusID, value time.Time) OperationStatus {
@@ -215,7 +215,7 @@ func (r *ReplicationStatusStore) SetCreatedAtOp(ctx context.Context, id entity.R
 }
 
 func (r *ReplicationStatusStore) SetCreatedAt(ctx context.Context, id entity.ReplicationStatusID, value time.Time) error {
-	return r.SetCreatedAtOp(ctx, id, value.UTC()).Get()
+	return r.SetCreatedAtOp(ctx, id, value.UTC()).Err()
 }
 
 func (r *ReplicationStatusStore) SetArchievedOp(ctx context.Context, id entity.ReplicationStatusID) OperationStatus {
@@ -223,7 +223,7 @@ func (r *ReplicationStatusStore) SetArchievedOp(ctx context.Context, id entity.R
 }
 
 func (r *ReplicationStatusStore) SetArchieved(ctx context.Context, id entity.ReplicationStatusID) error {
-	return r.SetArchievedOp(ctx, id).Get()
+	return r.SetArchievedOp(ctx, id).Err()
 }
 
 func (r *ReplicationStatusStore) SetArchievedAtOp(ctx context.Context, id entity.ReplicationStatusID, value time.Time) OperationStatus {
@@ -231,7 +231,7 @@ func (r *ReplicationStatusStore) SetArchievedAtOp(ctx context.Context, id entity
 }
 
 func (r *ReplicationStatusStore) SetArchievedAt(ctx context.Context, id entity.ReplicationStatusID, value time.Time) error {
-	return r.SetArchievedAtOp(ctx, id, value.UTC()).Get()
+	return r.SetArchievedAtOp(ctx, id, value.UTC()).Err()
 }
 
 type ReplicationSwitchInfoStore struct {
@@ -375,7 +375,7 @@ func (r *ReplicationSwitchInfoStore) SetWithDowntimeOptsOp(ctx context.Context, 
 }
 
 func (r *ReplicationSwitchInfoStore) SetWithDowntimeOpts(ctx context.Context, id entity.ReplicationSwitchInfoID, value entity.ReplicationSwitchInfo) error {
-	return r.SetWithDowntimeOptsOp(ctx, id, value).Get()
+	return r.SetWithDowntimeOptsOp(ctx, id, value).Err()
 }
 
 func (r *ReplicationSwitchInfoStore) UpdateDowntimeOptsOp(ctx context.Context, id entity.ReplicationSwitchInfoID, value *entity.ReplicationSwitchDowntimeOpts) OperationStatus {
@@ -409,7 +409,7 @@ func (r *ReplicationSwitchInfoStore) UpdateDowntimeOptsOp(ctx context.Context, i
 }
 
 func (r *ReplicationSwitchInfoStore) UpdateDowntimeOpts(ctx context.Context, id entity.ReplicationSwitchInfoID, value *entity.ReplicationSwitchDowntimeOpts) error {
-	return r.UpdateDowntimeOptsOp(ctx, id, value).Get()
+	return r.UpdateDowntimeOptsOp(ctx, id, value).Err()
 }
 
 func (r *ReplicationSwitchInfoStore) SetLastStatusOp(ctx context.Context, id entity.ReplicationSwitchInfoID, status entity.ReplicationSwitchStatus) OperationStatus {
@@ -417,7 +417,7 @@ func (r *ReplicationSwitchInfoStore) SetLastStatusOp(ctx context.Context, id ent
 }
 
 func (r *ReplicationSwitchInfoStore) SetLastStatus(ctx context.Context, id entity.ReplicationSwitchInfoID, status entity.ReplicationSwitchStatus) error {
-	return r.SetLastStatusOp(ctx, id, status).Get()
+	return r.SetLastStatusOp(ctx, id, status).Err()
 }
 
 func (r *ReplicationSwitchInfoStore) SetDoneAtOp(ctx context.Context, id entity.ReplicationSwitchInfoID, value time.Time) OperationStatus {
@@ -425,7 +425,7 @@ func (r *ReplicationSwitchInfoStore) SetDoneAtOp(ctx context.Context, id entity.
 }
 
 func (r *ReplicationSwitchInfoStore) SetDoneAt(ctx context.Context, id entity.ReplicationSwitchInfoID, value time.Time) error {
-	return r.SetDoneAtOp(ctx, id, value).Get()
+	return r.SetDoneAtOp(ctx, id, value).Err()
 }
 
 func (r *ReplicationSwitchInfoStore) SetStartedAtOp(ctx context.Context, id entity.ReplicationSwitchInfoID, value time.Time) OperationResult[uint64] {

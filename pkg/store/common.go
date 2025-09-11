@@ -32,10 +32,11 @@ type ErrorCollector func() error
 type ValueCollector[V any] func() (V, error)
 
 type OperationStatus interface {
-	Get() error
+	Err() error
 }
 
 type OperationResult[T any] interface {
+	OperationStatus
 	Get() (T, error)
 }
 
@@ -49,7 +50,7 @@ func NewRedisOperationStatus(confirm ErrorCollector) *RedisOperationStatus {
 	}
 }
 
-func (r *RedisOperationStatus) Get() error {
+func (r *RedisOperationStatus) Err() error {
 	if err := r.collect(); err != nil {
 		return fmt.Errorf("unable to collect result: %w", err)
 	}
@@ -66,7 +67,7 @@ func NewRedisFailedOperationStatus(err error) *RedisFailedOperationStatus {
 	}
 }
 
-func (r *RedisFailedOperationStatus) Get() error {
+func (r *RedisFailedOperationStatus) Err() error {
 	return fmt.Errorf("unable to create result: %w", r.err)
 }
 
@@ -83,6 +84,10 @@ func NewRedisFailedOperationResult[T any](err error) *RedisFailedOperationResult
 func (r *RedisFailedOperationResult[T]) Get() (T, error) {
 	var noVal T
 	return noVal, fmt.Errorf("unable to create command: %w", r.err)
+}
+func (r *RedisFailedOperationResult[T]) Err() error {
+	_, err := r.Get()
+	return err
 }
 
 type RedisOperationResult[T any] struct {
@@ -103,6 +108,11 @@ func (r *RedisOperationResult[T]) Get() (T, error) {
 	}
 
 	return result, nil
+}
+
+func (r *RedisOperationResult[T]) Err() error {
+	_, err := r.Get()
+	return err
 }
 
 type Pager struct {

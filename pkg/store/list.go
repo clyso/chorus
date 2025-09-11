@@ -173,7 +173,7 @@ func (r *RedisIDKeyList[ID, V]) AddLeftOp(ctx context.Context, id ID, values ...
 }
 
 func (r *RedisIDKeyList[ID, V]) AddLeft(ctx context.Context, id ID, values ...V) error {
-	return r.AddLeftOp(ctx, id, values...).Get()
+	return r.AddLeftOp(ctx, id, values...).Err()
 }
 
 func (r *RedisIDKeyList[ID, V]) AddRightOp(ctx context.Context, id ID, values ...V) OperationStatus {
@@ -199,7 +199,7 @@ func (r *RedisIDKeyList[ID, V]) AddRightOp(ctx context.Context, id ID, values ..
 }
 
 func (r *RedisIDKeyList[ID, V]) AddRight(ctx context.Context, id ID, values ...V) error {
-	return r.AddRightOp(ctx, id, values...).Get()
+	return r.AddRightOp(ctx, id, values...).Err()
 }
 
 func (r *RedisIDKeyList[ID, V]) FindOp(ctx context.Context, id ID, value V) OperationResult[int64] {

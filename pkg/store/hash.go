@@ -61,7 +61,7 @@ func (r *RedisIDKeyHash[ID, V]) SetOp(ctx context.Context, id ID, value V) Opera
 }
 
 func (r *RedisIDKeyHash[ID, V]) Set(ctx context.Context, id ID, value V) error {
-	return r.SetOp(ctx, id, value).Get()
+	return r.SetOp(ctx, id, value).Err()
 }
 
 func (r *RedisIDKeyHash[ID, V]) GetOp(ctx context.Context, id ID) OperationResult[V] {
@@ -144,7 +144,7 @@ func (r *RedisIDKeyHash[ID, V]) SetFieldIfExistsOp(ctx context.Context, id ID, f
 }
 
 func (r *RedisIDKeyHash[ID, V]) SetFieldIfExists(ctx context.Context, id ID, fieldName string, value any) error {
-	return r.SetFieldIfExistsOp(ctx, id, fieldName, value).Get()
+	return r.SetFieldIfExistsOp(ctx, id, fieldName, value).Err()
 }
 
 func (r *RedisIDKeyHash[ID, V]) SetFieldOp(ctx context.Context, id ID, fieldName string, value any) OperationResult[uint64] {

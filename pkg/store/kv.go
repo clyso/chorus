@@ -96,7 +96,7 @@ func (r *RedisIDKeyValue[ID, V]) SetOp(ctx context.Context, id ID, value V) Oper
 }
 
 func (r *RedisIDKeyValue[ID, V]) Set(ctx context.Context, id ID, value V) error {
-	return r.SetOp(ctx, id, value).Get()
+	return r.SetOp(ctx, id, value).Err()
 }
 
 func (r *RedisIDKeyValue[ID, V]) SetIfNotExistsOp(ctx context.Context, id ID, value V) OperationStatus {
@@ -126,5 +126,5 @@ func (r *RedisIDKeyValue[ID, V]) SetIfNotExistsOp(ctx context.Context, id ID, va
 }
 
 func (r *RedisIDKeyValue[ID, V]) SetIfNotExists(ctx context.Context, id ID, value V) error {
-	return r.SetIfNotExistsOp(ctx, id, value).Get()
+	return r.SetIfNotExistsOp(ctx, id, value).Err()
 }
