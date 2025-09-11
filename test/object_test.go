@@ -21,12 +21,16 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"sync/atomic"
 	"testing"
 
 	"github.com/clyso/chorus/test/env"
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	user = "test"
 )
 
 func TestApi_Object_CRUD(t *testing.T) {
@@ -316,40 +320,56 @@ func TestApi_Object_CriticalObjectNames(t *testing.T) {
 		{"word/..", "Object name consisting of a word, a slash and two dots"},
 		{"word/../another", "Object name consisting of a word, a slash, two dots, a slash and a word"},
 	}
-	var cnt uint64 = 0
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
+	tstCtx := t.Context()
+	for i := range len(tests) {
+		r := require.New(t)
+		bucket := fmt.Sprintf("object-critical-%d", i+1)
+		fmt.Println(bucket)
+		err := e.MainClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{Region: "us-east"})
+		r.NoError(err)
+		err = e.F1Client.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{Region: "us-east"})
+		r.NoError(err)
+		err = e.F2Client.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{Region: "us-east"})
+		r.NoError(err)
+		ok, err := e.MainClient.BucketExists(tstCtx, bucket)
+		r.NoError(err)
+		r.True(ok)
+		ok, err = e.F1Client.BucketExists(tstCtx, bucket)
+		r.NoError(err)
+		r.True(ok)
+		ok, err = e.F2Client.BucketExists(tstCtx, bucket)
+		r.NoError(err)
+		r.True(ok)
+		ok, err = e.ProxyClient.BucketExists(tstCtx, bucket)
+		r.NoError(err)
+		r.True(ok)
+		_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+			User:            user,
+			From:            "main",
+			To:              "f1",
+			Buckets:         []string{bucket},
+			IsForAllBuckets: false,
+		})
+		r.NoError(err)
+		_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+			User:            user,
+			From:            "main",
+			To:              "f2",
+			Buckets:         []string{bucket},
+			IsForAllBuckets: false,
+		})
+		r.NoError(err)
+	}
+	for i:= range len(tests) {
+		bucket := fmt.Sprintf("object-critical-%d", i+1)
+		test := tests[i]
+		objName, description := test.name, test.description
+		t.Run(description, func(t *testing.T) {
 			t.Parallel()
-			objName, description := test.name, test.description
-			tstCtx := t.Context()
-			bucket := fmt.Sprintf("object-critical-%d", atomic.AddUint64(&cnt, 1))
 			r := require.New(t)
 
-			err := e.ProxyClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{Region: "us-east"})
-			r.NoError(err)
-			ok, err := e.ProxyClient.BucketExists(tstCtx, bucket)
-			r.NoError(err)
-			r.True(ok)
-
-			r.Eventually(func() bool {
-				ok, err = e.MainClient.BucketExists(tstCtx, bucket)
-				if err != nil || !ok {
-					return false
-				}
-				ok, err = e.F1Client.BucketExists(tstCtx, bucket)
-				if err != nil || !ok {
-					return false
-				}
-				ok, err = e.F2Client.BucketExists(tstCtx, bucket)
-				if err != nil || !ok {
-					return false
-				}
-				return true
-			}, e.WaitLong, e.RetryLong)
-
-			// Generate random test data
-			source := []byte("test-data")
+			// Generate test data
+			source := []byte(bucket)
 
 			// Test object creation
 			putInfo, err := e.ProxyClient.PutObject(tstCtx, bucket, objName, bytes.NewReader(source), int64(len(source)), mclient.PutObjectOptions{
