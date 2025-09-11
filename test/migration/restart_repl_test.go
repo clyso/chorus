@@ -13,7 +13,7 @@ import (
 )
 
 func Test_Restart_Replication(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	bucket := "restart"

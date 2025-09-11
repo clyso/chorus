@@ -12,7 +12,7 @@ import (
 )
 
 func TestApi_Object_Multipart(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	bucket := "object-mp"
 	r := require.New(t)

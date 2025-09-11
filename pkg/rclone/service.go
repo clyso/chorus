@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	_ "github.com/rclone/rclone/backend/s3"
@@ -198,7 +199,9 @@ func (s *svc) Compare(ctx context.Context, listMatch bool, user, from, to, fromB
 	}
 
 	err = operations.Check(ctx, opt)
-	if err != nil && !fserrors.IsCounted(err) {
+	// don't return an error on ErrorDirNotFound to maintain api backwards compatibility
+	// with older versions of rclone
+	if err != nil && !fserrors.IsCounted(err) && !errors.Is(err, fs.ErrorDirNotFound) {
 		return nil, err
 	}
 

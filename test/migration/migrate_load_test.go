@@ -22,7 +22,7 @@ import (
 
 func TestApi_Migrate_Load_test(t *testing.T) {
 	t.Skip()
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	const objPerBucket = 150

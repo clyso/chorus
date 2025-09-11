@@ -6,7 +6,7 @@ replace github.com/hibiken/asynq => github.com/clyso/asynq v0.0.0-20250821155534
 
 require (
 	github.com/alicebob/miniredis/v2 v2.35.0
-	github.com/aws/aws-sdk-go v1.55.7
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/aws/aws-sdk-go-v2 v1.37.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.22.2
@@ -16,7 +16,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
 	github.com/hibiken/asynq v0.24.1
-	github.com/johannesboyne/gofakes3 v0.0.0-20250106100439-5c39aecd6999
+	github.com/johannesboyne/gofakes3 v0.0.0-20250825084532-6555d310c473
 	github.com/minio/minio-go/v7 v7.0.92
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rclone/rclone v1.70.3

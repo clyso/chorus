@@ -37,7 +37,7 @@ import (
 )
 
 func TestApi_ZeroDowntimeSwitch(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket"
@@ -347,7 +347,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 }
 
 func TestApi_switch_multipart(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket-multipart"
@@ -557,7 +557,7 @@ func TestApi_switch_multipart(t *testing.T) {
 }
 
 func TestApi_scheduled_switch(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket-scheduled"
@@ -777,7 +777,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 }
 
 func TestApi_scheduled_switch_continue_replication(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket-scheduled-continue"

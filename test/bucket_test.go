@@ -12,7 +12,7 @@ import (
 )
 
 func TestApi_MockBucket(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	bucket := "bucket-mock"
 	r := require.New(t)
@@ -90,7 +90,7 @@ func TestApi_MockBucket(t *testing.T) {
 }
 
 func TestApi_Bucket_CRUD(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	bucket := "bucket-crud"
 	r := require.New(t)
@@ -178,7 +178,7 @@ func TestApi_Bucket_CRUD(t *testing.T) {
 }
 
 func TestApi_Bucket_List(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	b1, b2 := "bucket-list-1", "bucket-list-2"
 	r := require.New(t)

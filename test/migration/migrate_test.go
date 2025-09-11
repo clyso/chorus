@@ -15,7 +15,7 @@ import (
 )
 
 func TestApi_Migrate_test(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e, _, _ := env.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	r := require.New(t)
