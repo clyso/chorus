@@ -208,16 +208,6 @@ func SetupEmbedded(t testing.TB, workerConfIn *worker.Config, proxyConfIn *proxy
 	e.UrlHttpApi = "http://" + e.UrlHttpApi
 	ctx := t.Context()
 
-	// do deep copy of configs before passing to goroutines to avoid panic on concurrent hashmap usage:
-	proxyConfCopy, err := deepCopyStruct(proxyConf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	workerConfCopy, err := deepCopyStruct(workerConf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	wg, ctx := errgroup.WithContext(ctx)
 	wg.Go(func() error {
 		app := dom.AppInfo{
@@ -225,7 +215,7 @@ func SetupEmbedded(t testing.TB, workerConfIn *worker.Config, proxyConfIn *proxy
 			App:     "proxy",
 			AppID:   xid.New().String(),
 		}
-		return proxy.Start(ctx, app, proxyConfCopy)
+		return proxy.Start(ctx, app, proxyConf)
 	})
 	wg.Go(func() error {
 		app := dom.AppInfo{
@@ -233,7 +223,7 @@ func SetupEmbedded(t testing.TB, workerConfIn *worker.Config, proxyConfIn *proxy
 			App:     "worker",
 			AppID:   xid.New().String(),
 		}
-		return worker.Start(ctx, app, workerConfCopy)
+		return worker.Start(ctx, app, workerConf)
 	})
 	t.Cleanup(func() {
 		err := wg.Wait()
