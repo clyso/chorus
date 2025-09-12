@@ -50,7 +50,6 @@ chorctl consistency purge oldstorage:bucket newstorage:altbucket`,
 			locations = append(locations, &pb.MigrateLocation{
 				Storage: storage,
 				Bucket:  bucket,
-				User:    consistencyCheckUser,
 			})
 		}
 

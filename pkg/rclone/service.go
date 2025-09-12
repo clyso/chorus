@@ -41,6 +41,18 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 )
 
+type Bucket struct {
+	Storage string
+	Bucket  string
+}
+
+func NewBucket(storage string, bucket string) Bucket {
+	return Bucket{
+		Storage: storage,
+		Bucket:  bucket,
+	}
+}
+
 type File struct {
 	Storage string
 	Bucket  string

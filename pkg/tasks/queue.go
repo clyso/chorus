@@ -15,6 +15,9 @@
 package tasks
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/clyso/chorus/pkg/entity"
@@ -45,7 +48,7 @@ const (
 var Priority = map[string]int{
 	string(QueueAPI): 200, // highest priority
 	string(QueueMigrateListObjectsPrefix) + ":*": 100,
-	string(QueueConsistencyCheck):                50,
+	string(QueueConsistencyCheck) + ":*":         50,
 	string(QueueMigrateCopyObjectPrefix) + ":*":  10,
 	string(QueueEventsPrefix) + ":*":             5, // lowest priority
 	"*":                                          1, // fallback for legacy queues
@@ -77,4 +80,14 @@ func EventMigrationQueues(id entity.UniversalReplicationID) []string {
 
 func AllReplicationQueues(id entity.UniversalReplicationID) []string {
 	return append(InitMigrationQueues(id), EventMigrationQueues(id)...)
+}
+
+func ConsistencyCheckQueue(id entity.ConsistencyCheckID) string {
+	var buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
+	if err := json.NewEncoder(encoder).Encode(&id); err != nil {
+		panic(fmt.Errorf("unable to encode consistency check id: %w", err))
+	}
+	// add prefix
+	return fmt.Sprintf("%s:%s", QueueConsistencyCheck, buf.String())
 }
