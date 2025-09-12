@@ -83,7 +83,7 @@ service Chorus {
 
   rpc GetReplication(ReplicationRequest) returns (Replication);
 
-  rpc StartConsistencyCheck(ConsistencyCheckRequest) returns (google.protobuf.Empty);
+  rpc StartConsistencyCheck(StartConsistencyCheckRequest) returns (google.protobuf.Empty);
   rpc ListConsistencyChecks(google.protobuf.Empty) returns (ListConsistencyChecksResponse);
   rpc GetConsistencyCheckReport(ConsistencyCheckRequest) returns (GetConsistencyCheckReportResponse);
   rpc GetConsistencyCheckReportEntries(GetConsistencyCheckReportEntriesRequest) returns (GetConsistencyCheckReportEntriesResponse);
@@ -93,7 +93,11 @@ service Chorus {
 message MigrateLocation {
   string storage = 1;
   string bucket = 2;
-  string user = 3;
+}
+
+message StartConsistencyCheckRequest {
+  repeated MigrateLocation locations = 1;
+  string user = 2;
 }
 
 message ConsistencyCheckRequest {
@@ -121,16 +125,21 @@ message GetConsistencyCheckReportResponse {
   ConsistencyCheck check = 1;
 }
 
+message ConsistencyCheckStorageEntry {
+  string storage = 1;
+  string versionId = 2;
+}
+
 message ConsistencyCheckReportEntry {
   string object = 1;
   string etag = 2;
-  repeated string storages = 3;
+  repeated ConsistencyCheckStorageEntry storageEntries = 3;
 }
 
 message GetConsistencyCheckReportEntriesRequest {
   repeated MigrateLocation locations = 1;
   uint64 Cursor = 2;
-  int64 PageSize = 3;
+  uint64 PageSize = 3;
 }
 
 message GetConsistencyCheckReportEntriesResponse {

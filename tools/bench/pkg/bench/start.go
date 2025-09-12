@@ -249,11 +249,11 @@ func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.C
 	if err != nil {
 		return
 	}
-	proxy, err = clients.GetByName(newCtx, "proxy")
+	proxy, err = clients.GetByName(newCtx, user, "proxy")
 	if err != nil {
 		return
 	}
-	main, err = clients.GetByName(newCtx, "main")
+	main, err = clients.GetByName(newCtx, user, "main")
 	if err != nil {
 		return
 	}

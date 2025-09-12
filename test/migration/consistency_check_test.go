@@ -43,6 +43,17 @@ const (
 	ConsistencyCheckDir1    = "empty/dir"
 )
 
+func pbConsistencyCheckStorageEntryContains(arr []*pb.ConsistencyCheckStorageEntry, mg *pb.ConsistencyCheckStorageEntry) bool {
+	contains := false
+	for _, el := range arr {
+		if el.Storage == mg.Storage && el.VersionId == mg.VersionId {
+			contains = true
+			break
+		}
+	}
+	return contains
+}
+
 func consistencyCheckFillUpStorages(ctx context.Context, r *require.Assertions, client *minio.Client, bucketName string, objectSeed []byte) {
 	err := client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
 	r.NoError(err)
@@ -80,12 +91,10 @@ func TestConsistency_2Storages_Success(t *testing.T) {
 		{
 			Storage: ConsistencyCheckStorage1,
 			Bucket:  ConsistencyCheckBucket1,
-			User:    user,
 		},
 		{
 			Storage: ConsistencyCheckStorage2,
 			Bucket:  ConsistencyCheckBucket2,
-			User:    user,
 		},
 	}
 
@@ -93,8 +102,9 @@ func TestConsistency_2Storages_Success(t *testing.T) {
 	ctx := context.WithoutCancel(tstCtx)
 	consistencyCheckSetup2Storages(ctx, &e, r)
 
-	checkRequest := &pb.ConsistencyCheckRequest{
+	checkRequest := &pb.StartConsistencyCheckRequest{
 		Locations: locations,
+		User:      user,
 	}
 	_, err := e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
 	r.NoError(err)
@@ -134,12 +144,10 @@ func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
 		{
 			Storage: ConsistencyCheckStorage1,
 			Bucket:  ConsistencyCheckBucket1,
-			User:    user,
 		},
 		{
 			Storage: ConsistencyCheckStorage2,
 			Bucket:  ConsistencyCheckBucket2,
-			User:    user,
 		},
 	}
 
@@ -150,136 +158,9 @@ func TestConsistency_2Storages_NoObject_Failure(t *testing.T) {
 	err := e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject3, minio.RemoveObjectOptions{})
 	r.NoError(err)
 
-	checkRequest := &pb.ConsistencyCheckRequest{
+	checkRequest := &pb.StartConsistencyCheckRequest{
 		Locations: locations,
-	}
-	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
-	r.NoError(err)
-
-	var getCheckResponse *pb.GetConsistencyCheckReportResponse
-	r.Eventually(func() bool {
-		getCheckResponse, err = e.ApiClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
-		if err != nil {
-			return false
-		}
-		if getCheckResponse == nil {
-			return false
-		}
-		if getCheckResponse.Check == nil {
-			return false
-		}
-		if !getCheckResponse.Check.Ready {
-			return false
-		}
-		return true
-	}, e.WaitLong, e.RetryLong)
-
-	r.False(getCheckResponse.Check.Consistent)
-
-	checkEntries, err := e.ApiClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
-		Locations: locations,
-		PageSize:  10,
-	})
-	r.NoError(err)
-	r.Len(checkEntries.Entries, 1)
-	r.NotContains(checkEntries.Entries[0].Storages, ConsistencyCheckStorage1)
-	r.Contains(checkEntries.Entries[0].Storages, ConsistencyCheckStorage2)
-	r.Equal(checkEntries.Entries[0].Object, ConsistencyCheckObject3)
-}
-
-func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
-	tstCtx := t.Context()
-	locations := []*pb.MigrateLocation{
-		{
-			Storage: ConsistencyCheckStorage1,
-			Bucket:  ConsistencyCheckBucket1,
-			User:    user,
-		},
-		{
-			Storage: ConsistencyCheckStorage2,
-			Bucket:  ConsistencyCheckBucket2,
-			User:    user,
-		},
-	}
-
-	r := require.New(t)
-	ctx := context.WithoutCancel(tstCtx)
-	consistencyCheckSetup2Storages(ctx, &e, r)
-
-	err := e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject1, minio.RemoveObjectOptions{ForceDelete: true})
-	r.NoError(err)
-	err = e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject2, minio.RemoveObjectOptions{ForceDelete: true})
-	r.NoError(err)
-
-	checkRequest := &pb.ConsistencyCheckRequest{
-		Locations: locations,
-	}
-	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
-	r.NoError(err)
-
-	var getCheckResponse *pb.GetConsistencyCheckReportResponse
-	r.Eventually(func() bool {
-		getCheckResponse, err = e.ApiClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
-		if err != nil {
-			return false
-		}
-		if getCheckResponse == nil {
-			return false
-		}
-		if getCheckResponse.Check == nil {
-			return false
-		}
-		if !getCheckResponse.Check.Ready {
-			return false
-		}
-		return true
-	}, e.WaitLong, e.RetryLong)
-
-	r.False(getCheckResponse.Check.Consistent)
-
-	checkEntries, err := e.ApiClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
-		Locations: locations,
-		PageSize:  10,
-	})
-	r.NoError(err)
-	r.Len(checkEntries.Entries, 3)
-	r.NotContains(checkEntries.Entries[0].Storages, ConsistencyCheckStorage1)
-	r.NotContains(checkEntries.Entries[1].Storages, ConsistencyCheckStorage1)
-	r.NotContains(checkEntries.Entries[2].Storages, ConsistencyCheckStorage1)
-	r.Contains(checkEntries.Entries[0].Storages, ConsistencyCheckStorage2)
-	r.Contains(checkEntries.Entries[1].Storages, ConsistencyCheckStorage2)
-	r.Contains(checkEntries.Entries[2].Storages, ConsistencyCheckStorage2)
-	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2, "path/to/"}, checkEntries.Entries[0].Object)
-	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2, "path/to/"}, checkEntries.Entries[1].Object)
-	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2, "path/to/"}, checkEntries.Entries[2].Object)
-}
-
-func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
-	tstCtx := t.Context()
-	locations := []*pb.MigrateLocation{
-		{
-			Storage: ConsistencyCheckStorage1,
-			Bucket:  ConsistencyCheckBucket1,
-			User:    user,
-		},
-		{
-			Storage: ConsistencyCheckStorage2,
-			Bucket:  ConsistencyCheckBucket2,
-			User:    user,
-		},
-	}
-
-	r := require.New(t)
-	ctx := context.WithoutCancel(tstCtx)
-	consistencyCheckSetup2Storages(ctx, &e, r)
-
-	err := e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckDir1, minio.RemoveObjectOptions{})
-	r.NoError(err)
-
-	checkRequest := &pb.ConsistencyCheckRequest{
-		Locations: locations,
+		User:      user,
 	}
 	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
 	r.NoError(err)
@@ -310,10 +191,152 @@ func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
 	})
 	r.NoError(err)
 	r.Len(checkEntries.Entries, 2)
-	r.NotContains(checkEntries.Entries[0].Storages, ConsistencyCheckStorage1)
-	r.Contains(checkEntries.Entries[0].Storages, ConsistencyCheckStorage2)
-	r.NotContains(checkEntries.Entries[1].Storages, ConsistencyCheckStorage1)
-	r.Contains(checkEntries.Entries[1].Storages, ConsistencyCheckStorage2)
+	r.True(func() bool {
+		if pbConsistencyCheckStorageEntryContains(checkEntries.Entries[0].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage1}) &&
+			pbConsistencyCheckStorageEntryContains(checkEntries.Entries[1].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage2}) {
+			return true
+		}
+		if pbConsistencyCheckStorageEntryContains(checkEntries.Entries[0].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage2}) &&
+			pbConsistencyCheckStorageEntryContains(checkEntries.Entries[1].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage1}) {
+			return true
+		}
+		return false
+	}())
+	r.True(func() bool {
+		if checkEntries.Entries[0].Object == ConsistencyCheckObject3 &&
+			checkEntries.Entries[1].Object == "path/" {
+			return true
+		}
+		if checkEntries.Entries[1].Object == ConsistencyCheckObject3 &&
+			checkEntries.Entries[0].Object == "path/" {
+			return true
+		}
+		return false
+	}())
+}
+
+func TestConsistency_2Storages_NoDir_Failure(t *testing.T) {
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
+	locations := []*pb.MigrateLocation{
+		{
+			Storage: ConsistencyCheckStorage1,
+			Bucket:  ConsistencyCheckBucket1,
+		},
+		{
+			Storage: ConsistencyCheckStorage2,
+			Bucket:  ConsistencyCheckBucket2,
+		},
+	}
+
+	r := require.New(t)
+	ctx := context.WithoutCancel(tstCtx)
+	consistencyCheckSetup2Storages(ctx, &e, r)
+
+	err := e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject1, minio.RemoveObjectOptions{ForceDelete: true})
+	r.NoError(err)
+	err = e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckObject2, minio.RemoveObjectOptions{ForceDelete: true})
+	r.NoError(err)
+
+	checkRequest := &pb.StartConsistencyCheckRequest{
+		Locations: locations,
+		User:      user,
+	}
+	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
+	r.NoError(err)
+
+	var getCheckResponse *pb.GetConsistencyCheckReportResponse
+	r.Eventually(func() bool {
+		getCheckResponse, err = e.ApiClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+		if err != nil {
+			return false
+		}
+		if getCheckResponse == nil {
+			return false
+		}
+		if getCheckResponse.Check == nil {
+			return false
+		}
+		if !getCheckResponse.Check.Ready {
+			return false
+		}
+		return true
+	}, e.WaitLong, e.RetryLong)
+
+	r.False(getCheckResponse.Check.Consistent)
+
+	checkEntries, err := e.ApiClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		Locations: locations,
+		PageSize:  10,
+	})
+
+	r.NoError(err)
+	r.Len(checkEntries.Entries, 2)
+
+	r.False(pbConsistencyCheckStorageEntryContains(checkEntries.Entries[0].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage1}))
+	r.False(pbConsistencyCheckStorageEntryContains(checkEntries.Entries[1].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage1}))
+	r.True(pbConsistencyCheckStorageEntryContains(checkEntries.Entries[0].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage2}))
+	r.True(pbConsistencyCheckStorageEntryContains(checkEntries.Entries[1].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage2}))
+	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2}, checkEntries.Entries[0].Object)
+	r.Contains([]string{ConsistencyCheckObject1, ConsistencyCheckObject2}, checkEntries.Entries[1].Object)
+}
+
+func TestConsistency_2Storages_NoEmptyDir_Failure(t *testing.T) {
+	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
+	locations := []*pb.MigrateLocation{
+		{
+			Storage: ConsistencyCheckStorage1,
+			Bucket:  ConsistencyCheckBucket1,
+		},
+		{
+			Storage: ConsistencyCheckStorage2,
+			Bucket:  ConsistencyCheckBucket2,
+		},
+	}
+
+	r := require.New(t)
+	ctx := context.WithoutCancel(tstCtx)
+	consistencyCheckSetup2Storages(ctx, &e, r)
+
+	err := e.MainClient.RemoveObject(ctx, ConsistencyCheckBucket1, ConsistencyCheckDir1, minio.RemoveObjectOptions{})
+	r.NoError(err)
+
+	checkRequest := &pb.StartConsistencyCheckRequest{
+		Locations: locations,
+		User:      user,
+	}
+	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
+	r.NoError(err)
+
+	var getCheckResponse *pb.GetConsistencyCheckReportResponse
+	r.Eventually(func() bool {
+		getCheckResponse, err = e.ApiClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+		if err != nil {
+			return false
+		}
+		if getCheckResponse == nil {
+			return false
+		}
+		if getCheckResponse.Check == nil {
+			return false
+		}
+		if !getCheckResponse.Check.Ready {
+			return false
+		}
+		return true
+	}, e.WaitLong, e.RetryLong)
+
+	r.False(getCheckResponse.Check.Consistent)
+
+	checkEntries, err := e.ApiClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		Locations: locations,
+		PageSize:  10,
+	})
+	r.NoError(err)
+	r.Len(checkEntries.Entries, 1)
+	r.NotContains(checkEntries.Entries[0].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage1})
+	r.Contains(checkEntries.Entries[0].StorageEntries, &pb.ConsistencyCheckStorageEntry{Storage: ConsistencyCheckStorage2})
 }
 
 func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
@@ -324,12 +347,10 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 		{
 			Storage: ConsistencyCheckStorage1,
 			Bucket:  ConsistencyCheckBucket1,
-			User:    user,
 		},
 		{
 			Storage: ConsistencyCheckStorage2,
 			Bucket:  ConsistencyCheckBucket2,
-			User:    user,
 		},
 	}
 
@@ -345,8 +366,9 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 	r.EqualValues(ConsistencyCheckObject1, uploadInfo.Key)
 	r.EqualValues(ConsistencyCheckBucket1, uploadInfo.Bucket)
 
-	checkRequest := &pb.ConsistencyCheckRequest{
+	checkRequest := &pb.StartConsistencyCheckRequest{
 		Locations: locations,
+		User:      user,
 	}
 	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
 	r.NoError(err)
@@ -379,9 +401,9 @@ func TestConsistency_2Storages_WrongEtag_Failure(t *testing.T) {
 	r.Equal(len(checkEntries.Entries), 2)
 	r.Equal(checkEntries.Entries[0].Object, checkEntries.Entries[1].Object)
 	r.NotEqual(checkEntries.Entries[0].Etag, checkEntries.Entries[1].Etag)
-	r.Len(checkEntries.Entries[0].Storages, 1)
-	r.Len(checkEntries.Entries[1].Storages, 1)
-	r.NotEqual(checkEntries.Entries[0].Storages[0], checkEntries.Entries[1].Storages[0])
+	r.Len(checkEntries.Entries[0].StorageEntries, 1)
+	r.Len(checkEntries.Entries[1].StorageEntries, 1)
+	r.NotEqual(checkEntries.Entries[0].StorageEntries[0], checkEntries.Entries[1].StorageEntries[0])
 }
 
 func TestConsistency_2Storages_ListChecks(t *testing.T) {
@@ -391,12 +413,10 @@ func TestConsistency_2Storages_ListChecks(t *testing.T) {
 		{
 			Storage: ConsistencyCheckStorage1,
 			Bucket:  ConsistencyCheckBucket1,
-			User:    user,
 		},
 		{
 			Storage: ConsistencyCheckStorage2,
 			Bucket:  ConsistencyCheckBucket2,
-			User:    user,
 		},
 	}
 
@@ -408,8 +428,9 @@ func TestConsistency_2Storages_ListChecks(t *testing.T) {
 	r.NoError(err)
 	r.Nil(rsp.Checks)
 
-	checkRequest := &pb.ConsistencyCheckRequest{
+	checkRequest := &pb.StartConsistencyCheckRequest{
 		Locations: locations,
+		User:      user,
 	}
 	_, err = e.ApiClient.StartConsistencyCheck(ctx, checkRequest)
 	r.NoError(err)
