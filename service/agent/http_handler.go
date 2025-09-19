@@ -18,7 +18,6 @@ package agent
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -27,8 +26,6 @@ import (
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/notifications"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
@@ -63,25 +60,10 @@ func HTTPHandler(policySvc policy.Service, handler *notifications.Handler) http.
 			reqCtx = xctx.SetBucket(reqCtx, bucket)
 			reqCtx = xctx.SetObject(reqCtx, object)
 
-			replicationPolicies, err := policySvc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(user, bucket))
-			if err != nil && !errors.Is(err, dom.ErrNotFound) {
+			reqCtx, err = policySvc.BuildAgentContext(reqCtx, user, bucket)
+			if err != nil {
 				util.WriteError(ctx, w, err)
 				return
-			}
-			if replicationPolicies != nil {
-				var replications []entity.UniversalReplicationID
-				for _, replTo := range replicationPolicies.Destinations {
-					replications = append(replications, entity.IDFromBucketReplication(entity.ReplicationStatusID{
-						User:        user,
-						FromStorage: replicationPolicies.FromStorage,
-						FromBucket:  bucket,
-						ToStorage:   replTo.Storage,
-						ToBucket:    replTo.Bucket,
-					}))
-				}
-				if len(replications) != 0 {
-					ctx = xctx.SetReplications(ctx, replications)
-				}
 			}
 			methodArr := strings.Split(record.EventName, ":")
 			switch methodArr[len(methodArr)-1] {

@@ -86,13 +86,11 @@ func (r *replicationID) SetReplicationID(id entity.UniversalReplicationID) {
 var _ ReplicationTask = (*replicationID)(nil)
 
 type ZeroDowntimeReplicationSwitchPayload struct {
-	// TODO: use entity.UniversalReplicationID in the next PR
-	ID entity.ReplicationStatusID
+	ID entity.UniversalReplicationID
 }
 
 type SwitchWithDowntimePayload struct {
-	// TODO: use entity.UniversalReplicationID in the next PR
-	ID entity.ReplicationStatusID
+	ID entity.UniversalReplicationID
 }
 
 type BucketSyncTagsPayload struct {

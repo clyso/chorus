@@ -22,7 +22,7 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 )
 
-func ReplicationStatusID(id entity.ReplicationStatusID) error {
+func ReplicationStatusID(id entity.BucketReplicationPolicy) error {
 	errs := make([]error, 0)
 	if id.User == "" {
 		err := fmt.Errorf("%w: user is required", dom.ErrInvalidArg)

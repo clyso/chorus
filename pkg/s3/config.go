@@ -32,10 +32,8 @@ const (
 )
 
 type StorageConfig struct {
-	DefaultRegion     string             `yaml:"defaultRegion"`
-	Storages          map[string]Storage `yaml:"storages"`
-	CreateRouting     bool               `yaml:"createRouting"`
-	CreateReplication bool               `yaml:"createReplication"`
+	DefaultRegion string             `yaml:"defaultRegion"`
+	Storages      map[string]Storage `yaml:"storages"`
 
 	storageList []string
 }

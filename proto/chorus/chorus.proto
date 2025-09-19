@@ -275,13 +275,42 @@ message UserReplication {
   string user = 1;
   string from = 2;
   string to = 3;
+
+  google.protobuf.Timestamp created_at = 5;
+  bool is_paused = 6;
+  bool is_init_done = 7;
+
+  int64 init_obj_listed = 8;
+  int64 init_obj_done = 9;
+
+  int64 init_bytes_listed = 10;
+  int64 init_bytes_done = 11;
+
+  int64 events = 12;
+  int64 events_done = 13;
+
+  google.protobuf.Timestamp last_emitted_at = 14;
+  google.protobuf.Timestamp last_processed_at = 15;
+
+  optional string agent_url = 16;
+
+  string to_bucket = 17;
+
+  google.protobuf.Timestamp init_done_at = 18;
+
+  // true if given replication has associated replication switch with it.
+  bool has_switch = 19;
+  // true if replication is archived. Archived replication will not generate or sync new events.
+  // The main purpose of archived replication is to keep replication metadata for future reference.
+  // Archived replication can be safely deleted.
+  bool is_archived = 20;
+  google.protobuf.Timestamp archived_at = 21;
 }
 
 message DeleteUserReplicationRequest {
   string user = 1;
   string from = 2;
   string to = 3;
-  bool delete_bucket_replications = 4;
 }
 
 message CompareBucketRequest {

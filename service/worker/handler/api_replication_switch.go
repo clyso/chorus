@@ -27,7 +27,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -36,7 +35,6 @@ func (s *svc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("ZeroDowntimeReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
-	ctx = log.WithBucket(ctx, p.ID.FromBucket)
 	policyID := p.ID
 
 	// acquire exclusive lock to switch task:
@@ -65,14 +63,11 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p tasks.Z
 	if !replStatus.IsArchived {
 		zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
 	}
-	switchPolicy, err := s.policySvc.GetReplicationSwitchInfo(ctx, replicationID)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
-			return nil
-		}
-		return err
+	if replStatus.Switch == nil {
+		zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
+		return nil
 	}
+	switchPolicy := replStatus.Switch
 	if !switchPolicy.IsZeroDowntime() {
 		// wrong switch type - drop task
 		// should never happen
@@ -85,11 +80,16 @@ func (s *svc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p tasks.Z
 		// events queue is not drained yet - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 	}
-	existsUploads, err := s.storageSvc.ExistsUploads(ctx, p.ID.User, p.ID.FromBucket)
+	var existsMultipartUploads bool
+	if bucketID, ok := replicationID.AsBucketID(); ok {
+		existsMultipartUploads, err = s.storageSvc.ExistsUploads(ctx, bucketID.FromStorage, bucketID.FromBucket)
+	} else if userID, ok := replicationID.AsUserID(); ok {
+		existsMultipartUploads, err = s.storageSvc.ExistsUploadsForUser(ctx, userID.User)
+	}
 	if err != nil {
 		return err
 	}
-	if existsUploads {
+	if existsMultipartUploads {
 		// there are pending multipart uploads - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 	}

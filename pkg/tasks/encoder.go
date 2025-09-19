@@ -240,7 +240,7 @@ var (
 	}
 	zeroDowntimeReplicationSwitch = encoder[ZeroDowntimeReplicationSwitchPayload]{
 		taskID: func(p ZeroDowntimeReplicationSwitchPayload) string {
-			return toTaskID("api:zdrs", p.ID.FromStorage, p.ID.FromBucket, p.ID.ToStorage, p.ID.ToBucket)
+			return toTaskID("api:zdrs", p.ID.AsString())
 		},
 		queue: func(p ZeroDowntimeReplicationSwitchPayload) string {
 			return string(QueueAPI)
@@ -249,7 +249,7 @@ var (
 	}
 	switchWithDowntime = encoder[SwitchWithDowntimePayload]{
 		taskID: func(p SwitchWithDowntimePayload) string {
-			return toTaskID("api:sd", p.ID.FromStorage, p.ID.FromBucket, p.ID.ToStorage, p.ID.ToBucket)
+			return toTaskID("api:sd", p.ID.AsString())
 		},
 		queue: func(p SwitchWithDowntimePayload) string {
 			return string(QueueAPI)

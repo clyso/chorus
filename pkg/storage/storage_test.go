@@ -35,14 +35,14 @@ func Test_svc_GetLastListedObj(t *testing.T) {
 
 	storage := New(c)
 	ctx := context.Background()
-	s1 := entity.IDFromBucketReplication(entity.ReplicationStatusID{
+	s1 := entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
 		FromStorage: "f1",
 		ToStorage:   "f2",
 		FromBucket:  "b",
 		ToBucket:    "b",
 	},
 	)
-	s2 := entity.IDFromBucketReplication(entity.ReplicationStatusID{
+	s2 := entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
 		FromStorage: "f2",
 		ToStorage:   "f1",
 		FromBucket:  "b",
@@ -133,6 +133,9 @@ func Test_svc_StoreUploadID(t *testing.T) {
 	uploads := []string{"id1", "id2"}
 
 	for _, user := range users {
+		exists, err := storage.ExistsUploadsForUser(ctx, user)
+		r.NoError(err)
+		r.False(exists)
 		for _, bucket := range buckets {
 			exists, err := storage.ExistsUploads(ctx, user, bucket)
 			r.NoError(err)
@@ -155,6 +158,9 @@ func Test_svc_StoreUploadID(t *testing.T) {
 	}
 
 	for _, user := range users {
+		exists, err := storage.ExistsUploadsForUser(ctx, user)
+		r.NoError(err)
+		r.True(exists)
 		for _, bucket := range buckets {
 			exists, err := storage.ExistsUploads(ctx, user, bucket)
 			r.NoError(err)
@@ -178,4 +184,65 @@ func Test_svc_StoreUploadID(t *testing.T) {
 	err = storage.DeleteUploadID(ctx, "missing", "keys", "valid", "args")
 	r.NoError(err)
 
+}
+
+func Test_StoreUploadID(t *testing.T) {
+	c := testutil.SetupRedis(t)
+	r := require.New(t)
+	ctx := t.Context()
+	storage := New(c)
+
+	user := "u1"
+	bucket1, bucket2 := "b1", "b2"
+	obj := "o1"
+	upload := "id1"
+
+	// not exists
+	exists, err := storage.ExistsUploadsForUser(ctx, user)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = storage.ExistsUploads(ctx, user, bucket1)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = storage.ExistsUploadID(ctx, user, bucket1, obj, upload)
+	r.NoError(err)
+	r.False(exists)
+
+	// store to user bucket1
+	err = storage.StoreUploadID(ctx, user, bucket1, obj, upload, time.Minute)
+	r.NoError(err)
+	// exists for user and bucket1
+	exists, err = storage.ExistsUploadsForUser(ctx, user)
+	r.NoError(err)
+	r.True(exists)
+	exists, err = storage.ExistsUploads(ctx, user, bucket1)
+	r.NoError(err)
+	r.True(exists)
+	exists, err = storage.ExistsUploadID(ctx, user, bucket1, obj, upload)
+	r.NoError(err)
+	r.True(exists)
+
+	// not exists for bucket2
+	exists, err = storage.ExistsUploads(ctx, user, bucket2)
+	r.NoError(err)
+	r.False(exists)
+	// not exists for other user
+	exists, err = storage.ExistsUploadsForUser(ctx, "u2")
+	r.NoError(err)
+	r.False(exists)
+
+	// delete upload ID
+	err = storage.DeleteUploadID(ctx, user, bucket1, obj, upload)
+	r.NoError(err)
+
+	// not exists
+	exists, err = storage.ExistsUploadsForUser(ctx, user)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = storage.ExistsUploads(ctx, user, bucket1)
+	r.NoError(err)
+	r.False(exists)
+	exists, err = storage.ExistsUploadID(ctx, user, bucket1, obj, upload)
+	r.NoError(err)
+	r.False(exists)
 }

@@ -15,6 +15,7 @@ import (
 func TestApi_Versioning_Bucket(t *testing.T) {
 	t.Skip()
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "bucket-versioning"
 	r := require.New(t)

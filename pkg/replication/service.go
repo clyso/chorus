@@ -139,22 +139,21 @@ func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVer
 	}
 	// no destinations means only 3 things:
 	// 1. bucket replication is not configured and user replication is not configured - no need to do anything
-	// 2. bucket replication is not configured BUT user replication is here - create bucket replication for CreateBucket request - Remove in next PR
-	// 3. bucket replication is archived because zero-downtime switch is in progress
+	// 2. bucket replication is archived because zero-downtime switch is in progress
 	//    - increment source version only if request routed to main storage
 	//    - replicate only for dangling multipart uploads to old main storage
 
 	inProgressZeroDowntimeSwitch := xctx.GetInProgressZeroDowntime(ctx)
 	if inProgressZeroDowntimeSwitch == nil {
-		// TODO: remove this function in the next PR after implementing new user replication policies
-		return s.createBucketReplicationFromUserReplication(ctx, routedTo)
 		// do nothing - replication was not configured
-		// return false, nil, nil
+		return false, nil, nil
 	}
+	originalReplID := inProgressZeroDowntimeSwitch.ReplicationID()
 
 	// zero-downtime switch is in progress
 	// check if we need to replicate dangling multipart upload to old main storage
-	wasRoutedToOldStorage := routedTo == inProgressZeroDowntimeSwitch.ReplID.FromStorage
+	wasRoutedToOldStorage := routedTo == originalReplID.FromStorage()
+
 	isCompleteMutlipart := xctx.GetMethod(ctx) == s3.CompleteMultipartUpload
 	if wasRoutedToOldStorage && isCompleteMutlipart {
 		// BUGFIX:
@@ -176,52 +175,11 @@ func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVer
 		// - because replication policy is archived we dont create replication tasks
 		// - but we need to finish old multipart upload on A and replicate completed object to B
 		return true, []entity.UniversalReplicationID{
-			entity.IDFromBucketReplication(inProgressZeroDowntimeSwitch.ReplID),
+			originalReplID,
 		}, nil
 	}
 
-	// no-error means that zero-downtime switch in progress.
+	// zero-downtime switch in progress.
 	// increment version in routed storage and skip creating replication tasks
 	return true, nil, nil
-}
-
-func (s *svc) createBucketReplicationFromUserReplication(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.UniversalReplicationID, err error) {
-	if xctx.GetMethod(ctx) != s3.CreateBucket {
-		return false, nil, nil
-	}
-	user := xctx.GetUser(ctx)
-	bucket := xctx.GetBucket(ctx)
-	// bucket replication not found. Create new bucket policy from user policy only for CreateBucket method
-
-	userPolicy, err := s.policySvc.GetUserReplicationPolicies(ctx, user)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			// user replication not configured.
-			return false, nil, nil
-		}
-		return false, nil, err
-	}
-	if userPolicy.FromStorage != routedTo {
-		// should never happen
-		return false, nil, fmt.Errorf("%w: user replication policy source storage %s does not match routed to storage %s", dom.ErrInternal, userPolicy.FromStorage, routedTo)
-	}
-	destinations := make([]entity.UniversalReplicationID, 0, len(userPolicy.Destinations))
-	for _, to := range userPolicy.Destinations {
-		replicationID := entity.ReplicationStatusID{
-			User:        user,
-			FromStorage: userPolicy.FromStorage,
-			ToStorage:   to.Storage,
-			FromBucket:  bucket,
-			ToBucket:    bucket,
-		}
-		destinations = append(destinations, entity.IDFromBucketReplication(replicationID))
-		err = s.policySvc.AddBucketReplicationPolicy(ctx, replicationID, nil)
-		if err != nil {
-			if errors.Is(err, dom.ErrAlreadyExists) {
-				continue
-			}
-			return false, nil, fmt.Errorf("unable to add bucket replication policy from user policy: %w", err)
-		}
-	}
-	return true, destinations, nil
 }

@@ -84,6 +84,7 @@ type Service interface {
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
 	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
 	ExistsUploadID(ctx context.Context, user, bucket, object, uploadID string) (bool, error)
+	ExistsUploadsForUser(ctx context.Context, user string) (bool, error)
 	ExistsUploads(ctx context.Context, user, bucket string) (bool, error)
 
 	GetLastListedConsistencyCheckObj(ctx context.Context, obj *ConsistencyCheckObject) (string, error)
@@ -196,6 +197,18 @@ func (s *svc) ExistsUploadID(ctx context.Context, user, bucket, object, uploadID
 	key := fmt.Sprintf("s:up:%s:%s", user, bucket)
 	val := fmt.Sprintf("%s:%s", object, uploadID)
 	return s.client.SIsMember(ctx, key, val).Result()
+}
+
+func (s *svc) ExistsUploadsForUser(ctx context.Context, user string) (bool, error) {
+	if user == "" {
+		return false, fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
+	}
+	key := fmt.Sprintf("s:up:%s:*", user)
+	res, _, err := s.client.Scan(ctx, 0, key, 1).Result()
+	if err != nil {
+		return false, err
+	}
+	return len(res) != 0, nil
 }
 
 func (s *svc) ExistsUploads(ctx context.Context, user, bucket string) (bool, error) {

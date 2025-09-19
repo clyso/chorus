@@ -22,7 +22,17 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 )
 
-func IDFromBucketReplication(id ReplicationStatusID) UniversalReplicationID {
+func UniversalFromUserReplication(policy UserReplicationPolicy) UniversalReplicationID {
+	return UniversalReplicationID{
+		user:        policy.User,
+		fromStorage: policy.FromStorage,
+		toStorage:   policy.ToStorage,
+		fromBucket:  "",
+		toBucket:    "",
+	}
+}
+
+func UniversalFromBucketReplication(id BucketReplicationPolicy) UniversalReplicationID {
 	return UniversalReplicationID{
 		user:        id.User,
 		fromStorage: id.FromStorage,
@@ -40,26 +50,57 @@ type UniversalReplicationID struct {
 	toBucket    string
 }
 
+func (r *UniversalReplicationID) Validate() error {
+	if r.IsEmpty() {
+		return fmt.Errorf("%w: empty replication ID", dom.ErrInvalidArg)
+	}
+	bucketID, ok := r.AsBucketID()
+	if ok {
+		return bucketID.Validate()
+	}
+	userID, ok := r.AsUserID()
+	if ok {
+		return userID.Validate()
+	}
+	return fmt.Errorf("%w: unknown replication ID: %#v", dom.ErrInvalidArg, *r)
+}
+
 func (r *UniversalReplicationID) FromStorage() string {
+	if r.fromStorage == "" {
+		// should never happen
+		panic(fmt.Sprintf("trying to access empty replication ID: %#v", *r))
+	}
 	return r.fromStorage
 }
 
 func (r *UniversalReplicationID) ToStorage() string {
+	if r.toStorage == "" {
+		// should never happen
+		panic(fmt.Sprintf("trying to access empty replication ID: %#v", *r))
+	}
 	return r.toStorage
 }
 
 func (r *UniversalReplicationID) User() string {
+	if r.user == "" {
+		// should never happen
+		panic(fmt.Sprintf("replication user is empty for replication ID %#v", *r))
+	}
 	return r.user
 }
 
 func (r *UniversalReplicationID) FromToBuckets(taskBucket string) (from, to string) {
-	if taskBucket != r.fromBucket {
-		// should never happen
-		panic(fmt.Sprintf("task bucket %q does not match replication from bucket %q", taskBucket, r.fromBucket))
-	}
 	if r.fromBucket == "" {
 		// user replication
 		return taskBucket, taskBucket
+	}
+	if r.toBucket == "" {
+		// should never happen
+		panic(fmt.Sprintf("trying to access empty replication ID: %#v", *r))
+	}
+	if taskBucket != r.fromBucket {
+		// should never happen
+		panic(fmt.Sprintf("task bucket %q does not match replication from bucket %q", taskBucket, r.fromBucket))
 	}
 	// bucket replication
 	return r.fromBucket, r.toBucket
@@ -69,22 +110,49 @@ func (r *UniversalReplicationID) IsEmpty() bool {
 	return r == nil || r.user == "" || r.fromStorage == "" || r.toStorage == ""
 }
 
-func (r *UniversalReplicationID) AsBucketID() (ReplicationStatusID, bool) {
+func (r *UniversalReplicationID) AsBucketID() (BucketReplicationPolicy, bool) {
 	if r.IsEmpty() {
-		return ReplicationStatusID{}, false
+		return BucketReplicationPolicy{}, false
 	}
 	if r.fromBucket == "" {
 		// user replication
-		return ReplicationStatusID{}, false
+		return BucketReplicationPolicy{}, false
 	}
 	// bucket replication
-	return ReplicationStatusID{
+	return BucketReplicationPolicy{
 		User:        r.user,
 		FromStorage: r.fromStorage,
 		ToStorage:   r.toStorage,
 		FromBucket:  r.fromBucket,
 		ToBucket:    r.toBucket,
 	}, true
+}
+
+func (r *UniversalReplicationID) AsUserID() (UserReplicationPolicy, bool) {
+	if r.IsEmpty() {
+		return UserReplicationPolicy{}, false
+	}
+	if r.fromBucket != "" || r.toBucket != "" {
+		// bucket replication
+		return UserReplicationPolicy{}, false
+	}
+	// user replication
+	return UserReplicationPolicy{
+		User:        r.user,
+		FromStorage: r.fromStorage,
+		ToStorage:   r.toStorage,
+	}, true
+}
+
+// Returns a new UniversalReplicationID with swapped source and destination
+func (r *UniversalReplicationID) Swap() UniversalReplicationID {
+	return UniversalReplicationID{
+		user:        r.user,
+		fromStorage: r.toStorage,
+		toStorage:   r.fromStorage,
+		fromBucket:  r.toBucket,
+		toBucket:    r.fromBucket,
+	}
 }
 
 func (r *UniversalReplicationID) AsString() string {

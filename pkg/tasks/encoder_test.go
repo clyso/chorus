@@ -51,7 +51,7 @@ func Test_encode_BucketCreate(t *testing.T) {
 	t.Log(err)
 	r.Error(err, " should fail without replication ID")
 
-	expect.SetReplicationID(entity.IDFromBucketReplication(entity.ReplicationStatusID{
+	expect.SetReplicationID(entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
 		User:        "u",
 		FromStorage: "fs",
 		FromBucket:  "fb",

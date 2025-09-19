@@ -18,7 +18,6 @@ package router
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -26,7 +25,6 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/s3"
@@ -55,60 +53,16 @@ func Middleware(policySvc policy.Service, next http.Handler) http.Handler {
 	})
 }
 
-// TODO: move this logic to a single method in policy service in the next PR
 func initPolicyContext(ctx context.Context, policySvc policy.Service) (context.Context, error) {
 	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
-
 	if bucket == "" {
 		// handle ListBuckets request here. It is the only request without a bucket.
 		if xctx.GetMethod(ctx) != s3.ListBuckets {
 			// should never happen
 			return nil, fmt.Errorf("%w: bucket is not defined in context for s3 method %s", dom.ErrInternal, xctx.GetMethod(ctx).String())
 		}
-		routeTo, err := policySvc.GetUserRoutingPolicy(ctx, user)
-		if err != nil {
-			return nil, err
-		}
-		ctx = xctx.SetRoutingPolicy(ctx, routeTo)
-		return ctx, nil
+		return policySvc.BuildProxyNoBucketContext(ctx, user)
 	}
-
-	// Set bucket routing policy
-	routeTo, err := policySvc.GetRoutingPolicy(ctx, entity.NewBucketRoutingPolicyID(user, bucket))
-	if err != nil {
-		return nil, err
-	}
-	ctx = xctx.SetRoutingPolicy(ctx, routeTo)
-
-	// Set bucket replication policies
-	replicationPolicies, err := policySvc.GetBucketReplicationPolicies(ctx, entity.NewBucketReplicationPolicyID(user, bucket))
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
-		return nil, err
-	}
-	if replicationPolicies != nil {
-		var replications []entity.UniversalReplicationID
-		for _, replTo := range replicationPolicies.Destinations {
-			replications = append(replications, entity.IDFromBucketReplication(entity.ReplicationStatusID{
-				User:        user,
-				FromStorage: replicationPolicies.FromStorage,
-				FromBucket:  bucket,
-				ToStorage:   replTo.Storage,
-				ToBucket:    replTo.Bucket,
-			}))
-		}
-		if len(replications) != 0 {
-			ctx = xctx.SetReplications(ctx, replications)
-		}
-	}
-
-	// Set in-progress zero-downtime switch info
-	switchInfo, err := policySvc.GetInProgressZeroDowntimeSwitchInfo(ctx, entity.NewReplicationSwitchInfoID(xctx.GetUser(ctx), bucket))
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
-		return nil, err
-	}
-	if switchInfo.MultipartTTL != 0 {
-		ctx = xctx.SetInProgressZeroDowntime(ctx, switchInfo)
-	}
-	return ctx, nil
+	return policySvc.BuildProxyContext(ctx, user, bucket)
 }

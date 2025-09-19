@@ -58,7 +58,7 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 	fromBucket, toBucket := listVersionsPayload.ID.FromToBuckets(listVersionsPayload.Bucket)
 
 	objectVersionID := entity.NewVersionedObjectID(listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.Prefix)
-	replicationID := entity.NewReplicationStatusID(user, listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.ID.ToStorage(), toBucket)
+	replicationID := entity.NewBucketRepliationPolicy(user, listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.ID.ToStorage(), toBucket)
 
 	if err := r.svc.ListVersions(ctx, objectVersionID, replicationID); err != nil {
 		return fmt.Errorf("unable to list obejct versions: %w", err)
@@ -82,7 +82,7 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 
 	user := migratePayload.ID.User()
 	fromBucket, toBucket := migratePayload.ID.FromToBuckets(migratePayload.Bucket)
-	replicationID := entity.NewReplicationStatusID(user, migratePayload.ID.FromStorage(), fromBucket, migratePayload.ID.ToStorage(), toBucket)
+	replicationID := entity.NewBucketRepliationPolicy(user, migratePayload.ID.FromStorage(), fromBucket, migratePayload.ID.ToStorage(), toBucket)
 
 	if err := r.svc.MigrateVersions(ctx, replicationID, migratePayload.Prefix); err != nil {
 		return fmt.Errorf("unable to migrate object version: %w", err)
@@ -114,7 +114,7 @@ func NewVersionedMigrationSvc(policySvc policy.Service, copySvc rclone.CopySvc,
 	}
 }
 
-func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entity.VersionedObjectID, replicationID entity.ReplicationStatusID) error {
+func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entity.VersionedObjectID, replicationID entity.BucketReplicationPolicy) error {
 	lastListedVersionInfo, err := r.objectVersionInfoStore.GetRight(ctx, objectID)
 	if err != nil && !errors.Is(err, dom.ErrNotFound) {
 		return fmt.Errorf("unable to get last listed version for object: %w", err)
@@ -148,7 +148,7 @@ func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entit
 	return nil
 }
 
-func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replicationID entity.ReplicationStatusID, prefix string) error {
+func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replicationID entity.BucketReplicationPolicy, prefix string) error {
 	toFile := rclone.File{
 		Storage: replicationID.ToStorage,
 		Bucket:  replicationID.ToBucket,

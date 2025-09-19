@@ -15,7 +15,11 @@
 package entity
 
 import (
+	"errors"
+	"fmt"
 	"time"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 type BucketReplicationPolicyID struct {
@@ -30,27 +34,44 @@ func NewBucketReplicationPolicyID(user string, fromBucket string) BucketReplicat
 	}
 }
 
-type BucketReplicationPolicy struct {
-	FromStorage string
-	ToStorage   string
-	ToBucket    string
-}
-
-func NewBucketReplicationPolicy(fromStorage string, toStorage string, toBucket string) BucketReplicationPolicy {
-	return BucketReplicationPolicy{
-		FromStorage: fromStorage,
-		ToStorage:   toStorage,
-		ToBucket:    toBucket,
-	}
+type BucketReplicationPolicyDestination struct {
+	ToStorage string
+	ToBucket  string
 }
 
 type UserReplicationPolicy struct {
+	User        string
 	FromStorage string
 	ToStorage   string
 }
 
-func NewUserReplicationPolicy(fromStorage string, toStorage string) UserReplicationPolicy {
+func (p UserReplicationPolicy) LookupID() string {
+	return p.User
+}
+
+func (p UserReplicationPolicy) RoutingID() string {
+	return p.User
+}
+
+func (p UserReplicationPolicy) Validate() error {
+	if p.User == "" {
+		return fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	if p.FromStorage == "" {
+		return fmt.Errorf("%w: from storage is required", dom.ErrInvalidArg)
+	}
+	if p.ToStorage == "" {
+		return fmt.Errorf("%w: to storage is required", dom.ErrInvalidArg)
+	}
+	if p.FromStorage == p.ToStorage {
+		return fmt.Errorf("%w: from/to storages should differ", dom.ErrInvalidArg)
+	}
+	return nil
+}
+
+func NewUserReplicationPolicy(user string, fromStorage string, toStorage string) UserReplicationPolicy {
 	return UserReplicationPolicy{
+		User:        user,
 		FromStorage: fromStorage,
 		ToStorage:   toStorage,
 	}
@@ -74,14 +95,11 @@ type ReplicationStatus struct {
 	AgentURL   string    `redis:"agent_url,omitempty"`
 
 	ArchivedAt *time.Time `redis:"archived_at,omitempty"`
-
-	ListingStarted bool `redis:"listing_started"`
-
-	HasSwitch bool `redis:"-"`
 }
 
 type ReplicationStatusExtended struct {
 	*ReplicationStatus
+	Switch *ReplicationSwitchInfo `redis:"-"`
 
 	// True if at least one of the queues is paused.
 	IsPaused bool
@@ -92,7 +110,7 @@ type ReplicationStatusExtended struct {
 }
 
 func (r *ReplicationStatusExtended) InitDone() bool {
-	return r.ListingStarted && r.InitMigration.Unprocessed == 0
+	return r.InitMigration.Unprocessed == 0
 }
 
 type QueueStats struct {
@@ -108,7 +126,7 @@ type QueueStats struct {
 	MemoryUsage int64
 }
 
-type ReplicationStatusID struct {
+type BucketReplicationPolicy struct {
 	User        string
 	FromStorage string
 	FromBucket  string
@@ -116,35 +134,66 @@ type ReplicationStatusID struct {
 	ToBucket    string
 }
 
-func NewReplicationStatusID(user string, fromStorage string, fromBucket string, toStorage string, toBucket string) ReplicationStatusID {
-	return ReplicationStatusID{
+func (p BucketReplicationPolicy) LookupID() BucketReplicationPolicyID {
+	return BucketReplicationPolicyID{
+		User:       p.User,
+		FromBucket: p.FromBucket,
+	}
+}
+
+func (p BucketReplicationPolicy) Destination() BucketReplicationPolicyDestination {
+	return BucketReplicationPolicyDestination{
+		ToStorage: p.ToStorage,
+		ToBucket:  p.ToBucket,
+	}
+}
+
+func (p BucketReplicationPolicy) RoutingID() BucketRoutingPolicyID {
+	return BucketRoutingPolicyID{
+		User:   p.User,
+		Bucket: p.FromBucket,
+	}
+}
+
+func (p BucketReplicationPolicy) Validate() error {
+	errs := make([]error, 0)
+	if p.User == "" {
+		err := fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.FromStorage == "" {
+		err := fmt.Errorf("%w: from storage is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.FromBucket == "" {
+		err := fmt.Errorf("%w: from bucket is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.ToStorage == "" {
+		err := fmt.Errorf("%w: to storage is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.ToBucket == "" {
+		err := fmt.Errorf("%w: to bucket is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.FromStorage == p.ToStorage && p.FromBucket == p.ToBucket {
+		err := fmt.Errorf("%w: from/to storages and/or buckets should differ", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+
+	if len(errs) != 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func NewBucketRepliationPolicy(user string, fromStorage string, fromBucket string, toStorage string, toBucket string) BucketReplicationPolicy {
+	return BucketReplicationPolicy{
 		User:        user,
 		FromStorage: fromStorage,
 		FromBucket:  fromBucket,
 		ToStorage:   toStorage,
 		ToBucket:    toBucket,
 	}
-}
-
-type ReplicationPolicyDestination struct {
-	Storage string
-	Bucket  string
-}
-
-func NewBucketReplicationPolicyDestination(storage string, bucket string) ReplicationPolicyDestination {
-	return ReplicationPolicyDestination{
-		Storage: storage,
-		Bucket:  bucket,
-	}
-}
-
-func NewUserReplicationPolicyDestination(storage string) ReplicationPolicyDestination {
-	return ReplicationPolicyDestination{
-		Storage: storage,
-	}
-}
-
-type StorageReplicationPolicies struct {
-	FromStorage  string
-	Destinations []ReplicationPolicyDestination
 }

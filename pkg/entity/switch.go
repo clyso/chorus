@@ -27,18 +27,6 @@ var (
 	TimeNow = time.Now
 )
 
-type ReplicationSwitchInfoID struct {
-	User       string
-	FromBucket string
-}
-
-func NewReplicationSwitchInfoID(user string, fromBucket string) ReplicationSwitchInfoID {
-	return ReplicationSwitchInfoID{
-		User:       user,
-		FromBucket: fromBucket,
-	}
-}
-
 type ReplicationSwitchStatus string
 
 const (
@@ -111,20 +99,6 @@ func (w *ReplicationSwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 	return 0, false
 }
 
-// Reduced replication switch info for in progress zero downtime switch.
-// Subset of SwitchInfo fields.
-// Used by proxy to route requests to correct bucket during zero downtime switch.
-type ZeroDowntimeSwitchInProgressInfo struct {
-	ReplID           ReplicationStatusID     `redis:"-"`
-	ReplicationIDStr string                  `redis:"replicationID"`
-	Status           ReplicationSwitchStatus `redis:"lastStatus"`
-	MultipartTTL     time.Duration           `redis:"multipartTTL"`
-}
-
-func (s *ZeroDowntimeSwitchInProgressInfo) ReplicationID() ReplicationStatusID {
-	return s.ReplID
-}
-
 // Contains all information about replication switch including its configuration and current status.
 type ReplicationSwitchInfo struct {
 	// Options for downtime switch
@@ -132,8 +106,7 @@ type ReplicationSwitchInfo struct {
 	// Options for zero downtime switch
 	ReplicationSwitchZeroDowntimeOpts
 	// ID of replication policy of this switch
-	ReplID           ReplicationStatusID `redis:"-"`
-	ReplicationIDStr string              `redis:"replicationID"`
+	ReplicationIDStr string `redis:"replicationID"`
 	// Time of switch creation
 	CreatedAt time.Time `redis:"createdAt"`
 	// Last status of switch
@@ -146,8 +119,30 @@ type ReplicationSwitchInfo struct {
 	History []string `redis:"-"`
 }
 
-func (s *ReplicationSwitchInfo) ReplicationID() ReplicationStatusID {
-	return s.ReplID
+func (s *ReplicationSwitchInfo) ReplicationID() UniversalReplicationID {
+	id, err := UniversalIDFromString(s.ReplicationIDStr)
+	if err != nil {
+		panic(fmt.Sprintf("invalid replication ID stored in switch info: %q", s.ReplicationIDStr))
+	}
+	return id
+}
+
+func (s *ReplicationSwitchInfo) SetReplicationID(id UniversalReplicationID) {
+	s.ReplicationIDStr = id.AsString()
+}
+
+func (s *ReplicationSwitchInfo) Validate() error {
+	if s.ReplicationIDStr == "" {
+		return fmt.Errorf("replicationID is required")
+	}
+	replID := s.ReplicationID()
+	if err := replID.Validate(); err != nil {
+		return fmt.Errorf("invalid replicationID: %w", err)
+	}
+	if s.CreatedAt.IsZero() {
+		return fmt.Errorf("createdAt is required")
+	}
+	return nil
 }
 
 func (s *ReplicationSwitchInfo) IsZeroDowntime() bool {

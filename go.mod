@@ -1,6 +1,6 @@
 module github.com/clyso/chorus
 
-go 1.24.4
+go 1.24.6
 
 replace github.com/hibiken/asynq => github.com/clyso/asynq v0.0.0-20250821155534-5a1f8d7cbff6
 

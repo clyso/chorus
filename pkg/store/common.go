@@ -16,6 +16,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -37,6 +38,7 @@ type OperationStatus interface {
 
 type OperationResult[T any] interface {
 	Get() (T, error)
+	Status() OperationStatus
 }
 
 type RedisOperationStatus struct {
@@ -46,6 +48,45 @@ type RedisOperationStatus struct {
 func NewRedisOperationStatus(confirm ErrorCollector) *RedisOperationStatus {
 	return &RedisOperationStatus{
 		collect: confirm,
+	}
+}
+
+func JoinRedisOperationStatus(message string, in ...OperationStatus) *RedisOperationStatus {
+	return &RedisOperationStatus{
+		collect: func() error {
+			var err error
+			for _, op := range in {
+				opErr := op.Get()
+				if opErr == nil {
+					continue
+				}
+				err = errors.Join(err, opErr)
+			}
+			if err != nil && message != "" {
+				err = fmt.Errorf("%s: %w", message, err)
+			}
+			return err
+		},
+	}
+}
+
+func JoinRedisOperationStatusWithMessages(message string, in map[string]OperationStatus) *RedisOperationStatus {
+	return &RedisOperationStatus{
+		collect: func() error {
+			var err error
+			for msg, op := range in {
+				opErr := op.Get()
+				if opErr == nil {
+					continue
+				}
+				opErr = fmt.Errorf("%s: %w", msg, opErr)
+				err = errors.Join(err, opErr)
+			}
+			if err != nil && message != "" {
+				err = fmt.Errorf("%s: %w", message, err)
+			}
+			return err
+		},
 	}
 }
 
@@ -85,6 +126,10 @@ func (r *RedisFailedOperationResult[T]) Get() (T, error) {
 	return noVal, fmt.Errorf("unable to create command: %w", r.err)
 }
 
+func (r *RedisFailedOperationResult[T]) Status() OperationStatus {
+	return NewRedisFailedOperationStatus(r.err)
+}
+
 type RedisOperationResult[T any] struct {
 	collect ValueCollector[T]
 }
@@ -103,6 +148,13 @@ func (r *RedisOperationResult[T]) Get() (T, error) {
 	}
 
 	return result, nil
+}
+
+func (r *RedisOperationResult[T]) Status() OperationStatus {
+	return NewRedisOperationStatus(func() error {
+		_, err := r.collect()
+		return err
+	})
 }
 
 type Pager struct {
