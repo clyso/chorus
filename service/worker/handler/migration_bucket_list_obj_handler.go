@@ -127,19 +127,6 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	}
 	_ = s.storageSvc.DelLastListedObj(ctx, p)
 
-	if p.Prefix == "" {
-		// TODO: this conversion will be removed in the next PR when policy svc will be refactored to use universal replication ID
-		bucketReplID, ok := replicationID.AsBucketID()
-		if !ok {
-			// not possible
-			panic("invalid replication ID type")
-		}
-		err = s.policySvc.ObjListStarted(ctx, bucketReplID)
-		if err != nil {
-			logger.Err(err).Msg("migration bucket list obj: unable to set ObjListStarted")
-		}
-	}
-
 	logger.Info().Msg("migration bucket list obj: done")
 	return nil
 }

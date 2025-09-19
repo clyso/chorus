@@ -64,6 +64,21 @@ func (r *RedisIDKeyHash[ID, V]) Set(ctx context.Context, id ID, value V) error {
 	return r.SetOp(ctx, id, value).Get()
 }
 
+func (r *RedisIDKeyHash[ID, V]) Len(ctx context.Context, id ID) (int64, error) {
+	return r.LenOp(ctx, id).Get()
+}
+
+func (r *RedisIDKeyHash[ID, V]) LenOp(ctx context.Context, id ID) OperationResult[int64] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[int64](fmt.Errorf("unable to make key: %w", err))
+	}
+	cmd := r.client.HLen(ctx, key)
+	return NewRedisOperationResult(func() (int64, error) {
+		return cmd.Result()
+	})
+}
+
 func (r *RedisIDKeyHash[ID, V]) GetOp(ctx context.Context, id ID) OperationResult[V] {
 	key, err := r.MakeKey(id)
 	if err != nil {
@@ -75,6 +90,10 @@ func (r *RedisIDKeyHash[ID, V]) GetOp(ctx context.Context, id ID) OperationResul
 		if err := cmd.Err(); err != nil {
 			var noVal V
 			return noVal, fmt.Errorf("unable to get hash map: %w", err)
+		}
+		if len(cmd.Val()) == 0 {
+			var noVal V
+			return noVal, fmt.Errorf("%w: hash map not found", dom.ErrNotFound)
 		}
 		var value V
 		if err := cmd.Scan(&value); err != nil {
@@ -115,6 +134,29 @@ func (r *RedisIDKeyHash[ID, V]) GetFieldOp(ctx context.Context, id ID, fieldName
 
 func (r *RedisIDKeyHash[ID, V]) GetField(ctx context.Context, id ID, fieldName string) (string, error) {
 	return r.GetFieldOp(ctx, id, fieldName).Get()
+}
+
+func (r *RedisIDKeyHash[ID, V]) DelFieldOp(ctx context.Context, id ID, fieldName string) OperationResult[uint64] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[uint64](fmt.Errorf("unable to make key: %w", err))
+	}
+
+	cmd := r.client.HDel(ctx, key, fieldName)
+
+	collectFunc := func() (uint64, error) {
+		value, err := cmd.Result()
+		if err != nil {
+			return 0, fmt.Errorf("unable to delete field: %w", err)
+		}
+		return uint64(value), nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDKeyHash[ID, V]) DelField(ctx context.Context, id ID, fieldName string) (uint64, error) {
+	return r.DelFieldOp(ctx, id, fieldName).Get()
 }
 
 func (r *RedisIDKeyHash[ID, V]) SetFieldIfExistsOp(ctx context.Context, id ID, fieldName string, value any) OperationStatus {
@@ -239,7 +281,7 @@ func (r *RedisIDKeyHash[ID, V]) IncrementFieldByNIfExists(ctx context.Context, i
 	return r.IncrementFieldByNIfExistsOp(ctx, id, fieldName, value).Get()
 }
 
-func (r *RedisIDKeyHash[ID, V]) MakeFieldMap(value any) map[string]any {
+func makeRedisFieldMap(value any) map[string]any {
 	result := map[string]any{}
 	reflectValue := reflect.ValueOf(value)
 	reflectType := reflectValue.Type()

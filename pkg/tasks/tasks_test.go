@@ -33,7 +33,7 @@ func Test_ReplicationGetterSetter(t *testing.T) {
 	r.Empty(expect.ID.AsString())
 	r.True(expect.ID.IsEmpty())
 
-	expect.SetReplicationID(entity.IDFromBucketReplication(entity.ReplicationStatusID{
+	expect.SetReplicationID(entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
 		User:        "u",
 		FromStorage: "fs",
 		FromBucket:  "fb",

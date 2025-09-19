@@ -992,9 +992,6 @@
         },
         "to": {
           "type": "string"
-        },
-        "deleteBucketReplications": {
-          "type": "boolean"
         }
       }
     },
@@ -1426,6 +1423,70 @@
         },
         "to": {
           "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "isPaused": {
+          "type": "boolean"
+        },
+        "isInitDone": {
+          "type": "boolean"
+        },
+        "initObjListed": {
+          "type": "string",
+          "format": "int64"
+        },
+        "initObjDone": {
+          "type": "string",
+          "format": "int64"
+        },
+        "initBytesListed": {
+          "type": "string",
+          "format": "int64"
+        },
+        "initBytesDone": {
+          "type": "string",
+          "format": "int64"
+        },
+        "events": {
+          "type": "string",
+          "format": "int64"
+        },
+        "eventsDone": {
+          "type": "string",
+          "format": "int64"
+        },
+        "lastEmittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastProcessedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "agentUrl": {
+          "type": "string"
+        },
+        "toBucket": {
+          "type": "string"
+        },
+        "initDoneAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "hasSwitch": {
+          "type": "boolean",
+          "description": "true if given replication has associated replication switch with it."
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "true if replication is archived. Archived replication will not generate or sync new events.\nThe main purpose of archived replication is to keep replication metadata for future reference.\nArchived replication can be safely deleted."
+        },
+        "archivedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

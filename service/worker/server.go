@@ -48,7 +48,6 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker/handler"
-	"github.com/clyso/chorus/service/worker/policy_helper"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -129,12 +128,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	inspector := asynq.NewInspector(queueRedis)
 	defer inspector.Close()
 	queueSvc := tasks.NewQueueService(taskClient, inspector)
-	policySvc := policy.NewService(confRedis, queueSvc)
-
-	err = policy_helper.CreateMainFollowerPolicies(ctx, *conf.Storage, s3Clients, policySvc, queueSvc)
-	if err != nil {
-		return fmt.Errorf("%w: unable to create default main-follower policies", err)
-	}
+	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main())
 
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 	lockRedis := util.NewRedis(conf.Redis, conf.Redis.LockDB)

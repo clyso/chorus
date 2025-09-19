@@ -82,7 +82,7 @@ func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error
 		}
 		if result.nextState.status != "" {
 			// update switch status:
-			err = s.policySvc.UpdateDowntimeSwitchStatus(ctx, policyID, result.nextState.status, result.nextState.message, result.nextState.startedAt, result.nextState.doneAt)
+			err = s.policySvc.UpdateDowntimeSwitchStatus(ctx, policyID, result.nextState.status, result.nextState.message)
 			if err != nil {
 				return fmt.Errorf("unable to update switch status to %q-%q: %w", result.nextState.status, result.nextState.message, err)
 			}
@@ -102,13 +102,11 @@ type switchResult struct {
 }
 
 type state struct {
-	status    entity.ReplicationSwitchStatus
-	message   string
-	startedAt *time.Time
-	doneAt    *time.Time
+	status  entity.ReplicationSwitchStatus
+	message string
 }
 
-func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.ReplicationStatusID, replStatus entity.ReplicationStatusExtended, switchStatus entity.ReplicationSwitchInfo) (switchResult, error) {
+func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.UniversalReplicationID, replStatus entity.ReplicationStatusExtended, switchStatus entity.ReplicationSwitchInfo) (switchResult, error) {
 	// state machine for switch with downtime:
 	// switch statement contain all states in logical order
 	// each task handling iteration handles one state and returns new state or error
@@ -175,13 +173,11 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 			}
 		}
 		// Start downtime window:
-		downtimeStart := time.Now()
 		return switchResult{
 			retryLater: true,
 			nextState: state{
-				status:    entity.StatusInProgress,
-				message:   "downtime window started",
-				startedAt: &downtimeStart,
+				status:  entity.StatusInProgress,
+				message: "downtime window started",
 			},
 		}, nil
 
@@ -260,26 +256,22 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 			}, nil
 		}
 		// switch done - complete switch:
-		doneAt := time.Now()
 		return switchResult{
 			retryLater: false,
 			nextState: state{
 				status:  entity.StatusDone,
 				message: "switch done",
-				doneAt:  &doneAt,
 			},
 		}, nil
 
 	case entity.StatusDone:
 		// should never be reached because Done is terminal state and we don't retry task.
 		// just in case double check that routing block is removed, switch routing and complete task:
-		doneAt := time.Now()
 		return switchResult{
 			retryLater: false,
 			nextState: state{
 				status:  entity.StatusDone,
 				message: "switch done",
-				doneAt:  &doneAt,
 			},
 		}, nil
 	default:
@@ -287,7 +279,7 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Repl
 	}
 }
 
-func (s *svc) checkBuckets(_ context.Context, _ entity.ReplicationStatusID, skip bool) (isEqual, isInProgress bool, err error) {
+func (s *svc) checkBuckets(_ context.Context, _ entity.UniversalReplicationID, skip bool) (isEqual, isInProgress bool, err error) {
 	if skip {
 		return true, false, nil
 	}

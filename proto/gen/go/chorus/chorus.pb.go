@@ -1621,10 +1621,31 @@ func (x *ListUserReplicationsResponse) GetReplications() []*UserReplication {
 }
 
 type UserReplication struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
-	From          string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
-	To            string                 `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	User            string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	From            string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
+	To              string                 `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	IsPaused        bool                   `protobuf:"varint,6,opt,name=is_paused,json=isPaused,proto3" json:"is_paused,omitempty"`
+	IsInitDone      bool                   `protobuf:"varint,7,opt,name=is_init_done,json=isInitDone,proto3" json:"is_init_done,omitempty"`
+	InitObjListed   int64                  `protobuf:"varint,8,opt,name=init_obj_listed,json=initObjListed,proto3" json:"init_obj_listed,omitempty"`
+	InitObjDone     int64                  `protobuf:"varint,9,opt,name=init_obj_done,json=initObjDone,proto3" json:"init_obj_done,omitempty"`
+	InitBytesListed int64                  `protobuf:"varint,10,opt,name=init_bytes_listed,json=initBytesListed,proto3" json:"init_bytes_listed,omitempty"`
+	InitBytesDone   int64                  `protobuf:"varint,11,opt,name=init_bytes_done,json=initBytesDone,proto3" json:"init_bytes_done,omitempty"`
+	Events          int64                  `protobuf:"varint,12,opt,name=events,proto3" json:"events,omitempty"`
+	EventsDone      int64                  `protobuf:"varint,13,opt,name=events_done,json=eventsDone,proto3" json:"events_done,omitempty"`
+	LastEmittedAt   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=last_emitted_at,json=lastEmittedAt,proto3" json:"last_emitted_at,omitempty"`
+	LastProcessedAt *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=last_processed_at,json=lastProcessedAt,proto3" json:"last_processed_at,omitempty"`
+	AgentUrl        *string                `protobuf:"bytes,16,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`
+	ToBucket        string                 `protobuf:"bytes,17,opt,name=to_bucket,json=toBucket,proto3" json:"to_bucket,omitempty"`
+	InitDoneAt      *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=init_done_at,json=initDoneAt,proto3" json:"init_done_at,omitempty"`
+	// true if given replication has associated replication switch with it.
+	HasSwitch bool `protobuf:"varint,19,opt,name=has_switch,json=hasSwitch,proto3" json:"has_switch,omitempty"`
+	// true if replication is archived. Archived replication will not generate or sync new events.
+	// The main purpose of archived replication is to keep replication metadata for future reference.
+	// Archived replication can be safely deleted.
+	IsArchived    bool                   `protobuf:"varint,20,opt,name=is_archived,json=isArchived,proto3" json:"is_archived,omitempty"`
+	ArchivedAt    *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=archived_at,json=archivedAt,proto3" json:"archived_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1680,14 +1701,132 @@ func (x *UserReplication) GetTo() string {
 	return ""
 }
 
+func (x *UserReplication) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *UserReplication) GetIsPaused() bool {
+	if x != nil {
+		return x.IsPaused
+	}
+	return false
+}
+
+func (x *UserReplication) GetIsInitDone() bool {
+	if x != nil {
+		return x.IsInitDone
+	}
+	return false
+}
+
+func (x *UserReplication) GetInitObjListed() int64 {
+	if x != nil {
+		return x.InitObjListed
+	}
+	return 0
+}
+
+func (x *UserReplication) GetInitObjDone() int64 {
+	if x != nil {
+		return x.InitObjDone
+	}
+	return 0
+}
+
+func (x *UserReplication) GetInitBytesListed() int64 {
+	if x != nil {
+		return x.InitBytesListed
+	}
+	return 0
+}
+
+func (x *UserReplication) GetInitBytesDone() int64 {
+	if x != nil {
+		return x.InitBytesDone
+	}
+	return 0
+}
+
+func (x *UserReplication) GetEvents() int64 {
+	if x != nil {
+		return x.Events
+	}
+	return 0
+}
+
+func (x *UserReplication) GetEventsDone() int64 {
+	if x != nil {
+		return x.EventsDone
+	}
+	return 0
+}
+
+func (x *UserReplication) GetLastEmittedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastEmittedAt
+	}
+	return nil
+}
+
+func (x *UserReplication) GetLastProcessedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastProcessedAt
+	}
+	return nil
+}
+
+func (x *UserReplication) GetAgentUrl() string {
+	if x != nil && x.AgentUrl != nil {
+		return *x.AgentUrl
+	}
+	return ""
+}
+
+func (x *UserReplication) GetToBucket() string {
+	if x != nil {
+		return x.ToBucket
+	}
+	return ""
+}
+
+func (x *UserReplication) GetInitDoneAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.InitDoneAt
+	}
+	return nil
+}
+
+func (x *UserReplication) GetHasSwitch() bool {
+	if x != nil {
+		return x.HasSwitch
+	}
+	return false
+}
+
+func (x *UserReplication) GetIsArchived() bool {
+	if x != nil {
+		return x.IsArchived
+	}
+	return false
+}
+
+func (x *UserReplication) GetArchivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ArchivedAt
+	}
+	return nil
+}
+
 type DeleteUserReplicationRequest struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	User                     string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
-	From                     string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
-	To                       string                 `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
-	DeleteBucketReplications bool                   `protobuf:"varint,4,opt,name=delete_bucket_replications,json=deleteBucketReplications,proto3" json:"delete_bucket_replications,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	From          string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
+	To            string                 `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeleteUserReplicationRequest) Reset() {
@@ -1739,13 +1878,6 @@ func (x *DeleteUserReplicationRequest) GetTo() string {
 		return x.To
 	}
 	return ""
-}
-
-func (x *DeleteUserReplicationRequest) GetDeleteBucketReplications() bool {
-	if x != nil {
-		return x.DeleteBucketReplications
-	}
-	return false
 }
 
 type CompareBucketRequest struct {
@@ -2537,16 +2669,42 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x02to\x18\x04 \x01(\tR\x02to\x12\x1b\n" +
 	"\tto_bucket\x18\x05 \x01(\tR\btoBucket\"[\n" +
 	"\x1cListUserReplicationsResponse\x12;\n" +
-	"\freplications\x18\x01 \x03(\v2\x17.chorus.UserReplicationR\freplications\"I\n" +
+	"\freplications\x18\x01 \x03(\v2\x17.chorus.UserReplicationR\freplications\"\xb0\x06\n" +
 	"\x0fUserReplication\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x12\n" +
 	"\x04from\x18\x02 \x01(\tR\x04from\x12\x0e\n" +
-	"\x02to\x18\x03 \x01(\tR\x02to\"\x94\x01\n" +
+	"\x02to\x18\x03 \x01(\tR\x02to\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1b\n" +
+	"\tis_paused\x18\x06 \x01(\bR\bisPaused\x12 \n" +
+	"\fis_init_done\x18\a \x01(\bR\n" +
+	"isInitDone\x12&\n" +
+	"\x0finit_obj_listed\x18\b \x01(\x03R\rinitObjListed\x12\"\n" +
+	"\rinit_obj_done\x18\t \x01(\x03R\vinitObjDone\x12*\n" +
+	"\x11init_bytes_listed\x18\n" +
+	" \x01(\x03R\x0finitBytesListed\x12&\n" +
+	"\x0finit_bytes_done\x18\v \x01(\x03R\rinitBytesDone\x12\x16\n" +
+	"\x06events\x18\f \x01(\x03R\x06events\x12\x1f\n" +
+	"\vevents_done\x18\r \x01(\x03R\n" +
+	"eventsDone\x12B\n" +
+	"\x0flast_emitted_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\rlastEmittedAt\x12F\n" +
+	"\x11last_processed_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x0flastProcessedAt\x12 \n" +
+	"\tagent_url\x18\x10 \x01(\tH\x00R\bagentUrl\x88\x01\x01\x12\x1b\n" +
+	"\tto_bucket\x18\x11 \x01(\tR\btoBucket\x12<\n" +
+	"\finit_done_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"initDoneAt\x12\x1d\n" +
+	"\n" +
+	"has_switch\x18\x13 \x01(\bR\thasSwitch\x12\x1f\n" +
+	"\vis_archived\x18\x14 \x01(\bR\n" +
+	"isArchived\x12;\n" +
+	"\varchived_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"archivedAtB\f\n" +
+	"\n" +
+	"_agent_url\"V\n" +
 	"\x1cDeleteUserReplicationRequest\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x12\n" +
 	"\x04from\x18\x02 \x01(\tR\x04from\x12\x0e\n" +
-	"\x02to\x18\x03 \x01(\tR\x02to\x12<\n" +
-	"\x1adelete_bucket_replications\x18\x04 \x01(\bR\x18deleteBucketReplications\"\xa2\x01\n" +
+	"\x02to\x18\x03 \x01(\tR\x02to\"\xa2\x01\n" +
 	"\x14CompareBucketRequest\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
@@ -2714,77 +2872,82 @@ var file_chorus_chorus_proto_depIdxs = []int32{
 	35, // 15: chorus.Replication.init_done_at:type_name -> google.protobuf.Timestamp
 	35, // 16: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
 	24, // 17: chorus.ListUserReplicationsResponse.replications:type_name -> chorus.UserReplication
-	29, // 18: chorus.GetAgentsResponse.agents:type_name -> chorus.Agent
-	22, // 19: chorus.SwitchBucketZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationRequest
-	36, // 20: chorus.SwitchBucketZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
-	22, // 21: chorus.SwitchBucketRequest.replication_id:type_name -> chorus.ReplicationRequest
-	32, // 22: chorus.SwitchBucketRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	35, // 23: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
-	36, // 24: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
-	1,  // 25: chorus.GetBucketSwitchStatusResponse.last_status:type_name -> chorus.GetBucketSwitchStatusResponse.Status
-	36, // 26: chorus.GetBucketSwitchStatusResponse.multipart_ttl:type_name -> google.protobuf.Duration
-	32, // 27: chorus.GetBucketSwitchStatusResponse.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	35, // 28: chorus.GetBucketSwitchStatusResponse.last_started_at:type_name -> google.protobuf.Timestamp
-	35, // 29: chorus.GetBucketSwitchStatusResponse.done_at:type_name -> google.protobuf.Timestamp
-	22, // 30: chorus.GetBucketSwitchStatusResponse.replication_id:type_name -> chorus.ReplicationRequest
-	33, // 31: chorus.ListSwitchResponse.switches:type_name -> chorus.GetBucketSwitchStatusResponse
-	37, // 32: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
-	37, // 33: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
-	37, // 34: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
-	18, // 35: chorus.Chorus.ListBucketsForReplication:input_type -> chorus.ListBucketsForReplicationRequest
-	16, // 36: chorus.Chorus.AddReplication:input_type -> chorus.AddReplicationRequest
-	37, // 37: chorus.Chorus.ListReplications:input_type -> google.protobuf.Empty
-	37, // 38: chorus.Chorus.ListUserReplications:input_type -> google.protobuf.Empty
-	22, // 39: chorus.Chorus.StreamBucketReplication:input_type -> chorus.ReplicationRequest
-	22, // 40: chorus.Chorus.PauseReplication:input_type -> chorus.ReplicationRequest
-	22, // 41: chorus.Chorus.ResumeReplication:input_type -> chorus.ReplicationRequest
-	22, // 42: chorus.Chorus.DeleteReplication:input_type -> chorus.ReplicationRequest
-	25, // 43: chorus.Chorus.DeleteUserReplication:input_type -> chorus.DeleteUserReplicationRequest
-	30, // 44: chorus.Chorus.SwitchBucketZeroDowntime:input_type -> chorus.SwitchBucketZeroDowntimeRequest
-	31, // 45: chorus.Chorus.SwitchBucket:input_type -> chorus.SwitchBucketRequest
-	22, // 46: chorus.Chorus.DeleteBucketSwitch:input_type -> chorus.ReplicationRequest
-	22, // 47: chorus.Chorus.GetBucketSwitchStatus:input_type -> chorus.ReplicationRequest
-	37, // 48: chorus.Chorus.ListReplicationSwitches:input_type -> google.protobuf.Empty
-	26, // 49: chorus.Chorus.CompareBucket:input_type -> chorus.CompareBucketRequest
-	37, // 50: chorus.Chorus.GetAgents:input_type -> google.protobuf.Empty
-	17, // 51: chorus.Chorus.AddBucketReplication:input_type -> chorus.AddBucketReplicationRequest
-	22, // 52: chorus.Chorus.GetReplication:input_type -> chorus.ReplicationRequest
-	3,  // 53: chorus.Chorus.StartConsistencyCheck:input_type -> chorus.ConsistencyCheckRequest
-	37, // 54: chorus.Chorus.ListConsistencyChecks:input_type -> google.protobuf.Empty
-	3,  // 55: chorus.Chorus.GetConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
-	9,  // 56: chorus.Chorus.GetConsistencyCheckReportEntries:input_type -> chorus.GetConsistencyCheckReportEntriesRequest
-	3,  // 57: chorus.Chorus.DeleteConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
-	11, // 58: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
-	12, // 59: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
-	15, // 60: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
-	19, // 61: chorus.Chorus.ListBucketsForReplication:output_type -> chorus.ListBucketsForReplicationResponse
-	37, // 62: chorus.Chorus.AddReplication:output_type -> google.protobuf.Empty
-	20, // 63: chorus.Chorus.ListReplications:output_type -> chorus.ListReplicationsResponse
-	23, // 64: chorus.Chorus.ListUserReplications:output_type -> chorus.ListUserReplicationsResponse
-	21, // 65: chorus.Chorus.StreamBucketReplication:output_type -> chorus.Replication
-	37, // 66: chorus.Chorus.PauseReplication:output_type -> google.protobuf.Empty
-	37, // 67: chorus.Chorus.ResumeReplication:output_type -> google.protobuf.Empty
-	37, // 68: chorus.Chorus.DeleteReplication:output_type -> google.protobuf.Empty
-	37, // 69: chorus.Chorus.DeleteUserReplication:output_type -> google.protobuf.Empty
-	37, // 70: chorus.Chorus.SwitchBucketZeroDowntime:output_type -> google.protobuf.Empty
-	37, // 71: chorus.Chorus.SwitchBucket:output_type -> google.protobuf.Empty
-	37, // 72: chorus.Chorus.DeleteBucketSwitch:output_type -> google.protobuf.Empty
-	33, // 73: chorus.Chorus.GetBucketSwitchStatus:output_type -> chorus.GetBucketSwitchStatusResponse
-	34, // 74: chorus.Chorus.ListReplicationSwitches:output_type -> chorus.ListSwitchResponse
-	27, // 75: chorus.Chorus.CompareBucket:output_type -> chorus.CompareBucketResponse
-	28, // 76: chorus.Chorus.GetAgents:output_type -> chorus.GetAgentsResponse
-	37, // 77: chorus.Chorus.AddBucketReplication:output_type -> google.protobuf.Empty
-	21, // 78: chorus.Chorus.GetReplication:output_type -> chorus.Replication
-	37, // 79: chorus.Chorus.StartConsistencyCheck:output_type -> google.protobuf.Empty
-	5,  // 80: chorus.Chorus.ListConsistencyChecks:output_type -> chorus.ListConsistencyChecksResponse
-	7,  // 81: chorus.Chorus.GetConsistencyCheckReport:output_type -> chorus.GetConsistencyCheckReportResponse
-	10, // 82: chorus.Chorus.GetConsistencyCheckReportEntries:output_type -> chorus.GetConsistencyCheckReportEntriesResponse
-	37, // 83: chorus.Chorus.DeleteConsistencyCheckReport:output_type -> google.protobuf.Empty
-	58, // [58:84] is the sub-list for method output_type
-	32, // [32:58] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	35, // 18: chorus.UserReplication.created_at:type_name -> google.protobuf.Timestamp
+	35, // 19: chorus.UserReplication.last_emitted_at:type_name -> google.protobuf.Timestamp
+	35, // 20: chorus.UserReplication.last_processed_at:type_name -> google.protobuf.Timestamp
+	35, // 21: chorus.UserReplication.init_done_at:type_name -> google.protobuf.Timestamp
+	35, // 22: chorus.UserReplication.archived_at:type_name -> google.protobuf.Timestamp
+	29, // 23: chorus.GetAgentsResponse.agents:type_name -> chorus.Agent
+	22, // 24: chorus.SwitchBucketZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationRequest
+	36, // 25: chorus.SwitchBucketZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
+	22, // 26: chorus.SwitchBucketRequest.replication_id:type_name -> chorus.ReplicationRequest
+	32, // 27: chorus.SwitchBucketRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
+	35, // 28: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
+	36, // 29: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
+	1,  // 30: chorus.GetBucketSwitchStatusResponse.last_status:type_name -> chorus.GetBucketSwitchStatusResponse.Status
+	36, // 31: chorus.GetBucketSwitchStatusResponse.multipart_ttl:type_name -> google.protobuf.Duration
+	32, // 32: chorus.GetBucketSwitchStatusResponse.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
+	35, // 33: chorus.GetBucketSwitchStatusResponse.last_started_at:type_name -> google.protobuf.Timestamp
+	35, // 34: chorus.GetBucketSwitchStatusResponse.done_at:type_name -> google.protobuf.Timestamp
+	22, // 35: chorus.GetBucketSwitchStatusResponse.replication_id:type_name -> chorus.ReplicationRequest
+	33, // 36: chorus.ListSwitchResponse.switches:type_name -> chorus.GetBucketSwitchStatusResponse
+	37, // 37: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
+	37, // 38: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
+	37, // 39: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
+	18, // 40: chorus.Chorus.ListBucketsForReplication:input_type -> chorus.ListBucketsForReplicationRequest
+	16, // 41: chorus.Chorus.AddReplication:input_type -> chorus.AddReplicationRequest
+	37, // 42: chorus.Chorus.ListReplications:input_type -> google.protobuf.Empty
+	37, // 43: chorus.Chorus.ListUserReplications:input_type -> google.protobuf.Empty
+	22, // 44: chorus.Chorus.StreamBucketReplication:input_type -> chorus.ReplicationRequest
+	22, // 45: chorus.Chorus.PauseReplication:input_type -> chorus.ReplicationRequest
+	22, // 46: chorus.Chorus.ResumeReplication:input_type -> chorus.ReplicationRequest
+	22, // 47: chorus.Chorus.DeleteReplication:input_type -> chorus.ReplicationRequest
+	25, // 48: chorus.Chorus.DeleteUserReplication:input_type -> chorus.DeleteUserReplicationRequest
+	30, // 49: chorus.Chorus.SwitchBucketZeroDowntime:input_type -> chorus.SwitchBucketZeroDowntimeRequest
+	31, // 50: chorus.Chorus.SwitchBucket:input_type -> chorus.SwitchBucketRequest
+	22, // 51: chorus.Chorus.DeleteBucketSwitch:input_type -> chorus.ReplicationRequest
+	22, // 52: chorus.Chorus.GetBucketSwitchStatus:input_type -> chorus.ReplicationRequest
+	37, // 53: chorus.Chorus.ListReplicationSwitches:input_type -> google.protobuf.Empty
+	26, // 54: chorus.Chorus.CompareBucket:input_type -> chorus.CompareBucketRequest
+	37, // 55: chorus.Chorus.GetAgents:input_type -> google.protobuf.Empty
+	17, // 56: chorus.Chorus.AddBucketReplication:input_type -> chorus.AddBucketReplicationRequest
+	22, // 57: chorus.Chorus.GetReplication:input_type -> chorus.ReplicationRequest
+	3,  // 58: chorus.Chorus.StartConsistencyCheck:input_type -> chorus.ConsistencyCheckRequest
+	37, // 59: chorus.Chorus.ListConsistencyChecks:input_type -> google.protobuf.Empty
+	3,  // 60: chorus.Chorus.GetConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
+	9,  // 61: chorus.Chorus.GetConsistencyCheckReportEntries:input_type -> chorus.GetConsistencyCheckReportEntriesRequest
+	3,  // 62: chorus.Chorus.DeleteConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
+	11, // 63: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
+	12, // 64: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
+	15, // 65: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
+	19, // 66: chorus.Chorus.ListBucketsForReplication:output_type -> chorus.ListBucketsForReplicationResponse
+	37, // 67: chorus.Chorus.AddReplication:output_type -> google.protobuf.Empty
+	20, // 68: chorus.Chorus.ListReplications:output_type -> chorus.ListReplicationsResponse
+	23, // 69: chorus.Chorus.ListUserReplications:output_type -> chorus.ListUserReplicationsResponse
+	21, // 70: chorus.Chorus.StreamBucketReplication:output_type -> chorus.Replication
+	37, // 71: chorus.Chorus.PauseReplication:output_type -> google.protobuf.Empty
+	37, // 72: chorus.Chorus.ResumeReplication:output_type -> google.protobuf.Empty
+	37, // 73: chorus.Chorus.DeleteReplication:output_type -> google.protobuf.Empty
+	37, // 74: chorus.Chorus.DeleteUserReplication:output_type -> google.protobuf.Empty
+	37, // 75: chorus.Chorus.SwitchBucketZeroDowntime:output_type -> google.protobuf.Empty
+	37, // 76: chorus.Chorus.SwitchBucket:output_type -> google.protobuf.Empty
+	37, // 77: chorus.Chorus.DeleteBucketSwitch:output_type -> google.protobuf.Empty
+	33, // 78: chorus.Chorus.GetBucketSwitchStatus:output_type -> chorus.GetBucketSwitchStatusResponse
+	34, // 79: chorus.Chorus.ListReplicationSwitches:output_type -> chorus.ListSwitchResponse
+	27, // 80: chorus.Chorus.CompareBucket:output_type -> chorus.CompareBucketResponse
+	28, // 81: chorus.Chorus.GetAgents:output_type -> chorus.GetAgentsResponse
+	37, // 82: chorus.Chorus.AddBucketReplication:output_type -> google.protobuf.Empty
+	21, // 83: chorus.Chorus.GetReplication:output_type -> chorus.Replication
+	37, // 84: chorus.Chorus.StartConsistencyCheck:output_type -> google.protobuf.Empty
+	5,  // 85: chorus.Chorus.ListConsistencyChecks:output_type -> chorus.ListConsistencyChecksResponse
+	7,  // 86: chorus.Chorus.GetConsistencyCheckReport:output_type -> chorus.GetConsistencyCheckReportResponse
+	10, // 87: chorus.Chorus.GetConsistencyCheckReportEntries:output_type -> chorus.GetConsistencyCheckReportEntriesResponse
+	37, // 88: chorus.Chorus.DeleteConsistencyCheckReport:output_type -> google.protobuf.Empty
+	63, // [63:89] is the sub-list for method output_type
+	37, // [37:63] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_chorus_chorus_proto_init() }
@@ -2795,6 +2958,7 @@ func file_chorus_chorus_proto_init() {
 	file_chorus_chorus_proto_msgTypes[14].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[15].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[19].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[22].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[28].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[29].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[30].OneofWrappers = []any{}

@@ -169,12 +169,12 @@ func SetReplications(ctx context.Context, r []entity.UniversalReplicationID) con
 	return context.WithValue(ctx, replicationsKey{}, r)
 }
 
-func GetInProgressZeroDowntime(ctx context.Context) *entity.ZeroDowntimeSwitchInProgressInfo {
-	r, _ := ctx.Value(inProgressZeroDowntimeKey{}).(*entity.ZeroDowntimeSwitchInProgressInfo)
+func GetInProgressZeroDowntime(ctx context.Context) *entity.ReplicationSwitchInfo {
+	r, _ := ctx.Value(inProgressZeroDowntimeKey{}).(*entity.ReplicationSwitchInfo)
 	return r
 }
 
-func SetInProgressZeroDowntime(ctx context.Context, r entity.ZeroDowntimeSwitchInProgressInfo) context.Context {
+func SetInProgressZeroDowntime(ctx context.Context, r entity.ReplicationSwitchInfo) context.Context {
 	if r.MultipartTTL == 0 {
 		panic("cannot set empty in progress zero downtime switch info to ctx")
 	}

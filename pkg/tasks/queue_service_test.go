@@ -322,7 +322,7 @@ func Test_queueService_Enqueue(t *testing.T) {
 	err = qs.EnqueueTask(ctx, &payload)
 	r.ErrorIs(err, dom.ErrInternal, "expected error when replication ID is not set")
 
-	payload.SetReplicationID(entity.IDFromBucketReplication(entity.ReplicationStatusID{
+	payload.SetReplicationID(entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
 		User:        "u",
 		FromStorage: "fs",
 		FromBucket:  "fb",

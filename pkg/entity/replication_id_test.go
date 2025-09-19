@@ -10,7 +10,7 @@ import (
 
 func TestIDFromBucketReplication(t *testing.T) {
 	type args struct {
-		id     ReplicationStatusID
+		id     BucketReplicationPolicy
 		bucket string
 	}
 
@@ -22,7 +22,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 		{
 			name: "valid",
 			args: args{
-				id: ReplicationStatusID{
+				id: BucketReplicationPolicy{
 					User:        "u",
 					FromStorage: "fs",
 					FromBucket:  "fb",
@@ -36,7 +36,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 		{
 			name: "invalid bucket is not equal to from bucket",
 			args: args{
-				id: ReplicationStatusID{
+				id: BucketReplicationPolicy{
 					User:        "u",
 					FromStorage: "fs",
 					FromBucket:  "fb",
@@ -50,7 +50,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 		{
 			name: "invalid bucket is not equal to from bucket",
 			args: args{
-				id: ReplicationStatusID{
+				id: BucketReplicationPolicy{
 					User:        "u",
 					FromStorage: "fs",
 					FromBucket:  "fb",
@@ -64,7 +64,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 		{
 			name: "invalid bucket is not equal to from bucket",
 			args: args{
-				id: ReplicationStatusID{
+				id: BucketReplicationPolicy{
 					User:        "u",
 					FromStorage: "fs",
 					FromBucket:  "fb",
@@ -78,7 +78,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 	}
 	for _, tt := range tests {
 		r := require.New(t)
-		got := IDFromBucketReplication(tt.args.id)
+		got := UniversalFromBucketReplication(tt.args.id)
 		r.Equal(tt.args.id.User, got.User())
 		r.Equal(tt.args.id.FromStorage, got.FromStorage())
 		r.Equal(tt.args.id.ToStorage, got.ToStorage())
@@ -171,4 +171,293 @@ func Test_UniversalReplicationID_json_field(t *testing.T) {
 	r.Nil(in.IDNilPtr)
 	r.Nil(out.IDNilPtr)
 	r.True(out.IDNilPtr.IsEmpty())
+}
+
+func TestUniversalFromBucketReplication(t *testing.T) {
+	r := require.New(t)
+	bp := BucketReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		FromBucket:  "fb",
+		ToStorage:   "ts",
+		ToBucket:    "tb",
+	}
+	got := UniversalFromBucketReplication(bp)
+	r.False(got.IsEmpty())
+	r.Equal(bp.User, got.User())
+	r.Equal(bp.FromStorage, got.FromStorage())
+	r.Equal(bp.ToStorage, got.ToStorage())
+	fromBucket, toBucket := got.FromToBuckets("fb")
+	r.Equal(bp.FromBucket, fromBucket)
+	r.Equal(bp.ToBucket, toBucket)
+
+	str := got.AsString()
+	fromStr, err := UniversalIDFromString(str)
+	r.NoError(err)
+	r.Equal(got, fromStr)
+
+	_, ok := got.AsUserID()
+	r.False(ok)
+	asBucket, ok := got.AsBucketID()
+	r.True(ok)
+	r.EqualValues(bp, asBucket)
+
+	// same bucket replication
+	bp2 := BucketReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		FromBucket:  "b",
+		ToStorage:   "ts",
+		ToBucket:    "b",
+	}
+
+	got = UniversalFromBucketReplication(bp2)
+	r.False(got.IsEmpty())
+	r.Equal(bp2.User, got.User())
+	r.Equal(bp2.FromStorage, got.FromStorage())
+	r.Equal(bp2.ToStorage, got.ToStorage())
+	fromBucket, toBucket = got.FromToBuckets("b")
+	r.Equal(bp2.FromBucket, fromBucket)
+	r.Equal(bp2.ToBucket, toBucket)
+
+	str = got.AsString()
+	fromStr, err = UniversalIDFromString(str)
+	r.NoError(err)
+	r.Equal(got, fromStr)
+
+	_, ok = got.AsUserID()
+	r.False(ok)
+	asBucket, ok = got.AsBucketID()
+	r.True(ok)
+	r.EqualValues(bp2, asBucket)
+}
+
+func TestUniversalFromUserReplication(t *testing.T) {
+	r := require.New(t)
+	ur := UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		ToStorage:   "ts",
+	}
+	got := UniversalFromUserReplication(ur)
+	r.False(got.IsEmpty())
+	r.Equal(ur.User, got.User())
+	r.Equal(ur.FromStorage, got.FromStorage())
+	r.Equal(ur.ToStorage, got.ToStorage())
+	fromBucket, toBucket := got.FromToBuckets("anybucket")
+	r.Equal("anybucket", fromBucket)
+	r.Equal("anybucket", toBucket)
+
+	str := got.AsString()
+	fromStr, err := UniversalIDFromString(str)
+	r.NoError(err)
+	r.Equal(got, fromStr)
+
+	_, ok := got.AsBucketID()
+	r.False(ok)
+	asUser, ok := got.AsUserID()
+	r.True(ok)
+	r.EqualValues(ur, asUser)
+}
+
+func TestUniversalReplicationID_Validate(t *testing.T) {
+	r := require.New(t)
+	brValid := BucketReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		ToStorage:   "ts",
+		FromBucket:  "fb",
+		ToBucket:    "tb",
+	}
+	got := UniversalFromBucketReplication(brValid)
+	r.NoError(got.Validate())
+	brInvalid := BucketReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		ToStorage:   "fs",
+		FromBucket:  "fb",
+		ToBucket:    "fb",
+	}
+	got = UniversalFromBucketReplication(brInvalid)
+	r.Error(got.Validate())
+	brEmpty := BucketReplicationPolicy{}
+	got = UniversalFromBucketReplication(brEmpty)
+	r.Error(got.Validate())
+
+	urValid := UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		ToStorage:   "ts",
+	}
+	got = UniversalFromUserReplication(urValid)
+	r.NoError(got.Validate())
+	urInvalid := UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		ToStorage:   "fs",
+	}
+	got = UniversalFromUserReplication(urInvalid)
+	r.Error(got.Validate())
+	urEmpty := UserReplicationPolicy{}
+	got = UniversalFromUserReplication(urEmpty)
+	r.Error(got.Validate())
+}
+
+func TestUniversalReplicationID_IsEmpty(t *testing.T) {
+	type fields struct {
+		user        string
+		fromStorage string
+		toStorage   string
+		fromBucket  string
+		toBucket    string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{
+			name:   "empty",
+			fields: fields{},
+			want:   true,
+		},
+		{
+			name: "non-empty",
+			fields: fields{
+				user:        "u",
+				fromStorage: "fs",
+				toStorage:   "ts",
+				fromBucket:  "",
+				toBucket:    "",
+			},
+			want: false,
+		},
+		{
+			name: "no user - empty",
+			fields: fields{
+				user:        "",
+				fromStorage: "fs",
+				toStorage:   "ts",
+				fromBucket:  "fb",
+				toBucket:    "tb",
+			},
+			want: true,
+		},
+		{
+			name: "no fromStorage - empty",
+			fields: fields{
+				user:        "u",
+				fromStorage: "",
+				toStorage:   "ts",
+				fromBucket:  "fb",
+				toBucket:    "tb",
+			},
+			want: true,
+		},
+		{
+			name: "no toStorage - empty",
+			fields: fields{
+				user:        "u",
+				fromStorage: "fs",
+				toStorage:   "",
+				fromBucket:  "fb",
+				toBucket:    "tb",
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &UniversalReplicationID{
+				user:        tt.fields.user,
+				fromStorage: tt.fields.fromStorage,
+				toStorage:   tt.fields.toStorage,
+				fromBucket:  tt.fields.fromBucket,
+				toBucket:    tt.fields.toBucket,
+			}
+			if got := r.IsEmpty(); got != tt.want {
+				t.Errorf("UniversalReplicationID.IsEmpty() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUniversalReplicationID_Swap(t *testing.T) {
+	type fields struct {
+		user        string
+		fromStorage string
+		toStorage   string
+		fromBucket  string
+		toBucket    string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   UniversalReplicationID
+	}{
+		{
+			name: "bucket replication",
+			fields: fields{
+				user:        "u",
+				fromStorage: "fs",
+				toStorage:   "ts",
+				fromBucket:  "fb",
+				toBucket:    "tb",
+			},
+			want: UniversalReplicationID{
+				user:        "u",
+				fromStorage: "ts",
+				toStorage:   "fs",
+				fromBucket:  "tb",
+				toBucket:    "fb",
+			},
+		},
+		{
+			name: "user replication",
+			fields: fields{
+				user:        "u",
+				fromStorage: "fs",
+				toStorage:   "ts",
+				fromBucket:  "",
+				toBucket:    "",
+			},
+			want: UniversalReplicationID{
+				user:        "u",
+				fromStorage: "ts",
+				toStorage:   "fs",
+				fromBucket:  "",
+				toBucket:    "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			repl := &UniversalReplicationID{
+				user:        tt.fields.user,
+				fromStorage: tt.fields.fromStorage,
+				toStorage:   tt.fields.toStorage,
+				fromBucket:  tt.fields.fromBucket,
+				toBucket:    tt.fields.toBucket,
+			}
+			got := repl.Swap()
+			r.EqualValues(tt.want, got)
+			r.Equal(tt.want.User(), got.User())
+			r.Equal(tt.want.user, got.user)
+			r.Equal(tt.want.FromStorage(), got.FromStorage())
+			r.Equal(tt.want.fromStorage, got.fromStorage)
+			r.Equal(tt.want.ToStorage(), got.ToStorage())
+			r.Equal(tt.want.toStorage, got.toStorage)
+			r.Equal(tt.want.fromBucket, got.fromBucket)
+			r.Equal(tt.want.toBucket, got.toBucket)
+			r.NoError(repl.Validate())
+			r.NoError(got.Validate())
+			// repl not modified
+			r.Equal(tt.fields.user, repl.user)
+			r.Equal(tt.fields.fromStorage, repl.fromStorage)
+			r.Equal(tt.fields.toStorage, repl.toStorage)
+			r.Equal(tt.fields.fromBucket, repl.fromBucket)
+			r.Equal(tt.fields.toBucket, repl.toBucket)
+		})
+	}
 }

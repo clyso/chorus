@@ -40,6 +40,7 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
@@ -101,6 +102,29 @@ type EmbeddedEnv struct {
 	RetryShort time.Duration
 	WaitLong   time.Duration
 	RetryLong  time.Duration
+}
+
+func (e *EmbeddedEnv) CreateMainFollowerUserReplications(t testing.TB) {
+	t.Helper()
+	ctx := t.Context()
+	r := require.New(t)
+
+	_, err := e.ApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
+		User:            user,
+		From:            "main",
+		To:              "f1",
+		Buckets:         []string{},
+		IsForAllBuckets: true,
+	})
+	r.NoError(err)
+	_, err = e.ApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
+		User:            user,
+		From:            "main",
+		To:              "f2",
+		Buckets:         []string{},
+		IsForAllBuckets: true,
+	})
+	r.NoError(err)
 }
 
 func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Config) EmbeddedEnv {
@@ -172,8 +196,6 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		Provider:    "Other",
 		IsMain:      false,
 	}
-	proxyConf.Storage.CreateRouting = true
-	proxyConf.Storage.CreateReplication = true
 
 	workerConf.Storage.Storages = proxyConf.Storage.Storages
 	// deep copy proxy config

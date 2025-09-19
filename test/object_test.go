@@ -29,6 +29,7 @@ import (
 
 func TestApi_Object_CRUD(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "object-crud"
 	r := require.New(t)
@@ -204,6 +205,7 @@ func TestApi_Object_CRUD(t *testing.T) {
 
 func TestApi_Object_Folder(t *testing.T) {
 	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "object-folder"
 	r := require.New(t)

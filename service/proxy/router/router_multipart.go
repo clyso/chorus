@@ -187,7 +187,7 @@ func (r *router) routeMultipart(req *http.Request) (storage string, switchInProg
 	// multipart upload was started before switch.
 	// route to old storage
 	oldReplicationID := inProgressSwitch.ReplicationID()
-	return oldReplicationID.FromStorage, true, nil
+	return oldReplicationID.FromStorage(), true, nil
 }
 
 func (r *router) routeListMultipart(req *http.Request) (storage string, err error) {
@@ -213,5 +213,5 @@ func (r *router) routeListMultipart(req *http.Request) (storage string, err erro
 	// multipart upload was started before switch.
 	// route to old storage
 	oldReplicationID := inProgressSwitch.ReplicationID()
-	return oldReplicationID.FromStorage, nil
+	return oldReplicationID.FromStorage(), nil
 }
