@@ -1,4 +1,4 @@
-package handler
+package swift
 
 import (
 	"strings"
@@ -53,7 +53,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	}()
 
 	// handler retuns error if object does not exist
-	err = svc.handleObjectMetaUpdate(tstCtx, tasks.ObjectMetaUpdatePayload{
+	err = svc.handleObjectMetaUpdate(tstCtx, tasks.SwiftObjectMetaUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -84,7 +84,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	r.NoError(err, "failed to extract object info from ceph")
 	r.Empty(meta, "object metadata in ceph should be empty")
 	// sync object metadata from swift to ceph
-	err = svc.handleObjectMetaUpdate(tstCtx, tasks.ObjectMetaUpdatePayload{
+	err = svc.handleObjectMetaUpdate(tstCtx, tasks.SwiftObjectMetaUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -107,7 +107,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	delRes := objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{})
 	r.NoError(delRes.Err, "failed to delete test object in swift")
 	// sync object metadata from swift to ceph
-	err = svc.handleObjectMetaUpdate(tstCtx, tasks.ObjectMetaUpdatePayload{
+	err = svc.handleObjectMetaUpdate(tstCtx, tasks.SwiftObjectMetaUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,

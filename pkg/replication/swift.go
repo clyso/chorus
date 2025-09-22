@@ -84,7 +84,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 	// all case statements are the same but we cannot move it to a function
 	// or add all types to a single case because of Go generics.
 	// tasks.NewTask is generic func and we will get compile error otherwise
-	case *tasks.AccountUpdatePayload:
+	case *tasks.SwiftAccountUpdatePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
 			t.SetTo(to.Parse())
@@ -97,7 +97,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				return err
 			}
 		}
-	case *tasks.ContainerUpdatePayload:
+	case *tasks.SwiftContainerUpdatePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
 			t.SetTo(to.Parse())
@@ -110,7 +110,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				return err
 			}
 		}
-	case *tasks.ObjectMetaUpdatePayload:
+	case *tasks.SwiftObjectMetaUpdatePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
 			t.SetTo(to.Parse())
@@ -123,7 +123,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				return err
 			}
 		}
-	case *tasks.ObjectUpdatePayload:
+	case *tasks.SwiftObjectUpdatePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
 			t.SetTo(to.Parse())
@@ -136,7 +136,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, task tasks.SyncTask) error {
 				return err
 			}
 		}
-	case *tasks.ObjectDeletePayload:
+	case *tasks.SwiftObjectDeletePayload:
 		// Fan-out task to replication destinations:
 		for to, priority := range replTo {
 			t.SetTo(to.Parse())

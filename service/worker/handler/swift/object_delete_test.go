@@ -1,4 +1,4 @@
-package handler
+package swift
 
 import (
 	"bytes"
@@ -64,7 +64,7 @@ func Test_handleObjectDelete(t *testing.T) {
 	}()
 
 	// task ignored when src object not deleted
-	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -83,7 +83,7 @@ func Test_handleObjectDelete(t *testing.T) {
 	r.NoError(err, "expected object to still exist in swift after task ignored")
 
 	// no error when dest already deleted
-	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -101,7 +101,7 @@ func Test_handleObjectDelete(t *testing.T) {
 	err = objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{}).Err
 	r.NoError(err, "failed to delete test object in swift")
 	// sync object delete
-	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -192,7 +192,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	r.NoError(err, "expected SLO manifest object to exist in ceph: %s", obj)
 
 	// sync object delete without multipart delete
-	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -224,7 +224,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	r.NoError(err, "failed to recreate SLO manifest object in ceph")
 
 	// sync object delete with multipart delete
-	err = svc.handleObjectDelete(tstCtx, tasks.ObjectDeletePayload{
+	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,

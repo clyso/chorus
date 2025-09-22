@@ -46,11 +46,11 @@ const (
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
 
 	// swift tasks:
-	TypeAccountUpdate           = "account:update"
-	TypeContainerUpdate         = "container:update"
-	TypeObjUpdate               = "obj:update"
-	TypeObjMetaUpdate           = "obj:meta:update"
-	TypeObjDelete               = "obj:del"
+	TypeSwiftAccountUpdate      = "account:update"
+	TypeSwiftContainerUpdate    = "container:update"
+	TypeSwiftObjUpdate          = "obj:update"
+	TypeSwiftObjMetaUpdate      = "obj:meta:update"
+	TypeSwiftObjDelete          = "obj:del"
 	TypeSwiftAccountMigration   = "migrate:swift:account"
 	TypeSwiftContainerMigration = "migrate:swift:container"
 	TypeSwiftObjectMigration    = "migrate:swift:obj"
@@ -70,6 +70,14 @@ type TaskPayload interface {
 		MigrateVersionedObjectPayload |
 		ZeroDowntimeReplicationSwitchPayload |
 		SwitchWithDowntimePayload |
+		SwiftAccountUpdatePayload |
+		SwiftContainerUpdatePayload |
+		SwiftObjectMetaUpdatePayload |
+		SwiftObjectUpdatePayload |
+		SwiftObjectDeletePayload |
+		SwiftAccountMigrationPayload |
+		SwiftContainerMigrationPayload |
+		SwiftObjectMigrationPayload |
 		ConsistencyCheckPayload |
 		ConsistencyCheckListPayload |
 		ConsistencyCheckReadinessPayload |
@@ -209,24 +217,18 @@ type ConsistencyCheckDeletePayload struct {
 	ID string
 }
 
-type SwitchWithDowntimePayload struct {
-	FromStorage string
-	ToStorage   string
-	User        string
-	Bucket      string
-	CreatedAt   time.Time
-}
+type SwiftAccountUpdatePayload struct {
+	replicationID
 
-type AccountUpdatePayload struct {
-	Sync
 	// Date of the server response. Not Account modification date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
 	// because Openstack Swift does not return Last-Modified for Account Updates
 	Date string
 }
 
-type ContainerUpdatePayload struct {
-	Sync
+type SwiftContainerUpdatePayload struct {
+	replicationID
+
 	Bucket string
 	// Date of the server response. Not Container modification date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
@@ -234,8 +236,9 @@ type ContainerUpdatePayload struct {
 	Date string
 }
 
-type ObjectMetaUpdatePayload struct {
-	Sync
+type SwiftObjectMetaUpdatePayload struct {
+	replicationID
+
 	Bucket string
 	Object string
 	// Date of the server response. Not Object modification date, so it cannot be
@@ -244,8 +247,9 @@ type ObjectMetaUpdatePayload struct {
 	Date string
 }
 
-type ObjectUpdatePayload struct {
-	Sync
+type SwiftObjectUpdatePayload struct {
+	replicationID
+
 	Bucket       string
 	Object       string
 	VersionID    string
@@ -253,8 +257,9 @@ type ObjectUpdatePayload struct {
 	LastModified string
 }
 
-type ObjectDeletePayload struct {
-	Sync
+type SwiftObjectDeletePayload struct {
+	replicationID
+
 	Bucket    string
 	Object    string
 	VersionID string
@@ -266,29 +271,19 @@ type ObjectDeletePayload struct {
 }
 
 type SwiftAccountMigrationPayload struct {
-	FromStorage string
-	ToStorage   string
-	FromAccount string
-	ToAccount   string
+	replicationID
 }
 
 type SwiftContainerMigrationPayload struct {
-	FromStorage  string
-	FromAccount  string
-	FromContaier string
-	ToStorage    string
-	ToAccount    string
-	ToContaier   string
+	replicationID
+
+	Bucket string
 }
 
 type SwiftObjectMigrationPayload struct {
-	FromStorage  string
-	FromAccount  string
-	FromContaier string
-	ToStorage    string
-	ToAccount    string
-	ToContaier   string
+	replicationID
 
+	Bucket          string
 	ObjName         string
 	ObjVersion      string
 	ObjEtag         string

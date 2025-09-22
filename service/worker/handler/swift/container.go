@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handler
+package swift
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -35,69 +36,42 @@ import (
 )
 
 func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err error) {
-	var p tasks.ContainerUpdatePayload
+	var p tasks.SwiftContainerUpdatePayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("ContainerUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
-	toBucket := p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
-	}
+	_, toBucket := p.ID.FromToBuckets(p.Bucket)
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
+	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
-
-	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ToStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.ToStorage).Msg("rate limit error")
-		return err
-	}
-	defer func() {
-		if err != nil {
-			return
-		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
-		if verErr != nil {
-			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
-		}
-	}()
 
-	release, refresh, err := s.locker.Lock(ctx, lock.BucketKey(p.ToStorage+p.ToAccount, toBucket))
+	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.ID.ToStorage(), toBucket))
 	if err != nil {
 		return err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
+	defer lock.Release(context.Background())
+	err = lock.Do(ctx, time.Second*2, func() error {
 		return s.handleContainerUpdate(ctx, p)
-	}, refresh, time.Second*2)
+	})
 
 	return
 }
 
-func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.ContainerUpdatePayload) (err error) {
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
-	}
+func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.SwiftContainerUpdatePayload) (err error) {
+	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 	// setup swift clients:
-	fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
+	fromClient, err := s.swiftClients.For(ctx, p.ID.FromStorage(), p.ID.User())
 	if err != nil {
 		return err
 	}
-	toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
+	toClient, err := s.swiftClients.For(ctx, p.ID.ToStorage(), p.ID.User())
 	if err != nil {
 		return err
 	}

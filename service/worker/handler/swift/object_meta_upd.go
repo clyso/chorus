@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handler
+package swift
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 )
 
 func (s *svc) HandleObjectMetaUpdate(ctx context.Context, t *asynq.Task) (err error) {
-	var p tasks.ObjectMetaUpdatePayload
+	var p tasks.SwiftObjectMetaUpdatePayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("ObjectMetaUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
@@ -89,7 +89,7 @@ func (s *svc) HandleObjectMetaUpdate(ctx context.Context, t *asynq.Task) (err er
 }
 
 // handleObjectMetaUpdate handles the object metadata update task, copying metadata from the source object to the destination object.
-func (s *svc) handleObjectMetaUpdate(ctx context.Context, p tasks.ObjectMetaUpdatePayload) (err error) {
+func (s *svc) handleObjectMetaUpdate(ctx context.Context, p tasks.SwiftObjectMetaUpdatePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.Bucket, p.Bucket
 	if p.ToBucket != nil {

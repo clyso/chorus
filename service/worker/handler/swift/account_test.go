@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handler
+package swift
 
 import (
 	"maps"
@@ -77,7 +77,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	r.NoError(updRes.Err, "failed to update swift account metadata")
 
 	// sync to ceph
-	err = svc.handleAccountUpdate(tstCtx, tasks.AccountUpdatePayload{
+	err = svc.handleAccountUpdate(tstCtx, tasks.SwiftAccountUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -120,7 +120,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	})
 	r.NoError(updRes.Err, "failed to update swift account metadata")
 	// sync to ceph
-	err = svc.handleAccountUpdate(tstCtx, tasks.AccountUpdatePayload{
+	err = svc.handleAccountUpdate(tstCtx, tasks.SwiftAccountUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,

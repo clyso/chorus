@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handler
+package swift
 
 import (
 	"context"
@@ -36,7 +36,7 @@ import (
 
 func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error) {
 	// setup:
-	var p tasks.ObjectUpdatePayload
+	var p tasks.SwiftObjectUpdatePayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("ObjectUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
@@ -96,7 +96,7 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 	return nil
 }
 
-func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.ObjectUpdatePayload) (err error) {
+func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.SwiftObjectUpdatePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.Bucket, p.Bucket
 	if p.ToBucket != nil {

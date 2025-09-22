@@ -1,4 +1,4 @@
-package handler
+package swift
 
 import (
 	"context"
@@ -66,7 +66,7 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 	}
 
 	// migrate container metadata:
-	err = s.handleContainerUpdate(ctx, tasks.ContainerUpdatePayload{
+	err = s.handleContainerUpdate(ctx, tasks.SwiftContainerUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: p.FromStorage,
 			FromAccount: p.FromAccount,

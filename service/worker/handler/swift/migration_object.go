@@ -1,4 +1,4 @@
-package handler
+package swift
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func (s *svc) HandleSwiftObjectMigration(ctx context.Context, t *asynq.Task) (er
 
 	// sync object:
 	err = lock.WithRefresh(ctx, func() error {
-		return s.handleObjectUpdate(ctx, tasks.ObjectUpdatePayload{
+		return s.handleObjectUpdate(ctx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: p.FromStorage,
 				FromAccount: p.FromAccount,

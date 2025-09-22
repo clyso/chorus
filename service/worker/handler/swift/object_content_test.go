@@ -1,4 +1,4 @@
-package handler
+package swift
 
 import (
 	"errors"
@@ -58,7 +58,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	r.NoError(err, "failed to extract object info")
 
 	// sync container to ceph
-	err = svc.handleContainerUpdate(tstCtx, tasks.ContainerUpdatePayload{
+	err = svc.handleContainerUpdate(tstCtx, tasks.SwiftContainerUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -74,7 +74,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		_ = objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
 	}()
 	// sync object to ceph
-	err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+	err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -103,7 +103,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	})
 	r.NoError(oRes.Err, "failed to update test object in swift")
 	// sync object update to ceph
-	err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+	err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -133,7 +133,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 
 	t.Run("task skipped if obj not exist in src container", func(t *testing.T) {
 		r := require.New(t)
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
@@ -149,7 +149,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	t.Run("task retried if src swift is not consistent", func(t *testing.T) {
 		r := require.New(t)
 		futureDate := objInfo.LastModified.Add(time.Hour * 24).Format(time.RFC3339)
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
@@ -168,7 +168,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	})
 
 	// sync object to ceph
-	err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+	err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -201,7 +201,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 			_ = objects.Delete(tstCtx, swiftClient, bucket, objName, objects.DeleteOpts{})
 		})
 		// sync obj to ceph
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
@@ -248,7 +248,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		})
 
 		// sync obj to ceph
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
@@ -334,7 +334,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		objRes := objects.Get(tstCtx, swiftClient, bucket, sloObj, objects.GetOpts{})
 		r.NoError(objRes.Err, "failed to get SLO object from swift")
 		// sync slo object to ceph
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
@@ -364,7 +364,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		t.Cleanup(func() {
 			_ = objects.Delete(tstCtx, cephClient, sloBucket, sloPart1, &objects.DeleteOpts{})
 		})
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
@@ -387,7 +387,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 			_ = objects.Delete(tstCtx, cephClient, sloBucket, sloPart2, &objects.DeleteOpts{})
 		})
 
-		err = svc.handleObjectUpdate(tstCtx, tasks.ObjectUpdatePayload{
+		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,

@@ -30,7 +30,6 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
-	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -43,7 +42,6 @@ type Config struct {
 
 type svc struct {
 	clients                 s3client.Service
-	swiftClients            swift.Client
 	versionSvc              meta.VersionService
 	policySvc               policy.Service
 	storageSvc              storage.Service
@@ -57,14 +55,13 @@ type svc struct {
 	rclone.CopySvc
 }
 
-func New(conf *Config, swiftClients swift.Client, clients s3client.Service, versionSvc meta.VersionService,
+func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
 	policySvc policy.Service, storageSvc storage.Service, rc rclone.Service,
 	queueSvc tasks.QueueService, limit ratelimit.RPM, objectLocker *store.ObjectLocker,
 	bucketLocker *store.BucketLocker, replicationstatusLocker *store.ReplicationStatusLocker) *svc {
 	return &svc{
 		conf:                    conf,
 		clients:                 clients,
-		swiftClients:            swiftClients,
 		versionSvc:              versionSvc,
 		policySvc:               policySvc,
 		storageSvc:              storageSvc,

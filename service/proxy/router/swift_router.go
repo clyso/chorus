@@ -104,7 +104,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 	// read requests, no replication task needed
 	case swift.PostAccount, swift.DeleteAccount:
 		// handle account changes:
-		task = &tasks.AccountUpdatePayload{
+		task = &tasks.SwiftAccountUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: storage,
 				FromAccount: account,
@@ -113,7 +113,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		}
 	case swift.PutContainer, swift.PostContainer, swift.DeleteContainer:
 		// handle container changes:
-		task = &tasks.ContainerUpdatePayload{
+		task = &tasks.SwiftContainerUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: storage,
 				FromAccount: account,
@@ -124,7 +124,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 	case swift.PostObject:
 		// updates only object meta
 		// meta update does not change obj version
-		task = &tasks.ObjectMetaUpdatePayload{
+		task = &tasks.SwiftObjectMetaUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: storage,
 				FromAccount: account,
@@ -136,7 +136,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 	case swift.PutObject, swift.CopyObject:
 		// same as POST but also updates object payload
 		// returns version id
-		task = &tasks.ObjectUpdatePayload{
+		task = &tasks.SwiftObjectUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: storage,
 				FromAccount: account,
@@ -149,7 +149,7 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		}
 	case swift.DeleteObject:
 		// can contain version id
-		task = &tasks.ObjectDeletePayload{
+		task = &tasks.SwiftObjectDeletePayload{
 			Sync: tasks.Sync{
 				FromStorage: storage,
 				FromAccount: account,

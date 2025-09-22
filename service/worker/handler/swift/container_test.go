@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handler
+package swift
 
 import (
 	"net/http"
@@ -62,7 +62,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 		_ = containers.Delete(tstCtx, swiftClient, tstCont)
 	}()
 	// sync container to ceph
-	err = svc.handleContainerUpdate(tstCtx, tasks.ContainerUpdatePayload{
+	err = svc.handleContainerUpdate(tstCtx, tasks.SwiftContainerUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -96,7 +96,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	})
 	r.NoError(updRes.Err, "failed to update swift container metadata")
 	// sync to ceph
-	err = svc.handleContainerUpdate(tstCtx, tasks.ContainerUpdatePayload{
+	err = svc.handleContainerUpdate(tstCtx, tasks.SwiftContainerUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -125,7 +125,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	delRes := containers.Delete(tstCtx, swiftClient, tstCont)
 	r.NoError(delRes.Err, "failed to delete swift container")
 	// sync to ceph
-	err = svc.handleContainerUpdate(tstCtx, tasks.ContainerUpdatePayload{
+	err = svc.handleContainerUpdate(tstCtx, tasks.SwiftContainerUpdatePayload{
 		Sync: tasks.Sync{
 			FromStorage: swiftTestKey,
 			FromAccount: testAcc,
@@ -160,7 +160,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 			_ = containers.Delete(tstCtx, swiftClient, versionsCont)
 		}()
 		// sync container to ceph
-		err = svc.handleContainerUpdate(tstCtx, tasks.ContainerUpdatePayload{
+		err = svc.handleContainerUpdate(tstCtx, tasks.SwiftContainerUpdatePayload{
 			Sync: tasks.Sync{
 				FromStorage: swiftTestKey,
 				FromAccount: testAcc,
