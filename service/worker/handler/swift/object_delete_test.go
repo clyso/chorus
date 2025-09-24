@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2"
@@ -64,56 +65,34 @@ func Test_handleObjectDelete(t *testing.T) {
 	}()
 
 	// task ignored when src object not deleted
-	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
+	task := tasks.SwiftObjectDeletePayload{
 		Bucket:          bucket,
 		Object:          obj,
 		VersionID:       "",
 		Date:            "",
 		DeleteMultipart: false,
-	})
+	}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        testAcc,
+		FromStorage: swiftTestKey,
+		ToStorage:   cephTestKey,
+	}))
+	err = svc.handleObjectDelete(tstCtx, task)
 	r.NoError(err, "task ignored when source object not deleted")
 	// object still exists in swift
 	err = objects.Get(tstCtx, swiftClient, bucket, obj, objects.GetOpts{Newest: true}).Err
 	r.NoError(err, "expected object to still exist in swift after task ignored")
 
+	taskDeleted := task
+	taskDeleted.Object = "non-existent-obj"
 	// no error when dest already deleted
-	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket:          bucket,
-		Object:          "non-existent-obj",
-		VersionID:       "",
-		Date:            "",
-		DeleteMultipart: false,
-	})
+	err = svc.handleObjectDelete(tstCtx, taskDeleted)
 	r.NoError(err, "expected no error when destination object already deleted")
 	// delete object in swift
 	err = objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{}).Err
 	r.NoError(err, "failed to delete test object in swift")
 	// sync object delete
-	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket:          bucket,
-		Object:          obj,
-		VersionID:       "",
-		Date:            "",
-		DeleteMultipart: false,
-	})
+	err = svc.handleObjectDelete(tstCtx, task)
 	r.NoError(err, "failed to sync object delete")
 	// check that object was deleted in ceph
 	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
@@ -192,17 +171,17 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	r.NoError(err, "expected SLO manifest object to exist in ceph: %s", obj)
 
 	// sync object delete without multipart delete
-	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
+	task := tasks.SwiftObjectDeletePayload{
 		Bucket:          bucket,
 		Object:          obj,
 		DeleteMultipart: false,
-	})
+	}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        testAcc,
+		FromStorage: swiftTestKey,
+		ToStorage:   cephTestKey,
+	}))
+	err = svc.handleObjectDelete(tstCtx, task)
 	r.NoError(err, "failed to sync object delete with multipart delete")
 	// check that SLO manifest was deleted, but parts still exist
 	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
@@ -223,18 +202,10 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	}).Err
 	r.NoError(err, "failed to recreate SLO manifest object in ceph")
 
+	taskMultipart := task
+	taskMultipart.DeleteMultipart = true
 	// sync object delete with multipart delete
-	err = svc.handleObjectDelete(tstCtx, tasks.SwiftObjectDeletePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket:          bucket,
-		Object:          obj,
-		DeleteMultipart: true,
-	})
+	err = svc.handleObjectDelete(tstCtx, taskMultipart)
 	r.NoError(err, "failed to sync object delete with multipart delete")
 	// check that SLO manifest and parts were deleted
 	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err

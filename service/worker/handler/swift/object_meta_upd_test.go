@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
@@ -52,17 +53,17 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 		_ = objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{})
 	}()
 
-	// handler retuns error if object does not exist
-	err = svc.handleObjectMetaUpdate(tstCtx, tasks.SwiftObjectMetaUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
+	task := tasks.SwiftObjectMetaUpdatePayload{
 		Bucket: bucket,
 		Object: obj,
-	})
+	}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        testAcc,
+		FromStorage: swiftTestKey,
+		ToStorage:   cephTestKey,
+	}))
+	// handler retuns error if object does not exist
+	err = svc.handleObjectMetaUpdate(tstCtx, task)
 	r.NoError(err, "handleObjectMetaUpdate should return an error if object does not exist in ceph")
 
 	// crate a test object in ceph
@@ -84,16 +85,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	r.NoError(err, "failed to extract object info from ceph")
 	r.Empty(meta, "object metadata in ceph should be empty")
 	// sync object metadata from swift to ceph
-	err = svc.handleObjectMetaUpdate(tstCtx, tasks.SwiftObjectMetaUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket: bucket,
-		Object: obj,
-	})
+	err = svc.handleObjectMetaUpdate(tstCtx, task)
 	r.NoError(err, "handleObjectMetaUpdate should not return an error")
 	// check object metadata in ceph
 	res = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{})
@@ -107,16 +99,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	delRes := objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{})
 	r.NoError(delRes.Err, "failed to delete test object in swift")
 	// sync object metadata from swift to ceph
-	err = svc.handleObjectMetaUpdate(tstCtx, tasks.SwiftObjectMetaUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket: bucket,
-		Object: obj,
-	})
+	err = svc.handleObjectMetaUpdate(tstCtx, task)
 	// no error. task should be skipped
 	r.NoError(err, "handleObjectMetaUpdate should not return an error if object was deleted from swift")
 	// object still in ceph

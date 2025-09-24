@@ -17,13 +17,11 @@ package swift
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2"
@@ -38,70 +36,38 @@ func (s *svc) HandleObjectDelete(ctx context.Context, t *asynq.Task) (err error)
 		return fmt.Errorf("ObjectDeletePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
-	toBucket := p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
-	}
 
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
+	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
-
-	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ToStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.ToStorage).Msg("rate limit error")
-		return err
-	}
-	defer func() {
-		if err != nil {
-			return
-		}
-		verErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
-		if verErr != nil {
-			zerolog.Ctx(ctx).Err(verErr).Msg("unable to inc processed events")
-		}
-	}()
 
-	release, refresh, err := s.locker.Lock(ctx, lock.ObjKey(p.ToStorage, dom.Object{
-		Bucket: toBucket,
-		Name:   p.Object,
-	}))
+	lock, err := s.objectLocker.Lock(ctx, entity.NewObjectLockID(p.ID.FromStorage(), p.Bucket, p.Object))
 	if err != nil {
 		return err
 	}
-	defer release()
-	err = lock.WithRefresh(ctx, func() error {
+	defer lock.Release(context.Background())
+
+	return lock.Do(ctx, time.Second*2, func() error {
 		return s.handleObjectDelete(ctx, p)
-	}, refresh, time.Second*2)
-
-	return
+	})
 }
 
 // handleObjectMetaUpdate handles the object metadata update task, copying metadata from the source object to the destination object.
 func (s *svc) handleObjectDelete(ctx context.Context, p tasks.SwiftObjectDeletePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
-	}
+	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 
 	// setup swift clients:
-	fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
+	fromClient, err := s.swiftClients.For(ctx, p.ID.FromStorage(), p.ID.User())
 	if err != nil {
 		return err
 	}
-	toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
+	toClient, err := s.swiftClients.For(ctx, p.ID.ToStorage(), p.ID.User())
 	if err != nil {
 		return err
 	}

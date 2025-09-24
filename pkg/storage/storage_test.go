@@ -253,12 +253,12 @@ func Test_svc_LastListedContainer(t *testing.T) {
 	storage := New(c)
 	ctx := context.Background()
 
-	task := tasks.SwiftAccountMigrationPayload{
-		FromStorage: "a",
-		ToStorage:   "b",
-		FromAccount: "c",
-		ToAccount:   "d",
-	}
+	task := tasks.SwiftAccountMigrationPayload{}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "f",
+		ToStorage:   "t",
+	}))
 
 	res, err := storage.GetLastListedContainer(ctx, task)
 	r.NoError(err, "no error if no container is set")
@@ -271,32 +271,22 @@ func Test_svc_LastListedContainer(t *testing.T) {
 	r.NoError(err, "no error if container is retrieved")
 	r.Equal("container1", res, "should return the set container")
 
-	other := []tasks.SwiftAccountMigrationPayload{
-		{
-			FromStorage: "aa",
-			ToStorage:   "b",
-			FromAccount: "c",
-			ToAccount:   "d",
-		},
-		{
-			FromStorage: "a",
-			ToStorage:   "bb",
-			FromAccount: "c",
-			ToAccount:   "d",
-		},
-		{
-			FromStorage: "a",
-			ToStorage:   "b",
-			FromAccount: "cc",
-			ToAccount:   "d",
-		},
-		{
-			FromStorage: "a",
-			ToStorage:   "b",
-			FromAccount: "c",
-			ToAccount:   "dd",
-		},
-	}
+	other := []tasks.SwiftAccountMigrationPayload{task, task, task}
+	other[0].SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u2",
+		FromStorage: "f",
+		ToStorage:   "t",
+	}))
+	other[1].SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "f2",
+		ToStorage:   "t",
+	}))
+	other[2].SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "f",
+		ToStorage:   "t2",
+	}))
 	for _, o := range other {
 		res, err = storage.GetLastListedContainer(ctx, o)
 		r.NoError(err, "no error if other container is retrieved %+v", o)

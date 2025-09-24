@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/handler"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
@@ -24,7 +26,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client, conf: &Config{}}
+	svc := &svc{swiftClients: client, conf: &handler.Config{}}
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -58,35 +60,32 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	r.NoError(err, "failed to extract object info")
 
 	// sync container to ceph
-	err = svc.handleContainerUpdate(tstCtx, tasks.SwiftContainerUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
+	task := tasks.SwiftContainerUpdatePayload{
 		Bucket: bucket,
-	})
+	}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        testAcc,
+		FromStorage: swiftTestKey,
+		ToStorage:   cephTestKey,
+	}))
+	err = svc.handleContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// defer cleanup dest container in ceph
 	defer func() {
 		_ = containers.Delete(tstCtx, cephClient, bucket)
 		_ = objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
 	}()
+
 	// sync object to ceph
-	err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
+	taskObj := tasks.SwiftObjectUpdatePayload{
 		Bucket:       bucket,
 		Object:       obj,
 		VersionID:    "",
 		Etag:         objInfo.ETag,
 		LastModified: objInfo.LastModified.Format(time.RFC3339),
-	})
+	}
+	taskObj.SetReplicationID(task.ID)
+	err = svc.handleObjectUpdate(tstCtx, taskObj)
 	r.NoError(err, "handleObjectUpdate should not return an error for new object")
 	// compare ceph obj content
 	objRes := objects.Download(tstCtx, cephClient, bucket, obj, objects.DownloadOpts{})
@@ -103,20 +102,10 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	})
 	r.NoError(oRes.Err, "failed to update test object in swift")
 	// sync object update to ceph
-	err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket:    bucket,
-		Object:    obj,
-		VersionID: "",
-
-		Etag:         oRes.Header.Get("Etag"),
-		LastModified: oRes.Header.Get("Last-Modified"),
-	})
+	taskObjUpdated := taskObj
+	taskObjUpdated.Etag = oRes.Header.Get("Etag")
+	taskObjUpdated.LastModified = oRes.Header.Get("Last-Modified")
+	err = svc.handleObjectUpdate(tstCtx, taskObjUpdated)
 	r.NoError(err, "handleObjectUpdate should not return an error for updated object")
 	// compare ceph obj content after update
 	objRes = objects.Download(tstCtx, cephClient, bucket, obj, objects.DownloadOpts{})
@@ -133,54 +122,29 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 
 	t.Run("task skipped if obj not exist in src container", func(t *testing.T) {
 		r := require.New(t)
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Bucket: bucket,
-			Object: "non-existing-object",
-		})
+		taskNonExist := taskObj
+		taskNonExist.Object = "non-existing-object"
+		// should not return an error
+		err = svc.handleObjectUpdate(tstCtx, taskNonExist)
 		r.NoError(err, "handleObjectUpdate should not return an error if object does not exist in source container")
 	})
 
 	t.Run("task retried if src swift is not consistent", func(t *testing.T) {
 		r := require.New(t)
 		futureDate := objInfo.LastModified.Add(time.Hour * 24).Format(time.RFC3339)
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Bucket:       bucket,
-			Object:       obj,
-			VersionID:    "",
-			Etag:         objInfo.ETag,
-			LastModified: futureDate,
-		})
+		taskInconsistent := taskObj
+		taskInconsistent.LastModified = futureDate
+		taskInconsistent.Etag = objInfo.ETag
+		err = svc.handleObjectUpdate(tstCtx, taskInconsistent)
 		r.Error(err)
 		var rateLimitErr *dom.ErrRateLimitExceeded
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if swift is not consistent")
 	})
 
 	// sync object to ceph
-	err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-		Bucket:       bucket,
-		Object:       obj,
-		VersionID:    "",
-		Etag:         objInfo.ETag,
-		LastModified: objInfo.LastModified.Format(time.RFC3339),
-	})
+	taskObj.Etag = objInfo.ETag
+	taskObj.LastModified = objInfo.LastModified.Format(time.RFC3339)
+	err = svc.handleObjectUpdate(tstCtx, taskObj)
 	r.NoError(err, "handleObjectUpdate should not return an error")
 	// defer cleanup dest object in ceph
 	delRes := objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
@@ -201,18 +165,12 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 			_ = objects.Delete(tstCtx, swiftClient, bucket, objName, objects.DeleteOpts{})
 		})
 		// sync obj to ceph
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Bucket:       bucket,
-			Object:       objName,
-			Etag:         oRes.Header.Get("Etag"),
-			LastModified: oRes.Header.Get("Last-Modified"),
-		})
+		taskDeleteAt := taskObj
+		taskDeleteAt.Object = objName
+		taskDeleteAt.Etag = oRes.Header.Get("Etag")
+		taskDeleteAt.LastModified = oRes.Header.Get("Last-Modified")
+
+		err = svc.handleObjectUpdate(tstCtx, taskDeleteAt)
 		r.NoError(err, "handleObjectUpdate should not return an error for object with deleteAt")
 		// check if object was created in ceph
 		getRes := objects.Get(tstCtx, cephClient, bucket, objName, objects.GetOpts{})
@@ -248,16 +206,11 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		})
 
 		// sync obj to ceph
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Bucket: bucket,
-			Object: dloObj,
-		})
+		taskDLO := taskObj
+		taskDLO.Object = dloObj
+		taskDLO.Etag = ""
+		taskDLO.LastModified = time.Now().Format(time.RFC3339)
+		err = svc.handleObjectUpdate(tstCtx, taskDLO)
 		r.NoError(err, "handleObjectUpdate should not return an error for DLO object")
 
 		// get object from ceph and check if it has X-Object-Manifest header
@@ -334,18 +287,11 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		objRes := objects.Get(tstCtx, swiftClient, bucket, sloObj, objects.GetOpts{})
 		r.NoError(objRes.Err, "failed to get SLO object from swift")
 		// sync slo object to ceph
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Etag:         objRes.Header.Get("Etag"),
-			LastModified: objRes.Header.Get("Last-Modified"),
-			Bucket:       bucket,
-			Object:       sloObj,
-		})
+		taskSLO := taskObj
+		taskSLO.Object = sloObj
+		taskSLO.Etag = objRes.Header.Get("Etag")
+		taskSLO.LastModified = objRes.Header.Get("Last-Modified")
+		err = svc.handleObjectUpdate(tstCtx, taskSLO)
 		r.Error(err)
 		var rateLimitErr *dom.ErrRateLimitExceeded
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
@@ -364,18 +310,9 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		t.Cleanup(func() {
 			_ = objects.Delete(tstCtx, cephClient, sloBucket, sloPart1, &objects.DeleteOpts{})
 		})
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Etag:         objRes.Header.Get("Etag"),
-			LastModified: objRes.Header.Get("Last-Modified"),
-			Bucket:       bucket,
-			Object:       sloObj,
-		})
+		taskSLO.Etag = objRes.Header.Get("Etag")
+		taskSLO.LastModified = objRes.Header.Get("Last-Modified")
+		err = svc.handleObjectUpdate(tstCtx, taskSLO)
 		r.Error(err)
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
 
@@ -387,18 +324,10 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 			_ = objects.Delete(tstCtx, cephClient, sloBucket, sloPart2, &objects.DeleteOpts{})
 		})
 
-		err = svc.handleObjectUpdate(tstCtx, tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: swiftTestKey,
-				FromAccount: testAcc,
-				ToStorage:   cephTestKey,
-				ToAccount:   testAcc,
-			},
-			Etag:         objRes.Header.Get("Etag"),
-			LastModified: objRes.Header.Get("Last-Modified"),
-			Bucket:       bucket,
-			Object:       sloObj,
-		})
+		taskSLO.Etag = objRes.Header.Get("Etag")
+		taskSLO.LastModified = objRes.Header.Get("Last-Modified")
+		// should work now
+		err = svc.handleObjectUpdate(tstCtx, taskSLO)
 		r.NoError(err)
 		t.Cleanup(func() {
 			_ = objects.Delete(tstCtx, cephClient, bucket, sloObj, &objects.DeleteOpts{MultipartManifest: "delete"})

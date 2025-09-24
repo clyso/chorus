@@ -26,7 +26,6 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
-	"github.com/clyso/chorus/pkg/lock"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2"

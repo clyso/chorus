@@ -17,14 +17,13 @@ package swift
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/lock"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -41,73 +40,39 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 		return fmt.Errorf("ObjectUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
-	toBucket := p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
-	}
-
-	// check if replication policy is paused or removed:
-	paused, err := s.policySvc.IsReplicationPolicyPaused(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket)
-	if err != nil {
-		if errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msg("drop replication task: replication policy not found")
-			return nil
-		}
-		return err
-	}
-	if paused {
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.PauseRetryInterval}
-	}
 
 	// check rate limits:
-	if err = s.limit.StorReq(ctx, p.FromStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.FromStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ToStorage); err != nil {
-		logger.Debug().Err(err).Str(log.Storage, p.ToStorage).Msg("rate limit error")
+	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
 
 	// acquire lock for object update
-	release, refresh, err := s.locker.Lock(ctx, lock.ObjKey(p.ToStorage, dom.Object{
-		Bucket: toBucket,
-		Name:   p.Object,
-	}))
+	lock, err := s.objectLocker.Lock(ctx, entity.NewObjectLockID(p.ID.FromStorage(), p.Bucket, p.Object))
 	if err != nil {
 		return err
 	}
-	defer release()
+	defer lock.Release(context.Background())
 
 	// sync object:
-	err = lock.WithRefresh(ctx, func() error {
+	return lock.Do(ctx, time.Second*2, func() error {
 		return s.handleObjectUpdate(ctx, p)
-	}, refresh, time.Second*2)
-	if err != nil {
-		return err
-	}
-
-	// update replication progress:
-	metaErr := s.policySvc.IncReplEventsDone(ctx, p.FromAccount, p.Bucket, p.FromStorage, p.ToStorage, p.ToBucket, p.CreatedAt)
-	if metaErr != nil {
-		logger.Err(metaErr).Msg("unable to inc processed events")
-	}
-
-	return nil
+	})
 }
 
 func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.SwiftObjectUpdatePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
-	fromBucket, toBucket := p.Bucket, p.Bucket
-	if p.ToBucket != nil {
-		toBucket = *p.ToBucket
-	}
+	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 	// setup swift clients:
-	fromClient, err := s.swiftClients.For(ctx, p.FromStorage, p.FromAccount)
+	fromClient, err := s.swiftClients.For(ctx, p.ID.FromStorage(), p.ID.User())
 	if err != nil {
 		return err
 	}
-	toClient, err := s.swiftClients.For(ctx, p.ToStorage, p.ToAccount)
+	toClient, err := s.swiftClients.For(ctx, p.ID.ToStorage(), p.ID.User())
 	if err != nil {
 		return err
 	}

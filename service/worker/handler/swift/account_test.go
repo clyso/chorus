@@ -20,6 +20,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/gophercloud/gophercloud/v2"
@@ -77,14 +78,13 @@ func Test_handleAccountUpdate(t *testing.T) {
 	r.NoError(updRes.Err, "failed to update swift account metadata")
 
 	// sync to ceph
-	err = svc.handleAccountUpdate(tstCtx, tasks.SwiftAccountUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-	})
+	task := tasks.SwiftAccountUpdatePayload{}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        testAcc,
+		FromStorage: swiftTestKey,
+		ToStorage:   cephTestKey,
+	}))
+	err = svc.handleAccountUpdate(tstCtx, task)
 	r.NoError(err, "handleAccountUpdate should not return an error")
 
 	// check swift account
@@ -120,14 +120,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	})
 	r.NoError(updRes.Err, "failed to update swift account metadata")
 	// sync to ceph
-	err = svc.handleAccountUpdate(tstCtx, tasks.SwiftAccountUpdatePayload{
-		Sync: tasks.Sync{
-			FromStorage: swiftTestKey,
-			FromAccount: testAcc,
-			ToStorage:   cephTestKey,
-			ToAccount:   testAcc,
-		},
-	})
+	err = svc.handleAccountUpdate(tstCtx, task)
 	r.NoError(err, "handleAccountUpdate should not return an error")
 
 	// check swift account

@@ -34,10 +34,6 @@ const (
 	lastListedObjTTL = time.Hour * 8
 )
 
-const (
-	lastListedContainerPrefix = "s:c:" // common prefix for listed container checkpoint keys
-)
-
 var (
 	luaDeleteKeysByPrefix = redis.NewScript(`local keys = redis.call('keys', ARGV[1])
 if #keys >0 then
@@ -133,11 +129,7 @@ type svc struct {
 }
 
 func lastListedContainerKey(task tasks.SwiftAccountMigrationPayload) string {
-	return fmt.Sprintf(lastListedContainerPrefix+"%s:%s:%s:%s",
-		task.FromStorage,
-		task.FromAccount,
-		task.ToStorage,
-		task.ToAccount)
+	return "s:c:" + task.ID.AsString()
 }
 
 func (s *svc) DelLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) error {
