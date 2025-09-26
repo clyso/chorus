@@ -60,11 +60,11 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 
 	// sync object:
 	return lock.Do(ctx, time.Second*2, func() error {
-		return s.handleObjectUpdate(ctx, p)
+		return s.ObjectUpdate(ctx, p)
 	})
 }
 
-func (s *svc) handleObjectUpdate(ctx context.Context, p tasks.SwiftObjectUpdatePayload) (err error) {
+func (s *svc) ObjectUpdate(ctx context.Context, p tasks.SwiftObjectUpdatePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 	// setup swift clients:

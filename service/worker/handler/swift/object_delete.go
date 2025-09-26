@@ -53,12 +53,12 @@ func (s *svc) HandleObjectDelete(ctx context.Context, t *asynq.Task) (err error)
 	defer lock.Release(context.Background())
 
 	return lock.Do(ctx, time.Second*2, func() error {
-		return s.handleObjectDelete(ctx, p)
+		return s.ObjectDelete(ctx, p)
 	})
 }
 
 // handleObjectMetaUpdate handles the object metadata update task, copying metadata from the source object to the destination object.
-func (s *svc) handleObjectDelete(ctx context.Context, p tasks.SwiftObjectDeletePayload) (err error) {
+func (s *svc) ObjectDelete(ctx context.Context, p tasks.SwiftObjectDeletePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 

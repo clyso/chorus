@@ -18,7 +18,6 @@ package router
 
 import (
 	"net/url"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"

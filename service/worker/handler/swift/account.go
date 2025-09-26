@@ -51,12 +51,12 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 	}
 	defer lock.Release(context.Background())
 	return lock.Do(ctx, time.Second*2, func() error {
-		return s.handleAccountUpdate(ctx, p)
+		return s.AccountUpdate(ctx, p)
 	})
 }
 
-// handleAccountUpdate handles the account update task, copying metadata from the source account to the destination account.
-func (s *svc) handleAccountUpdate(ctx context.Context, p tasks.SwiftAccountUpdatePayload) (err error) {
+// AccountUpdate handles the account update task, copying metadata from the source account to the destination account.
+func (s *svc) AccountUpdate(ctx context.Context, p tasks.SwiftAccountUpdatePayload) (err error) {
 	fromClient, err := s.swiftClients.For(ctx, p.ID.FromStorage(), p.ID.User())
 	if err != nil {
 		return err

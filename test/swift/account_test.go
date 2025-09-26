@@ -23,6 +23,7 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client}
+	svc := swift_worker.New(nil, client, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -84,7 +85,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
 	}))
-	err = svc.handleAccountUpdate(tstCtx, task)
+	err = svc.AccountUpdate(tstCtx, task)
 	r.NoError(err, "handleAccountUpdate should not return an error")
 
 	// check swift account
@@ -120,7 +121,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 	})
 	r.NoError(updRes.Err, "failed to update swift account metadata")
 	// sync to ceph
-	err = svc.handleAccountUpdate(tstCtx, task)
+	err = svc.AccountUpdate(tstCtx, task)
 	r.NoError(err, "handleAccountUpdate should not return an error")
 
 	// check swift account

@@ -13,6 +13,7 @@ import (
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/service/worker/handler"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
@@ -26,7 +27,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client, conf: &handler.Config{}}
+	svc := swift_worker.New(&handler.Config{}, client, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -68,7 +69,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
 	}))
-	err = svc.handleContainerUpdate(tstCtx, task)
+	err = svc.ContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// defer cleanup dest container in ceph
 	defer func() {
@@ -85,7 +86,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		LastModified: objInfo.LastModified.Format(time.RFC3339),
 	}
 	taskObj.SetReplicationID(task.ID)
-	err = svc.handleObjectUpdate(tstCtx, taskObj)
+	err = svc.ObjectUpdate(tstCtx, taskObj)
 	r.NoError(err, "handleObjectUpdate should not return an error for new object")
 	// compare ceph obj content
 	objRes := objects.Download(tstCtx, cephClient, bucket, obj, objects.DownloadOpts{})
@@ -105,7 +106,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	taskObjUpdated := taskObj
 	taskObjUpdated.Etag = oRes.Header.Get("Etag")
 	taskObjUpdated.LastModified = oRes.Header.Get("Last-Modified")
-	err = svc.handleObjectUpdate(tstCtx, taskObjUpdated)
+	err = svc.ObjectUpdate(tstCtx, taskObjUpdated)
 	r.NoError(err, "handleObjectUpdate should not return an error for updated object")
 	// compare ceph obj content after update
 	objRes = objects.Download(tstCtx, cephClient, bucket, obj, objects.DownloadOpts{})
@@ -125,7 +126,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		taskNonExist := taskObj
 		taskNonExist.Object = "non-existing-object"
 		// should not return an error
-		err = svc.handleObjectUpdate(tstCtx, taskNonExist)
+		err = svc.ObjectUpdate(tstCtx, taskNonExist)
 		r.NoError(err, "handleObjectUpdate should not return an error if object does not exist in source container")
 	})
 
@@ -135,7 +136,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		taskInconsistent := taskObj
 		taskInconsistent.LastModified = futureDate
 		taskInconsistent.Etag = objInfo.ETag
-		err = svc.handleObjectUpdate(tstCtx, taskInconsistent)
+		err = svc.ObjectUpdate(tstCtx, taskInconsistent)
 		r.Error(err)
 		var rateLimitErr *dom.ErrRateLimitExceeded
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if swift is not consistent")
@@ -144,7 +145,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	// sync object to ceph
 	taskObj.Etag = objInfo.ETag
 	taskObj.LastModified = objInfo.LastModified.Format(time.RFC3339)
-	err = svc.handleObjectUpdate(tstCtx, taskObj)
+	err = svc.ObjectUpdate(tstCtx, taskObj)
 	r.NoError(err, "handleObjectUpdate should not return an error")
 	// defer cleanup dest object in ceph
 	delRes := objects.Delete(tstCtx, cephClient, bucket, obj, objects.DeleteOpts{})
@@ -170,7 +171,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		taskDeleteAt.Etag = oRes.Header.Get("Etag")
 		taskDeleteAt.LastModified = oRes.Header.Get("Last-Modified")
 
-		err = svc.handleObjectUpdate(tstCtx, taskDeleteAt)
+		err = svc.ObjectUpdate(tstCtx, taskDeleteAt)
 		r.NoError(err, "handleObjectUpdate should not return an error for object with deleteAt")
 		// check if object was created in ceph
 		getRes := objects.Get(tstCtx, cephClient, bucket, objName, objects.GetOpts{})
@@ -210,7 +211,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		taskDLO.Object = dloObj
 		taskDLO.Etag = ""
 		taskDLO.LastModified = time.Now().Format(time.RFC3339)
-		err = svc.handleObjectUpdate(tstCtx, taskDLO)
+		err = svc.ObjectUpdate(tstCtx, taskDLO)
 		r.NoError(err, "handleObjectUpdate should not return an error for DLO object")
 
 		// get object from ceph and check if it has X-Object-Manifest header
@@ -291,7 +292,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		taskSLO.Object = sloObj
 		taskSLO.Etag = objRes.Header.Get("Etag")
 		taskSLO.LastModified = objRes.Header.Get("Last-Modified")
-		err = svc.handleObjectUpdate(tstCtx, taskSLO)
+		err = svc.ObjectUpdate(tstCtx, taskSLO)
 		r.Error(err)
 		var rateLimitErr *dom.ErrRateLimitExceeded
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
@@ -312,7 +313,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		})
 		taskSLO.Etag = objRes.Header.Get("Etag")
 		taskSLO.LastModified = objRes.Header.Get("Last-Modified")
-		err = svc.handleObjectUpdate(tstCtx, taskSLO)
+		err = svc.ObjectUpdate(tstCtx, taskSLO)
 		r.Error(err)
 		r.True(errors.As(err, &rateLimitErr), "handleObjectUpdate should return rate limit exceeded error if parts are not copied yet")
 
@@ -327,7 +328,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		taskSLO.Etag = objRes.Header.Get("Etag")
 		taskSLO.LastModified = objRes.Header.Get("Last-Modified")
 		// should work now
-		err = svc.handleObjectUpdate(tstCtx, taskSLO)
+		err = svc.ObjectUpdate(tstCtx, taskSLO)
 		r.NoError(err)
 		t.Cleanup(func() {
 			_ = objects.Delete(tstCtx, cephClient, bucket, sloObj, &objects.DeleteOpts{MultipartManifest: "delete"})

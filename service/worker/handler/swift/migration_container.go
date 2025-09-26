@@ -40,11 +40,11 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 	}
 
 	// migrate container metadata:
-	task := tasks.SwiftContainerUpdatePayload{
+	containerUpdTask := tasks.SwiftContainerUpdatePayload{
 		Bucket: p.Bucket,
 	}
-	task.SetReplicationID(p.ID)
-	err = s.handleContainerUpdate(ctx, task)
+	containerUpdTask.SetReplicationID(p.ID)
+	err = s.ContainerUpdate(ctx, containerUpdTask)
 	if err != nil {
 		return fmt.Errorf("handle container update: %w", err)
 	}
@@ -76,7 +76,7 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 				ObjLastModified: object.LastModified.Format(time.RFC3339),
 			}
 			objTask.SetReplicationID(p.ID)
-			err = s.queueSvc.EnqueueTask(ctx, task)
+			err = s.queueSvc.EnqueueTask(ctx, objTask)
 			if err != nil {
 				return false, fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 			}
@@ -89,6 +89,9 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 		}
 		return len(objectList) == swiftObjectListLimit, nil
 	})
+	if err != nil {
+		return err
+	}
 
 	// cleanup listing checkpoint:
 	_ = s.storageSvc.DelLastListedObj(ctx, lastListedKey)

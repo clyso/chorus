@@ -57,13 +57,13 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 	}
 	defer lock.Release(context.Background())
 	err = lock.Do(ctx, time.Second*2, func() error {
-		return s.handleContainerUpdate(ctx, p)
+		return s.ContainerUpdate(ctx, p)
 	})
 
 	return
 }
 
-func (s *svc) handleContainerUpdate(ctx context.Context, p tasks.SwiftContainerUpdatePayload) (err error) {
+func (s *svc) ContainerUpdate(ctx context.Context, p tasks.SwiftContainerUpdatePayload) (err error) {
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 	// setup swift clients:
 	fromClient, err := s.swiftClients.For(ctx, p.ID.FromStorage(), p.ID.User())

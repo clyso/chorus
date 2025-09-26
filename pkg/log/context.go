@@ -107,16 +107,6 @@ func WithUser(ctx context.Context, u string) context.Context {
 	return xctx.SetUser(ctx, u)
 }
 
-func WithAccount(ctx context.Context, acc string) context.Context {
-	if acc == "" {
-		return ctx
-	}
-	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Str(account, acc)
-	})
-	return xctx.SetAccount(ctx, acc)
-}
-
 func StartNew(from context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = zerolog.Ctx(from).WithContext(ctx)

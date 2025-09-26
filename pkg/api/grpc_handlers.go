@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
-	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -82,7 +81,6 @@ type handlers struct {
 	s3clients               s3client.Service
 	queueSvc                tasks.QueueService
 	swiftClients            swift.Client
-	taskClient              *asynq.Client
 	rclone                  rclone.Service
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
@@ -422,24 +420,33 @@ func (h *handlers) AddSwiftAccountReplication(ctx context.Context, req *pb.Swift
 		return nil, fmt.Errorf("unable to get swift account %s on storage %s: %w", req.Account, req.ToStorage, err)
 	}
 
-	// create account replication policy:
-	err = h.policySvc.AddUserReplicationPolicy(ctx, req.Account, req.FromStorage, req.ToStorage, tasks.PriorityDefault1)
-	if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
-		return nil, fmt.Errorf("unable to add swift account replication policy: %w", err)
-	}
-	// create task for replication:
-	task, err := tasks.NewTask(ctx, tasks.SwiftAccountMigrationPayload{
+	userPolicy := entity.UserReplicationPolicy{
+		User:        req.Account,
 		FromStorage: req.FromStorage,
 		ToStorage:   req.ToStorage,
-		FromAccount: req.Account,
-		ToAccount:   req.Account,
+	}
+	uid := entity.UniversalFromUserReplication(userPolicy)
+	if err := userPolicy.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid user replication policy %v: %w", userPolicy, err)
+	}
+	lock, err := h.replicationStatusLocker.Lock(ctx, uid, store.WithDuration(time.Second), store.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
+		// create account replication policy:
+		err = h.policySvc.AddUserReplicationPolicy(ctx, userPolicy)
+		if err != nil {
+			return err
+		}
+		// create task for replication:
+		task := tasks.SwiftAccountMigrationPayload{}
+		task.SetReplicationID(uid)
+		return h.queueSvc.EnqueueTask(ctx, task)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to create swift account replication task: %w", err)
-	}
-	_, err = h.taskClient.EnqueueContext(ctx, task)
-	if err != nil && !errors.Is(err, asynq.ErrDuplicateTask) && !errors.Is(err, asynq.ErrTaskIDConflict) {
-		return nil, fmt.Errorf("unable to enqueue swift account replication task: %w", err)
+		return nil, err
 	}
 	return &emptypb.Empty{}, nil
 }

@@ -18,7 +18,6 @@ package router
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -65,32 +64,16 @@ type swiftRouter struct {
 	client     *http.Client
 }
 
-func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
+func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	var (
-		ctx     = req.Context()
-		logger  = zerolog.Ctx(ctx)
-		method  = xctx.GetSwiftMethod(req.Context())
-		account = xctx.GetAccount(ctx)
-		bucket  = xctx.GetBucket(ctx)
-		object  = xctx.GetObject(ctx)
-		task    tasks.SyncTask
+		ctx    = req.Context()
+		logger = zerolog.Ctx(ctx)
+		method = xctx.GetSwiftMethod(req.Context())
+		bucket = xctx.GetBucket(ctx)
+		object = xctx.GetObject(ctx)
+		task   tasks.ReplicationTask
 	)
-	if account != "" {
-		// for swift there is no routing per bucket (per container)
-		// because different containers from the same account are used to implement
-		// object versioning and multipart upload (swift DLO and SLO)
-		// TODO: change this method when swift zero-downtime migration will be implemented
-		//TODO: support account routing policies
-		storage, err = r.policySvc.GetRoutingPolicy(ctx, account)
-		if err != nil && !errors.Is(err, dom.ErrNotFound) {
-			return nil, nil, "", false, err
-		}
-	}
-	if storage == "" {
-		// custom routing not configured
-		// fallback to main
-		storage = r.conf.MainStorage
-	}
+	storage = xctx.GetRoutingPolicy(ctx)
 
 	// forward request:
 	resp, isApiErr, err = r.forwardToStorage(ctx, req, storage)
@@ -105,19 +88,11 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 	case swift.PostAccount, swift.DeleteAccount:
 		// handle account changes:
 		task = &tasks.SwiftAccountUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: storage,
-				FromAccount: account,
-			},
 			Date: getDate(resp), // Use date because Last-modified not returned by swift
 		}
 	case swift.PutContainer, swift.PostContainer, swift.DeleteContainer:
 		// handle container changes:
 		task = &tasks.SwiftContainerUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: storage,
-				FromAccount: account,
-			},
 			Bucket: bucket,
 			Date:   getDate(resp), // Use date because Last-modified not returned by swift
 		}
@@ -125,10 +100,6 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		// updates only object meta
 		// meta update does not change obj version
 		task = &tasks.SwiftObjectMetaUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: storage,
-				FromAccount: account,
-			},
 			Bucket: bucket,
 			Object: object,
 			Date:   getDate(resp), // Use date because Last-modified not returned by swift
@@ -137,10 +108,6 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		// same as POST but also updates object payload
 		// returns version id
 		task = &tasks.SwiftObjectUpdatePayload{
-			Sync: tasks.Sync{
-				FromStorage: storage,
-				FromAccount: account,
-			},
 			Bucket:       bucket,
 			Object:       object,
 			VersionID:    getObjVersion(resp),
@@ -150,10 +117,6 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 	case swift.DeleteObject:
 		// can contain version id
 		task = &tasks.SwiftObjectDeletePayload{
-			Sync: tasks.Sync{
-				FromStorage: storage,
-				FromAccount: account,
-			},
 			Bucket:          bucket,
 			Object:          object,
 			VersionID:       getVersionFromRequest(req),
@@ -171,19 +134,15 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		return nil, nil, "", false, fmt.Errorf("%w: unknown swift method %q", dom.ErrNotImplemented, method.String())
 	}
 
-	if err == nil && task != nil {
-		if taskList == nil {
-			taskList = []tasks.SyncTask{task}
-		}
-	}
+	taskList = []tasks.ReplicationTask{task}
 	return
 }
 
 func (r *swiftRouter) forwardToStorage(ctx context.Context, req *http.Request, toStorage string) (resp *http.Response, isApiErr bool, err error) {
 	ctx, span := otel.Tracer("").Start(ctx, fmt.Sprintf("swiftForward.%s", xctx.GetSwiftMethod(ctx).String()))
 	span.SetAttributes(attribute.String("storage", toStorage))
-	if xctx.GetAccount(ctx) != "" {
-		span.SetAttributes(attribute.String("account", xctx.GetAccount(ctx)))
+	if xctx.GetUser(ctx) != "" {
+		span.SetAttributes(attribute.String("account", xctx.GetUser(ctx)))
 	}
 	if xctx.GetBucket(ctx) != "" {
 		span.SetAttributes(attribute.String("bucket", xctx.GetBucket(ctx)))

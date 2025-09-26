@@ -55,12 +55,12 @@ func (s *svc) HandleObjectMetaUpdate(ctx context.Context, t *asynq.Task) (err er
 	defer lock.Release(context.Background())
 
 	return lock.Do(ctx, time.Second*2, func() error {
-		return s.handleObjectMetaUpdate(ctx, p)
+		return s.ObjectMetaUpdate(ctx, p)
 	})
 }
 
-// handleObjectMetaUpdate handles the object metadata update task, copying metadata from the source object to the destination object.
-func (s *svc) handleObjectMetaUpdate(ctx context.Context, p tasks.SwiftObjectMetaUpdatePayload) (err error) {
+// ObjectMetaUpdate handles the object metadata update task, copying metadata from the source object to the destination object.
+func (s *svc) ObjectMetaUpdate(ctx context.Context, p tasks.SwiftObjectMetaUpdatePayload) (err error) {
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 

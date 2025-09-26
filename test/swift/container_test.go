@@ -22,6 +22,7 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
@@ -35,7 +36,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client}
+	svc := swift_worker.New(nil, client, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -71,7 +72,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
 	}))
-	err = svc.handleContainerUpdate(tstCtx, task)
+	err = svc.ContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// check swift container
 	cgRes := containers.Get(tstCtx, swiftClient, tstCont, containers.GetOpts{})
@@ -97,7 +98,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	})
 	r.NoError(updRes.Err, "failed to update swift container metadata")
 	// sync to ceph
-	err = svc.handleContainerUpdate(tstCtx, task)
+	err = svc.ContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// check swift container
 	cgRes = containers.Get(tstCtx, swiftClient, tstCont, containers.GetOpts{})
@@ -118,7 +119,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	delRes := containers.Delete(tstCtx, swiftClient, tstCont)
 	r.NoError(delRes.Err, "failed to delete swift container")
 	// sync to ceph
-	err = svc.handleContainerUpdate(tstCtx, task)
+	err = svc.ContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// check swift container
 	cgRes = containers.Get(tstCtx, swiftClient, tstCont, containers.GetOpts{})
@@ -147,7 +148,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 		// sync container to ceph
 		taskVer := task
 		taskVer.Bucket = versionsCont
-		err = svc.handleContainerUpdate(tstCtx, taskVer)
+		err = svc.ContainerUpdate(tstCtx, taskVer)
 		r.NoError(err, "handleContainerUpdate should not return an error")
 		// check swift container
 		cgRes = containers.Get(tstCtx, swiftClient, versionsCont, containers.GetOpts{})

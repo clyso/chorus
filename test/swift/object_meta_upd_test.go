@@ -7,6 +7,7 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client}
+	svc := swift_worker.New(nil, client, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -63,7 +64,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 		ToStorage:   cephTestKey,
 	}))
 	// handler retuns error if object does not exist
-	err = svc.handleObjectMetaUpdate(tstCtx, task)
+	err = svc.ObjectMetaUpdate(tstCtx, task)
 	r.NoError(err, "handleObjectMetaUpdate should return an error if object does not exist in ceph")
 
 	// crate a test object in ceph
@@ -85,7 +86,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	r.NoError(err, "failed to extract object info from ceph")
 	r.Empty(meta, "object metadata in ceph should be empty")
 	// sync object metadata from swift to ceph
-	err = svc.handleObjectMetaUpdate(tstCtx, task)
+	err = svc.ObjectMetaUpdate(tstCtx, task)
 	r.NoError(err, "handleObjectMetaUpdate should not return an error")
 	// check object metadata in ceph
 	res = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{})
@@ -99,7 +100,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 	delRes := objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{})
 	r.NoError(delRes.Err, "failed to delete test object in swift")
 	// sync object metadata from swift to ceph
-	err = svc.handleObjectMetaUpdate(tstCtx, task)
+	err = svc.ObjectMetaUpdate(tstCtx, task)
 	// no error. task should be skipped
 	r.NoError(err, "handleObjectMetaUpdate should not return an error if object was deleted from swift")
 	// object still in ceph

@@ -33,9 +33,10 @@ import (
 
 func S3Middleware(policySvc policy.Service, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := log.WithStorType(r.Context(), "S3")
 		bucket, object, method := s3.ParseReq(r)
-		ctx := log.WithBucket(r.Context(), bucket)
-		ctx = log.WithStorType(r.Context(), "S3")
+
+		ctx = log.WithBucket(ctx, bucket)
 		ctx = log.WithObjName(ctx, object)
 		ctx = log.WithMethod(ctx, method)
 		ctx = log.WithFlow(ctx, xctx.Event)

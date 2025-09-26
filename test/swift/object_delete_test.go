@@ -9,6 +9,7 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
@@ -22,7 +23,7 @@ func Test_handleObjectDelete(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client}
+	svc := swift_worker.New(nil, client, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := client.For(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
@@ -77,7 +78,7 @@ func Test_handleObjectDelete(t *testing.T) {
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
 	}))
-	err = svc.handleObjectDelete(tstCtx, task)
+	err = svc.ObjectDelete(tstCtx, task)
 	r.NoError(err, "task ignored when source object not deleted")
 	// object still exists in swift
 	err = objects.Get(tstCtx, swiftClient, bucket, obj, objects.GetOpts{Newest: true}).Err
@@ -86,13 +87,13 @@ func Test_handleObjectDelete(t *testing.T) {
 	taskDeleted := task
 	taskDeleted.Object = "non-existent-obj"
 	// no error when dest already deleted
-	err = svc.handleObjectDelete(tstCtx, taskDeleted)
+	err = svc.ObjectDelete(tstCtx, taskDeleted)
 	r.NoError(err, "expected no error when destination object already deleted")
 	// delete object in swift
 	err = objects.Delete(tstCtx, swiftClient, bucket, obj, objects.DeleteOpts{}).Err
 	r.NoError(err, "failed to delete test object in swift")
 	// sync object delete
-	err = svc.handleObjectDelete(tstCtx, task)
+	err = svc.ObjectDelete(tstCtx, task)
 	r.NoError(err, "failed to sync object delete")
 	// check that object was deleted in ceph
 	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
@@ -113,7 +114,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	// setup clients
 	client, err := swift.New(swiftConf)
 	r.NoError(err, "failed to create swift client")
-	svc := &svc{swiftClients: client}
+	svc := swift_worker.New(nil, client, nil, nil, nil, nil, nil, nil)
 	cephClient, err := client.For(tstCtx, cephTestKey, testAcc)
 	r.NoError(err, "failed to get ceph client for test account")
 
@@ -181,7 +182,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
 	}))
-	err = svc.handleObjectDelete(tstCtx, task)
+	err = svc.ObjectDelete(tstCtx, task)
 	r.NoError(err, "failed to sync object delete with multipart delete")
 	// check that SLO manifest was deleted, but parts still exist
 	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err
@@ -205,7 +206,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	taskMultipart := task
 	taskMultipart.DeleteMultipart = true
 	// sync object delete with multipart delete
-	err = svc.handleObjectDelete(tstCtx, taskMultipart)
+	err = svc.ObjectDelete(tstCtx, taskMultipart)
 	r.NoError(err, "failed to sync object delete with multipart delete")
 	// check that SLO manifest and parts were deleted
 	err = objects.Get(tstCtx, cephClient, bucket, obj, objects.GetOpts{Newest: true}).Err

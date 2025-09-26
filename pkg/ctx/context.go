@@ -37,7 +37,6 @@ type userKey struct{}
 type routingPolicyKey struct{}
 type replicationsKey struct{}
 type inProgressZeroDowntimeKey struct{}
-type accKey struct{}
 
 type Flow string
 
@@ -200,21 +199,4 @@ func SetInProgressZeroDowntime(ctx context.Context, r entity.ReplicationSwitchIn
 		panic("cannot set empty in progress zero downtime switch info to ctx")
 	}
 	return context.WithValue(ctx, inProgressZeroDowntimeKey{}, &r)
-}
-
-func GetAccount(ctx context.Context) string {
-	k, _ := ctx.Value(accKey{}).(string)
-	return k
-}
-
-func SetAccount(ctx context.Context, acc string) context.Context {
-	if acc == "" {
-		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty account to ctx")
-		return ctx
-	}
-	if prev := GetAccount(ctx); prev != "" {
-		zerolog.Ctx(ctx).Warn().Msgf("cannot set account %s, ctx already contains account %s", acc, prev)
-		return ctx
-	}
-	return context.WithValue(ctx, accKey{}, acc)
 }

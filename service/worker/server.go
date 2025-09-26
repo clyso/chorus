@@ -49,6 +49,8 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker/handler"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
+	// swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -145,11 +147,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
 	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
 
-	swiftClient, err := swift.New(conf.Worker)
+	swiftClient, err := swift.New(*conf.Swift)
 	if err != nil {
 		return fmt.Errorf("%w: unable to create swift client", err)
 	}
-	workerSvc := handler.New(conf.Worker, swiftClient, s3Clients, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	swiftWorkerSvc := swift_worker.New(conf.Worker, swiftClient, storageSvc, queueSvc, limiter, objectLocker, userLocker, bucketLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -215,14 +218,14 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, workerSvc.HandleZeroDowntimeReplicationSwitch)
 	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, workerSvc.HandleSwitchWithDowntime)
 	// swift tasks:
-	mux.HandleFunc(tasks.TypeSwiftAccountUpdate, workerSvc.HandleAccountUpdate)
-	mux.HandleFunc(tasks.TypeSwiftContainerUpdate, workerSvc.HandleContainerUpdate)
-	mux.HandleFunc(tasks.TypeSwiftObjUpdate, workerSvc.HandleObjectUpdate)
-	mux.HandleFunc(tasks.TypeSwiftObjMetaUpdate, workerSvc.HandleObjectMetaUpdate)
-	mux.HandleFunc(tasks.TypeSwiftObjDelete, workerSvc.HandleObjectDelete)
-	mux.HandleFunc(tasks.TypeSwiftAccountMigration, workerSvc.HandleSwiftAccountMigration)
-	mux.HandleFunc(tasks.TypeSwiftContainerMigration, workerSvc.HandleSwiftContainerMigration)
-	mux.HandleFunc(tasks.TypeSwiftObjectMigration, workerSvc.HandleSwiftObjectMigration)
+	mux.HandleFunc(tasks.TypeSwiftAccountUpdate, swiftWorkerSvc.HandleAccountUpdate)
+	mux.HandleFunc(tasks.TypeSwiftContainerUpdate, swiftWorkerSvc.HandleContainerUpdate)
+	mux.HandleFunc(tasks.TypeSwiftObjUpdate, swiftWorkerSvc.HandleObjectUpdate)
+	mux.HandleFunc(tasks.TypeSwiftObjMetaUpdate, swiftWorkerSvc.HandleObjectMetaUpdate)
+	mux.HandleFunc(tasks.TypeSwiftObjDelete, swiftWorkerSvc.HandleObjectDelete)
+	mux.HandleFunc(tasks.TypeSwiftAccountMigration, swiftWorkerSvc.HandleSwiftAccountMigration)
+	mux.HandleFunc(tasks.TypeSwiftContainerMigration, swiftWorkerSvc.HandleSwiftContainerMigration)
+	mux.HandleFunc(tasks.TypeSwiftObjectMigration, swiftWorkerSvc.HandleSwiftObjectMigration)
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {

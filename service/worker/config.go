@@ -26,6 +26,7 @@ import (
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/service/worker/handler"
 )
 
@@ -42,7 +43,8 @@ func defaultConfig() fs.File {
 
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
-	Storage       *s3.StorageConfig `yaml:"storage,omitempty"`
+	Storage       *s3.StorageConfig   `yaml:"storage,omitempty"`
+	Swift         *swift.WorkerConfig `yaml:"swift,omitempty"` // TODO: define swift config
 
 	Concurrency     int           `yaml:"concurrency"`
 	ShutdownTimeout time.Duration `yaml:"shutdownTimeout"`

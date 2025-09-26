@@ -125,7 +125,7 @@ func parseObject(httpMethod string) Method {
 	}
 }
 
-// remove all symbols in path before v1/ incuding v1/
+// remove all symbols in path before v1/ including v1/
 func trimV1(path string) string {
 	return path[strings.Index(path, "v1/")+len("v1/"):]
 }
