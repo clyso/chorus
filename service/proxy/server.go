@@ -113,9 +113,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	authCheck := auth.Middleware(conf.Auth, conf.Storage.Storages)
 	var handler http.Handler
 	if conf.Metrics.Enabled {
-		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.Middleware(policySvc, trace.HttpMiddleware(tp, metrics.ProxyMiddleware(proxyMux)))))
+		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.S3Middleware(policySvc, trace.HttpMiddleware(tp, metrics.ProxyMiddleware(proxyMux)))))
 	} else {
-		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.Middleware(policySvc, trace.HttpMiddleware(tp, proxyMux))))
+		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.S3Middleware(policySvc, trace.HttpMiddleware(tp, proxyMux))))
 	}
 	handler = cors.HttpMiddleware(conf.Cors, handler)
 

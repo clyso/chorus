@@ -34,6 +34,7 @@ import (
 )
 
 type Config struct {
+	SwiftRetryInterval  time.Duration `yaml:"swiftRetryInterval"`
 	PauseRetryInterval  time.Duration `yaml:"pauseRetryInterval"`
 	SwitchRetryInterval time.Duration `yaml:"switchRetryInterval"`
 	QueueUpdateInterval time.Duration `yaml:"queueUpdateInterval"`

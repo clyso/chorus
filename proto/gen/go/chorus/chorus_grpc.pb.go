@@ -25,6 +25,7 @@ const (
 	Chorus_GetProxyCredentials_FullMethodName              = "/chorus.Chorus/GetProxyCredentials"
 	Chorus_ListBucketsForReplication_FullMethodName        = "/chorus.Chorus/ListBucketsForReplication"
 	Chorus_AddReplication_FullMethodName                   = "/chorus.Chorus/AddReplication"
+	Chorus_AddSwiftAccountReplication_FullMethodName       = "/chorus.Chorus/AddSwiftAccountReplication"
 	Chorus_ListReplications_FullMethodName                 = "/chorus.Chorus/ListReplications"
 	Chorus_ListUserReplications_FullMethodName             = "/chorus.Chorus/ListUserReplications"
 	Chorus_StreamBucketReplication_FullMethodName          = "/chorus.Chorus/StreamBucketReplication"
@@ -62,6 +63,7 @@ type ChorusClient interface {
 	ListBucketsForReplication(ctx context.Context, in *ListBucketsForReplicationRequest, opts ...grpc.CallOption) (*ListBucketsForReplicationResponse, error)
 	// Configures new replication for user or bucket(-s)
 	AddReplication(ctx context.Context, in *AddReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	AddSwiftAccountReplication(ctx context.Context, in *SwiftAccountReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Lists configured replications with statuses
 	ListReplications(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListReplicationsResponse, error)
 	ListUserReplications(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListUserReplicationsResponse, error)
@@ -171,6 +173,16 @@ func (c *chorusClient) AddReplication(ctx context.Context, in *AddReplicationReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Chorus_AddReplication_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chorusClient) AddSwiftAccountReplication(ctx context.Context, in *SwiftAccountReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Chorus_AddSwiftAccountReplication_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -410,6 +422,7 @@ type ChorusServer interface {
 	ListBucketsForReplication(context.Context, *ListBucketsForReplicationRequest) (*ListBucketsForReplicationResponse, error)
 	// Configures new replication for user or bucket(-s)
 	AddReplication(context.Context, *AddReplicationRequest) (*emptypb.Empty, error)
+	AddSwiftAccountReplication(context.Context, *SwiftAccountReplicationRequest) (*emptypb.Empty, error)
 	// Lists configured replications with statuses
 	ListReplications(context.Context, *emptypb.Empty) (*ListReplicationsResponse, error)
 	ListUserReplications(context.Context, *emptypb.Empty) (*ListUserReplicationsResponse, error)
@@ -488,6 +501,9 @@ func (UnimplementedChorusServer) ListBucketsForReplication(context.Context, *Lis
 }
 func (UnimplementedChorusServer) AddReplication(context.Context, *AddReplicationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddReplication not implemented")
+}
+func (UnimplementedChorusServer) AddSwiftAccountReplication(context.Context, *SwiftAccountReplicationRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddSwiftAccountReplication not implemented")
 }
 func (UnimplementedChorusServer) ListReplications(context.Context, *emptypb.Empty) (*ListReplicationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListReplications not implemented")
@@ -658,6 +674,24 @@ func _Chorus_AddReplication_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ChorusServer).AddReplication(ctx, req.(*AddReplicationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chorus_AddSwiftAccountReplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwiftAccountReplicationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).AddSwiftAccountReplication(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_AddSwiftAccountReplication_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).AddSwiftAccountReplication(ctx, req.(*SwiftAccountReplicationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1059,6 +1093,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddReplication",
 			Handler:    _Chorus_AddReplication_Handler,
+		},
+		{
+			MethodName: "AddSwiftAccountReplication",
+			Handler:    _Chorus_AddSwiftAccountReplication_Handler,
 		},
 		{
 			MethodName: "ListReplications",
