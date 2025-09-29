@@ -14,6 +14,11 @@
 
 package gen
 
+const (
+	CTestGenSeed    = 811509576612567777
+	CUseTestGenSeed = false
+)
+
 type GeneratorRange struct {
 	Min int64
 	Max int64

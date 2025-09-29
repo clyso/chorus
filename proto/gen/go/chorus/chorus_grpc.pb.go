@@ -112,7 +112,7 @@ type ChorusClient interface {
 	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
 	AddBucketReplication(ctx context.Context, in *AddBucketReplicationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetReplication(ctx context.Context, in *ReplicationRequest, opts ...grpc.CallOption) (*Replication, error)
-	StartConsistencyCheck(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StartConsistencyCheck(ctx context.Context, in *StartConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListConsistencyChecks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListConsistencyChecksResponse, error)
 	GetConsistencyCheckReport(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportResponse, error)
 	GetConsistencyCheckReportEntries(ctx context.Context, in *GetConsistencyCheckReportEntriesRequest, opts ...grpc.CallOption) (*GetConsistencyCheckReportEntriesResponse, error)
@@ -346,7 +346,7 @@ func (c *chorusClient) GetReplication(ctx context.Context, in *ReplicationReques
 	return out, nil
 }
 
-func (c *chorusClient) StartConsistencyCheck(ctx context.Context, in *ConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *chorusClient) StartConsistencyCheck(ctx context.Context, in *StartConsistencyCheckRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Chorus_StartConsistencyCheck_FullMethodName, in, out, cOpts...)
@@ -460,7 +460,7 @@ type ChorusServer interface {
 	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
 	AddBucketReplication(context.Context, *AddBucketReplicationRequest) (*emptypb.Empty, error)
 	GetReplication(context.Context, *ReplicationRequest) (*Replication, error)
-	StartConsistencyCheck(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error)
+	StartConsistencyCheck(context.Context, *StartConsistencyCheckRequest) (*emptypb.Empty, error)
 	ListConsistencyChecks(context.Context, *emptypb.Empty) (*ListConsistencyChecksResponse, error)
 	GetConsistencyCheckReport(context.Context, *ConsistencyCheckRequest) (*GetConsistencyCheckReportResponse, error)
 	GetConsistencyCheckReportEntries(context.Context, *GetConsistencyCheckReportEntriesRequest) (*GetConsistencyCheckReportEntriesResponse, error)
@@ -537,7 +537,7 @@ func (UnimplementedChorusServer) AddBucketReplication(context.Context, *AddBucke
 func (UnimplementedChorusServer) GetReplication(context.Context, *ReplicationRequest) (*Replication, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetReplication not implemented")
 }
-func (UnimplementedChorusServer) StartConsistencyCheck(context.Context, *ConsistencyCheckRequest) (*emptypb.Empty, error) {
+func (UnimplementedChorusServer) StartConsistencyCheck(context.Context, *StartConsistencyCheckRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartConsistencyCheck not implemented")
 }
 func (UnimplementedChorusServer) ListConsistencyChecks(context.Context, *emptypb.Empty) (*ListConsistencyChecksResponse, error) {
@@ -944,7 +944,7 @@ func _Chorus_GetReplication_Handler(srv interface{}, ctx context.Context, dec fu
 }
 
 func _Chorus_StartConsistencyCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ConsistencyCheckRequest)
+	in := new(StartConsistencyCheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -956,7 +956,7 @@ func _Chorus_StartConsistencyCheck_Handler(srv interface{}, ctx context.Context,
 		FullMethod: Chorus_StartConsistencyCheck_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChorusServer).StartConsistencyCheck(ctx, req.(*ConsistencyCheckRequest))
+		return srv.(ChorusServer).StartConsistencyCheck(ctx, req.(*StartConsistencyCheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

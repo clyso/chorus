@@ -37,10 +37,9 @@ const (
 	TypeMigrateObjectListVersions = "migrate:object:list_versions"
 	TypeMigrateVersionedObject    = "migrate:object:copy_versioned"
 
-	TypeConsistencyCheck          = "consistency"
-	TypeConsistencyCheckList      = "consistency:list"
-	TypeConsistencyCheckReadiness = "consistency:readiness"
-	TypeConsistencyCheckResult    = "consistency:result"
+	TypeConsistencyCheck             = "consistency"
+	TypeConsistencyCheckListObjects  = "consistency:list_objects"
+	TypeConsistencyCheckListVersions = "consistency:list_versions"
 
 	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
@@ -61,9 +60,8 @@ type TaskPayload interface {
 		ZeroDowntimeReplicationSwitchPayload |
 		SwitchWithDowntimePayload |
 		ConsistencyCheckPayload |
-		ConsistencyCheckListPayload |
-		ConsistencyCheckReadinessPayload |
-		ConsistencyCheckDeletePayload
+		ConsistencyCheckListObjectsPayload |
+		ConsistencyCheckListVersionsPayload
 }
 
 type ReplicationTask interface {
@@ -176,25 +174,24 @@ type ObjPayload struct {
 type MigrateLocation struct {
 	Storage string
 	Bucket  string
-	User    string
 }
 
 type ConsistencyCheckPayload struct {
-	ID        string
 	Locations []MigrateLocation
+	User      string
 }
 
-type ConsistencyCheckListPayload struct {
-	MigrateLocation
-	Prefix       string
-	ID           string
-	StorageCount uint8
+type ConsistencyCheckListObjectsPayload struct {
+	Locations []MigrateLocation
+	User      string
+	Index     int
+	Prefix    string
+	Versioned bool
 }
 
-type ConsistencyCheckReadinessPayload struct {
-	ID string
-}
-
-type ConsistencyCheckDeletePayload struct {
-	ID string
+type ConsistencyCheckListVersionsPayload struct {
+	Locations []MigrateLocation
+	User      string
+	Index     int
+	Prefix    string
 }

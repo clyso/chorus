@@ -145,7 +145,7 @@
             "in": "query",
             "required": false,
             "type": "string",
-            "format": "int64"
+            "format": "uint64"
           }
         ],
         "tags": [
@@ -177,7 +177,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusConsistencyCheckRequest"
+              "$ref": "#/definitions/chorusStartConsistencyCheckRequest"
             }
           }
         ],
@@ -947,10 +947,11 @@
         "etag": {
           "type": "string"
         },
-        "storages": {
+        "storageEntries": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "$ref": "#/definitions/chorusConsistencyCheckStorageEntry"
           }
         }
       }
@@ -964,6 +965,17 @@
             "type": "object",
             "$ref": "#/definitions/chorusMigrateLocation"
           }
+        }
+      }
+    },
+    "chorusConsistencyCheckStorageEntry": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
         }
       }
     },
@@ -1215,9 +1227,6 @@
         },
         "bucket": {
           "type": "string"
-        },
-        "user": {
-          "type": "string"
         }
       }
     },
@@ -1318,6 +1327,21 @@
           "type": "string"
         },
         "toBucket": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusStartConsistencyCheckRequest": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        },
+        "user": {
           "type": "string"
         }
       }

@@ -39,8 +39,8 @@ var _ = Describe("Tree generation", func() {
 		tree2, err := treeGen2.Generate()
 		Expect(err).NotTo(HaveOccurred())
 
-		depthIter1 := tree1.DepthFirstIterator()
-		depthIter2 := tree2.DepthFirstIterator()
+		depthIter1 := tree1.DepthFirstValueIterator()
+		depthIter2 := tree2.DepthFirstValueIterator()
 
 		for depthIter1.HasNext() {
 			item1, err := depthIter1.Next()
@@ -98,7 +98,7 @@ var _ = Describe("Tree generation", func() {
 		tree, err := treeGen.Generate()
 		Expect(err).NotTo(HaveOccurred())
 
-		for item := range tree.DepthFirstIterator().Must() {
+		for item := range tree.DepthFirstValueIterator().Must() {
 			for i := uint64(0); i < item.versionCount; i++ {
 				reader1 := item.GetVersionContentReader(i)
 				reader2 := item.GetVersionContentReader(i)
@@ -129,10 +129,10 @@ var _ = Describe("Tree generation", func() {
 		tree, err := treeGen.Generate()
 		Expect(err).NotTo(HaveOccurred())
 
-		depthIter := tree.DepthFirstIterator()
+		depthIter := tree.DepthFirstValueIterator()
 		depthCollection := slices.Collect(depthIter.Must())
 
-		widthIter := tree.WidthFirstIterator()
+		widthIter := tree.WidthFirstValueIterator()
 		widthCollection := slices.Collect(widthIter.Must())
 
 		sortFunc := func(a, b *GeneratedS3Object) int {

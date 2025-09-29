@@ -52,7 +52,6 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 			locations = append(locations, &pb.MigrateLocation{
 				Storage: storage,
 				Bucket:  bucket,
-				User:    consistencyCheckUser,
 			})
 		}
 
@@ -88,7 +87,7 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 		w = tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 		fmt.Fprintln(w, api.ConsistencyCheckReportHeader(storages))
 
-		pageSize := int64(10)
+		pageSize := uint64(10)
 		cursor := uint64(0)
 
 		for {

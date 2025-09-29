@@ -28,6 +28,23 @@ const (
 	CWildcardSelector  = "*"
 )
 
+var (
+	luaUnlinkKeys = redis.NewScript(`local cursor = "0"
+local keys = {}
+repeat
+	local result = redis.call("SCAN", cursor, "MATCH", KEYS[1], "COUNT", 100)
+	cursor = result[1]
+	local page = result[2]
+	for _, key in ipairs(page) do
+		table.insert(keys, key)
+	end
+until cursor == "0"
+if #keys > 0 then
+	return redis.call('UNLINK', unpack(keys))
+end
+return 0`)
+)
+
 type ErrorCollector func() error
 
 type ValueCollector[V any] func() (V, error)
@@ -292,6 +309,48 @@ func (r *RedisIDCommonStore[ID]) GetIDsOp(ctx context.Context, pager Pager, keyP
 
 func (r *RedisIDCommonStore[ID]) GetIDs(ctx context.Context, pager Pager, keyParts ...string) (Page[ID], error) {
 	return r.GetIDsOp(ctx, pager, keyParts...).Get()
+}
+
+func (r *RedisIDCommonStore[ID]) HasIDsOp(ctx context.Context, keyParts ...string) OperationResult[bool] {
+	selector := r.MakeWildcardSelector(keyParts...)
+	// with count value set to low values client returns empty key set and cursor greater than zero,
+	// regardless of key count in database; default value is 10
+	cmd := r.client.Scan(ctx, 0, selector, 0)
+
+	collectFunc := func() (bool, error) {
+		keys, _, err := cmd.Result()
+		if err != nil {
+			return false, fmt.Errorf("unable to scan keys: %w", err)
+		}
+
+		return len(keys) > 0, nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDCommonStore[ID]) HasIDs(ctx context.Context, keyParts ...string) (bool, error) {
+	return r.HasIDsOp(ctx, keyParts...).Get()
+}
+
+func (r *RedisIDCommonStore[ID]) DropIDsOp(ctx context.Context, keyParts ...string) OperationResult[uint64] {
+	selector := r.MakeWildcardSelector(keyParts...)
+
+	cmd := luaUnlinkKeys.Eval(ctx, r.client, []string{selector})
+
+	collectFunc := func() (uint64, error) {
+		affected, err := cmd.Uint64()
+		if err != nil {
+			return 0, fmt.Errorf("unable to execute script: %w", err)
+		}
+		return uint64(affected), nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDCommonStore[ID]) DropIDs(ctx context.Context, keyParts ...string) (uint64, error) {
+	return r.DropIDsOp(ctx, keyParts...).Get()
 }
 
 func (r *RedisIDCommonStore[ID]) DropOp(ctx context.Context, id ID) OperationResult[uint64] {

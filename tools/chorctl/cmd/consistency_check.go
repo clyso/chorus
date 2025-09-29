@@ -54,7 +54,6 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
 			locations = append(locations, &pb.MigrateLocation{
 				Storage: storage,
 				Bucket:  bucket,
-				User:    consistencyCheckUser,
 			})
 		}
 
@@ -65,7 +64,7 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
 		defer conn.Close()
 
 		client := pb.NewChorusClient(conn)
-		if _, err = client.StartConsistencyCheck(ctx, &pb.ConsistencyCheckRequest{Locations: locations}); err != nil {
+		if _, err = client.StartConsistencyCheck(ctx, &pb.StartConsistencyCheckRequest{Locations: locations, User: consistencyCheckUser}); err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}
 		fmt.Println("Consistency check has been created.")
