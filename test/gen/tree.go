@@ -34,24 +34,28 @@ var (
 
 type TreeNodeType int
 
-type WidthFirstTreeIterator[T any] struct {
+type WidthFirstTreeNodeIterator[T any] struct {
 	queue *Queue[*TreeNode[T]]
 }
 
-func (r *WidthFirstTreeIterator[T]) HasNext() bool {
+func (r *WidthFirstTreeNodeIterator[T]) HasNext() bool {
 	return !r.queue.Empty()
 }
 
-func (r *WidthFirstTreeIterator[T]) Next() (T, error) {
+func (r *WidthFirstTreeNodeIterator[T]) Next() (*TreeNode[T], error) {
 	if r.queue.Empty() {
-		var noVal T
-		return noVal, ErrEmptyIterator
+		// var noVal T
+		return nil, ErrEmptyIterator
 	}
 
 	currentNode, err := r.queue.Dequeue()
 	if err != nil {
-		var noVal T
-		return noVal, fmt.Errorf("unable to get next node from queue: %w", err)
+		// var noVal T
+		return nil, fmt.Errorf("unable to get next node from queue: %w", err)
+	}
+
+	if currentNode == nil {
+		return nil, errors.New("queue returned nil value")
 	}
 
 	nextNode := currentNode.leftChild
@@ -60,11 +64,11 @@ func (r *WidthFirstTreeIterator[T]) Next() (T, error) {
 		nextNode = nextNode.rightNeighbour
 	}
 
-	return currentNode.data, nil
+	return currentNode, nil
 }
 
-func (r *WidthFirstTreeIterator[T]) Must() iter.Seq[T] {
-	return func(yield func(T) bool) {
+func (r *WidthFirstTreeNodeIterator[T]) Must() iter.Seq[*TreeNode[T]] {
+	return func(yield func(*TreeNode[T]) bool) {
 		for r.HasNext() {
 			next, err := r.Next()
 			if err != nil {
@@ -77,24 +81,54 @@ func (r *WidthFirstTreeIterator[T]) Must() iter.Seq[T] {
 	}
 }
 
-type DepthFirstTreeIterator[T any] struct {
+type WidthFirstTreeValueIterator[T any] struct {
+	WidthFirstTreeNodeIterator[T]
+}
+
+func (r *WidthFirstTreeValueIterator[T]) Next() (T, error) {
+	next, err := r.WidthFirstTreeNodeIterator.Next()
+	if err != nil {
+		var noVal T
+		return noVal, err
+	}
+
+	return next.data, nil
+}
+
+func (r *WidthFirstTreeValueIterator[T]) Must() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for r.WidthFirstTreeNodeIterator.HasNext() {
+			next, err := r.Next()
+			if err != nil {
+				panic(err)
+			}
+			if !yield(next) {
+				return
+			}
+		}
+	}
+}
+
+type DepthFirstTreeNodeIterator[T any] struct {
 	stack *Stack[*TreeNode[T]]
 }
 
-func (r *DepthFirstTreeIterator[T]) HasNext() bool {
+func (r *DepthFirstTreeNodeIterator[T]) HasNext() bool {
 	return !r.stack.Empty()
 }
 
-func (r *DepthFirstTreeIterator[T]) Next() (T, error) {
+func (r *DepthFirstTreeNodeIterator[T]) Next() (*TreeNode[T], error) {
 	if r.stack.Empty() {
-		var noVal T
-		return noVal, ErrEmptyIterator
+		return nil, ErrEmptyIterator
 	}
 
 	currentNode, err := r.stack.Pop()
 	if err != nil {
-		var noVal T
-		return noVal, fmt.Errorf("unable to get next node from stack: %w", err)
+		return nil, fmt.Errorf("unable to get next node from stack: %w", err)
+	}
+
+	if currentNode == nil {
+		return nil, errors.New("stack returned nil value")
 	}
 
 	nextNode := currentNode.leftChild
@@ -103,10 +137,38 @@ func (r *DepthFirstTreeIterator[T]) Next() (T, error) {
 		nextNode = nextNode.rightNeighbour
 	}
 
-	return currentNode.data, nil
+	return currentNode, nil
 }
 
-func (r *DepthFirstTreeIterator[T]) Must() iter.Seq[T] {
+func (r *DepthFirstTreeNodeIterator[T]) Must() iter.Seq[*TreeNode[T]] {
+	return func(yield func(*TreeNode[T]) bool) {
+		for r.HasNext() {
+			next, err := r.Next()
+			if err != nil {
+				panic(err)
+			}
+			if !yield(next) {
+				return
+			}
+		}
+	}
+}
+
+type DepthFirstTreeValueIterator[T any] struct {
+	DepthFirstTreeNodeIterator[T]
+}
+
+func (r *DepthFirstTreeValueIterator[T]) Next() (T, error) {
+	next, err := r.DepthFirstTreeNodeIterator.Next()
+	if err != nil {
+		var noVal T
+		return noVal, err
+	}
+
+	return next.data, nil
+}
+
+func (r *DepthFirstTreeValueIterator[T]) Must() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for r.HasNext() {
 			next, err := r.Next()
@@ -126,27 +188,61 @@ type TreeNode[T any] struct {
 	leftChild      *TreeNode[T]
 }
 
+func (r *TreeNode[T]) Data() T {
+	return r.data
+}
+
 type Tree[T any] struct {
 	root *TreeNode[T]
 }
 
-func (r *Tree[T]) DepthFirstIterator() *DepthFirstTreeIterator[T] {
+func NewTree[T any](root *TreeNode[T]) *Tree[T] {
+	return &Tree[T]{
+		root: root,
+	}
+}
+
+func (r *Tree[T]) DepthFirstNodeIterator() *DepthFirstTreeNodeIterator[T] {
 	stack := NewStack[*TreeNode[T]]()
 	if r.root != nil {
 		stack.Push(r.root)
 	}
-	return &DepthFirstTreeIterator[T]{
+	return &DepthFirstTreeNodeIterator[T]{
 		stack: stack,
 	}
 }
 
-func (r *Tree[T]) WidthFirstIterator() *WidthFirstTreeIterator[T] {
+func (r *Tree[T]) WidthFirstNodeIterator() *WidthFirstTreeNodeIterator[T] {
 	queue := NewQueue[*TreeNode[T]]()
 	if r.root != nil {
 		queue.Enqueue(r.root)
 	}
-	return &WidthFirstTreeIterator[T]{
+	return &WidthFirstTreeNodeIterator[T]{
 		queue: queue,
+	}
+}
+
+func (r *Tree[T]) DepthFirstValueIterator() *DepthFirstTreeValueIterator[T] {
+	stack := NewStack[*TreeNode[T]]()
+	if r.root != nil {
+		stack.Push(r.root)
+	}
+	return &DepthFirstTreeValueIterator[T]{
+		DepthFirstTreeNodeIterator: DepthFirstTreeNodeIterator[T]{
+			stack: stack,
+		},
+	}
+}
+
+func (r *Tree[T]) WidthFirstValueIterator() *WidthFirstTreeValueIterator[T] {
+	queue := NewQueue[*TreeNode[T]]()
+	if r.root != nil {
+		queue.Enqueue(r.root)
+	}
+	return &WidthFirstTreeValueIterator[T]{
+		WidthFirstTreeNodeIterator: WidthFirstTreeNodeIterator[T]{
+			queue: queue,
+		},
 	}
 }
 
@@ -167,6 +263,21 @@ func (r *DummyObjectGenerator[T]) Generate(_ *Rnd, _ TreeNodeType, _ T) (T, erro
 
 type TreeGeneratorOption[T any] interface {
 	apply(*TreeGenerator[T])
+}
+
+type TreeGeneratorWithRndOption[T any] struct {
+	rnd *Rnd
+}
+
+func WithRnd[T any](rnd *Rnd) TreeGeneratorOption[T] {
+	return &TreeGeneratorWithRndOption[T]{
+		rnd: rnd,
+	}
+}
+
+//nolint:unused // detected as unused, but it is used in tree generator
+func (r *TreeGeneratorWithRndOption[T]) apply(gen *TreeGenerator[T]) {
+	gen.rnd = r.rnd
 }
 
 type TreeGeneratorWithRandomSeedOption[T any] struct {
@@ -342,9 +453,7 @@ func (r *TreeGenerator[T]) Generate() (*Tree[T], error) {
 		generationTask.node.leftChild = prevChild
 	}
 
-	return &Tree[T]{
-		root: rootNode,
-	}, nil
+	return NewTree(rootNode), nil
 }
 
 func (r *TreeGenerator[T]) setDefaults() error {
@@ -372,4 +481,91 @@ func (r *TreeGenerator[T]) setDefaults() error {
 		r.rnd = NewRnd(int64(binary.NativeEndian.Uint64(seed[:])))
 	}
 	return nil
+}
+
+type TreeRandomElementPicker[T any] struct {
+	root   *TreeNode[T]
+	joints []*TreeNode[T]
+	leafs  []*TreeNode[T]
+	rnd    *Rnd
+}
+
+func NewTreeRandomElementPicker[T any](tree *Tree[T], rnd *Rnd) *TreeRandomElementPicker[T] {
+	picker := &TreeRandomElementPicker[T]{
+		root:   tree.root,
+		joints: []*TreeNode[T]{},
+		leafs:  []*TreeNode[T]{},
+		rnd:    rnd,
+	}
+
+	if tree.root == nil || tree.root.leftChild == nil {
+		return picker
+	}
+
+	rootlessTree := NewTree(tree.root.leftChild)
+
+	for node := range rootlessTree.DepthFirstNodeIterator().Must() {
+		if node.leftChild == nil {
+			picker.leafs = append(picker.leafs, node)
+		} else {
+			picker.joints = append(picker.joints, node)
+		}
+	}
+
+	return picker
+}
+
+func (r *TreeRandomElementPicker[T]) RootNode() *TreeNode[T] {
+	return r.root
+}
+
+func (r *TreeRandomElementPicker[T]) RootValue() T {
+	return r.root.data
+}
+
+func (r *TreeRandomElementPicker[T]) RandomJointSubtree() *Tree[T] {
+	node := r.randomNode(r.joints)
+	if node == nil {
+		return nil
+	}
+	return NewTree(node)
+}
+
+func (r *TreeRandomElementPicker[T]) RandomJointNode() *TreeNode[T] {
+	node := r.randomNode(r.joints)
+	return node
+}
+
+func (r *TreeRandomElementPicker[T]) RandomJointValue() T {
+	node := r.randomNode(r.joints)
+	if node == nil {
+		var noVal T
+		return noVal
+	}
+	return node.data
+}
+
+func (r *TreeRandomElementPicker[T]) RandomLeafNode() *TreeNode[T] {
+	node := r.randomNode(r.leafs)
+	return node
+}
+
+func (r *TreeRandomElementPicker[T]) RandomLeafValue() T {
+	node := r.randomNode(r.leafs)
+	if node == nil {
+		var noVal T
+		return noVal
+	}
+	return node.data
+}
+
+func (r *TreeRandomElementPicker[T]) randomNode(collection []*TreeNode[T]) *TreeNode[T] {
+	if len(collection) == 0 {
+		return nil
+	}
+	if len(collection) == 1 {
+		return collection[0]
+	}
+	idx := r.rnd.IntInRange(0, len(r.joints)-1)
+	return collection[idx]
 }

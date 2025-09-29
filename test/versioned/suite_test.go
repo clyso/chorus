@@ -59,11 +59,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	CTestGenSeed    = 811509576612567777
-	CUseTestGenSeed = true
-)
-
 var (
 	testCtx           context.Context
 	testCtxCancelFunc context.CancelFunc
@@ -85,8 +80,8 @@ var _ = BeforeSuite(func() {
 	genOpts := []gen.TreeGeneratorOption[*gen.GeneratedS3Object]{
 		gen.WithObjectGenerator[*gen.GeneratedS3Object](objGen),
 	}
-	if CUseTestGenSeed {
-		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedS3Object](CTestGenSeed))
+	if gen.CUseTestGenSeed {
+		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedS3Object](gen.CTestGenSeed))
 	} else {
 		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedS3Object](GinkgoRandomSeed()))
 	}
@@ -350,7 +345,7 @@ var _ = Describe("Minio versioned migration", func() {
 			return resp.Replications[0].IsInitDone
 		}, 60*time.Second, time.Second).Should(BeTrue())
 
-		for treeObject := range testTree.DepthFirstIterator().Must() {
+		for treeObject := range testTree.DepthFirstValueIterator().Must() {
 			srcObjectList := testMinioSrcUserClient.ListObjects(ctx, CMinioSrcBucket, minio.ListObjectsOptions{
 				WithVersions: true,
 				Prefix:       treeObject.GetFullPath(),
@@ -659,7 +654,7 @@ var _ = Describe("Ceph versioned migration", func() {
 			return resp.Replications[0].IsInitDone
 		}, 60*time.Second, time.Second).Should(BeTrue())
 
-		for treeObject := range testTree.DepthFirstIterator().Must() {
+		for treeObject := range testTree.DepthFirstValueIterator().Must() {
 			if treeObject.GetVersionCount() == 0 || treeObject.GetVersionCount() == 1 && treeObject.GetContentReader().Len() == 0 {
 				continue
 			}

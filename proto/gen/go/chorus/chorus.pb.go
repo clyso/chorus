@@ -85,7 +85,7 @@ func (x Storage_Provider) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Storage_Provider.Descriptor instead.
 func (Storage_Provider) EnumDescriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{11, 0}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{13, 0}
 }
 
 type GetBucketSwitchStatusResponse_Status int32
@@ -155,14 +155,13 @@ func (x GetBucketSwitchStatusResponse_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GetBucketSwitchStatusResponse_Status.Descriptor instead.
 func (GetBucketSwitchStatusResponse_Status) EnumDescriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{31, 0}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{33, 0}
 }
 
 type MigrateLocation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
 	Bucket        string                 `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
-	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -211,7 +210,52 @@ func (x *MigrateLocation) GetBucket() string {
 	return ""
 }
 
-func (x *MigrateLocation) GetUser() string {
+type StartConsistencyCheckRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Locations     []*MigrateLocation     `protobuf:"bytes,1,rep,name=locations,proto3" json:"locations,omitempty"`
+	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartConsistencyCheckRequest) Reset() {
+	*x = StartConsistencyCheckRequest{}
+	mi := &file_chorus_chorus_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartConsistencyCheckRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartConsistencyCheckRequest) ProtoMessage() {}
+
+func (x *StartConsistencyCheckRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartConsistencyCheckRequest.ProtoReflect.Descriptor instead.
+func (*StartConsistencyCheckRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *StartConsistencyCheckRequest) GetLocations() []*MigrateLocation {
+	if x != nil {
+		return x.Locations
+	}
+	return nil
+}
+
+func (x *StartConsistencyCheckRequest) GetUser() string {
 	if x != nil {
 		return x.User
 	}
@@ -227,7 +271,7 @@ type ConsistencyCheckRequest struct {
 
 func (x *ConsistencyCheckRequest) Reset() {
 	*x = ConsistencyCheckRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[1]
+	mi := &file_chorus_chorus_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +283,7 @@ func (x *ConsistencyCheckRequest) String() string {
 func (*ConsistencyCheckRequest) ProtoMessage() {}
 
 func (x *ConsistencyCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[1]
+	mi := &file_chorus_chorus_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +296,7 @@ func (x *ConsistencyCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsistencyCheckRequest.ProtoReflect.Descriptor instead.
 func (*ConsistencyCheckRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{1}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ConsistencyCheckRequest) GetLocations() []*MigrateLocation {
@@ -276,7 +320,7 @@ type ConsistencyCheck struct {
 
 func (x *ConsistencyCheck) Reset() {
 	*x = ConsistencyCheck{}
-	mi := &file_chorus_chorus_proto_msgTypes[2]
+	mi := &file_chorus_chorus_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -288,7 +332,7 @@ func (x *ConsistencyCheck) String() string {
 func (*ConsistencyCheck) ProtoMessage() {}
 
 func (x *ConsistencyCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[2]
+	mi := &file_chorus_chorus_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -301,7 +345,7 @@ func (x *ConsistencyCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsistencyCheck.ProtoReflect.Descriptor instead.
 func (*ConsistencyCheck) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{2}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ConsistencyCheck) GetId() string {
@@ -355,7 +399,7 @@ type ListConsistencyChecksResponse struct {
 
 func (x *ListConsistencyChecksResponse) Reset() {
 	*x = ListConsistencyChecksResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[3]
+	mi := &file_chorus_chorus_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +411,7 @@ func (x *ListConsistencyChecksResponse) String() string {
 func (*ListConsistencyChecksResponse) ProtoMessage() {}
 
 func (x *ListConsistencyChecksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[3]
+	mi := &file_chorus_chorus_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +424,7 @@ func (x *ListConsistencyChecksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConsistencyChecksResponse.ProtoReflect.Descriptor instead.
 func (*ListConsistencyChecksResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{3}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListConsistencyChecksResponse) GetChecks() []*ConsistencyCheck {
@@ -399,7 +443,7 @@ type GetConsistencyCheckReportRequest struct {
 
 func (x *GetConsistencyCheckReportRequest) Reset() {
 	*x = GetConsistencyCheckReportRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[4]
+	mi := &file_chorus_chorus_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -411,7 +455,7 @@ func (x *GetConsistencyCheckReportRequest) String() string {
 func (*GetConsistencyCheckReportRequest) ProtoMessage() {}
 
 func (x *GetConsistencyCheckReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[4]
+	mi := &file_chorus_chorus_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -424,7 +468,7 @@ func (x *GetConsistencyCheckReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConsistencyCheckReportRequest.ProtoReflect.Descriptor instead.
 func (*GetConsistencyCheckReportRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{4}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetConsistencyCheckReportRequest) GetLocations() []*MigrateLocation {
@@ -443,7 +487,7 @@ type GetConsistencyCheckReportResponse struct {
 
 func (x *GetConsistencyCheckReportResponse) Reset() {
 	*x = GetConsistencyCheckReportResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[5]
+	mi := &file_chorus_chorus_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +499,7 @@ func (x *GetConsistencyCheckReportResponse) String() string {
 func (*GetConsistencyCheckReportResponse) ProtoMessage() {}
 
 func (x *GetConsistencyCheckReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[5]
+	mi := &file_chorus_chorus_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +512,7 @@ func (x *GetConsistencyCheckReportResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetConsistencyCheckReportResponse.ProtoReflect.Descriptor instead.
 func (*GetConsistencyCheckReportResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{5}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetConsistencyCheckReportResponse) GetCheck() *ConsistencyCheck {
@@ -478,18 +522,70 @@ func (x *GetConsistencyCheckReportResponse) GetCheck() *ConsistencyCheck {
 	return nil
 }
 
-type ConsistencyCheckReportEntry struct {
+type ConsistencyCheckStorageEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Object        string                 `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
-	Etag          string                 `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
-	Storages      []string               `protobuf:"bytes,3,rep,name=storages,proto3" json:"storages,omitempty"`
+	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=versionId,proto3" json:"versionId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *ConsistencyCheckStorageEntry) Reset() {
+	*x = ConsistencyCheckStorageEntry{}
+	mi := &file_chorus_chorus_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsistencyCheckStorageEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsistencyCheckStorageEntry) ProtoMessage() {}
+
+func (x *ConsistencyCheckStorageEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsistencyCheckStorageEntry.ProtoReflect.Descriptor instead.
+func (*ConsistencyCheckStorageEntry) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ConsistencyCheckStorageEntry) GetStorage() string {
+	if x != nil {
+		return x.Storage
+	}
+	return ""
+}
+
+func (x *ConsistencyCheckStorageEntry) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+type ConsistencyCheckReportEntry struct {
+	state          protoimpl.MessageState          `protogen:"open.v1"`
+	Object         string                          `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
+	Etag           string                          `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	StorageEntries []*ConsistencyCheckStorageEntry `protobuf:"bytes,3,rep,name=storageEntries,proto3" json:"storageEntries,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
 func (x *ConsistencyCheckReportEntry) Reset() {
 	*x = ConsistencyCheckReportEntry{}
-	mi := &file_chorus_chorus_proto_msgTypes[6]
+	mi := &file_chorus_chorus_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -501,7 +597,7 @@ func (x *ConsistencyCheckReportEntry) String() string {
 func (*ConsistencyCheckReportEntry) ProtoMessage() {}
 
 func (x *ConsistencyCheckReportEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[6]
+	mi := &file_chorus_chorus_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -514,7 +610,7 @@ func (x *ConsistencyCheckReportEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsistencyCheckReportEntry.ProtoReflect.Descriptor instead.
 func (*ConsistencyCheckReportEntry) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{6}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ConsistencyCheckReportEntry) GetObject() string {
@@ -531,9 +627,9 @@ func (x *ConsistencyCheckReportEntry) GetEtag() string {
 	return ""
 }
 
-func (x *ConsistencyCheckReportEntry) GetStorages() []string {
+func (x *ConsistencyCheckReportEntry) GetStorageEntries() []*ConsistencyCheckStorageEntry {
 	if x != nil {
-		return x.Storages
+		return x.StorageEntries
 	}
 	return nil
 }
@@ -542,14 +638,14 @@ type GetConsistencyCheckReportEntriesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Locations     []*MigrateLocation     `protobuf:"bytes,1,rep,name=locations,proto3" json:"locations,omitempty"`
 	Cursor        uint64                 `protobuf:"varint,2,opt,name=Cursor,proto3" json:"Cursor,omitempty"`
-	PageSize      int64                  `protobuf:"varint,3,opt,name=PageSize,proto3" json:"PageSize,omitempty"`
+	PageSize      uint64                 `protobuf:"varint,3,opt,name=PageSize,proto3" json:"PageSize,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetConsistencyCheckReportEntriesRequest) Reset() {
 	*x = GetConsistencyCheckReportEntriesRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[7]
+	mi := &file_chorus_chorus_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -561,7 +657,7 @@ func (x *GetConsistencyCheckReportEntriesRequest) String() string {
 func (*GetConsistencyCheckReportEntriesRequest) ProtoMessage() {}
 
 func (x *GetConsistencyCheckReportEntriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[7]
+	mi := &file_chorus_chorus_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -574,7 +670,7 @@ func (x *GetConsistencyCheckReportEntriesRequest) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use GetConsistencyCheckReportEntriesRequest.ProtoReflect.Descriptor instead.
 func (*GetConsistencyCheckReportEntriesRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{7}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetConsistencyCheckReportEntriesRequest) GetLocations() []*MigrateLocation {
@@ -591,7 +687,7 @@ func (x *GetConsistencyCheckReportEntriesRequest) GetCursor() uint64 {
 	return 0
 }
 
-func (x *GetConsistencyCheckReportEntriesRequest) GetPageSize() int64 {
+func (x *GetConsistencyCheckReportEntriesRequest) GetPageSize() uint64 {
 	if x != nil {
 		return x.PageSize
 	}
@@ -608,7 +704,7 @@ type GetConsistencyCheckReportEntriesResponse struct {
 
 func (x *GetConsistencyCheckReportEntriesResponse) Reset() {
 	*x = GetConsistencyCheckReportEntriesResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[8]
+	mi := &file_chorus_chorus_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -620,7 +716,7 @@ func (x *GetConsistencyCheckReportEntriesResponse) String() string {
 func (*GetConsistencyCheckReportEntriesResponse) ProtoMessage() {}
 
 func (x *GetConsistencyCheckReportEntriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[8]
+	mi := &file_chorus_chorus_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -633,7 +729,7 @@ func (x *GetConsistencyCheckReportEntriesResponse) ProtoReflect() protoreflect.M
 
 // Deprecated: Use GetConsistencyCheckReportEntriesResponse.ProtoReflect.Descriptor instead.
 func (*GetConsistencyCheckReportEntriesResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{8}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetConsistencyCheckReportEntriesResponse) GetEntries() []*ConsistencyCheckReportEntry {
@@ -661,7 +757,7 @@ type GetAppVersionResponse struct {
 
 func (x *GetAppVersionResponse) Reset() {
 	*x = GetAppVersionResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[9]
+	mi := &file_chorus_chorus_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -673,7 +769,7 @@ func (x *GetAppVersionResponse) String() string {
 func (*GetAppVersionResponse) ProtoMessage() {}
 
 func (x *GetAppVersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[9]
+	mi := &file_chorus_chorus_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -686,7 +782,7 @@ func (x *GetAppVersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAppVersionResponse.ProtoReflect.Descriptor instead.
 func (*GetAppVersionResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{9}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetAppVersionResponse) GetVersion() string {
@@ -719,7 +815,7 @@ type GetStoragesResponse struct {
 
 func (x *GetStoragesResponse) Reset() {
 	*x = GetStoragesResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[10]
+	mi := &file_chorus_chorus_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +827,7 @@ func (x *GetStoragesResponse) String() string {
 func (*GetStoragesResponse) ProtoMessage() {}
 
 func (x *GetStoragesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[10]
+	mi := &file_chorus_chorus_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +840,7 @@ func (x *GetStoragesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStoragesResponse.ProtoReflect.Descriptor instead.
 func (*GetStoragesResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{10}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetStoragesResponse) GetStorages() []*Storage {
@@ -771,7 +867,7 @@ type Storage struct {
 
 func (x *Storage) Reset() {
 	*x = Storage{}
-	mi := &file_chorus_chorus_proto_msgTypes[11]
+	mi := &file_chorus_chorus_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -783,7 +879,7 @@ func (x *Storage) String() string {
 func (*Storage) ProtoMessage() {}
 
 func (x *Storage) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[11]
+	mi := &file_chorus_chorus_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -796,7 +892,7 @@ func (x *Storage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Storage.ProtoReflect.Descriptor instead.
 func (*Storage) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{11}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Storage) GetName() string {
@@ -845,7 +941,7 @@ type Credential struct {
 
 func (x *Credential) Reset() {
 	*x = Credential{}
-	mi := &file_chorus_chorus_proto_msgTypes[12]
+	mi := &file_chorus_chorus_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -857,7 +953,7 @@ func (x *Credential) String() string {
 func (*Credential) ProtoMessage() {}
 
 func (x *Credential) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[12]
+	mi := &file_chorus_chorus_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -870,7 +966,7 @@ func (x *Credential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Credential.ProtoReflect.Descriptor instead.
 func (*Credential) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{12}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Credential) GetAlias() string {
@@ -904,7 +1000,7 @@ type GetProxyCredentialsResponse struct {
 
 func (x *GetProxyCredentialsResponse) Reset() {
 	*x = GetProxyCredentialsResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[13]
+	mi := &file_chorus_chorus_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -916,7 +1012,7 @@ func (x *GetProxyCredentialsResponse) String() string {
 func (*GetProxyCredentialsResponse) ProtoMessage() {}
 
 func (x *GetProxyCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[13]
+	mi := &file_chorus_chorus_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -929,7 +1025,7 @@ func (x *GetProxyCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProxyCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*GetProxyCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{13}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetProxyCredentialsResponse) GetAddress() string {
@@ -961,7 +1057,7 @@ type AddReplicationRequest struct {
 
 func (x *AddReplicationRequest) Reset() {
 	*x = AddReplicationRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[14]
+	mi := &file_chorus_chorus_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +1069,7 @@ func (x *AddReplicationRequest) String() string {
 func (*AddReplicationRequest) ProtoMessage() {}
 
 func (x *AddReplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[14]
+	mi := &file_chorus_chorus_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +1082,7 @@ func (x *AddReplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddReplicationRequest.ProtoReflect.Descriptor instead.
 func (*AddReplicationRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{14}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AddReplicationRequest) GetUser() string {
@@ -1058,7 +1154,7 @@ type AddBucketReplicationRequest struct {
 
 func (x *AddBucketReplicationRequest) Reset() {
 	*x = AddBucketReplicationRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[15]
+	mi := &file_chorus_chorus_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1070,7 +1166,7 @@ func (x *AddBucketReplicationRequest) String() string {
 func (*AddBucketReplicationRequest) ProtoMessage() {}
 
 func (x *AddBucketReplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[15]
+	mi := &file_chorus_chorus_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1083,7 +1179,7 @@ func (x *AddBucketReplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddBucketReplicationRequest.ProtoReflect.Descriptor instead.
 func (*AddBucketReplicationRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{15}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AddBucketReplicationRequest) GetUser() string {
@@ -1140,7 +1236,7 @@ type ListBucketsForReplicationRequest struct {
 
 func (x *ListBucketsForReplicationRequest) Reset() {
 	*x = ListBucketsForReplicationRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[16]
+	mi := &file_chorus_chorus_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1152,7 +1248,7 @@ func (x *ListBucketsForReplicationRequest) String() string {
 func (*ListBucketsForReplicationRequest) ProtoMessage() {}
 
 func (x *ListBucketsForReplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[16]
+	mi := &file_chorus_chorus_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1165,7 +1261,7 @@ func (x *ListBucketsForReplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBucketsForReplicationRequest.ProtoReflect.Descriptor instead.
 func (*ListBucketsForReplicationRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{16}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListBucketsForReplicationRequest) GetUser() string {
@@ -1206,7 +1302,7 @@ type ListBucketsForReplicationResponse struct {
 
 func (x *ListBucketsForReplicationResponse) Reset() {
 	*x = ListBucketsForReplicationResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[17]
+	mi := &file_chorus_chorus_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1314,7 @@ func (x *ListBucketsForReplicationResponse) String() string {
 func (*ListBucketsForReplicationResponse) ProtoMessage() {}
 
 func (x *ListBucketsForReplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[17]
+	mi := &file_chorus_chorus_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1327,7 @@ func (x *ListBucketsForReplicationResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListBucketsForReplicationResponse.ProtoReflect.Descriptor instead.
 func (*ListBucketsForReplicationResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{17}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListBucketsForReplicationResponse) GetBuckets() []string {
@@ -1257,7 +1353,7 @@ type ListReplicationsResponse struct {
 
 func (x *ListReplicationsResponse) Reset() {
 	*x = ListReplicationsResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[18]
+	mi := &file_chorus_chorus_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1269,7 +1365,7 @@ func (x *ListReplicationsResponse) String() string {
 func (*ListReplicationsResponse) ProtoMessage() {}
 
 func (x *ListReplicationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[18]
+	mi := &file_chorus_chorus_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1282,7 +1378,7 @@ func (x *ListReplicationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReplicationsResponse.ProtoReflect.Descriptor instead.
 func (*ListReplicationsResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{18}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListReplicationsResponse) GetReplications() []*Replication {
@@ -1325,7 +1421,7 @@ type Replication struct {
 
 func (x *Replication) Reset() {
 	*x = Replication{}
-	mi := &file_chorus_chorus_proto_msgTypes[19]
+	mi := &file_chorus_chorus_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1337,7 +1433,7 @@ func (x *Replication) String() string {
 func (*Replication) ProtoMessage() {}
 
 func (x *Replication) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[19]
+	mi := &file_chorus_chorus_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1350,7 +1446,7 @@ func (x *Replication) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Replication.ProtoReflect.Descriptor instead.
 func (*Replication) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{19}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Replication) GetUser() string {
@@ -1513,7 +1609,7 @@ type ReplicationRequest struct {
 
 func (x *ReplicationRequest) Reset() {
 	*x = ReplicationRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[20]
+	mi := &file_chorus_chorus_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1525,7 +1621,7 @@ func (x *ReplicationRequest) String() string {
 func (*ReplicationRequest) ProtoMessage() {}
 
 func (x *ReplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[20]
+	mi := &file_chorus_chorus_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1538,7 +1634,7 @@ func (x *ReplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicationRequest.ProtoReflect.Descriptor instead.
 func (*ReplicationRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{20}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ReplicationRequest) GetUser() string {
@@ -1585,7 +1681,7 @@ type ListUserReplicationsResponse struct {
 
 func (x *ListUserReplicationsResponse) Reset() {
 	*x = ListUserReplicationsResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[21]
+	mi := &file_chorus_chorus_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1597,7 +1693,7 @@ func (x *ListUserReplicationsResponse) String() string {
 func (*ListUserReplicationsResponse) ProtoMessage() {}
 
 func (x *ListUserReplicationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[21]
+	mi := &file_chorus_chorus_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1610,7 +1706,7 @@ func (x *ListUserReplicationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUserReplicationsResponse.ProtoReflect.Descriptor instead.
 func (*ListUserReplicationsResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{21}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListUserReplicationsResponse) GetReplications() []*UserReplication {
@@ -1652,7 +1748,7 @@ type UserReplication struct {
 
 func (x *UserReplication) Reset() {
 	*x = UserReplication{}
-	mi := &file_chorus_chorus_proto_msgTypes[22]
+	mi := &file_chorus_chorus_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1664,7 +1760,7 @@ func (x *UserReplication) String() string {
 func (*UserReplication) ProtoMessage() {}
 
 func (x *UserReplication) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[22]
+	mi := &file_chorus_chorus_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1677,7 +1773,7 @@ func (x *UserReplication) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserReplication.ProtoReflect.Descriptor instead.
 func (*UserReplication) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{22}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UserReplication) GetUser() string {
@@ -1831,7 +1927,7 @@ type DeleteUserReplicationRequest struct {
 
 func (x *DeleteUserReplicationRequest) Reset() {
 	*x = DeleteUserReplicationRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[23]
+	mi := &file_chorus_chorus_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1843,7 +1939,7 @@ func (x *DeleteUserReplicationRequest) String() string {
 func (*DeleteUserReplicationRequest) ProtoMessage() {}
 
 func (x *DeleteUserReplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[23]
+	mi := &file_chorus_chorus_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1856,7 +1952,7 @@ func (x *DeleteUserReplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserReplicationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserReplicationRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{23}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DeleteUserReplicationRequest) GetUser() string {
@@ -1895,7 +1991,7 @@ type CompareBucketRequest struct {
 
 func (x *CompareBucketRequest) Reset() {
 	*x = CompareBucketRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[24]
+	mi := &file_chorus_chorus_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1907,7 +2003,7 @@ func (x *CompareBucketRequest) String() string {
 func (*CompareBucketRequest) ProtoMessage() {}
 
 func (x *CompareBucketRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[24]
+	mi := &file_chorus_chorus_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1920,7 +2016,7 @@ func (x *CompareBucketRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompareBucketRequest.ProtoReflect.Descriptor instead.
 func (*CompareBucketRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{24}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *CompareBucketRequest) GetUser() string {
@@ -1986,7 +2082,7 @@ type CompareBucketResponse struct {
 
 func (x *CompareBucketResponse) Reset() {
 	*x = CompareBucketResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[25]
+	mi := &file_chorus_chorus_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1998,7 +2094,7 @@ func (x *CompareBucketResponse) String() string {
 func (*CompareBucketResponse) ProtoMessage() {}
 
 func (x *CompareBucketResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[25]
+	mi := &file_chorus_chorus_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2011,7 +2107,7 @@ func (x *CompareBucketResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompareBucketResponse.ProtoReflect.Descriptor instead.
 func (*CompareBucketResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{25}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *CompareBucketResponse) GetIsMatch() bool {
@@ -2065,7 +2161,7 @@ type GetAgentsResponse struct {
 
 func (x *GetAgentsResponse) Reset() {
 	*x = GetAgentsResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[26]
+	mi := &file_chorus_chorus_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2077,7 +2173,7 @@ func (x *GetAgentsResponse) String() string {
 func (*GetAgentsResponse) ProtoMessage() {}
 
 func (x *GetAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[26]
+	mi := &file_chorus_chorus_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2090,7 +2186,7 @@ func (x *GetAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentsResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{26}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetAgentsResponse) GetAgents() []*Agent {
@@ -2110,7 +2206,7 @@ type Agent struct {
 
 func (x *Agent) Reset() {
 	*x = Agent{}
-	mi := &file_chorus_chorus_proto_msgTypes[27]
+	mi := &file_chorus_chorus_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2122,7 +2218,7 @@ func (x *Agent) String() string {
 func (*Agent) ProtoMessage() {}
 
 func (x *Agent) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[27]
+	mi := &file_chorus_chorus_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2135,7 +2231,7 @@ func (x *Agent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Agent.ProtoReflect.Descriptor instead.
 func (*Agent) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{27}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Agent) GetStorage() string {
@@ -2166,7 +2262,7 @@ type SwitchBucketZeroDowntimeRequest struct {
 
 func (x *SwitchBucketZeroDowntimeRequest) Reset() {
 	*x = SwitchBucketZeroDowntimeRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[28]
+	mi := &file_chorus_chorus_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2178,7 +2274,7 @@ func (x *SwitchBucketZeroDowntimeRequest) String() string {
 func (*SwitchBucketZeroDowntimeRequest) ProtoMessage() {}
 
 func (x *SwitchBucketZeroDowntimeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[28]
+	mi := &file_chorus_chorus_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2191,7 +2287,7 @@ func (x *SwitchBucketZeroDowntimeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwitchBucketZeroDowntimeRequest.ProtoReflect.Descriptor instead.
 func (*SwitchBucketZeroDowntimeRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{28}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SwitchBucketZeroDowntimeRequest) GetReplicationId() *ReplicationRequest {
@@ -2222,7 +2318,7 @@ type SwitchBucketRequest struct {
 
 func (x *SwitchBucketRequest) Reset() {
 	*x = SwitchBucketRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[29]
+	mi := &file_chorus_chorus_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2234,7 +2330,7 @@ func (x *SwitchBucketRequest) String() string {
 func (*SwitchBucketRequest) ProtoMessage() {}
 
 func (x *SwitchBucketRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[29]
+	mi := &file_chorus_chorus_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2247,7 +2343,7 @@ func (x *SwitchBucketRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwitchBucketRequest.ProtoReflect.Descriptor instead.
 func (*SwitchBucketRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{29}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SwitchBucketRequest) GetReplicationId() *ReplicationRequest {
@@ -2303,7 +2399,7 @@ type SwitchDowntimeOpts struct {
 
 func (x *SwitchDowntimeOpts) Reset() {
 	*x = SwitchDowntimeOpts{}
-	mi := &file_chorus_chorus_proto_msgTypes[30]
+	mi := &file_chorus_chorus_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2315,7 +2411,7 @@ func (x *SwitchDowntimeOpts) String() string {
 func (*SwitchDowntimeOpts) ProtoMessage() {}
 
 func (x *SwitchDowntimeOpts) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[30]
+	mi := &file_chorus_chorus_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2328,7 +2424,7 @@ func (x *SwitchDowntimeOpts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwitchDowntimeOpts.ProtoReflect.Descriptor instead.
 func (*SwitchDowntimeOpts) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{30}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SwitchDowntimeOpts) GetStartOnInitDone() bool {
@@ -2402,7 +2498,7 @@ type GetBucketSwitchStatusResponse struct {
 
 func (x *GetBucketSwitchStatusResponse) Reset() {
 	*x = GetBucketSwitchStatusResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[31]
+	mi := &file_chorus_chorus_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2414,7 +2510,7 @@ func (x *GetBucketSwitchStatusResponse) String() string {
 func (*GetBucketSwitchStatusResponse) ProtoMessage() {}
 
 func (x *GetBucketSwitchStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[31]
+	mi := &file_chorus_chorus_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2427,7 +2523,7 @@ func (x *GetBucketSwitchStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBucketSwitchStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetBucketSwitchStatusResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{31}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetBucketSwitchStatusResponse) GetLastStatus() GetBucketSwitchStatusResponse_Status {
@@ -2495,7 +2591,7 @@ type ListSwitchResponse struct {
 
 func (x *ListSwitchResponse) Reset() {
 	*x = ListSwitchResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[32]
+	mi := &file_chorus_chorus_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2507,7 +2603,7 @@ func (x *ListSwitchResponse) String() string {
 func (*ListSwitchResponse) ProtoMessage() {}
 
 func (x *ListSwitchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[32]
+	mi := &file_chorus_chorus_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2520,7 +2616,7 @@ func (x *ListSwitchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSwitchResponse.ProtoReflect.Descriptor instead.
 func (*ListSwitchResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{32}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ListSwitchResponse) GetSwitches() []*GetBucketSwitchStatusResponse {
@@ -2534,11 +2630,13 @@ var File_chorus_chorus_proto protoreflect.FileDescriptor
 
 const file_chorus_chorus_proto_rawDesc = "" +
 	"\n" +
-	"\x13chorus/chorus.proto\x12\x06chorus\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"W\n" +
+	"\x13chorus/chorus.proto\x12\x06chorus\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"C\n" +
 	"\x0fMigrateLocation\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x16\n" +
-	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
-	"\x04user\x18\x03 \x01(\tR\x04user\"P\n" +
+	"\x06bucket\x18\x02 \x01(\tR\x06bucket\"i\n" +
+	"\x1cStartConsistencyCheckRequest\x125\n" +
+	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\x12\x12\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\"P\n" +
 	"\x17ConsistencyCheckRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\"\xc5\x01\n" +
 	"\x10ConsistencyCheck\x12\x0e\n" +
@@ -2555,15 +2653,18 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	" GetConsistencyCheckReportRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\"S\n" +
 	"!GetConsistencyCheckReportResponse\x12.\n" +
-	"\x05check\x18\x01 \x01(\v2\x18.chorus.ConsistencyCheckR\x05check\"e\n" +
+	"\x05check\x18\x01 \x01(\v2\x18.chorus.ConsistencyCheckR\x05check\"V\n" +
+	"\x1cConsistencyCheckStorageEntry\x12\x18\n" +
+	"\astorage\x18\x01 \x01(\tR\astorage\x12\x1c\n" +
+	"\tversionId\x18\x02 \x01(\tR\tversionId\"\x97\x01\n" +
 	"\x1bConsistencyCheckReportEntry\x12\x16\n" +
 	"\x06object\x18\x01 \x01(\tR\x06object\x12\x12\n" +
-	"\x04etag\x18\x02 \x01(\tR\x04etag\x12\x1a\n" +
-	"\bstorages\x18\x03 \x03(\tR\bstorages\"\x94\x01\n" +
+	"\x04etag\x18\x02 \x01(\tR\x04etag\x12L\n" +
+	"\x0estorageEntries\x18\x03 \x03(\v2$.chorus.ConsistencyCheckStorageEntryR\x0estorageEntries\"\x94\x01\n" +
 	"'GetConsistencyCheckReportEntriesRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\x12\x16\n" +
 	"\x06Cursor\x18\x02 \x01(\x04R\x06Cursor\x12\x1a\n" +
-	"\bPageSize\x18\x03 \x01(\x03R\bPageSize\"\x81\x01\n" +
+	"\bPageSize\x18\x03 \x01(\x04R\bPageSize\"\x81\x01\n" +
 	"(GetConsistencyCheckReportEntriesResponse\x12=\n" +
 	"\aentries\x18\x01 \x03(\v2#.chorus.ConsistencyCheckReportEntryR\aentries\x12\x16\n" +
 	"\x06Cursor\x18\x02 \x01(\x04R\x06Cursor\"]\n" +
@@ -2770,7 +2871,7 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\n" +
 	"\b_done_at\"W\n" +
 	"\x12ListSwitchResponse\x12A\n" +
-	"\bswitches\x18\x01 \x03(\v2%.chorus.GetBucketSwitchStatusResponseR\bswitches2\xf7\x10\n" +
+	"\bswitches\x18\x01 \x03(\v2%.chorus.GetBucketSwitchStatusResponseR\bswitches2\xfc\x10\n" +
 	"\x06Chorus\x12F\n" +
 	"\rGetAppVersion\x12\x16.google.protobuf.Empty\x1a\x1d.chorus.GetAppVersionResponse\x12B\n" +
 	"\vGetStorages\x12\x16.google.protobuf.Empty\x1a\x1b.chorus.GetStoragesResponse\x12R\n" +
@@ -2792,8 +2893,8 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\rCompareBucket\x12\x1c.chorus.CompareBucketRequest\x1a\x1d.chorus.CompareBucketResponse\x12>\n" +
 	"\tGetAgents\x12\x16.google.protobuf.Empty\x1a\x19.chorus.GetAgentsResponse\x12S\n" +
 	"\x14AddBucketReplication\x12#.chorus.AddBucketReplicationRequest\x1a\x16.google.protobuf.Empty\x12A\n" +
-	"\x0eGetReplication\x12\x1a.chorus.ReplicationRequest\x1a\x13.chorus.Replication\x12P\n" +
-	"\x15StartConsistencyCheck\x12\x1f.chorus.ConsistencyCheckRequest\x1a\x16.google.protobuf.Empty\x12V\n" +
+	"\x0eGetReplication\x12\x1a.chorus.ReplicationRequest\x1a\x13.chorus.Replication\x12U\n" +
+	"\x15StartConsistencyCheck\x12$.chorus.StartConsistencyCheckRequest\x1a\x16.google.protobuf.Empty\x12V\n" +
 	"\x15ListConsistencyChecks\x12\x16.google.protobuf.Empty\x1a%.chorus.ListConsistencyChecksResponse\x12g\n" +
 	"\x19GetConsistencyCheckReport\x12\x1f.chorus.ConsistencyCheckRequest\x1a).chorus.GetConsistencyCheckReportResponse\x12\x85\x01\n" +
 	" GetConsistencyCheckReportEntries\x12/.chorus.GetConsistencyCheckReportEntriesRequest\x1a0.chorus.GetConsistencyCheckReportEntriesResponse\x12W\n" +
@@ -2812,142 +2913,146 @@ func file_chorus_chorus_proto_rawDescGZIP() []byte {
 }
 
 var file_chorus_chorus_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_chorus_chorus_proto_goTypes = []any{
 	(Storage_Provider)(0),                            // 0: chorus.Storage.Provider
 	(GetBucketSwitchStatusResponse_Status)(0),        // 1: chorus.GetBucketSwitchStatusResponse.Status
 	(*MigrateLocation)(nil),                          // 2: chorus.MigrateLocation
-	(*ConsistencyCheckRequest)(nil),                  // 3: chorus.ConsistencyCheckRequest
-	(*ConsistencyCheck)(nil),                         // 4: chorus.ConsistencyCheck
-	(*ListConsistencyChecksResponse)(nil),            // 5: chorus.ListConsistencyChecksResponse
-	(*GetConsistencyCheckReportRequest)(nil),         // 6: chorus.GetConsistencyCheckReportRequest
-	(*GetConsistencyCheckReportResponse)(nil),        // 7: chorus.GetConsistencyCheckReportResponse
-	(*ConsistencyCheckReportEntry)(nil),              // 8: chorus.ConsistencyCheckReportEntry
-	(*GetConsistencyCheckReportEntriesRequest)(nil),  // 9: chorus.GetConsistencyCheckReportEntriesRequest
-	(*GetConsistencyCheckReportEntriesResponse)(nil), // 10: chorus.GetConsistencyCheckReportEntriesResponse
-	(*GetAppVersionResponse)(nil),                    // 11: chorus.GetAppVersionResponse
-	(*GetStoragesResponse)(nil),                      // 12: chorus.GetStoragesResponse
-	(*Storage)(nil),                                  // 13: chorus.Storage
-	(*Credential)(nil),                               // 14: chorus.Credential
-	(*GetProxyCredentialsResponse)(nil),              // 15: chorus.GetProxyCredentialsResponse
-	(*AddReplicationRequest)(nil),                    // 16: chorus.AddReplicationRequest
-	(*AddBucketReplicationRequest)(nil),              // 17: chorus.AddBucketReplicationRequest
-	(*ListBucketsForReplicationRequest)(nil),         // 18: chorus.ListBucketsForReplicationRequest
-	(*ListBucketsForReplicationResponse)(nil),        // 19: chorus.ListBucketsForReplicationResponse
-	(*ListReplicationsResponse)(nil),                 // 20: chorus.ListReplicationsResponse
-	(*Replication)(nil),                              // 21: chorus.Replication
-	(*ReplicationRequest)(nil),                       // 22: chorus.ReplicationRequest
-	(*ListUserReplicationsResponse)(nil),             // 23: chorus.ListUserReplicationsResponse
-	(*UserReplication)(nil),                          // 24: chorus.UserReplication
-	(*DeleteUserReplicationRequest)(nil),             // 25: chorus.DeleteUserReplicationRequest
-	(*CompareBucketRequest)(nil),                     // 26: chorus.CompareBucketRequest
-	(*CompareBucketResponse)(nil),                    // 27: chorus.CompareBucketResponse
-	(*GetAgentsResponse)(nil),                        // 28: chorus.GetAgentsResponse
-	(*Agent)(nil),                                    // 29: chorus.Agent
-	(*SwitchBucketZeroDowntimeRequest)(nil),          // 30: chorus.SwitchBucketZeroDowntimeRequest
-	(*SwitchBucketRequest)(nil),                      // 31: chorus.SwitchBucketRequest
-	(*SwitchDowntimeOpts)(nil),                       // 32: chorus.SwitchDowntimeOpts
-	(*GetBucketSwitchStatusResponse)(nil),            // 33: chorus.GetBucketSwitchStatusResponse
-	(*ListSwitchResponse)(nil),                       // 34: chorus.ListSwitchResponse
-	(*timestamppb.Timestamp)(nil),                    // 35: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),                      // 36: google.protobuf.Duration
-	(*emptypb.Empty)(nil),                            // 37: google.protobuf.Empty
+	(*StartConsistencyCheckRequest)(nil),             // 3: chorus.StartConsistencyCheckRequest
+	(*ConsistencyCheckRequest)(nil),                  // 4: chorus.ConsistencyCheckRequest
+	(*ConsistencyCheck)(nil),                         // 5: chorus.ConsistencyCheck
+	(*ListConsistencyChecksResponse)(nil),            // 6: chorus.ListConsistencyChecksResponse
+	(*GetConsistencyCheckReportRequest)(nil),         // 7: chorus.GetConsistencyCheckReportRequest
+	(*GetConsistencyCheckReportResponse)(nil),        // 8: chorus.GetConsistencyCheckReportResponse
+	(*ConsistencyCheckStorageEntry)(nil),             // 9: chorus.ConsistencyCheckStorageEntry
+	(*ConsistencyCheckReportEntry)(nil),              // 10: chorus.ConsistencyCheckReportEntry
+	(*GetConsistencyCheckReportEntriesRequest)(nil),  // 11: chorus.GetConsistencyCheckReportEntriesRequest
+	(*GetConsistencyCheckReportEntriesResponse)(nil), // 12: chorus.GetConsistencyCheckReportEntriesResponse
+	(*GetAppVersionResponse)(nil),                    // 13: chorus.GetAppVersionResponse
+	(*GetStoragesResponse)(nil),                      // 14: chorus.GetStoragesResponse
+	(*Storage)(nil),                                  // 15: chorus.Storage
+	(*Credential)(nil),                               // 16: chorus.Credential
+	(*GetProxyCredentialsResponse)(nil),              // 17: chorus.GetProxyCredentialsResponse
+	(*AddReplicationRequest)(nil),                    // 18: chorus.AddReplicationRequest
+	(*AddBucketReplicationRequest)(nil),              // 19: chorus.AddBucketReplicationRequest
+	(*ListBucketsForReplicationRequest)(nil),         // 20: chorus.ListBucketsForReplicationRequest
+	(*ListBucketsForReplicationResponse)(nil),        // 21: chorus.ListBucketsForReplicationResponse
+	(*ListReplicationsResponse)(nil),                 // 22: chorus.ListReplicationsResponse
+	(*Replication)(nil),                              // 23: chorus.Replication
+	(*ReplicationRequest)(nil),                       // 24: chorus.ReplicationRequest
+	(*ListUserReplicationsResponse)(nil),             // 25: chorus.ListUserReplicationsResponse
+	(*UserReplication)(nil),                          // 26: chorus.UserReplication
+	(*DeleteUserReplicationRequest)(nil),             // 27: chorus.DeleteUserReplicationRequest
+	(*CompareBucketRequest)(nil),                     // 28: chorus.CompareBucketRequest
+	(*CompareBucketResponse)(nil),                    // 29: chorus.CompareBucketResponse
+	(*GetAgentsResponse)(nil),                        // 30: chorus.GetAgentsResponse
+	(*Agent)(nil),                                    // 31: chorus.Agent
+	(*SwitchBucketZeroDowntimeRequest)(nil),          // 32: chorus.SwitchBucketZeroDowntimeRequest
+	(*SwitchBucketRequest)(nil),                      // 33: chorus.SwitchBucketRequest
+	(*SwitchDowntimeOpts)(nil),                       // 34: chorus.SwitchDowntimeOpts
+	(*GetBucketSwitchStatusResponse)(nil),            // 35: chorus.GetBucketSwitchStatusResponse
+	(*ListSwitchResponse)(nil),                       // 36: chorus.ListSwitchResponse
+	(*timestamppb.Timestamp)(nil),                    // 37: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),                      // 38: google.protobuf.Duration
+	(*emptypb.Empty)(nil),                            // 39: google.protobuf.Empty
 }
 var file_chorus_chorus_proto_depIdxs = []int32{
-	2,  // 0: chorus.ConsistencyCheckRequest.locations:type_name -> chorus.MigrateLocation
-	2,  // 1: chorus.ConsistencyCheck.locations:type_name -> chorus.MigrateLocation
-	4,  // 2: chorus.ListConsistencyChecksResponse.checks:type_name -> chorus.ConsistencyCheck
-	2,  // 3: chorus.GetConsistencyCheckReportRequest.locations:type_name -> chorus.MigrateLocation
-	4,  // 4: chorus.GetConsistencyCheckReportResponse.check:type_name -> chorus.ConsistencyCheck
-	2,  // 5: chorus.GetConsistencyCheckReportEntriesRequest.locations:type_name -> chorus.MigrateLocation
-	8,  // 6: chorus.GetConsistencyCheckReportEntriesResponse.entries:type_name -> chorus.ConsistencyCheckReportEntry
-	13, // 7: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
-	0,  // 8: chorus.Storage.provider:type_name -> chorus.Storage.Provider
-	14, // 9: chorus.Storage.credentials:type_name -> chorus.Credential
-	14, // 10: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
-	21, // 11: chorus.ListReplicationsResponse.replications:type_name -> chorus.Replication
-	35, // 12: chorus.Replication.created_at:type_name -> google.protobuf.Timestamp
-	35, // 13: chorus.Replication.last_emitted_at:type_name -> google.protobuf.Timestamp
-	35, // 14: chorus.Replication.last_processed_at:type_name -> google.protobuf.Timestamp
-	35, // 15: chorus.Replication.init_done_at:type_name -> google.protobuf.Timestamp
-	35, // 16: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
-	24, // 17: chorus.ListUserReplicationsResponse.replications:type_name -> chorus.UserReplication
-	35, // 18: chorus.UserReplication.created_at:type_name -> google.protobuf.Timestamp
-	35, // 19: chorus.UserReplication.last_emitted_at:type_name -> google.protobuf.Timestamp
-	35, // 20: chorus.UserReplication.last_processed_at:type_name -> google.protobuf.Timestamp
-	35, // 21: chorus.UserReplication.init_done_at:type_name -> google.protobuf.Timestamp
-	35, // 22: chorus.UserReplication.archived_at:type_name -> google.protobuf.Timestamp
-	29, // 23: chorus.GetAgentsResponse.agents:type_name -> chorus.Agent
-	22, // 24: chorus.SwitchBucketZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationRequest
-	36, // 25: chorus.SwitchBucketZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
-	22, // 26: chorus.SwitchBucketRequest.replication_id:type_name -> chorus.ReplicationRequest
-	32, // 27: chorus.SwitchBucketRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	35, // 28: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
-	36, // 29: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
-	1,  // 30: chorus.GetBucketSwitchStatusResponse.last_status:type_name -> chorus.GetBucketSwitchStatusResponse.Status
-	36, // 31: chorus.GetBucketSwitchStatusResponse.multipart_ttl:type_name -> google.protobuf.Duration
-	32, // 32: chorus.GetBucketSwitchStatusResponse.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	35, // 33: chorus.GetBucketSwitchStatusResponse.last_started_at:type_name -> google.protobuf.Timestamp
-	35, // 34: chorus.GetBucketSwitchStatusResponse.done_at:type_name -> google.protobuf.Timestamp
-	22, // 35: chorus.GetBucketSwitchStatusResponse.replication_id:type_name -> chorus.ReplicationRequest
-	33, // 36: chorus.ListSwitchResponse.switches:type_name -> chorus.GetBucketSwitchStatusResponse
-	37, // 37: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
-	37, // 38: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
-	37, // 39: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
-	18, // 40: chorus.Chorus.ListBucketsForReplication:input_type -> chorus.ListBucketsForReplicationRequest
-	16, // 41: chorus.Chorus.AddReplication:input_type -> chorus.AddReplicationRequest
-	37, // 42: chorus.Chorus.ListReplications:input_type -> google.protobuf.Empty
-	37, // 43: chorus.Chorus.ListUserReplications:input_type -> google.protobuf.Empty
-	22, // 44: chorus.Chorus.StreamBucketReplication:input_type -> chorus.ReplicationRequest
-	22, // 45: chorus.Chorus.PauseReplication:input_type -> chorus.ReplicationRequest
-	22, // 46: chorus.Chorus.ResumeReplication:input_type -> chorus.ReplicationRequest
-	22, // 47: chorus.Chorus.DeleteReplication:input_type -> chorus.ReplicationRequest
-	25, // 48: chorus.Chorus.DeleteUserReplication:input_type -> chorus.DeleteUserReplicationRequest
-	30, // 49: chorus.Chorus.SwitchBucketZeroDowntime:input_type -> chorus.SwitchBucketZeroDowntimeRequest
-	31, // 50: chorus.Chorus.SwitchBucket:input_type -> chorus.SwitchBucketRequest
-	22, // 51: chorus.Chorus.DeleteBucketSwitch:input_type -> chorus.ReplicationRequest
-	22, // 52: chorus.Chorus.GetBucketSwitchStatus:input_type -> chorus.ReplicationRequest
-	37, // 53: chorus.Chorus.ListReplicationSwitches:input_type -> google.protobuf.Empty
-	26, // 54: chorus.Chorus.CompareBucket:input_type -> chorus.CompareBucketRequest
-	37, // 55: chorus.Chorus.GetAgents:input_type -> google.protobuf.Empty
-	17, // 56: chorus.Chorus.AddBucketReplication:input_type -> chorus.AddBucketReplicationRequest
-	22, // 57: chorus.Chorus.GetReplication:input_type -> chorus.ReplicationRequest
-	3,  // 58: chorus.Chorus.StartConsistencyCheck:input_type -> chorus.ConsistencyCheckRequest
-	37, // 59: chorus.Chorus.ListConsistencyChecks:input_type -> google.protobuf.Empty
-	3,  // 60: chorus.Chorus.GetConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
-	9,  // 61: chorus.Chorus.GetConsistencyCheckReportEntries:input_type -> chorus.GetConsistencyCheckReportEntriesRequest
-	3,  // 62: chorus.Chorus.DeleteConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
-	11, // 63: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
-	12, // 64: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
-	15, // 65: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
-	19, // 66: chorus.Chorus.ListBucketsForReplication:output_type -> chorus.ListBucketsForReplicationResponse
-	37, // 67: chorus.Chorus.AddReplication:output_type -> google.protobuf.Empty
-	20, // 68: chorus.Chorus.ListReplications:output_type -> chorus.ListReplicationsResponse
-	23, // 69: chorus.Chorus.ListUserReplications:output_type -> chorus.ListUserReplicationsResponse
-	21, // 70: chorus.Chorus.StreamBucketReplication:output_type -> chorus.Replication
-	37, // 71: chorus.Chorus.PauseReplication:output_type -> google.protobuf.Empty
-	37, // 72: chorus.Chorus.ResumeReplication:output_type -> google.protobuf.Empty
-	37, // 73: chorus.Chorus.DeleteReplication:output_type -> google.protobuf.Empty
-	37, // 74: chorus.Chorus.DeleteUserReplication:output_type -> google.protobuf.Empty
-	37, // 75: chorus.Chorus.SwitchBucketZeroDowntime:output_type -> google.protobuf.Empty
-	37, // 76: chorus.Chorus.SwitchBucket:output_type -> google.protobuf.Empty
-	37, // 77: chorus.Chorus.DeleteBucketSwitch:output_type -> google.protobuf.Empty
-	33, // 78: chorus.Chorus.GetBucketSwitchStatus:output_type -> chorus.GetBucketSwitchStatusResponse
-	34, // 79: chorus.Chorus.ListReplicationSwitches:output_type -> chorus.ListSwitchResponse
-	27, // 80: chorus.Chorus.CompareBucket:output_type -> chorus.CompareBucketResponse
-	28, // 81: chorus.Chorus.GetAgents:output_type -> chorus.GetAgentsResponse
-	37, // 82: chorus.Chorus.AddBucketReplication:output_type -> google.protobuf.Empty
-	21, // 83: chorus.Chorus.GetReplication:output_type -> chorus.Replication
-	37, // 84: chorus.Chorus.StartConsistencyCheck:output_type -> google.protobuf.Empty
-	5,  // 85: chorus.Chorus.ListConsistencyChecks:output_type -> chorus.ListConsistencyChecksResponse
-	7,  // 86: chorus.Chorus.GetConsistencyCheckReport:output_type -> chorus.GetConsistencyCheckReportResponse
-	10, // 87: chorus.Chorus.GetConsistencyCheckReportEntries:output_type -> chorus.GetConsistencyCheckReportEntriesResponse
-	37, // 88: chorus.Chorus.DeleteConsistencyCheckReport:output_type -> google.protobuf.Empty
-	63, // [63:89] is the sub-list for method output_type
-	37, // [37:63] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	2,  // 0: chorus.StartConsistencyCheckRequest.locations:type_name -> chorus.MigrateLocation
+	2,  // 1: chorus.ConsistencyCheckRequest.locations:type_name -> chorus.MigrateLocation
+	2,  // 2: chorus.ConsistencyCheck.locations:type_name -> chorus.MigrateLocation
+	5,  // 3: chorus.ListConsistencyChecksResponse.checks:type_name -> chorus.ConsistencyCheck
+	2,  // 4: chorus.GetConsistencyCheckReportRequest.locations:type_name -> chorus.MigrateLocation
+	5,  // 5: chorus.GetConsistencyCheckReportResponse.check:type_name -> chorus.ConsistencyCheck
+	9,  // 6: chorus.ConsistencyCheckReportEntry.storageEntries:type_name -> chorus.ConsistencyCheckStorageEntry
+	2,  // 7: chorus.GetConsistencyCheckReportEntriesRequest.locations:type_name -> chorus.MigrateLocation
+	10, // 8: chorus.GetConsistencyCheckReportEntriesResponse.entries:type_name -> chorus.ConsistencyCheckReportEntry
+	15, // 9: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
+	0,  // 10: chorus.Storage.provider:type_name -> chorus.Storage.Provider
+	16, // 11: chorus.Storage.credentials:type_name -> chorus.Credential
+	16, // 12: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
+	23, // 13: chorus.ListReplicationsResponse.replications:type_name -> chorus.Replication
+	37, // 14: chorus.Replication.created_at:type_name -> google.protobuf.Timestamp
+	37, // 15: chorus.Replication.last_emitted_at:type_name -> google.protobuf.Timestamp
+	37, // 16: chorus.Replication.last_processed_at:type_name -> google.protobuf.Timestamp
+	37, // 17: chorus.Replication.init_done_at:type_name -> google.protobuf.Timestamp
+	37, // 18: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
+	26, // 19: chorus.ListUserReplicationsResponse.replications:type_name -> chorus.UserReplication
+	37, // 20: chorus.UserReplication.created_at:type_name -> google.protobuf.Timestamp
+	37, // 21: chorus.UserReplication.last_emitted_at:type_name -> google.protobuf.Timestamp
+	37, // 22: chorus.UserReplication.last_processed_at:type_name -> google.protobuf.Timestamp
+	37, // 23: chorus.UserReplication.init_done_at:type_name -> google.protobuf.Timestamp
+	37, // 24: chorus.UserReplication.archived_at:type_name -> google.protobuf.Timestamp
+	31, // 25: chorus.GetAgentsResponse.agents:type_name -> chorus.Agent
+	24, // 26: chorus.SwitchBucketZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationRequest
+	38, // 27: chorus.SwitchBucketZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
+	24, // 28: chorus.SwitchBucketRequest.replication_id:type_name -> chorus.ReplicationRequest
+	34, // 29: chorus.SwitchBucketRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
+	37, // 30: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
+	38, // 31: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
+	1,  // 32: chorus.GetBucketSwitchStatusResponse.last_status:type_name -> chorus.GetBucketSwitchStatusResponse.Status
+	38, // 33: chorus.GetBucketSwitchStatusResponse.multipart_ttl:type_name -> google.protobuf.Duration
+	34, // 34: chorus.GetBucketSwitchStatusResponse.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
+	37, // 35: chorus.GetBucketSwitchStatusResponse.last_started_at:type_name -> google.protobuf.Timestamp
+	37, // 36: chorus.GetBucketSwitchStatusResponse.done_at:type_name -> google.protobuf.Timestamp
+	24, // 37: chorus.GetBucketSwitchStatusResponse.replication_id:type_name -> chorus.ReplicationRequest
+	35, // 38: chorus.ListSwitchResponse.switches:type_name -> chorus.GetBucketSwitchStatusResponse
+	39, // 39: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
+	39, // 40: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
+	39, // 41: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
+	20, // 42: chorus.Chorus.ListBucketsForReplication:input_type -> chorus.ListBucketsForReplicationRequest
+	18, // 43: chorus.Chorus.AddReplication:input_type -> chorus.AddReplicationRequest
+	39, // 44: chorus.Chorus.ListReplications:input_type -> google.protobuf.Empty
+	39, // 45: chorus.Chorus.ListUserReplications:input_type -> google.protobuf.Empty
+	24, // 46: chorus.Chorus.StreamBucketReplication:input_type -> chorus.ReplicationRequest
+	24, // 47: chorus.Chorus.PauseReplication:input_type -> chorus.ReplicationRequest
+	24, // 48: chorus.Chorus.ResumeReplication:input_type -> chorus.ReplicationRequest
+	24, // 49: chorus.Chorus.DeleteReplication:input_type -> chorus.ReplicationRequest
+	27, // 50: chorus.Chorus.DeleteUserReplication:input_type -> chorus.DeleteUserReplicationRequest
+	32, // 51: chorus.Chorus.SwitchBucketZeroDowntime:input_type -> chorus.SwitchBucketZeroDowntimeRequest
+	33, // 52: chorus.Chorus.SwitchBucket:input_type -> chorus.SwitchBucketRequest
+	24, // 53: chorus.Chorus.DeleteBucketSwitch:input_type -> chorus.ReplicationRequest
+	24, // 54: chorus.Chorus.GetBucketSwitchStatus:input_type -> chorus.ReplicationRequest
+	39, // 55: chorus.Chorus.ListReplicationSwitches:input_type -> google.protobuf.Empty
+	28, // 56: chorus.Chorus.CompareBucket:input_type -> chorus.CompareBucketRequest
+	39, // 57: chorus.Chorus.GetAgents:input_type -> google.protobuf.Empty
+	19, // 58: chorus.Chorus.AddBucketReplication:input_type -> chorus.AddBucketReplicationRequest
+	24, // 59: chorus.Chorus.GetReplication:input_type -> chorus.ReplicationRequest
+	3,  // 60: chorus.Chorus.StartConsistencyCheck:input_type -> chorus.StartConsistencyCheckRequest
+	39, // 61: chorus.Chorus.ListConsistencyChecks:input_type -> google.protobuf.Empty
+	4,  // 62: chorus.Chorus.GetConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
+	11, // 63: chorus.Chorus.GetConsistencyCheckReportEntries:input_type -> chorus.GetConsistencyCheckReportEntriesRequest
+	4,  // 64: chorus.Chorus.DeleteConsistencyCheckReport:input_type -> chorus.ConsistencyCheckRequest
+	13, // 65: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
+	14, // 66: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
+	17, // 67: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
+	21, // 68: chorus.Chorus.ListBucketsForReplication:output_type -> chorus.ListBucketsForReplicationResponse
+	39, // 69: chorus.Chorus.AddReplication:output_type -> google.protobuf.Empty
+	22, // 70: chorus.Chorus.ListReplications:output_type -> chorus.ListReplicationsResponse
+	25, // 71: chorus.Chorus.ListUserReplications:output_type -> chorus.ListUserReplicationsResponse
+	23, // 72: chorus.Chorus.StreamBucketReplication:output_type -> chorus.Replication
+	39, // 73: chorus.Chorus.PauseReplication:output_type -> google.protobuf.Empty
+	39, // 74: chorus.Chorus.ResumeReplication:output_type -> google.protobuf.Empty
+	39, // 75: chorus.Chorus.DeleteReplication:output_type -> google.protobuf.Empty
+	39, // 76: chorus.Chorus.DeleteUserReplication:output_type -> google.protobuf.Empty
+	39, // 77: chorus.Chorus.SwitchBucketZeroDowntime:output_type -> google.protobuf.Empty
+	39, // 78: chorus.Chorus.SwitchBucket:output_type -> google.protobuf.Empty
+	39, // 79: chorus.Chorus.DeleteBucketSwitch:output_type -> google.protobuf.Empty
+	35, // 80: chorus.Chorus.GetBucketSwitchStatus:output_type -> chorus.GetBucketSwitchStatusResponse
+	36, // 81: chorus.Chorus.ListReplicationSwitches:output_type -> chorus.ListSwitchResponse
+	29, // 82: chorus.Chorus.CompareBucket:output_type -> chorus.CompareBucketResponse
+	30, // 83: chorus.Chorus.GetAgents:output_type -> chorus.GetAgentsResponse
+	39, // 84: chorus.Chorus.AddBucketReplication:output_type -> google.protobuf.Empty
+	23, // 85: chorus.Chorus.GetReplication:output_type -> chorus.Replication
+	39, // 86: chorus.Chorus.StartConsistencyCheck:output_type -> google.protobuf.Empty
+	6,  // 87: chorus.Chorus.ListConsistencyChecks:output_type -> chorus.ListConsistencyChecksResponse
+	8,  // 88: chorus.Chorus.GetConsistencyCheckReport:output_type -> chorus.GetConsistencyCheckReportResponse
+	12, // 89: chorus.Chorus.GetConsistencyCheckReportEntries:output_type -> chorus.GetConsistencyCheckReportEntriesResponse
+	39, // 90: chorus.Chorus.DeleteConsistencyCheckReport:output_type -> google.protobuf.Empty
+	65, // [65:91] is the sub-list for method output_type
+	39, // [39:65] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_chorus_chorus_proto_init() }
@@ -2955,21 +3060,21 @@ func file_chorus_chorus_proto_init() {
 	if File_chorus_chorus_proto != nil {
 		return
 	}
-	file_chorus_chorus_proto_msgTypes[14].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[15].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[19].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[22].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[28].OneofWrappers = []any{}
-	file_chorus_chorus_proto_msgTypes[29].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[16].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[17].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[21].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[24].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[30].OneofWrappers = []any{}
 	file_chorus_chorus_proto_msgTypes[31].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[32].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[33].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chorus_chorus_proto_rawDesc), len(file_chorus_chorus_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   33,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

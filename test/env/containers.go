@@ -48,7 +48,7 @@ var (
 )
 
 const (
-	CRedisImage    = "redis:8.0.1-alpine"
+	CRedisImage    = "redis:8.2.1-alpine"
 	CRedisPort     = 6379
 	CRedisPassword = "password"
 
@@ -80,7 +80,7 @@ const (
 	CSwiftImage = "ghcr.io/aiivashchenko/docker-swift:2.35.0"
 	CSwiftPort  = 8080
 
-	CMinioImage          = "minio/minio:RELEASE.2025-05-24T17-08-30Z-cpuv1"
+	CMinioImage          = "minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1"
 	CMinioUsername       = "minioadmin"
 	CMinioPassword       = "minioadmin"
 	CMinioS3Port         = 9000

@@ -42,7 +42,9 @@ import (
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/pkg/validate"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/service/worker/handler"
 )
 
 const (
@@ -52,9 +54,10 @@ const (
 
 func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, queueSvc tasks.QueueService,
 	rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService,
-	storageSvc storage.Service, proxyClient rpc.Proxy, agentClient *rpc.AgentClient,
-	notificationSvc *notifications.Service, replicationStatusLocker *store.ReplicationStatusLocker,
-	userLocker *store.UserLocker, appInfo *dom.AppInfo) pb.ChorusServer {
+	storageSvc storage.Service, checkSvc *handler.ConsistencyCheckSvc, proxyClient rpc.Proxy,
+	agentClient *rpc.AgentClient, notificationSvc *notifications.Service,
+	replicationStatusLocker *store.ReplicationStatusLocker, userLocker *store.UserLocker,
+	appInfo *dom.AppInfo) pb.ChorusServer {
 	return &handlers{
 		storages:                storages,
 		rclone:                  rclone,
@@ -63,6 +66,7 @@ func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, queueS
 		policySvc:               policySvc,
 		versionSvc:              versionSvc,
 		storageSvc:              storageSvc,
+		checkSvc:                checkSvc,
 		proxyClient:             proxyClient,
 		agentClient:             agentClient,
 		notificationSvc:         notificationSvc,
@@ -82,6 +86,7 @@ type handlers struct {
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
 	storageSvc              storage.Service
+	checkSvc                *handler.ConsistencyCheckSvc
 	proxyClient             rpc.Proxy
 	agentClient             *rpc.AgentClient
 	notificationSvc         *notifications.Service
@@ -90,32 +95,30 @@ type handlers struct {
 	userLocker              *store.UserLocker
 }
 
-func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
-	if err := h.validateStorageLocations(req.Locations, true); err != nil {
+func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsistencyCheckRequest) (*emptypb.Empty, error) {
+	if err := validate.StorageLocationsWithUser(h.storages, req.Locations, req.User); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
-	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
-	idExists, err := h.storageSvc.HasConsistencyCheckID(ctx, consistencyCheckID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to check if consistency check id exists: %w", err)
-	}
-	if idExists {
-		return nil, errors.New("consistency check for this set of storage locations already exists")
-	}
-
-	locations := make([]tasks.MigrateLocation, 0, len(req.Locations))
-	for _, location := range req.Locations {
-		locations = append(locations, tasks.MigrateLocation{
-			Storage: location.Storage,
-			Bucket:  location.Bucket,
-			User:    location.User,
+	locationCount := len(req.Locations)
+	checkLocations := make([]entity.ConsistencyCheckLocation, 0, locationCount)
+	taskLocations := make([]tasks.MigrateLocation, 0, locationCount)
+	for _, reqLocation := range req.Locations {
+		checkLocations = append(checkLocations, entity.NewConsistencyCheckLocation(reqLocation.Storage, reqLocation.Bucket))
+		taskLocations = append(taskLocations, tasks.MigrateLocation{
+			Storage: reqLocation.Storage,
+			Bucket:  reqLocation.Bucket,
 		})
 	}
 
+	checkID := entity.NewConsistencyCheckID(checkLocations...)
+	if err := h.checkSvc.RegisterConsistencyCheck(ctx, checkID, taskLocations); err != nil {
+		return nil, fmt.Errorf("unable to start consistency check: %w", err)
+	}
+
 	consistencyCheckTask := tasks.ConsistencyCheckPayload{
-		ID:        consistencyCheckID,
-		Locations: locations,
+		Locations: taskLocations,
+		User:      req.User,
 	}
 	if err := h.queueSvc.EnqueueTask(ctx, consistencyCheckTask); err != nil {
 		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)
@@ -125,19 +128,27 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.Consistenc
 }
 
 func (h *handlers) ListConsistencyChecks(ctx context.Context, _ *emptypb.Empty) (*pb.ListConsistencyChecksResponse, error) {
-	ids, err := h.storageSvc.ListConsistencyCheckIDs(ctx)
+	checkList, err := h.checkSvc.GetConsistencyCheckList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list consistency check ids: %w", err)
+		return nil, fmt.Errorf("unable to list consistency checks: %w", err)
 	}
 
-	consistencyChecks := make([]*pb.ConsistencyCheck, 0, len(ids))
-	for _, id := range ids {
-		consistencyCheck, err := h.constructConsistencyCheck(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("unable to construct consistency check: %w", err)
+	consistencyChecks := make([]*pb.ConsistencyCheck, 0, len(checkList))
+	for _, check := range checkList {
+		locations := make([]*pb.MigrateLocation, 0, len(check.Locations))
+		for _, checkLocation := range check.Locations {
+			locations = append(locations, &pb.MigrateLocation{
+				Storage: checkLocation.Storage,
+				Bucket:  checkLocation.Bucket,
+			})
 		}
-
-		consistencyChecks = append(consistencyChecks, consistencyCheck)
+		consistencyChecks = append(consistencyChecks, &pb.ConsistencyCheck{
+			Locations:  locations,
+			Queued:     check.Queued,
+			Completed:  check.Completed,
+			Ready:      check.Ready,
+			Consistent: check.Consistent,
+		})
 	}
 
 	return &pb.ListConsistencyChecksResponse{
@@ -145,159 +156,84 @@ func (h *handlers) ListConsistencyChecks(ctx context.Context, _ *emptypb.Empty) 
 	}, nil
 }
 
-func (h *handlers) validateStorageLocations(locations []*pb.MigrateLocation, userRequired bool) error {
-	if len(locations) < 2 {
-		return errors.New("at least 2 migration locations should be provided")
-	}
-
-	for idx, location := range locations {
-		if location.Bucket == "" {
-			return fmt.Errorf("location %d bucket is empty", idx)
-		}
-		if location.Storage == "" {
-			return fmt.Errorf("location %d storage is empty", idx)
-		}
-		if _, ok := h.storages.Storages[location.Storage]; !ok {
-			return fmt.Errorf("unable to find storage %s in config", location.Storage)
-		}
-		_, ok := h.storages.Storages[location.Storage].Credentials[location.User]
-		if userRequired && !ok {
-			return fmt.Errorf("unable to find user %s storage %s in config", location.User, location.Storage)
-		}
-	}
-
-	return nil
-}
-
-func MakeConsistencyCheckID(locations []*pb.MigrateLocation) string {
-	sort.Slice(locations, func(i, j int) bool {
-		if locations[i].Storage < locations[j].Storage {
-			return true
-		}
-		if locations[i].Storage > locations[j].Storage {
-			return false
-		}
-		return locations[i].Bucket < locations[j].Bucket
-	})
-
-	parts := make([]string, 0, len(locations))
-	for _, location := range locations {
-		parts = append(parts, fmt.Sprintf("%s_%s", location.Storage, location.Bucket))
-	}
-
-	return strings.Join(parts, "_")
-}
-
-func (h *handlers) constructConsistencyCheck(ctx context.Context, id string) (*pb.ConsistencyCheck, error) {
-	completedCounter, err := h.storageSvc.GetConsistencyCheckCompletedCounter(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get complete counter: %w", err)
-	}
-	scheduledCounter, err := h.storageSvc.GetConsistencyCheckScheduledCounter(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get scheduled counter: %w", err)
-	}
-	ready, err := h.storageSvc.GetConsistencyCheckReadiness(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get readiness: %w", err)
-	}
-	checkedStorages, err := h.storageSvc.GetConsistencyCheckStorages(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get storages: %w", err)
-	}
-
-	migrateLocations := make([]*pb.MigrateLocation, 0, len(checkedStorages))
-	for _, checkedStorage := range checkedStorages {
-		storage, bucket, found := strings.Cut(checkedStorage, ":")
-		if !found {
-			return nil, fmt.Errorf("can not separate storage from bucket in %s", checkedStorages)
-		}
-		migrateLocations = append(migrateLocations, &pb.MigrateLocation{
-			Storage: storage,
-			Bucket:  bucket,
-		})
-	}
-
-	consistencyCheck := &pb.ConsistencyCheck{
-		Queued:    scheduledCounter,
-		Completed: completedCounter,
-		Locations: migrateLocations,
-		Ready:     ready,
-	}
-
-	if !ready {
-		return consistencyCheck, nil
-	}
-
-	hasSets, err := h.storageSvc.HasConsistencyCheckSets(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("unable to check whether consistency check sets are present: %w", err)
-	}
-
-	consistencyCheck.Consistent = !hasSets
-
-	return consistencyCheck, nil
-}
-
 func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*pb.GetConsistencyCheckReportResponse, error) {
-	if err := h.validateStorageLocations(req.Locations, false); err != nil {
+	if err := validate.StorageLocations(h.storages, req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
-	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
-	consistencyCheck, err := h.constructConsistencyCheck(ctx, consistencyCheckID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to construct consistency check: %w", err)
+	checkLocations := make([]entity.ConsistencyCheckLocation, 0, len(req.Locations))
+	for _, reqLocation := range req.Locations {
+		checkLocations = append(checkLocations, entity.NewConsistencyCheckLocation(reqLocation.Storage, reqLocation.Bucket))
 	}
-	if !consistencyCheck.Ready {
-		return &pb.GetConsistencyCheckReportResponse{
-			Check: consistencyCheck,
-		}, nil
+
+	checkID := entity.NewConsistencyCheckID(checkLocations...)
+	checkStatus, err := h.checkSvc.GetConsistencyCheckStatus(ctx, checkID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get consistency check status: %w", err)
 	}
 
 	return &pb.GetConsistencyCheckReportResponse{
-		Check: consistencyCheck,
+		Check: &pb.ConsistencyCheck{
+			Locations:  req.Locations,
+			Queued:     checkStatus.Queued,
+			Completed:  checkStatus.Completed,
+			Ready:      checkStatus.Ready,
+			Consistent: checkStatus.Consistent,
+		},
 	}, nil
 }
 
 func (h *handlers) GetConsistencyCheckReportEntries(ctx context.Context, req *pb.GetConsistencyCheckReportEntriesRequest) (*pb.GetConsistencyCheckReportEntriesResponse, error) {
-	if err := h.validateStorageLocations(req.Locations, false); err != nil {
+	if err := validate.StorageLocations(h.storages, req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
-	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
-	page, err := h.storageSvc.FindConsistencyCheckSetsPageable(ctx, consistencyCheckID, req.Cursor, req.PageSize)
+	checkLocations := make([]entity.ConsistencyCheckLocation, 0, len(req.Locations))
+	for _, reqLocation := range req.Locations {
+		checkLocations = append(checkLocations, entity.NewConsistencyCheckLocation(reqLocation.Storage, reqLocation.Bucket))
+	}
+
+	checkID := entity.NewConsistencyCheckID(checkLocations...)
+	reportPage, err := h.checkSvc.GetConsistencyCheckReportEntries(ctx, checkID, req.Cursor, req.PageSize)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get consistency sets page: %w", err)
 	}
 
-	entries := make([]*pb.ConsistencyCheckReportEntry, 0, len(page.Entries))
-	for _, storageEntry := range page.Entries {
+	entries := make([]*pb.ConsistencyCheckReportEntry, 0, len(reportPage.Entries))
+	for _, reportEntry := range reportPage.Entries {
+		storageEntries := make([]*pb.ConsistencyCheckStorageEntry, 0, len(reportEntry.StorageEntries))
+		for _, entry := range reportEntry.StorageEntries {
+			storageEntries = append(storageEntries, &pb.ConsistencyCheckStorageEntry{
+				Storage:   entry.Storage,
+				VersionId: entry.VersionID,
+			})
+		}
 		entries = append(entries, &pb.ConsistencyCheckReportEntry{
-			Object:   storageEntry.Object,
-			Etag:     storageEntry.ETag,
-			Storages: storageEntry.Storages,
+			Object:         reportEntry.Object,
+			Etag:           reportEntry.Etag,
+			StorageEntries: storageEntries,
 		})
 	}
 
 	return &pb.GetConsistencyCheckReportEntriesResponse{
 		Entries: entries,
-		Cursor:  page.Cursor,
+		Cursor:  reportPage.Cursor,
 	}, nil
 }
 
 func (h *handlers) DeleteConsistencyCheckReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
-	if err := h.validateStorageLocations(req.Locations, false); err != nil {
+	if err := validate.StorageLocations(h.storages, req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
-	consistencyCheckID := MakeConsistencyCheckID(req.Locations)
-	deleteConsistencyCheckReportTask := tasks.ConsistencyCheckDeletePayload{
-		ID: consistencyCheckID,
+	checkLocations := make([]entity.ConsistencyCheckLocation, 0, len(req.Locations))
+	for _, reqLocation := range req.Locations {
+		checkLocations = append(checkLocations, entity.NewConsistencyCheckLocation(reqLocation.Storage, reqLocation.Bucket))
 	}
 
-	if err := h.queueSvc.EnqueueTask(ctx, deleteConsistencyCheckReportTask); err != nil {
-		return nil, fmt.Errorf("unable to enqueue consistency check deletion task: %w", err)
+	checkID := entity.NewConsistencyCheckID(checkLocations...)
+	if err := h.checkSvc.DeleteConsistencyCheck(ctx, checkID); err != nil {
+		return nil, fmt.Errorf("unable to delete consistency check: %w", err)
 	}
 
 	return nil, nil
@@ -496,7 +432,6 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 	if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
 		return err
 	}
-
 	client, err := h.s3clients.GetByName(ctx, req.User, req.From)
 	if err != nil {
 		return err

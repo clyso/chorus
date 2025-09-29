@@ -19,11 +19,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hibiken/asynq"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 )
 
 // encoder contains metadata for task payload.
@@ -132,18 +134,14 @@ func enqueueAny(ctx context.Context, taskClient *asynq.Client, payload any) erro
 		return consistencyCheck.Enqueue(ctx, taskClient, *p)
 	case ConsistencyCheckPayload:
 		return consistencyCheck.Enqueue(ctx, taskClient, p)
-	case *ConsistencyCheckListPayload:
-		return consistencyCheckList.Enqueue(ctx, taskClient, *p)
-	case ConsistencyCheckListPayload:
-		return consistencyCheckList.Enqueue(ctx, taskClient, p)
-	case *ConsistencyCheckReadinessPayload:
-		return consistencyCheckReadiness.Enqueue(ctx, taskClient, *p)
-	case ConsistencyCheckReadinessPayload:
-		return consistencyCheckReadiness.Enqueue(ctx, taskClient, p)
-	case *ConsistencyCheckDeletePayload:
-		return consistencyCheckDelete.Enqueue(ctx, taskClient, *p)
-	case ConsistencyCheckDeletePayload:
-		return consistencyCheckDelete.Enqueue(ctx, taskClient, p)
+	case *ConsistencyCheckListObjectsPayload:
+		return consistencyCheckListObjects.Enqueue(ctx, taskClient, *p)
+	case ConsistencyCheckListObjectsPayload:
+		return consistencyCheckListObjects.Enqueue(ctx, taskClient, p)
+	case *ConsistencyCheckListVersionsPayload:
+		return consistencyCheckListVersions.Enqueue(ctx, taskClient, *p)
+	case ConsistencyCheckListVersionsPayload:
+		return consistencyCheckListVersions.Enqueue(ctx, taskClient, p)
 	default:
 		return fmt.Errorf("%w: unsupported payload type %T. Define encoder[%T] instance in pkg/tasks/encoder.go and add it to encodeAny switch statement", dom.ErrNotImplemented, payload, payload)
 	}
@@ -257,38 +255,61 @@ var (
 		taskType: TypeApiSwitchWithDowntime,
 	}
 	consistencyCheck = encoder[ConsistencyCheckPayload]{
-		taskID: nil,
+		taskID: func(p ConsistencyCheckPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations))
+			for _, location := range p.Locations {
+				locationTokens = append(locationTokens, location.Storage, location.Bucket)
+			}
+			return toTaskID(append([]string{"cc:root"}, locationTokens...)...)
+		},
 		queue: func(p ConsistencyCheckPayload) string {
-			return string(QueueConsistencyCheck)
+			locations := make([]entity.ConsistencyCheckLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+
+			checkID := entity.NewConsistencyCheckID(locations...)
+			return ConsistencyCheckQueue(checkID)
 		},
 		taskType: TypeConsistencyCheck,
 	}
-	consistencyCheckList = encoder[ConsistencyCheckListPayload]{
-		taskID: func(p ConsistencyCheckListPayload) string {
-			return toTaskID("cc:l", p.ID, p.Storage, p.Bucket, p.Prefix)
+	consistencyCheckListObjects = encoder[ConsistencyCheckListObjectsPayload]{
+		taskID: func(p ConsistencyCheckListObjectsPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations))
+			for _, location := range p.Locations {
+				locationTokens = append(locationTokens, location.Storage, location.Bucket)
+			}
+			return toTaskID(append(append([]string{"cc:lo"}, locationTokens...), strconv.Itoa(p.Index), p.Prefix)...)
 		},
-		queue: func(p ConsistencyCheckListPayload) string {
-			return string(QueueConsistencyCheck)
+		queue: func(p ConsistencyCheckListObjectsPayload) string {
+			locations := make([]entity.ConsistencyCheckLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+
+			checkID := entity.NewConsistencyCheckID(locations...)
+			return ConsistencyCheckQueue(checkID)
 		},
-		taskType: TypeConsistencyCheckList,
+		taskType: TypeConsistencyCheckListObjects,
 	}
-	consistencyCheckReadiness = encoder[ConsistencyCheckReadinessPayload]{
-		taskID: func(p ConsistencyCheckReadinessPayload) string {
-			return toTaskID("cc:r", p.ID)
+	consistencyCheckListVersions = encoder[ConsistencyCheckListVersionsPayload]{
+		taskID: func(p ConsistencyCheckListVersionsPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations))
+			for _, location := range p.Locations {
+				locationTokens = append(locationTokens, location.Storage, location.Bucket)
+			}
+			return toTaskID(append(append([]string{"cc:lo"}, locationTokens...), strconv.Itoa(p.Index), p.Prefix)...)
 		},
-		queue: func(p ConsistencyCheckReadinessPayload) string {
-			return string(QueueConsistencyCheck)
+		queue: func(p ConsistencyCheckListVersionsPayload) string {
+			locations := make([]entity.ConsistencyCheckLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+
+			checkID := entity.NewConsistencyCheckID(locations...)
+			return ConsistencyCheckQueue(checkID)
 		},
-		taskType: TypeConsistencyCheckReadiness,
-	}
-	consistencyCheckDelete = encoder[ConsistencyCheckDeletePayload]{
-		taskID: func(p ConsistencyCheckDeletePayload) string {
-			return toTaskID("cc:d", p.ID)
-		},
-		queue: func(p ConsistencyCheckDeletePayload) string {
-			return string(QueueConsistencyCheck)
-		},
-		taskType: TypeConsistencyCheckResult,
+		taskType: TypeConsistencyCheckListVersions,
 	}
 )
 

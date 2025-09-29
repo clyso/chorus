@@ -34,6 +34,10 @@ func (r *Rnd) Int64InRange(min int64, max int64) int64 {
 	return r.rnd.Int63n(max-min+1) + min
 }
 
+func (r *Rnd) IntInRange(min int, max int) int {
+	return r.rnd.Intn(max-min+1) + min
+}
+
 func (r *Rnd) Bool() bool {
 	if r.boolRemain == 0 {
 		r.boolSource = r.rnd.Int63()

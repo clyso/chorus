@@ -111,7 +111,7 @@ func DateToAge(d *timestamppb.Timestamp) string {
 	if d == nil {
 		return "-"
 	}
-	age := time.Now().Sub(d.AsTime())
+	age := time.Since(d.AsTime())
 	return DurationToStr(age)
 }
 
@@ -168,7 +168,9 @@ func ConsistencyCheckReportHeader(storages []string) string {
 func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry) string {
 	storageMarkers := ""
 	for _, storage := range storages {
-		if slices.Contains(entry.Storages, storage) {
+		if slices.ContainsFunc(entry.StorageEntries, func(e *pb.ConsistencyCheckStorageEntry) bool {
+			return e.Storage == storage
+		}) {
 			storageMarkers += "\t✓"
 		} else {
 			storageMarkers += "\tX"

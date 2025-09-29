@@ -314,12 +314,27 @@ func NewS3Filler(tree *Tree[*GeneratedS3Object], client *minio.Client) *S3Filler
 }
 
 func (r *S3Filler) Fill(ctx context.Context, bucket string) error {
-	for item := range r.tree.DepthFirstIterator().Must() {
+	for item := range r.tree.DepthFirstValueIterator().Must() {
 		for _, reader := range item.ContentReaderIterator() {
 			_, err := r.client.PutObject(ctx, bucket, item.fullPath, reader, int64(reader.Len()), minio.PutObjectOptions{})
 			if err != nil {
 				return fmt.Errorf("unable to upload object: %w", err)
 			}
+		}
+	}
+
+	return nil
+}
+
+func (r *S3Filler) FillLast(ctx context.Context, bucket string) error {
+	for item := range r.tree.DepthFirstValueIterator().Must() {
+		if item.GetVersionCount() == 0 {
+			continue
+		}
+		reader := item.GetLastVersionContentReader()
+		_, err := r.client.PutObject(ctx, bucket, item.fullPath, reader, int64(reader.Len()), minio.PutObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("unable to upload object: %w", err)
 		}
 	}
 
@@ -339,7 +354,7 @@ func NewS3Validator(tree *Tree[*GeneratedS3Object], client *minio.Client) *S3Fil
 }
 
 func (r *S3Validator) Validator(ctx context.Context, bucket string) error {
-	for item := range r.tree.DepthFirstIterator().Must() {
+	for item := range r.tree.DepthFirstValueIterator().Must() {
 		versions := []string{}
 		objectList := r.client.ListObjects(ctx, bucket, minio.ListObjectsOptions{
 			WithVersions: true,
