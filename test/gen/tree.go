@@ -502,9 +502,10 @@ func NewTreeRandomElementPicker[T any](tree *Tree[T], rnd *Rnd) *TreeRandomEleme
 		return picker
 	}
 
-	rootlessTree := NewTree(tree.root.leftChild)
+	iterator := tree.DepthFirstNodeIterator()
+	_, _ = iterator.Next() // skip root
 
-	for node := range rootlessTree.DepthFirstNodeIterator().Must() {
+	for node := range iterator.Must() {
 		if node.leftChild == nil {
 			picker.leafs = append(picker.leafs, node)
 		} else {
