@@ -10,11 +10,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 )
 
 func Test_api_storages(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	res, err := e.ApiClient.GetStorages(tstCtx, &emptypb.Empty{})
@@ -30,7 +30,7 @@ func Test_api_storages(t *testing.T) {
 }
 
 func Test_api_proxy_creds(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	res, err := e.ApiClient.GetProxyCredentials(tstCtx, &emptypb.Empty{})
@@ -45,7 +45,7 @@ func Test_api_proxy_creds(t *testing.T) {
 }
 
 func Test_api_list_replications(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	err := e.ProxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})
@@ -68,7 +68,7 @@ func Test_api_list_replications(t *testing.T) {
 }
 
 func Test_api_get_replication(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	r := require.New(t)
 	err := e.ProxyClient.MakeBucket(tstCtx, "replications", mclient.MakeBucketOptions{})

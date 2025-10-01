@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 )
 
 func TestApi_Versioning_Bucket(t *testing.T) {
 	t.Skip()
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "bucket-versioning"

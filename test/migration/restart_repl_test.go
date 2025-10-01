@@ -9,11 +9,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 )
 
 func Test_Restart_Replication(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	bucket := "restart"

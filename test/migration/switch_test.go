@@ -33,11 +33,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 )
 
 func TestApi_ZeroDowntimeSwitch(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket"
@@ -347,7 +347,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 }
 
 func TestApi_switch_multipart(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket-multipart"
@@ -557,7 +557,7 @@ func TestApi_switch_multipart(t *testing.T) {
 }
 
 func TestApi_scheduled_switch(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket-scheduled"
@@ -777,7 +777,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 }
 
 func TestApi_scheduled_switch_continue_replication(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket = "switch-bucket-scheduled-continue"
@@ -1023,7 +1023,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 }
 
 func Test_User_switch(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket1 = "user-switch-1"

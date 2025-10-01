@@ -22,13 +22,13 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 )
 
 func TestApi_Object_CRUD(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "object-crud"
@@ -204,7 +204,7 @@ func TestApi_Object_CRUD(t *testing.T) {
 }
 
 func TestApi_Object_Folder(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "object-folder"
