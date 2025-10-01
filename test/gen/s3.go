@@ -22,7 +22,6 @@ import (
 	"io"
 	"iter"
 	"slices"
-	"strings"
 
 	"github.com/minio/minio-go/v7"
 )
@@ -290,15 +289,7 @@ func (r *S3ObjectGenerator) generateLeaf(rnd *Rnd, parentData *GeneratedS3Object
 }
 
 func (r *S3ObjectGenerator) generateName(rnd *Rnd) string {
-	nameLength := rnd.Int64InRange(r.nameLengthRange.Min, r.nameLengthRange.Max)
-	alphabetLenght := len(r.nameGenerationCharacters)
-	var nameBuilder strings.Builder
-	for i := int64(0); i < nameLength; i++ {
-		nameRuneIdx := rnd.Int64InRange(0, int64(alphabetLenght)-1)
-		nameRune := r.nameGenerationCharacters[nameRuneIdx]
-		_, _ = nameBuilder.WriteRune(nameRune)
-	}
-	return nameBuilder.String()
+	return rnd.VarLengthStringFromRunes(r.nameGenerationCharacters, r.nameLengthRange.Min, r.nameLengthRange.Max)
 }
 
 type S3Filler struct {

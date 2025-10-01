@@ -11,11 +11,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 )
 
 func TestApi_Migrate_test(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	r := require.New(t)
@@ -549,7 +549,7 @@ func TestApi_Migrate_test(t *testing.T) {
 }
 
 func Test_User_migration(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 	const (
 		bucket1 = "user-migration-1"

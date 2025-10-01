@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	"github.com/stretchr/testify/require"
@@ -13,7 +13,7 @@ import (
 
 func TestApi_Tagging_Bucket(t *testing.T) {
 	t.Skip("fake s3 does not support bucket tagging")
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "bucket-tag"
@@ -135,7 +135,7 @@ func TestApi_Tagging_Bucket(t *testing.T) {
 
 func TestApi_Tagging_Object(t *testing.T) {
 	t.Skip("fake s3 does not support bucket tagging")
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 

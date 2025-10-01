@@ -20,10 +20,14 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http/httptest"
+	"net/url"
 	"runtime"
+	"strconv"
 	"text/template"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/gophercloud/gophercloud/v2"
@@ -35,16 +39,11 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/services"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/v2/pagination"
+	"github.com/johannesboyne/gofakes3"
+	"github.com/johannesboyne/gofakes3/backend/s3mem"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
-)
-
-var (
-	//go:embed proxy-server.conf
-	proxyServerConf string
-	//go:embed ceph-entrypoint.sh
-	cephEntrypointSh string
 )
 
 const (
@@ -77,6 +76,9 @@ const (
 	CKeystoneCephOperatorRole         = "ceph-operator"
 	CKeystoneCephResellerRole         = "ceph-reseller"
 
+	CGoFakeS3EC2AccessToken = "a7f1e798b7c2417cba4a02de97dc3cdc"
+	CGoFakeS3EC2SecretToken = "18f4f6761ada4e3795fa5273c30349b9"
+
 	CSwiftImage = "ghcr.io/aiivashchenko/docker-swift:2.35.0"
 	CSwiftPort  = 8080
 
@@ -98,6 +100,13 @@ const (
 	CContainerStopDeadline = 10 * time.Second
 
 	CNATPortTemplate = "%d/tcp"
+)
+
+var (
+	//go:embed proxy-server.conf
+	proxyServerConf string
+	//go:embed ceph-entrypoint.sh
+	cephEntrypointSh string
 )
 
 // ComponentOption interface to support Functional options for test-containers.
@@ -172,6 +181,19 @@ type RedisAccessConfig struct {
 	Password string
 }
 
+type MiniRedisAccessConfig struct {
+	Port     int
+	Host     string
+	Password string
+}
+
+type GoFakeS3AccessConfig struct {
+	Port        int
+	Host        string
+	AccessToken string
+	SecretToken string
+}
+
 type KeystoneAccessConfig struct {
 	ExternalPort   ContainerPort
 	AdminPort      ContainerPort
@@ -231,19 +253,21 @@ type CephRGWTemplateValues struct {
 	ResellerRole     string
 }
 
+type Terminator func(context.Context) error
+
 type TestEnvironment struct {
 	creationConfigs map[string]ComponentCreationConfig
 	network         *testcontainers.DockerNetwork
-	containers      map[string]testcontainers.Container
 	accessConfigs   map[string]any
+	terminators     map[string]Terminator
 }
 
 func NewTestEnvironment(ctx context.Context, envConfig map[string]ComponentCreationConfig) (*TestEnvironment, error) {
 	configLen := len(envConfig)
 	env := &TestEnvironment{
 		creationConfigs: make(map[string]ComponentCreationConfig, configLen),
-		containers:      make(map[string]testcontainers.Container, configLen),
 		accessConfigs:   make(map[string]any, configLen),
+		terminators:     make(map[string]Terminator, configLen),
 	}
 	env.creationConfigs = envConfig
 
@@ -259,14 +283,18 @@ func NewTestEnvironment(ctx context.Context, envConfig map[string]ComponentCreat
 		}
 	}
 
+	go func() {
+		<-ctx.Done()
+		_ = env.Terminate(ctx)
+	}()
+
 	return env, nil
 }
 
 func (r *TestEnvironment) Terminate(ctx context.Context) error {
-	stopDuration := CContainerStopDeadline
-	for name, container := range r.containers {
-		if err := container.Stop(ctx, &stopDuration); err != nil {
-			return fmt.Errorf("unable to stop container %s: %w", name, err)
+	for name, terminate := range r.terminators {
+		if err := terminate(ctx); err != nil {
+			return fmt.Errorf("unable to stop component %s: %w", name, err)
 		}
 	}
 	if err := r.network.Remove(ctx); err != nil {
@@ -285,6 +313,30 @@ func (r *TestEnvironment) GetRedisAccessConfig(instanceName string) (*RedisAcces
 		return nil, fmt.Errorf("unable to cast instance access cfg %s to redis access cfg", instanceName)
 	}
 	return &redisAccessCfg, nil
+}
+
+func (r *TestEnvironment) GetMiniRedisAccessConfig(instanceName string) (*MiniRedisAccessConfig, error) {
+	instanceAccessCfg, ok := r.accessConfigs[instanceName]
+	if !ok {
+		return nil, fmt.Errorf("unable to find instance %s", instanceName)
+	}
+	miniRedisAccessCfg, ok := instanceAccessCfg.(MiniRedisAccessConfig)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast instance access cfg %s to mini redis access cfg", instanceName)
+	}
+	return &miniRedisAccessCfg, nil
+}
+
+func (r *TestEnvironment) GetGoFakeS3AccessConfig(instanceName string) (*GoFakeS3AccessConfig, error) {
+	instanceAccessCfg, ok := r.accessConfigs[instanceName]
+	if !ok {
+		return nil, fmt.Errorf("unable to find instance %s", instanceName)
+	}
+	goFakeS3AccessCfg, ok := instanceAccessCfg.(GoFakeS3AccessConfig)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast instance access cfg %s to go fake s3 access cfg", instanceName)
+	}
+	return &goFakeS3AccessCfg, nil
 }
 
 func (r *TestEnvironment) GetKeystoneAccessConfig(instanceName string) (*KeystoneAccessConfig, error) {
@@ -355,6 +407,26 @@ func AsRedis(opts ...ComponentOption) ComponentCreationConfig {
 	return cfg
 }
 
+func AsMiniRedis(opts ...ComponentOption) ComponentCreationConfig {
+	cfg := ComponentCreationConfig{
+		InstantiateFunc: startMiniRedisInstance,
+	}
+	for _, opt := range opts {
+		opt.apply(&cfg)
+	}
+	return cfg
+}
+
+func AsGoFakeS3(opts ...ComponentOption) ComponentCreationConfig {
+	cfg := ComponentCreationConfig{
+		InstantiateFunc: startGoFakeS3instance,
+	}
+	for _, opt := range opts {
+		opt.apply(&cfg)
+	}
+	return cfg
+}
+
 func AsKeystone(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
 		InstantiateFunc: startKeystoneInstance,
@@ -396,12 +468,12 @@ func vlan(ctx context.Context) (*testcontainers.DockerNetwork, error) {
 }
 
 func instantiate(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
-	if _, ok := env.containers[componentName]; ok {
+	if _, ok := env.terminators[componentName]; ok {
 		return nil
 	}
 
 	for _, dependencyName := range componentConfig.Dependencies {
-		if _, ok := env.containers[dependencyName]; ok {
+		if _, ok := env.terminators[dependencyName]; ok {
 			continue
 		}
 
@@ -607,7 +679,9 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 			ResellerRole: resellerRole,
 		},
 	}
-	env.containers[componentName] = container
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
 
 	return nil
 }
@@ -727,7 +801,9 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 		TenantName:     CKeystoneAdminTenantName,
 		ServiceProject: serviceProject,
 	}
-	env.containers[componentName] = container
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
 
 	return nil
 }
@@ -781,7 +857,74 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 		},
 		Password: CRedisPassword,
 	}
-	env.containers[componentName] = container
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
+
+	return nil
+}
+
+func startMiniRedisInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	miniRedis := miniredis.NewMiniRedis()
+	miniRedis.RequireAuth(CRedisPassword)
+
+	if err := miniRedis.Start(); err != nil {
+		return fmt.Errorf("unable to start miniredis: %w", err)
+	}
+
+	go func() {
+		<-ctx.Done()
+		miniRedis.Close()
+	}()
+
+	portString := miniRedis.Port()
+	port, err := strconv.Atoi(portString)
+	if err != nil {
+		return fmt.Errorf("unable to convert port string %s to int: %w", portString, err)
+	}
+
+	host := miniRedis.Host()
+
+	env.accessConfigs[componentName] = MiniRedisAccessConfig{
+		Port:     port,
+		Host:     host,
+		Password: CRedisPassword,
+	}
+
+	env.terminators[componentName] = func(ctx context.Context) error {
+		miniRedis.Close()
+		return nil
+	}
+
+	return nil
+}
+
+func startGoFakeS3instance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	fakeS3Backend := s3mem.New()
+	fakeS3 := gofakes3.New(fakeS3Backend)
+	fakeS3Server := httptest.NewServer(fakeS3.Server())
+	url, err := url.Parse(fakeS3Server.URL)
+	if err != nil {
+		return fmt.Errorf("unable to parse fake s3 url: %w", err)
+	}
+
+	portString := url.Port()
+	port, err := strconv.Atoi(portString)
+	if err != nil {
+		return fmt.Errorf("unable to convert port string %s to int: %w", portString, err)
+	}
+
+	env.accessConfigs[componentName] = GoFakeS3AccessConfig{
+		Port:        port,
+		Host:        url.Host,
+		AccessToken: CGoFakeS3EC2AccessToken,
+		SecretToken: CGoFakeS3EC2SecretToken,
+	}
+
+	env.terminators[componentName] = func(ctx context.Context) error {
+		fakeS3Server.Close()
+		return nil
+	}
 
 	return nil
 }
@@ -851,7 +994,10 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 		User:     CMinioUsername,
 		Password: CMinioPassword,
 	}
-	env.containers[componentName] = container
+	// env.containers[componentName] = container
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
 
 	return nil
 }
@@ -1060,7 +1206,9 @@ func startCephInstance(ctx context.Context, env *TestEnvironment, componentName 
 			ResellerRole: resellerRole,
 		},
 	}
-	env.containers[componentName] = container
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
 
 	return nil
 }
@@ -1074,4 +1222,12 @@ func startContainer(ctx context.Context, req testcontainers.ContainerRequest) (t
 		return nil, fmt.Errorf("unable to create container: %w", err)
 	}
 	return container, nil
+}
+
+func stopContainer(ctx context.Context, container testcontainers.Container) error {
+	stopDuration := CContainerStopDeadline
+	if err := container.Stop(ctx, &stopDuration); err != nil {
+		return fmt.Errorf("unable to stop container: %w", err)
+	}
+	return nil
 }

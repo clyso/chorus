@@ -17,12 +17,12 @@ import (
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/store"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 )
 
 func TestApi_Migrate_Load_test(t *testing.T) {
 	t.Skip()
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	const objPerBucket = 150

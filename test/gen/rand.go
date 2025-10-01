@@ -16,6 +16,7 @@ package gen
 
 import (
 	"math/rand"
+	"strings"
 )
 
 type Rnd struct {
@@ -38,6 +39,14 @@ func (r *Rnd) IntInRange(min int, max int) int {
 	return r.rnd.Intn(max-min+1) + min
 }
 
+func (r *Rnd) Int64() int64 {
+	return r.rnd.Int63()
+}
+
+func (r *Rnd) Read(p []byte) {
+	r.rnd.Read(p)
+}
+
 func (r *Rnd) Bool() bool {
 	if r.boolRemain == 0 {
 		r.boolSource = r.rnd.Int63()
@@ -51,10 +60,27 @@ func (r *Rnd) Bool() bool {
 	return val == 1
 }
 
-func (r *Rnd) Int64() int64 {
-	return r.rnd.Int63()
+func (r *Rnd) VarLengthStringFromAlphabet(alphabet string, minLength int64, maxLength int64) string {
+	resultLength := r.Int64InRange(minLength, maxLength)
+	return r.StringFromAlphabet(alphabet, resultLength)
 }
 
-func (r *Rnd) Read(p []byte) {
-	r.rnd.Read(p)
+func (r *Rnd) VarLengthStringFromRunes(alphabet []rune, minLength int64, maxLength int64) string {
+	resultLength := r.Int64InRange(minLength, maxLength)
+	return r.StringFromRunes(alphabet, resultLength)
+}
+
+func (r *Rnd) StringFromAlphabet(alphabet string, resultLength int64) string {
+	return r.StringFromRunes([]rune(alphabet), resultLength)
+}
+
+func (r *Rnd) StringFromRunes(alphabet []rune, resultLength int64) string {
+	alphabetLenght := len(alphabet)
+	var nameBuilder strings.Builder
+	for i := int64(0); i < resultLength; i++ {
+		nameRuneIdx := r.Int64InRange(0, int64(alphabetLenght)-1)
+		nameRune := alphabet[nameRuneIdx]
+		_, _ = nameBuilder.WriteRune(nameRune)
+	}
+	return nameBuilder.String()
 }

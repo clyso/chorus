@@ -6,13 +6,13 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 )
 
 func TestApi_MockBucket(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "bucket-mock"
@@ -91,7 +91,7 @@ func TestApi_MockBucket(t *testing.T) {
 }
 
 func TestApi_Bucket_CRUD(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	bucket := "bucket-crud"
@@ -176,11 +176,10 @@ func TestApi_Bucket_CRUD(t *testing.T) {
 	buckets, err = e.F2Client.ListBuckets(tstCtx)
 	r.NoError(err)
 	r.Len(buckets, 1)
-
 }
 
 func TestApi_Bucket_List(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	e.CreateMainFollowerUserReplications(t)
 	tstCtx := t.Context()
 	b1, b2 := "bucket-list-1", "bucket-list-2"

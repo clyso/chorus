@@ -10,11 +10,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/test/env"
+	"github.com/clyso/chorus/test/app"
 )
 
 func TestApi_Migrate_CustomBucket(t *testing.T) {
-	e := env.SetupEmbedded(t, workerConf, proxyConf)
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
 
 	bucketSrc := "src-cb-test"
