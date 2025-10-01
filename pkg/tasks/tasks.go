@@ -179,6 +179,7 @@ type MigrateLocation struct {
 type ConsistencyCheckPayload struct {
 	Locations []MigrateLocation
 	User      string
+	Versioned bool
 }
 
 type ConsistencyCheckListObjectsPayload struct {

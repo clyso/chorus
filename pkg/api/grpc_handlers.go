@@ -111,6 +111,11 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 		})
 	}
 
+	shouldCheckVersions, err := h.checkSvc.ShouldCheckVersions(ctx, req.User, checkLocations)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine if should check version: %w", err)
+	}
+
 	checkID := entity.NewConsistencyCheckID(checkLocations...)
 	if err := h.checkSvc.RegisterConsistencyCheck(ctx, checkID, taskLocations); err != nil {
 		return nil, fmt.Errorf("unable to start consistency check: %w", err)
@@ -119,6 +124,7 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 	consistencyCheckTask := tasks.ConsistencyCheckPayload{
 		Locations: taskLocations,
 		User:      req.User,
+		Versioned: shouldCheckVersions,
 	}
 	if err := h.queueSvc.EnqueueTask(ctx, consistencyCheckTask); err != nil {
 		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)

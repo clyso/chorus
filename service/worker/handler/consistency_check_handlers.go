@@ -54,27 +54,12 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheck(ctx context.Context, t *as
 		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
 	}
 
-	locationCount := len(payload.Locations)
-	if locationCount == 0 {
-		return fmt.Errorf("migration location list is empty: %w", asynq.SkipRetry)
-	}
-
-	locations := make([]entity.ConsistencyCheckLocation, 0, locationCount)
-	for _, payloadLocation := range payload.Locations {
-		locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
-	}
-
-	shouldCheckVersions, err := r.svc.ShouldCheckVersions(ctx, payload.User, locations)
-	if err != nil {
-		return fmt.Errorf("unable to create consistency check list task: %w", err)
-	}
-
 	for idx := range payload.Locations {
 		if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListObjectsPayload{
 			Locations: payload.Locations,
 			User:      payload.User,
 			Index:     idx,
-			Versioned: shouldCheckVersions,
+			Versioned: payload.Versioned,
 		}); err != nil {
 			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
