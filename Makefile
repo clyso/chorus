@@ -33,6 +33,12 @@ imports:
 	go tool goimports -local github.com/clyso/chorus -w ./service
 	go tool goimports -local github.com/clyso/chorus -w ./tools
 
+.PHONY: fieldalignment
+fieldalignment:
+	go tool betteralign -apply ./pkg/... ./test/... ./cmd/... || true
+	cd ./tools/chorctl && go tool betteralign -apply ./... || true
+	cd ./tools/bench && go tool betteralign -apply ./... || true
+
 .PHONY: lint
 lint:
 	go tool golangci-lint run
@@ -50,7 +56,7 @@ license-fix:
 	find . -name "*.go" ! -name "*_test.go" | xargs go tool addlicense -c 'Clyso GmbH' || (echo "Missing license headers"; exit 1)
 
 .PHONY: pretty
-pretty: tidy gen fmt vet imports lint vuln license-check
+pretty: tidy gen fmt vet imports fieldalignment lint vuln license-check
 
 .PHONY: mkdir-build
 mkdir-build: 

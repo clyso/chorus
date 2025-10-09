@@ -23,17 +23,17 @@ import (
 )
 
 type Config struct {
-	MemoryLimit     MemoryLimit               `yaml:"memoryLimit"`
 	MemoryCalc      MemoryCalc                `yaml:"memoryCalc"`
+	MemoryLimit     MemoryLimit               `yaml:"memoryLimit"`
 	LocalFileLimit  ratelimit.SemaphoreConfig `yaml:"localFileLimit"`
 	GlobalFileLimit ratelimit.SemaphoreConfig `yaml:"globalFileLimit"`
 }
 
 type MemoryLimit struct {
-	Enabled  bool          `yaml:"enabled"`
 	Limit    string        `yaml:"limit"`
 	RetryMin time.Duration `yaml:"retryMin"`
 	RetryMax time.Duration `yaml:"retryMax"`
+	Enabled  bool          `yaml:"enabled"`
 }
 
 type MemoryCalc struct {

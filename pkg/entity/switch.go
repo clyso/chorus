@@ -62,11 +62,11 @@ type ReplicationSwitchZeroDowntimeOpts struct {
 }
 
 type ReplicationSwitchDowntimeOpts struct {
-	StartOnInitDone     bool          `redis:"onInitDone"`
 	Cron                *string       `redis:"cron,omitempty"`
 	StartAt             *time.Time    `redis:"startAt,omitempty"`
-	MaxDuration         time.Duration `redis:"maxDuration,omitempty"`
 	MaxEventLag         *uint32       `redis:"maxEventLag,omitempty"`
+	MaxDuration         time.Duration `redis:"maxDuration,omitempty"`
+	StartOnInitDone     bool          `redis:"onInitDone"`
 	SkipBucketCheck     bool          `redis:"skipBucketCheck,omitempty"`
 	ContinueReplication bool          `redis:"continueReplication,omitempty"`
 }
@@ -101,22 +101,22 @@ func (w *ReplicationSwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 
 // Contains all information about replication switch including its configuration and current status.
 type ReplicationSwitchInfo struct {
-	// Options for downtime switch
-	ReplicationSwitchDowntimeOpts
-	// Options for zero downtime switch
-	ReplicationSwitchZeroDowntimeOpts
-	// ID of replication policy of this switch
-	ReplicationIDStr string `redis:"replicationID"`
 	// Time of switch creation
 	CreatedAt time.Time `redis:"createdAt"`
-	// Last status of switch
-	LastStatus ReplicationSwitchStatus `redis:"lastStatus,omitempty"`
 	// Time of last switch was in progress
 	LastStartedAt *time.Time `redis:"startedAt,omitempty"`
 	// Time of last switch was done
 	DoneAt *time.Time `redis:"doneAt,omitempty"`
+	// Options for downtime switch
+	ReplicationSwitchDowntimeOpts
+	// ID of replication policy of this switch
+	ReplicationIDStr string `redis:"replicationID"`
+	// Last status of switch
+	LastStatus ReplicationSwitchStatus `redis:"lastStatus,omitempty"`
 	// History of switch status changes
 	History []string `redis:"-"`
+	// Options for zero downtime switch
+	ReplicationSwitchZeroDowntimeOpts
 }
 
 func (s *ReplicationSwitchInfo) ReplicationID() UniversalReplicationID {

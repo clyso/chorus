@@ -111,9 +111,9 @@ func (r *GeneratedS3ObjectContentReader) Read(p []byte) (int, error) {
 }
 
 type GeneratedS3Object struct {
+	contentLengthRange *GeneratorRange
 	name               string
 	fullPath           string
-	contentLengthRange *GeneratorRange
 	contentSeed        int64
 	versionCount       uint64
 }
@@ -197,10 +197,10 @@ func WithNameCharacters(chars []rune) S3ObjectGeneratorOptions {
 
 type S3ObjectGenerator struct {
 	contentLenghtRange       *GeneratorRange
-	versioned                bool
 	versionRange             *GeneratorRange
 	nameLengthRange          *GeneratorRange
 	nameGenerationCharacters []rune
+	versioned                bool
 }
 
 func NewS3ObjectGenerator(opts ...S3ObjectGeneratorOptions) *S3ObjectGenerator {

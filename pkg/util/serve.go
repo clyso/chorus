@@ -38,9 +38,9 @@ type server struct {
 }
 
 type worker struct {
-	name    string
 	work    func(ctx context.Context) error
 	cleanUp func(ctx context.Context) error
+	name    string
 }
 
 func (s *server) Add(name string, work func(ctx context.Context) error, cleanUp func(ctx context.Context) error) error {

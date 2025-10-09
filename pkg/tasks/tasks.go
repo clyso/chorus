@@ -167,8 +167,8 @@ type ObjPayload struct {
 	Name        string
 	VersionID   string
 	ETag        string
-	Size        int64
 	ContentType string
+	Size        int64
 }
 
 type MigrateLocation struct {
@@ -177,22 +177,22 @@ type MigrateLocation struct {
 }
 
 type ConsistencyCheckPayload struct {
-	Locations []MigrateLocation
 	User      string
+	Locations []MigrateLocation
 	Versioned bool
 }
 
 type ConsistencyCheckListObjectsPayload struct {
-	Locations []MigrateLocation
 	User      string
-	Index     int
 	Prefix    string
+	Locations []MigrateLocation
+	Index     int
 	Versioned bool
 }
 
 type ConsistencyCheckListVersionsPayload struct {
-	Locations []MigrateLocation
 	User      string
-	Index     int
 	Prefix    string
+	Locations []MigrateLocation
+	Index     int
 }

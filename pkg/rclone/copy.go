@@ -51,12 +51,12 @@ type ObjectVersionInfo struct {
 }
 
 type ObjectInfo struct {
+	LastModified time.Time
 	Key          string
 	VersionID    string
-	LastModified time.Time
 	Etag         string
-	Size         uint64
 	StorageClass string
+	Size         uint64
 }
 
 type CopySvc interface {

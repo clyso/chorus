@@ -131,9 +131,9 @@ func WithRetry(retry bool) LockOpt {
 }
 
 type RedisIDKeyLocker[ID any] struct {
-	overlap time.Duration
-	locker  *redislock.Client
 	RedisIDCommonStore[ID]
+	locker  *redislock.Client
+	overlap time.Duration
 }
 
 func NewRedisIDKeyLocker[ID any](client redis.Cmdable, keyPrefix string,

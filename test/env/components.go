@@ -137,8 +137,8 @@ func WithDisabledSTDErrLog() ComponentOption {
 }
 
 type ContainerLogConsumer struct {
-	componentName string
 	disabledLogs  map[string]struct{}
+	componentName string
 }
 
 func NewContainerLogConsumer(componenetName string, disabled []string) *ContainerLogConsumer {
@@ -170,39 +170,39 @@ type ContainerPort struct {
 }
 
 type ComponentCreationConfig struct {
+	InstantiateFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
 	Dependencies    []string
 	DisabledLogs    []string
-	InstantiateFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
 }
 
 type RedisAccessConfig struct {
-	Port     ContainerPort
 	Host     ContainerHost
 	Password string
+	Port     ContainerPort
 }
 
 type MiniRedisAccessConfig struct {
-	Port     int
 	Host     string
 	Password string
+	Port     int
 }
 
 type GoFakeS3AccessConfig struct {
-	Port        int
 	Host        string
 	AccessToken string
 	SecretToken string
+	Port        int
 }
 
 type KeystoneAccessConfig struct {
-	ExternalPort   ContainerPort
-	AdminPort      ContainerPort
+	DefaultDomain  *domains.Domain
+	ServiceProject *projects.Project
 	Host           ContainerHost
 	User           string
 	Password       string
 	TenantName     string
-	DefaultDomain  *domains.Domain
-	ServiceProject *projects.Project
+	ExternalPort   ContainerPort
+	AdminPort      ContainerPort
 }
 
 type StorageKeystoneAccessConfig struct {
@@ -211,46 +211,46 @@ type StorageKeystoneAccessConfig struct {
 }
 
 type SwiftAccessConfig struct {
-	Port     ContainerPort
-	Host     ContainerHost
 	Keystone StorageKeystoneAccessConfig
+	Host     ContainerHost
+	Port     ContainerPort
 }
 
 type MinioAccessConfig struct {
-	S3Port         ContainerPort
-	ManagementPort ContainerPort
 	Host           ContainerHost
 	User           string
 	Password       string
+	S3Port         ContainerPort
+	ManagementPort ContainerPort
 }
 
 type CephAccessConfig struct {
-	Port     ContainerPort
-	Host     ContainerHost
 	Keystone StorageKeystoneAccessConfig
+	Host     ContainerHost
+	Port     ContainerPort
 }
 
 type SwiftProxyConfigTemplateValues struct {
 	AuthHost         string
-	AdminAuthPort    int
-	ExternalAuthPort int
 	AdminTenant      string
 	AdminDomain      string
 	AdminUser        string
 	AdminPassword    string
 	OperatorRole     string
 	ResellerRole     string
+	AdminAuthPort    int
+	ExternalAuthPort int
 }
 
 type CephRGWTemplateValues struct {
 	AuthHost         string
-	ExternalAuthPort int
 	AdminProject     string
 	AdminDomain      string
 	AdminUser        string
 	AdminPassword    string
 	OperatorRole     string
 	ResellerRole     string
+	ExternalAuthPort int
 }
 
 type Terminator func(context.Context) error

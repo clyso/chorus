@@ -128,16 +128,16 @@ func isOnline(ctx context.Context, c *client) error {
 }
 
 type client struct {
+	metricsSvc metrics.S3Service
 	c          *http.Client
 	s3         *S3
 	aws        *AWS
 	sns        *sns.Client
 	online     *atomic.Bool
-	conf       s3.Storage
+	cred       s3.CredentialsV4
 	name       string
 	user       string
-	cred       s3.CredentialsV4
-	metricsSvc metrics.S3Service
+	conf       s3.Storage
 }
 
 func (c *client) SNS() *sns.Client {

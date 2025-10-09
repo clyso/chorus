@@ -46,6 +46,7 @@ const (
 )
 
 type Config struct {
+	_lastAdjusted  time.Time
 	DB             string
 	Bucket         string
 	Api            string
@@ -58,7 +59,6 @@ type Config struct {
 	ListMax        int64
 	StartedTs      int64
 	LastCount      int64
-	_lastAdjusted  time.Time
 	_m             sync.Mutex
 }
 

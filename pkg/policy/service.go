@@ -45,7 +45,7 @@ func NewService(client redis.UniversalClient, queueSVC tasks.QueueService, mainS
 }
 
 type policySvc struct {
-	mainStorage        string
+	queueSvc           tasks.QueueService
 	userRoutingStore   *store.UserRoutingStore
 	bucketRoutingStore *store.BucketRoutingStore
 
@@ -57,5 +57,5 @@ type policySvc struct {
 	userReplicationSwitchStore   *store.UserReplicationSwitchStore
 	bucketReplicationSwitchStore *store.BucketReplicationSwitchStore
 
-	queueSvc tasks.QueueService
+	mainStorage string
 }
