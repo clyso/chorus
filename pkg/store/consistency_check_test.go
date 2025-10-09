@@ -56,7 +56,7 @@ var _ = Describe("Consistency checker stores", func() {
 		for i := 0; i < int(locationCount)-1; i++ {
 			location := locations[i]
 			for _, key := range ids {
-				err := store.Add(ctx, key, entity.NewConsistencyCheckSetEntry(location.Storage), uint8(locationCount))
+				err := store.Add(ctx, key, entity.NewConsistencyCheckSetEntry(location), uint8(locationCount))
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -67,7 +67,7 @@ var _ = Describe("Consistency checker stores", func() {
 
 		lastLocation := locations[locationCount-1]
 		for idx, key := range ids {
-			err := store.Add(ctx, key, entity.NewConsistencyCheckSetEntry(lastLocation.Storage), uint8(locationCount))
+			err := store.Add(ctx, key, entity.NewConsistencyCheckSetEntry(lastLocation), uint8(locationCount))
 			Expect(err).NotTo(HaveOccurred())
 			keys, err := testRedisClient.Keys(ctx, "*").Result()
 			Expect(keys).To(HaveLen(int(keyCount) - idx - 1))
