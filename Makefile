@@ -35,9 +35,9 @@ imports:
 
 .PHONY: fieldalignment
 fieldalignment:
-	go tool betteralign -apply ./pkg/... ./test/... ./cmd/... || true
-	cd ./tools/chorctl && go tool betteralign -apply ./... || true
-	cd ./tools/bench && go tool betteralign -apply ./... || true
+	until go tool betteralign -apply ./pkg/... ./test/... ./cmd/... ; do :; done
+	cd ./tools/chorctl && until go tool betteralign -apply ./... ; do :; done
+	cd ./tools/bench && until go tool betteralign -apply ./... ; do :; done
 
 .PHONY: lint
 lint:
