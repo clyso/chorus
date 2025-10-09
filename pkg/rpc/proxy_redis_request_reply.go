@@ -36,8 +36,8 @@ const (
 )
 
 type GetCredentialsResp struct {
-	Address string
 	Creds   map[string]s3.CredentialsV4
+	Address string
 }
 
 type Proxy interface {

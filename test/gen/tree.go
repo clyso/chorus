@@ -363,11 +363,11 @@ type TreeGenerationTask[T any] struct {
 }
 
 type TreeGenerator[T any] struct {
-	forceTargetDepth bool
+	objectGenerator  ObjectGenerator[T]
 	depthRange       *GeneratorRange
 	widthRange       *GeneratorRange
-	objectGenerator  ObjectGenerator[T]
 	rnd              *Rnd
+	forceTargetDepth bool
 }
 
 func NewTreeGenerator[T any](opts ...TreeGeneratorOption[T]) (*TreeGenerator[T], error) {
@@ -485,9 +485,9 @@ func (r *TreeGenerator[T]) setDefaults() error {
 
 type TreeRandomElementPicker[T any] struct {
 	root   *TreeNode[T]
+	rnd    *Rnd
 	joints []*TreeNode[T]
 	leafs  []*TreeNode[T]
-	rnd    *Rnd
 }
 
 func NewTreeRandomElementPicker[T any](tree *Tree[T], rnd *Rnd) *TreeRandomElementPicker[T] {

@@ -39,18 +39,19 @@ type StorageConfig struct {
 }
 
 type Storage struct {
-	Address             string                   `yaml:"address"`
-	Credentials         map[string]CredentialsV4 `yaml:"credentials"`
-	Provider            string                   `yaml:"provider"`
-	IsMain              bool                     `yaml:"isMain"`
-	HealthCheckInterval time.Duration            `yaml:"healthCheckInterval"`
-	HttpTimeout         time.Duration            `yaml:"httpTimeout"`
-	IsSecure            bool                     `yaml:"isSecure"`
-	DefaultRegion       string                   `yaml:"defaultRegion"`
+	Credentials   map[string]CredentialsV4 `yaml:"credentials"`
+	Address       string                   `yaml:"address"`
+	Provider      string                   `yaml:"provider"`
+	DefaultRegion string                   `yaml:"defaultRegion"`
+
+	credentialList []string
 
 	RateLimit RateLimit `yaml:"rateLimit"`
 
-	credentialList []string
+	HealthCheckInterval time.Duration `yaml:"healthCheckInterval"`
+	HttpTimeout         time.Duration `yaml:"httpTimeout"`
+	IsMain              bool          `yaml:"isMain"`
+	IsSecure            bool          `yaml:"isSecure"`
 }
 
 type RateLimit struct {

@@ -90,11 +90,12 @@ func NewBucketRoutingPolicyID(user string, bucket string) BucketRoutingPolicyID 
 }
 
 type ReplicationStatus struct {
-	CreatedAt  time.Time `redis:"created_at"`
-	IsArchived bool      `redis:"archived"`
-	AgentURL   string    `redis:"agent_url,omitempty"`
+	CreatedAt time.Time `redis:"created_at"`
 
 	ArchivedAt *time.Time `redis:"archived_at,omitempty"`
+	AgentURL   string     `redis:"agent_url,omitempty"`
+
+	IsArchived bool `redis:"archived"`
 }
 
 type ReplicationStatusExtended struct {

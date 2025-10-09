@@ -395,8 +395,8 @@ func (r *RedisIDCommonStore[ID]) RestoreID(key string) (ID, error) {
 }
 
 type RedisCommonStore struct {
-	keyPrefix string
 	client    redis.Cmdable
+	keyPrefix string
 }
 
 func NewRedisCommonStore(client redis.Cmdable, keyPrefix string) *RedisCommonStore {

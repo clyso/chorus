@@ -17,8 +17,8 @@
 package api
 
 type Config struct {
-	Enabled  bool `yaml:"enabled"`
 	GrpcPort int  `yaml:"grpcPort"`
 	HttpPort int  `yaml:"httpPort"`
+	Enabled  bool `yaml:"enabled"`
 	Secure   bool `yaml:"secure"`
 }

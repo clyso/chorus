@@ -25,9 +25,8 @@ import (
 )
 
 type Handler struct {
+	replSvc     replication.Service
 	fromStorage string
-
-	replSvc replication.Service
 }
 
 func NewHandler(fromStorage string, replSvc replication.Service) *Handler {

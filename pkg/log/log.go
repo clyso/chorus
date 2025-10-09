@@ -38,8 +38,8 @@ const (
 )
 
 type Config struct {
-	Json  bool   `yaml:"json"`
 	Level string `yaml:"level"`
+	Json  bool   `yaml:"json"`
 }
 
 func GetLogger(cfg *Config, app, appID string) zerolog.Logger {

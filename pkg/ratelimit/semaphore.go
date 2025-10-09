@@ -113,9 +113,9 @@ func GlobalSemaphore(rc redis.UniversalClient, c SemaphoreConfig, name string) *
 var _ Semaphore = &Global{}
 
 type Global struct {
-	c    SemaphoreConfig
 	rc   redis.UniversalClient
 	name string
+	c    SemaphoreConfig
 }
 
 func (g *Global) TryAcquire(ctx context.Context) (func(), error) {

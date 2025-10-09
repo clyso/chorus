@@ -68,15 +68,17 @@ type UI struct {
 	client pb.ChorusClient
 	ctx    context.Context
 
-	storages []*pb.Storage
-	main     *pb.Storage
-	err      error
+	err error
 
-	data     []*pb.Replication
-	selected string
+	main     *pb.Storage
 	table    *table.Model
-	spinner  spinner.Model
 	events   chan tea.Msg
+	selected string
+
+	storages []*pb.Storage
+
+	data    []*pb.Replication
+	spinner spinner.Model
 }
 
 func (u *UI) Init() tea.Cmd {

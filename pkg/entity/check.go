@@ -50,9 +50,9 @@ func NewConsistencyCheckID(locations ...ConsistencyCheckLocation) ConsistencyChe
 }
 
 type ConsistencyCheckObjectID struct {
-	ConsistencyCheckID ConsistencyCheckID
 	Storage            string
 	Prefix             string
+	ConsistencyCheckID ConsistencyCheckID
 }
 
 func NewConsistencyCheckObjectID(consistencyCheckID ConsistencyCheckID, storage string, prefix string) ConsistencyCheckObjectID {
@@ -64,10 +64,10 @@ func NewConsistencyCheckObjectID(consistencyCheckID ConsistencyCheckID, storage 
 }
 
 type ConsistencyCheckSetID struct {
-	ConsistencyCheckID ConsistencyCheckID
 	Object             string
-	VersionIndex       uint64
 	Etag               string
+	ConsistencyCheckID ConsistencyCheckID
+	VersionIndex       uint64
 }
 
 func NewConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, etag string) ConsistencyCheckSetID {
@@ -107,9 +107,9 @@ func NewVersionedConsistencyCheckSetEntry(location ConsistencyCheckLocation, ver
 
 type ConsistencyCheckReportEntry struct {
 	Object         string
-	VersionIndex   uint64
 	Etag           string
 	StorageEntries []ConsistencyCheckSetEntry
+	VersionIndex   uint64
 }
 
 func NewConsistencyCheckReportEntry(object string, versionIndex uint64, etag string, storageEntries []ConsistencyCheckSetEntry) ConsistencyCheckReportEntry {

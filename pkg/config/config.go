@@ -44,18 +44,18 @@ type Common struct {
 }
 
 type Redis struct {
+	Sentinel RedisSentinel `yaml:"sentinel"`
 	// Deprecated: Address is deprecated: use Addresses
 	// If Addresses set, Address will be ignored
-	Address   string        `yaml:"address"`
-	Addresses []string      `yaml:"addresses"`
-	Sentinel  RedisSentinel `yaml:"sentinel"`
-	User      string        `yaml:"user"`
-	Password  string        `yaml:"password"`
-	TLS       TLS           `yaml:"tls"`
-	MetaDB    int           `yaml:"metaDB"`
-	QueueDB   int           `yaml:"queueDB"`
-	LockDB    int           `yaml:"lockDB"`
-	ConfigDB  int           `yaml:"configDB"`
+	Address   string   `yaml:"address"`
+	User      string   `yaml:"user"`
+	Password  string   `yaml:"password"`
+	Addresses []string `yaml:"addresses"`
+	MetaDB    int      `yaml:"metaDB"`
+	QueueDB   int      `yaml:"queueDB"`
+	LockDB    int      `yaml:"lockDB"`
+	ConfigDB  int      `yaml:"configDB"`
+	TLS       TLS      `yaml:"tls"`
 }
 
 type RedisSentinel struct {

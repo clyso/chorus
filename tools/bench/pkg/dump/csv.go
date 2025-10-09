@@ -28,8 +28,8 @@ import (
 )
 
 type BenchEvent struct {
-	Count int64
 	Data  []string
+	Count int64
 }
 
 func ToCSV(conf *config.Config, fileName string, header []string, ch <-chan BenchEvent) error {

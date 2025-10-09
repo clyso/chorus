@@ -81,13 +81,13 @@ type CompareRes struct {
 	SrcStor  string
 	DestStor string
 	Bucket   string
-	IsMatch  bool
 
 	MissFrom []string
 	MissTo   []string
 	Differ   []string
 	Error    []string
 	Match    []string
+	IsMatch  bool
 }
 
 func (f File) path() string {
