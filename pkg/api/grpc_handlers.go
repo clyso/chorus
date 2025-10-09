@@ -210,7 +210,7 @@ func (h *handlers) GetConsistencyCheckReportEntries(ctx context.Context, req *pb
 		storageEntries := make([]*pb.ConsistencyCheckStorageEntry, 0, len(reportEntry.StorageEntries))
 		for _, entry := range reportEntry.StorageEntries {
 			storageEntries = append(storageEntries, &pb.ConsistencyCheckStorageEntry{
-				Storage:   entry.Storage,
+				Storage:   entry.Location.Storage,
 				VersionId: entry.VersionID,
 			})
 		}

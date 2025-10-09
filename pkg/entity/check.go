@@ -88,19 +88,19 @@ func NewVersionedConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, ob
 }
 
 type ConsistencyCheckSetEntry struct {
-	Storage   string
+	Location  ConsistencyCheckLocation
 	VersionID string
 }
 
-func NewConsistencyCheckSetEntry(storage string) ConsistencyCheckSetEntry {
+func NewConsistencyCheckSetEntry(location ConsistencyCheckLocation) ConsistencyCheckSetEntry {
 	return ConsistencyCheckSetEntry{
-		Storage: storage,
+		Location: location,
 	}
 }
 
-func NewVersionedConsistencyCheckSetEntry(storage string, versionID string) ConsistencyCheckSetEntry {
+func NewVersionedConsistencyCheckSetEntry(location ConsistencyCheckLocation, versionID string) ConsistencyCheckSetEntry {
 	return ConsistencyCheckSetEntry{
-		Storage:   storage,
+		Location:  location,
 		VersionID: versionID,
 	}
 }

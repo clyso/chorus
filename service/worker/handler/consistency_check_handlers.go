@@ -221,7 +221,7 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 
 			id := entity.NewConsistencyCheckSetID(checkID, object.Key, object.Etag)
 
-			entry := entity.NewConsistencyCheckSetEntry(location.Storage)
+			entry := entity.NewConsistencyCheckSetEntry(location)
 			if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
 				yield(ObjectTask{}, fmt.Errorf("unable to add storage to consistency check set: %w", err))
 				return
@@ -237,7 +237,7 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 		isEmptyDir := lastObject == "" && objectCount == 0 && prefix != ""
 
 		id := entity.NewConsistencyCheckSetID(checkID, prefix, CEmptyDirETagPlaceholder)
-		entry := entity.NewConsistencyCheckSetEntry(location.Storage)
+		entry := entity.NewConsistencyCheckSetEntry(location)
 		if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
 			yield(ObjectTask{}, fmt.Errorf("unable to add storage to consistency check set: %w", err))
 			return
@@ -265,7 +265,7 @@ func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID
 			return fmt.Errorf("unable to list object versions: %w", err)
 		}
 		setID := entity.NewVersionedConsistencyCheckSetID(checkID, object.Key, versionIdx, object.Etag)
-		entry := entity.NewVersionedConsistencyCheckSetEntry(location.Storage, object.VersionID)
+		entry := entity.NewVersionedConsistencyCheckSetEntry(location, object.VersionID)
 		if err := r.setStore.Add(ctx, setID, entry, uint8(locationCount)); err != nil {
 			return fmt.Errorf("unable to add to check set: %w", err)
 		}

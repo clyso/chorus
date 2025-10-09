@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,7 +42,6 @@ var _ = Describe("Common stores", func() {
 			Expect(err).NotTo(HaveOccurred())
 			_, err = testRedisClient.Set(ctx, key, i, 0).Result()
 			Expect(err).NotTo(HaveOccurred())
-			fmt.Println("idx", i, key)
 		}
 
 		keys, err := testRedisClient.Keys(ctx, "*").Result()
