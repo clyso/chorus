@@ -84,7 +84,7 @@ func userReplicationToPb(id entity.UserReplicationPolicy, value entity.Replicati
 }
 
 func toListed(in entity.QueueStats) int64 {
-	return int64(in.Unprocessed + in.Done + in.Failed)
+	return int64(in.Unprocessed + in.Done)
 }
 
 func strPtr(s string) *string {

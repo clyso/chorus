@@ -55,7 +55,7 @@ func Test_queueService_UnprocessedCount(t *testing.T) {
 	r.Equal(1, count, "expected queue to have 1 unprocessed task")
 
 	// dequeue all tasks
-	archieved, err := inspector.ArchiveAllPendingTasks(queueName)
+	archieved, err := inspector.DeleteAllPendingTasks(queueName)
 	r.NoError(err, "failed to archive all pending tasks")
 	r.Equal(1, archieved, "expected to archive 1 task")
 
@@ -152,7 +152,7 @@ func Test_queueService_RetriedTasksCountAsUnprocessed(t *testing.T) {
 	r.Equal(1, count, "expected queue to have 1 unprocessed task")
 
 	// dequeue all retry tasks
-	archieved, err := inspector.ArchiveAllRetryTasks(queueName)
+	archieved, err := inspector.DeleteAllRetryTasks(queueName)
 	r.NoError(err, "failed to archive all pending tasks")
 	r.Equal(1, archieved, "expected to archive 1 task")
 
@@ -293,7 +293,6 @@ func Test_queueService_Stats(t *testing.T) {
 	// compare with inspector info
 	info, err := inspector.GetQueueInfo(queueName)
 	r.NoError(err, "failed to get queue info from inspector")
-	r.Equal(info.FailedTotal, stats.FailedTotal, "expected stats failed total to match inspector info")
 	r.Equal(info.ProcessedTotal, stats.ProcessedTotal, "expected stats processed total to match inspector info")
 	r.Equal(info.MemoryUsage, stats.MemoryUsage, "expected stats memory usage to match inspector info")
 }

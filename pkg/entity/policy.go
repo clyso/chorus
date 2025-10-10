@@ -119,8 +119,6 @@ type QueueStats struct {
 	Unprocessed int
 	// Total number of successfully processed tasks.
 	Done int
-	// Failed  are tasks that exceeded maximum retries and were removed from the queue.
-	Failed int
 	// Age of the oldest pending task in the queue.
 	Latency time.Duration
 	// Approx bytes used by the queue and its tasks in Redis.

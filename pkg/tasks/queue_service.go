@@ -43,9 +43,6 @@ type QueueStats struct {
 	Unprocessed int
 	// Total number of tasks processed.
 	ProcessedTotal int
-	// Total number of tasks failed.
-	// Failed tasks are those that have been retried the maximum number of times and removed from the queue.
-	FailedTotal int
 
 	// Paused indicates whether the queue is paused.
 	// If true, tasks in the queue will not be processed.
@@ -83,9 +80,8 @@ func (q *queueService) Stats(ctx context.Context, queueName string) (*QueueStats
 		return nil, err
 	}
 	return &QueueStats{
-		Unprocessed:    unprocessedCount(info),
+		Unprocessed:    info.Size,
 		ProcessedTotal: info.ProcessedTotal,
-		FailedTotal:    info.FailedTotal,
 		Paused:         info.Paused,
 		MemoryUsage:    info.MemoryUsage,
 		Latency:        info.Latency,
@@ -116,13 +112,9 @@ func (q *queueService) UnprocessedCount(ctx context.Context, ignoreNotFound bool
 		if err != nil {
 			return 0, err
 		}
-		count += unprocessedCount(info)
+		count += info.Size
 	}
 	return count, nil
-}
-
-func unprocessedCount(info *asynq.QueueInfo) int {
-	return info.Pending + info.Active + info.Scheduled + info.Retry
 }
 
 func (q *queueService) IsPaused(ctx context.Context, queueName string) (bool, error) {
