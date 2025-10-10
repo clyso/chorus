@@ -157,7 +157,6 @@ func (r *policySvc) buildQueueStats(ctx context.Context, queues []string) (bool,
 	result := entity.QueueStats{
 		Unprocessed: 0,
 		Done:        0,
-		Failed:      0,
 		Latency:     0,
 		MemoryUsage: 0,
 	}
@@ -177,7 +176,6 @@ func (r *policySvc) buildQueueStats(ctx context.Context, queues []string) (bool,
 		// sum up counters for all queues
 		result.Unprocessed += stats.Unprocessed
 		result.Done += stats.ProcessedTotal
-		result.Failed += stats.FailedTotal
 		result.MemoryUsage += stats.MemoryUsage
 		if result.Latency < stats.Latency {
 			// return the maximum latency across all queues
