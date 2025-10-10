@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.24"
+          go-version: "1.25"
       - name: make test
         run: make test TEST_WAIT_SHORT=20s TEST_WAIT_LONG=80s
       - name: Run Proto Generation

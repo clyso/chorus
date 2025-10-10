@@ -1,4 +1,4 @@
-FROM golang:1.24 as builder
+FROM golang:1.25 as builder
 ARG GIT_COMMIT='not set'
 ARG GIT_TAG=development
 ENV GIT_COMMIT=$GIT_COMMIT
