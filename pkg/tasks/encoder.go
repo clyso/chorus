@@ -21,11 +21,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hibiken/asynq"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+)
+
+const (
+	taskTimeout = time.Hour * 8 // overrides asynq default task timeout (30m)
 )
 
 // encoder contains metadata for task payload.
@@ -52,7 +57,7 @@ func (e encoder[T]) Encode(ctx context.Context, payload T) (*asynq.Task, error) 
 		return nil, err
 	}
 	queue := e.queue(payload)
-	optionList := []asynq.Option{asynq.Queue(queue)}
+	optionList := []asynq.Option{asynq.Queue(queue), asynq.Timeout(taskTimeout)}
 	if e.taskID != nil {
 		id := e.taskID(payload)
 		if id == "" {
