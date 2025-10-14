@@ -97,6 +97,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	inspector := asynq.NewInspector(queueRedis)
 	defer inspector.Close()
 	queueSvc := tasks.NewQueueService(taskClient, inspector)
+	err = policy.CheckSchemaCompatibility(ctx, app.Version, confRedis)
+	if err != nil {
+		return err
+	}
 	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main())
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
