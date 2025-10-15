@@ -111,20 +111,30 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 		})
 	}
 
-	shouldCheckVersions, err := h.checkSvc.ShouldCheckVersions(ctx, req.User, checkLocations)
-	if err != nil {
-		return nil, fmt.Errorf("unable to determine if should check version: %w", err)
+	shouldCheckVersions := !req.CheckOnlyLastVersions
+
+	if shouldCheckVersions {
+		var err error
+		shouldCheckVersions, err = h.checkSvc.ShouldCheckVersions(ctx, req.User, checkLocations)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if should check version: %w", err)
+		}
 	}
 
+	withSizeCheck := !req.DoNotCheckSizes
+	withEtagCheck := !req.DoNotCheckEtags && !req.DoNotCheckSizes
 	checkID := entity.NewConsistencyCheckID(checkLocations...)
-	if err := h.checkSvc.RegisterConsistencyCheck(ctx, checkID, taskLocations); err != nil {
+	settings := entity.NewConsistencyCheckSettings(shouldCheckVersions, withSizeCheck, withEtagCheck)
+	if err := h.checkSvc.RegisterConsistencyCheck(ctx, checkID, settings); err != nil {
 		return nil, fmt.Errorf("unable to start consistency check: %w", err)
 	}
 
 	consistencyCheckTask := tasks.ConsistencyCheckPayload{
-		Locations: taskLocations,
-		User:      req.User,
-		Versioned: shouldCheckVersions,
+		Locations:       taskLocations,
+		User:            req.User,
+		Versioned:       shouldCheckVersions,
+		DoNotCheckEtags: req.DoNotCheckEtags,
+		DoNotCheckSizes: req.DoNotCheckSizes,
 	}
 	if err := h.queueSvc.EnqueueTask(ctx, consistencyCheckTask); err != nil {
 		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)
@@ -154,6 +164,9 @@ func (h *handlers) ListConsistencyChecks(ctx context.Context, _ *emptypb.Empty) 
 			Completed:  check.Completed,
 			Ready:      check.Ready,
 			Consistent: check.Consistent,
+			Versioned:  check.Versioned,
+			WithSize:   check.WithSize,
+			WithEtag:   check.WithEtag,
 		})
 	}
 
@@ -185,6 +198,9 @@ func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.Consis
 			Completed:  checkStatus.Completed,
 			Ready:      checkStatus.Ready,
 			Consistent: checkStatus.Consistent,
+			Versioned:  checkStatus.Versioned,
+			WithSize:   checkStatus.WithSize,
+			WithEtag:   checkStatus.WithEtag,
 		},
 	}, nil
 }
@@ -216,6 +232,8 @@ func (h *handlers) GetConsistencyCheckReportEntries(ctx context.Context, req *pb
 		}
 		entries = append(entries, &pb.ConsistencyCheckReportEntry{
 			Object:         reportEntry.Object,
+			VersionIdx:     reportEntry.VersionIndex,
+			Size:           reportEntry.Size,
 			Etag:           reportEntry.Etag,
 			StorageEntries: storageEntries,
 		})

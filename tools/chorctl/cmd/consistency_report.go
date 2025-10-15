@@ -85,13 +85,13 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 		w.Flush()
 
 		w = tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, api.ConsistencyCheckReportHeader(storages))
+		fmt.Fprintln(w, api.ConsistencyCheckReportHeader(storages, res.Check.Versioned, res.Check.WithSize, res.Check.WithEtag))
 
 		pageSize := uint64(10)
 		cursor := uint64(0)
 
 		for {
-			res, err := client.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			page, err := client.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				Cursor:    cursor,
 				PageSize:  pageSize,
@@ -100,15 +100,15 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 				logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency check report entries")
 			}
 
-			for _, entry := range res.Entries {
-				fmt.Fprintln(w, api.ConsistencyCheckReportRow(storages, entry))
+			for _, entry := range page.Entries {
+				fmt.Fprintln(w, api.ConsistencyCheckReportRow(storages, entry, res.Check.Versioned, res.Check.WithSize, res.Check.WithEtag))
 			}
 
-			if res.Cursor == 0 {
+			if page.Cursor == 0 {
 				break
 			}
 
-			cursor = res.Cursor
+			cursor = page.Cursor
 		}
 
 		w.Flush()

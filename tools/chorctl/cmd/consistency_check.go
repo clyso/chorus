@@ -30,7 +30,10 @@ import (
 )
 
 var (
-	consistencyCheckUser string
+	consistencyCheckUser  string
+	doNotCheckEtags       bool
+	doNotCheckSizes       bool
+	checkOnlyLastVersions bool
 )
 
 var consistencyCheckCmd = &cobra.Command{
@@ -39,7 +42,14 @@ var consistencyCheckCmd = &cobra.Command{
 	Long: `Start consistency check against 2 or more buckets.
 
 Example:
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
+# Check bucket contents by matching etag
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username
+# Check bucket contents by matching sizes
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --no-etag-check
+# Check bucket contents by matching object list
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --no-size-check
+# Check bucket contents by matching last versions of object
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --last-versions-only`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -57,6 +67,18 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
 			})
 		}
 
+		if doNotCheckSizes {
+			doNotCheckEtags = true
+		}
+
+		request := &pb.StartConsistencyCheckRequest{
+			Locations:             locations,
+			User:                  consistencyCheckUser,
+			DoNotCheckEtags:       doNotCheckEtags,
+			DoNotCheckSizes:       doNotCheckSizes,
+			CheckOnlyLastVersions: checkOnlyLastVersions,
+		}
+
 		conn, err := api.Connect(ctx, address)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
@@ -64,7 +86,7 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
 		defer conn.Close()
 
 		client := pb.NewChorusClient(conn)
-		if _, err = client.StartConsistencyCheck(ctx, &pb.StartConsistencyCheckRequest{Locations: locations, User: consistencyCheckUser}); err != nil {
+		if _, err = client.StartConsistencyCheck(ctx, request); err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}
 		fmt.Println("Consistency check has been created.")
@@ -74,6 +96,9 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username`,
 func init() {
 	consistencyCmd.AddCommand(consistencyCheckCmd)
 	consistencyCheckCmd.Flags().StringVarP(&consistencyCheckUser, "user", "u", "", "storage user")
+	consistencyCheckCmd.Flags().BoolVarP(&doNotCheckEtags, "no-etag-check", "e", false, "do not perform etag check")
+	consistencyCheckCmd.Flags().BoolVarP(&doNotCheckSizes, "no-size-check", "s", false, "do not perform etag and size check")
+	consistencyCheckCmd.Flags().BoolVarP(&checkOnlyLastVersions, "last-versions-only", "l", false, "check only last versions")
 	err := consistencyCheckCmd.MarkFlagRequired("user")
 	if err != nil {
 		logrus.WithError(err).Fatal()

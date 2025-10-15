@@ -211,11 +211,14 @@ func (x *MigrateLocation) GetBucket() string {
 }
 
 type StartConsistencyCheckRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Locations     []*MigrateLocation     `protobuf:"bytes,1,rep,name=locations,proto3" json:"locations,omitempty"`
-	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Locations             []*MigrateLocation     `protobuf:"bytes,1,rep,name=locations,proto3" json:"locations,omitempty"`
+	User                  string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	CheckOnlyLastVersions bool                   `protobuf:"varint,3,opt,name=checkOnlyLastVersions,proto3" json:"checkOnlyLastVersions,omitempty"`
+	DoNotCheckEtags       bool                   `protobuf:"varint,4,opt,name=doNotCheckEtags,proto3" json:"doNotCheckEtags,omitempty"`
+	DoNotCheckSizes       bool                   `protobuf:"varint,5,opt,name=doNotCheckSizes,proto3" json:"doNotCheckSizes,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *StartConsistencyCheckRequest) Reset() {
@@ -260,6 +263,27 @@ func (x *StartConsistencyCheckRequest) GetUser() string {
 		return x.User
 	}
 	return ""
+}
+
+func (x *StartConsistencyCheckRequest) GetCheckOnlyLastVersions() bool {
+	if x != nil {
+		return x.CheckOnlyLastVersions
+	}
+	return false
+}
+
+func (x *StartConsistencyCheckRequest) GetDoNotCheckEtags() bool {
+	if x != nil {
+		return x.DoNotCheckEtags
+	}
+	return false
+}
+
+func (x *StartConsistencyCheckRequest) GetDoNotCheckSizes() bool {
+	if x != nil {
+		return x.DoNotCheckSizes
+	}
+	return false
 }
 
 type ConsistencyCheckRequest struct {
@@ -308,12 +332,14 @@ func (x *ConsistencyCheckRequest) GetLocations() []*MigrateLocation {
 
 type ConsistencyCheck struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Locations     []*MigrateLocation     `protobuf:"bytes,2,rep,name=locations,proto3" json:"locations,omitempty"`
 	Queued        uint64                 `protobuf:"varint,3,opt,name=queued,proto3" json:"queued,omitempty"`
 	Completed     uint64                 `protobuf:"varint,4,opt,name=completed,proto3" json:"completed,omitempty"`
 	Ready         bool                   `protobuf:"varint,5,opt,name=ready,proto3" json:"ready,omitempty"`
 	Consistent    bool                   `protobuf:"varint,6,opt,name=consistent,proto3" json:"consistent,omitempty"`
+	Versioned     bool                   `protobuf:"varint,7,opt,name=versioned,proto3" json:"versioned,omitempty"`
+	WithSize      bool                   `protobuf:"varint,8,opt,name=withSize,proto3" json:"withSize,omitempty"`
+	WithEtag      bool                   `protobuf:"varint,9,opt,name=withEtag,proto3" json:"withEtag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -348,13 +374,6 @@ func (*ConsistencyCheck) Descriptor() ([]byte, []int) {
 	return file_chorus_chorus_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ConsistencyCheck) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
 func (x *ConsistencyCheck) GetLocations() []*MigrateLocation {
 	if x != nil {
 		return x.Locations
@@ -386,6 +405,27 @@ func (x *ConsistencyCheck) GetReady() bool {
 func (x *ConsistencyCheck) GetConsistent() bool {
 	if x != nil {
 		return x.Consistent
+	}
+	return false
+}
+
+func (x *ConsistencyCheck) GetVersioned() bool {
+	if x != nil {
+		return x.Versioned
+	}
+	return false
+}
+
+func (x *ConsistencyCheck) GetWithSize() bool {
+	if x != nil {
+		return x.WithSize
+	}
+	return false
+}
+
+func (x *ConsistencyCheck) GetWithEtag() bool {
+	if x != nil {
+		return x.WithEtag
 	}
 	return false
 }
@@ -577,8 +617,10 @@ func (x *ConsistencyCheckStorageEntry) GetVersionId() string {
 type ConsistencyCheckReportEntry struct {
 	state          protoimpl.MessageState          `protogen:"open.v1"`
 	Object         string                          `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
-	Etag           string                          `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
-	StorageEntries []*ConsistencyCheckStorageEntry `protobuf:"bytes,3,rep,name=storageEntries,proto3" json:"storageEntries,omitempty"`
+	VersionIdx     uint64                          `protobuf:"varint,2,opt,name=versionIdx,proto3" json:"versionIdx,omitempty"`
+	Size           uint64                          `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	Etag           string                          `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`
+	StorageEntries []*ConsistencyCheckStorageEntry `protobuf:"bytes,5,rep,name=storageEntries,proto3" json:"storageEntries,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -618,6 +660,20 @@ func (x *ConsistencyCheckReportEntry) GetObject() string {
 		return x.Object
 	}
 	return ""
+}
+
+func (x *ConsistencyCheckReportEntry) GetVersionIdx() uint64 {
+	if x != nil {
+		return x.VersionIdx
+	}
+	return 0
+}
+
+func (x *ConsistencyCheckReportEntry) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
 }
 
 func (x *ConsistencyCheckReportEntry) GetEtag() string {
@@ -2633,21 +2689,26 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x13chorus/chorus.proto\x12\x06chorus\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"C\n" +
 	"\x0fMigrateLocation\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x16\n" +
-	"\x06bucket\x18\x02 \x01(\tR\x06bucket\"i\n" +
+	"\x06bucket\x18\x02 \x01(\tR\x06bucket\"\xf3\x01\n" +
 	"\x1cStartConsistencyCheckRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\x12\x12\n" +
-	"\x04user\x18\x02 \x01(\tR\x04user\"P\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\x124\n" +
+	"\x15checkOnlyLastVersions\x18\x03 \x01(\bR\x15checkOnlyLastVersions\x12(\n" +
+	"\x0fdoNotCheckEtags\x18\x04 \x01(\bR\x0fdoNotCheckEtags\x12(\n" +
+	"\x0fdoNotCheckSizes\x18\x05 \x01(\bR\x0fdoNotCheckSizes\"P\n" +
 	"\x17ConsistencyCheckRequest\x125\n" +
-	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\"\xc5\x01\n" +
-	"\x10ConsistencyCheck\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x125\n" +
+	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\"\x8b\x02\n" +
+	"\x10ConsistencyCheck\x125\n" +
 	"\tlocations\x18\x02 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\x12\x16\n" +
 	"\x06queued\x18\x03 \x01(\x04R\x06queued\x12\x1c\n" +
 	"\tcompleted\x18\x04 \x01(\x04R\tcompleted\x12\x14\n" +
 	"\x05ready\x18\x05 \x01(\bR\x05ready\x12\x1e\n" +
 	"\n" +
 	"consistent\x18\x06 \x01(\bR\n" +
-	"consistent\"Q\n" +
+	"consistent\x12\x1c\n" +
+	"\tversioned\x18\a \x01(\bR\tversioned\x12\x1a\n" +
+	"\bwithSize\x18\b \x01(\bR\bwithSize\x12\x1a\n" +
+	"\bwithEtag\x18\t \x01(\bR\bwithEtag\"Q\n" +
 	"\x1dListConsistencyChecksResponse\x120\n" +
 	"\x06checks\x18\x01 \x03(\v2\x18.chorus.ConsistencyCheckR\x06checks\"Y\n" +
 	" GetConsistencyCheckReportRequest\x125\n" +
@@ -2656,11 +2717,15 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x05check\x18\x01 \x01(\v2\x18.chorus.ConsistencyCheckR\x05check\"V\n" +
 	"\x1cConsistencyCheckStorageEntry\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x1c\n" +
-	"\tversionId\x18\x02 \x01(\tR\tversionId\"\x97\x01\n" +
+	"\tversionId\x18\x02 \x01(\tR\tversionId\"\xcb\x01\n" +
 	"\x1bConsistencyCheckReportEntry\x12\x16\n" +
-	"\x06object\x18\x01 \x01(\tR\x06object\x12\x12\n" +
-	"\x04etag\x18\x02 \x01(\tR\x04etag\x12L\n" +
-	"\x0estorageEntries\x18\x03 \x03(\v2$.chorus.ConsistencyCheckStorageEntryR\x0estorageEntries\"\x94\x01\n" +
+	"\x06object\x18\x01 \x01(\tR\x06object\x12\x1e\n" +
+	"\n" +
+	"versionIdx\x18\x02 \x01(\x04R\n" +
+	"versionIdx\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x04R\x04size\x12\x12\n" +
+	"\x04etag\x18\x04 \x01(\tR\x04etag\x12L\n" +
+	"\x0estorageEntries\x18\x05 \x03(\v2$.chorus.ConsistencyCheckStorageEntryR\x0estorageEntries\"\x94\x01\n" +
 	"'GetConsistencyCheckReportEntriesRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\x12\x16\n" +
 	"\x06Cursor\x18\x02 \x01(\x04R\x06Cursor\x12\x1a\n" +

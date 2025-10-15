@@ -93,6 +93,7 @@ var _ = BeforeSuite(func() {
 
 	objGen := gen.NewS3ObjectGenerator(
 		gen.WithVersioned(),
+		gen.WithVersionRange(2, 10),
 	)
 	genOpts := []gen.TreeGeneratorOption[*gen.GeneratedS3Object]{
 		gen.WithObjectGenerator(objGen),
@@ -319,6 +320,109 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
+
+		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: locations,
+			PageSize:  10,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(checkEntries.Entries).To(HaveLen(0))
+	})
+
+	It("Should succeed, check only sizes", func() {
+		ctx := context.WithoutCancel(testCtx)
+
+		joint := testTreePicker.RandomJointValue()
+		jointPath := joint.GetFullPath()
+
+		objectPath := jointPath + "filewithdiffetag"
+
+		_, err := testMinioClient.PutObject(ctx, CBucket1, objectPath, bytes.NewReader([]byte{1, 2, 3, 4}), 4, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = testMinioClient.PutObject(ctx, CBucket2, objectPath, bytes.NewReader([]byte{5, 6, 7, 8}), 4, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			_, err := testMinioClient.StatObject(ctx, CBucket1, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			_, err = testMinioClient.StatObject(ctx, CBucket2, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		checkRequest := &pb.StartConsistencyCheckRequest{
+			Locations:       locations,
+			User:            CSyncUserKey,
+			DoNotCheckEtags: true,
+		}
+		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		Expect(err).NotTo(HaveOccurred())
+
+		var getCheckResponse *pb.GetConsistencyCheckReportResponse
+		Eventually(func(g Gomega) {
+			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(getCheckResponse).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
+
+		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: locations,
+			PageSize:  10,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(checkEntries.Entries).To(HaveLen(0))
+	})
+
+	It("Should succeed, check only list", func() {
+		ctx := context.WithoutCancel(testCtx)
+
+		joint := testTreePicker.RandomJointValue()
+		jointPath := joint.GetFullPath()
+
+		objectPath := jointPath + "filewithdiffetag"
+
+		_, err := testMinioClient.PutObject(ctx, CBucket1, objectPath, bytes.NewReader([]byte{1, 2, 3, 4}), 4, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = testMinioClient.PutObject(ctx, CBucket2, objectPath, bytes.NewReader([]byte{5, 6, 7, 8, 9}), 5, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			_, err := testMinioClient.StatObject(ctx, CBucket1, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			_, err = testMinioClient.StatObject(ctx, CBucket2, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		checkRequest := &pb.StartConsistencyCheckRequest{
+			Locations:       locations,
+			User:            CSyncUserKey,
+			DoNotCheckSizes: true,
+		}
+		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		Expect(err).NotTo(HaveOccurred())
+
+		var getCheckResponse *pb.GetConsistencyCheckReportResponse
+		Eventually(func(g Gomega) {
+			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(getCheckResponse).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
+		Expect(getCheckResponse.Check.WithSize).To(BeFalse())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
 		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
@@ -364,6 +468,9 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -433,6 +540,9 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -501,6 +611,9 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -568,6 +681,9 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -659,6 +775,182 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
+
+		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: locations,
+			PageSize:  10,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(checkEntries.Entries).To(HaveLen(0))
+	})
+
+	It("Should succeed, check only sizes", func() {
+		ctx := context.WithoutCancel(testCtx)
+
+		leaf := testTreePicker.RandomLeafValue()
+		objectPath := leaf.GetFullPath()
+
+		_, err := testMinioClient.PutObject(ctx, CBucket1, objectPath, bytes.NewReader([]byte{1, 2, 3, 4}), 4, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = testMinioClient.PutObject(ctx, CBucket2, objectPath, bytes.NewReader([]byte{5, 6, 7, 8}), 4, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			stat1, err := testMinioClient.StatObject(ctx, CBucket1, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(stat1.Size).To(BeNumerically("==", 4))
+			stat2, err := testMinioClient.StatObject(ctx, CBucket2, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(stat2.Size).To(BeNumerically("==", 4))
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		checkRequest := &pb.StartConsistencyCheckRequest{
+			Locations:       locations,
+			User:            CSyncUserKey,
+			DoNotCheckEtags: true,
+		}
+		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		Expect(err).NotTo(HaveOccurred())
+
+		var getCheckResponse *pb.GetConsistencyCheckReportResponse
+		Eventually(func(g Gomega) {
+			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(getCheckResponse).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
+
+		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: locations,
+			PageSize:  10,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(checkEntries.Entries).To(HaveLen(0))
+	})
+
+	It("Should succeed, check only list", func() {
+		ctx := context.WithoutCancel(testCtx)
+
+		leaf := testTreePicker.RandomLeafValue()
+		objectPath := leaf.GetFullPath()
+
+		_, err := testMinioClient.PutObject(ctx, CBucket1, objectPath, bytes.NewReader([]byte{1, 2, 3, 4}), 4, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = testMinioClient.PutObject(ctx, CBucket2, objectPath, bytes.NewReader([]byte{5, 6, 7, 8, 9}), 5, minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			stat1, err := testMinioClient.StatObject(ctx, CBucket1, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(stat1.Size).To(BeNumerically("==", 4))
+			stat2, err := testMinioClient.StatObject(ctx, CBucket2, objectPath, minio.StatObjectOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(stat2.Size).To(BeNumerically("==", 5))
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		checkRequest := &pb.StartConsistencyCheckRequest{
+			Locations:       locations,
+			User:            CSyncUserKey,
+			DoNotCheckSizes: true,
+		}
+		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		Expect(err).NotTo(HaveOccurred())
+
+		var getCheckResponse *pb.GetConsistencyCheckReportResponse
+		Eventually(func(g Gomega) {
+			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(getCheckResponse).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
+		Expect(getCheckResponse.Check.WithSize).To(BeFalse())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
+
+		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: locations,
+			PageSize:  10,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(checkEntries.Entries).To(HaveLen(0))
+	})
+
+	It("Should succeed, check only last version", func() {
+		ctx := context.WithoutCancel(testCtx)
+
+		leaf := testTreePicker.RandomLeafValue()
+		leafPath := leaf.GetFullPath()
+		versionCount := leaf.GetVersionCount()
+		Expect(versionCount).To(BeNumerically(">", 0))
+		versionIdx := testRnd.IntInRange(1, int(versionCount)-1)
+
+		objectVersionChan := testMinioClient.ListObjectsIter(ctx, CBucket2, minio.ListObjectsOptions{
+			Prefix:       strings.TrimPrefix(leafPath, "/"),
+			WithVersions: true,
+		})
+
+		versionId := ""
+		currentVersionIdx := 0
+		for version := range objectVersionChan {
+			Expect(version.Err).NotTo(HaveOccurred())
+
+			if currentVersionIdx == versionIdx {
+				versionId = version.VersionID
+				break
+			}
+
+			currentVersionIdx++
+		}
+		Expect(versionId).NotTo(BeEmpty())
+
+		err := testMinioClient.RemoveObject(ctx, CBucket2, leafPath, minio.RemoveObjectOptions{
+			VersionID: versionId,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			_, err := testMinioClient.StatObject(ctx, CBucket2, leafPath, minio.StatObjectOptions{
+				VersionID: versionId,
+			})
+			g.Expect(err).To(HaveOccurred())
+			minioErr, ok := err.(minio.ErrorResponse)
+			g.Expect(ok).To(BeTrue())
+			g.Expect(minioErr.StatusCode).To(Equal(http.StatusNotFound))
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		checkRequest := &pb.StartConsistencyCheckRequest{
+			Locations:             locations,
+			User:                  CSyncUserKey,
+			CheckOnlyLastVersions: true,
+		}
+		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		Expect(err).NotTo(HaveOccurred())
+
+		var getCheckResponse *pb.GetConsistencyCheckReportResponse
+		Eventually(func(g Gomega) {
+			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(getCheckResponse).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check).NotTo(BeNil())
+			g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+		Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
 		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
@@ -704,6 +996,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -773,6 +1068,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -841,6 +1139,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -908,6 +1209,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
@@ -946,10 +1250,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		leafPath := leaf.GetFullPath()
 		versionCount := leaf.GetVersionCount()
 		Expect(versionCount).To(BeNumerically(">", 0))
-		versionIdx := 0
-		if versionCount != 1 {
-			versionIdx = testRnd.IntInRange(0, int(versionCount)-1)
-		}
+		versionIdx := testRnd.IntInRange(0, int(versionCount)-1)
 
 		objectVersionChan := testMinioClient.ListObjectsIter(ctx, CBucket2, minio.ListObjectsOptions{
 			Prefix:       strings.TrimPrefix(leafPath, "/"),
@@ -1003,6 +1304,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+		Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
+		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"text/tabwriter"
 
 	"github.com/sirupsen/logrus"
@@ -54,10 +53,6 @@ chorctl consistency`,
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency checks")
 		}
-
-		sort.Slice(res.Checks, func(i, j int) bool {
-			return res.Checks[i].Id < res.Checks[j].Id
-		})
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
