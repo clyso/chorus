@@ -215,8 +215,8 @@ type StartConsistencyCheckRequest struct {
 	Locations             []*MigrateLocation     `protobuf:"bytes,1,rep,name=locations,proto3" json:"locations,omitempty"`
 	User                  string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
 	CheckOnlyLastVersions bool                   `protobuf:"varint,3,opt,name=checkOnlyLastVersions,proto3" json:"checkOnlyLastVersions,omitempty"`
-	DoNotCheckEtags       bool                   `protobuf:"varint,4,opt,name=doNotCheckEtags,proto3" json:"doNotCheckEtags,omitempty"`
-	DoNotCheckSizes       bool                   `protobuf:"varint,5,opt,name=doNotCheckSizes,proto3" json:"doNotCheckSizes,omitempty"`
+	IgnoreEtags           bool                   `protobuf:"varint,4,opt,name=ignoreEtags,proto3" json:"ignoreEtags,omitempty"`
+	IgnoreSizes           bool                   `protobuf:"varint,5,opt,name=ignoreSizes,proto3" json:"ignoreSizes,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -272,16 +272,16 @@ func (x *StartConsistencyCheckRequest) GetCheckOnlyLastVersions() bool {
 	return false
 }
 
-func (x *StartConsistencyCheckRequest) GetDoNotCheckEtags() bool {
+func (x *StartConsistencyCheckRequest) GetIgnoreEtags() bool {
 	if x != nil {
-		return x.DoNotCheckEtags
+		return x.IgnoreEtags
 	}
 	return false
 }
 
-func (x *StartConsistencyCheckRequest) GetDoNotCheckSizes() bool {
+func (x *StartConsistencyCheckRequest) GetIgnoreSizes() bool {
 	if x != nil {
-		return x.DoNotCheckSizes
+		return x.IgnoreSizes
 	}
 	return false
 }
@@ -2689,13 +2689,13 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x13chorus/chorus.proto\x12\x06chorus\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"C\n" +
 	"\x0fMigrateLocation\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x16\n" +
-	"\x06bucket\x18\x02 \x01(\tR\x06bucket\"\xf3\x01\n" +
+	"\x06bucket\x18\x02 \x01(\tR\x06bucket\"\xe3\x01\n" +
 	"\x1cStartConsistencyCheckRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\x12\x12\n" +
 	"\x04user\x18\x02 \x01(\tR\x04user\x124\n" +
-	"\x15checkOnlyLastVersions\x18\x03 \x01(\bR\x15checkOnlyLastVersions\x12(\n" +
-	"\x0fdoNotCheckEtags\x18\x04 \x01(\bR\x0fdoNotCheckEtags\x12(\n" +
-	"\x0fdoNotCheckSizes\x18\x05 \x01(\bR\x0fdoNotCheckSizes\"P\n" +
+	"\x15checkOnlyLastVersions\x18\x03 \x01(\bR\x15checkOnlyLastVersions\x12 \n" +
+	"\vignoreEtags\x18\x04 \x01(\bR\vignoreEtags\x12 \n" +
+	"\vignoreSizes\x18\x05 \x01(\bR\vignoreSizes\"P\n" +
 	"\x17ConsistencyCheckRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\"\x8b\x02\n" +
 	"\x10ConsistencyCheck\x125\n" +

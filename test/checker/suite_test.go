@@ -353,9 +353,9 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		checkRequest := &pb.StartConsistencyCheckRequest{
-			Locations:       locations,
-			User:            CSyncUserKey,
-			DoNotCheckEtags: true,
+			Locations:   locations,
+			User:        CSyncUserKey,
+			IgnoreEtags: true,
 		}
 		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
@@ -403,9 +403,9 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		checkRequest := &pb.StartConsistencyCheckRequest{
-			Locations:       locations,
-			User:            CSyncUserKey,
-			DoNotCheckSizes: true,
+			Locations:   locations,
+			User:        CSyncUserKey,
+			IgnoreSizes: true,
 		}
 		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
@@ -808,9 +808,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		checkRequest := &pb.StartConsistencyCheckRequest{
-			Locations:       locations,
-			User:            CSyncUserKey,
-			DoNotCheckEtags: true,
+			Locations:   locations,
+			User:        CSyncUserKey,
+			IgnoreEtags: true,
 		}
 		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
@@ -858,9 +858,9 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 		checkRequest := &pb.StartConsistencyCheckRequest{
-			Locations:       locations,
-			User:            CSyncUserKey,
-			DoNotCheckSizes: true,
+			Locations:   locations,
+			User:        CSyncUserKey,
+			IgnoreSizes: true,
 		}
 		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())

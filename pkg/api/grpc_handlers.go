@@ -121,8 +121,8 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 		}
 	}
 
-	withSizeCheck := !req.DoNotCheckSizes
-	withEtagCheck := !req.DoNotCheckEtags && !req.DoNotCheckSizes
+	withSizeCheck := !req.IgnoreSizes
+	withEtagCheck := !req.IgnoreEtags && !req.IgnoreSizes
 	checkID := entity.NewConsistencyCheckID(checkLocations...)
 	settings := entity.NewConsistencyCheckSettings(shouldCheckVersions, withSizeCheck, withEtagCheck)
 	if err := h.checkSvc.RegisterConsistencyCheck(ctx, checkID, settings); err != nil {
@@ -130,11 +130,11 @@ func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsi
 	}
 
 	consistencyCheckTask := tasks.ConsistencyCheckPayload{
-		Locations:       taskLocations,
-		User:            req.User,
-		Versioned:       shouldCheckVersions,
-		DoNotCheckEtags: req.DoNotCheckEtags,
-		DoNotCheckSizes: req.DoNotCheckSizes,
+		Locations:   taskLocations,
+		User:        req.User,
+		Versioned:   shouldCheckVersions,
+		IgnoreEtags: req.IgnoreEtags,
+		IgnoreSizes: req.IgnoreSizes,
 	}
 	if err := h.queueSvc.EnqueueTask(ctx, consistencyCheckTask); err != nil {
 		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)

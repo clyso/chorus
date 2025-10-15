@@ -1361,10 +1361,10 @@
         "checkOnlyLastVersions": {
           "type": "boolean"
         },
-        "doNotCheckEtags": {
+        "ignoreEtags": {
           "type": "boolean"
         },
-        "doNotCheckSizes": {
+        "ignoreSizes": {
           "type": "boolean"
         }
       }

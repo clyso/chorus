@@ -177,28 +177,28 @@ type MigrateLocation struct {
 }
 
 type ConsistencyCheckPayload struct {
-	User            string
-	Locations       []MigrateLocation
-	Versioned       bool
-	DoNotCheckEtags bool
-	DoNotCheckSizes bool
+	User        string
+	Locations   []MigrateLocation
+	Versioned   bool
+	IgnoreEtags bool
+	IgnoreSizes bool
 }
 
 type ConsistencyCheckListObjectsPayload struct {
-	User            string
-	Prefix          string
-	Locations       []MigrateLocation
-	Index           int
-	Versioned       bool
-	DoNotCheckEtags bool
-	DoNotCheckSizes bool
+	User        string
+	Prefix      string
+	Locations   []MigrateLocation
+	Index       int
+	Versioned   bool
+	IgnoreEtags bool
+	IgnoreSizes bool
 }
 
 type ConsistencyCheckListVersionsPayload struct {
-	User            string
-	Prefix          string
-	Locations       []MigrateLocation
-	Index           int
-	DoNotCheckEtags bool
-	DoNotCheckSizes bool
+	User         string
+	Prefix       string
+	Locations    []MigrateLocation
+	Index        int
+	IgonoreEtags bool
+	IgnoreSizes  bool
 }

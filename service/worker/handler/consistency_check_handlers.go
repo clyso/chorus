@@ -56,12 +56,12 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheck(ctx context.Context, t *as
 
 	for idx := range payload.Locations {
 		if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListObjectsPayload{
-			Locations:       payload.Locations,
-			User:            payload.User,
-			Index:           idx,
-			Versioned:       payload.Versioned,
-			DoNotCheckEtags: payload.DoNotCheckEtags,
-			DoNotCheckSizes: payload.DoNotCheckSizes,
+			Locations:   payload.Locations,
+			User:        payload.User,
+			Index:       idx,
+			Versioned:   payload.Versioned,
+			IgnoreEtags: payload.IgnoreEtags,
+			IgnoreSizes: payload.IgnoreSizes,
 		}); err != nil {
 			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
@@ -92,7 +92,7 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckList(ctx context.Context, t
 
 	objectTasks := r.svc.ObjectTasks(ctx, checkID, payload.User,
 		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix,
-		payload.Versioned, payload.DoNotCheckEtags, payload.DoNotCheckSizes)
+		payload.Versioned, payload.IgnoreEtags, payload.IgnoreSizes)
 	for objectTask, err := range objectTasks {
 		if err != nil {
 			return fmt.Errorf("unable to list object tasks: %w", err)
@@ -100,24 +100,24 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckList(ctx context.Context, t
 
 		if objectTask.Dir {
 			if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListObjectsPayload{
-				Locations:       payload.Locations,
-				User:            payload.User,
-				Index:           payload.Index,
-				Prefix:          objectTask.Key,
-				Versioned:       payload.Versioned,
-				DoNotCheckEtags: payload.DoNotCheckEtags,
-				DoNotCheckSizes: payload.DoNotCheckSizes,
+				Locations:   payload.Locations,
+				User:        payload.User,
+				Index:       payload.Index,
+				Prefix:      objectTask.Key,
+				Versioned:   payload.Versioned,
+				IgnoreEtags: payload.IgnoreEtags,
+				IgnoreSizes: payload.IgnoreSizes,
 			}); err != nil {
 				return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 			}
 		} else {
 			if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListVersionsPayload{
-				Locations:       payload.Locations,
-				User:            payload.User,
-				Index:           payload.Index,
-				Prefix:          objectTask.Key,
-				DoNotCheckEtags: payload.DoNotCheckEtags,
-				DoNotCheckSizes: payload.DoNotCheckSizes,
+				Locations:    payload.Locations,
+				User:         payload.User,
+				Index:        payload.Index,
+				Prefix:       objectTask.Key,
+				IgonoreEtags: payload.IgnoreEtags,
+				IgnoreSizes:  payload.IgnoreSizes,
 			}); err != nil {
 				return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 			}
@@ -145,7 +145,7 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckListVersions(ctx context.Co
 	bucket := payload.Locations[payload.Index].Bucket
 
 	if err := r.svc.AccountObjectVersions(ctx, checkID, payload.User,
-		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix, payload.DoNotCheckEtags, payload.DoNotCheckSizes); err != nil {
+		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix, payload.IgonoreEtags, payload.IgnoreSizes); err != nil {
 		return fmt.Errorf("unable to account object versions: %w", err)
 	}
 
@@ -194,7 +194,7 @@ type ObjectTask struct {
 }
 
 func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.ConsistencyCheckID,
-	user string, location entity.ConsistencyCheckLocation, prefix string, versioned bool, doNotCheckEtags bool, doNotCheckSizes bool) iter.Seq2[ObjectTask, error] {
+	user string, location entity.ConsistencyCheckLocation, prefix string, versioned bool, ignoreEtags bool, ignoreSizes bool) iter.Seq2[ObjectTask, error] {
 	locationCount := len(checkID.Locations)
 	objectID := entity.NewConsistencyCheckObjectID(checkID, location.Storage, prefix)
 
@@ -232,9 +232,9 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 
 			var id entity.ConsistencyCheckSetID
 			switch {
-			case doNotCheckSizes:
+			case ignoreSizes:
 				id = entity.NewNameConsistencyCheckSetID(checkID, object.Key)
-			case doNotCheckEtags:
+			case ignoreEtags:
 				id = entity.NewSizeConsistencyCheckSetID(checkID, object.Key, object.Size)
 			default:
 				id = entity.NewEtagConsistencyCheckSetID(checkID, object.Key, object.Size, object.Etag)
@@ -271,7 +271,7 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 }
 
 func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID entity.ConsistencyCheckID,
-	user string, location entity.ConsistencyCheckLocation, prefix string, doNotCheckEtags bool, doNotCheckSizes bool) error {
+	user string, location entity.ConsistencyCheckLocation, prefix string, ignoreEtags bool, ignoreSizes bool) error {
 	locationCount := len(checkID.Locations)
 	listBucket := rclone.Bucket{
 		Storage: location.Storage,
@@ -287,9 +287,9 @@ func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID
 
 		var id entity.ConsistencyCheckSetID
 		switch {
-		case doNotCheckSizes:
+		case ignoreSizes:
 			id = entity.NewVersionedNameConsistencyCheckSetID(checkID, object.Key, versionIdx)
-		case doNotCheckEtags:
+		case ignoreEtags:
 			id = entity.NewVersionedSizeConsistencyCheckSetID(checkID, object.Key, versionIdx, object.Size)
 		default:
 			id = entity.NewVersionedEtagConsistencyCheckSetID(checkID, object.Key, versionIdx, object.Size, object.Etag)
