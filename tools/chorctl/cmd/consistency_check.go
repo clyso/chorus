@@ -31,8 +31,8 @@ import (
 
 var (
 	consistencyCheckUser  string
-	doNotCheckEtags       bool
-	doNotCheckSizes       bool
+	ignoreEtags           bool
+	ignoreSizes           bool
 	checkOnlyLastVersions bool
 )
 
@@ -45,9 +45,9 @@ Example:
 # Check bucket contents by matching etag
 chorctl consistency check storage1:bucket1 storage2:bucket2 --user username
 # Check bucket contents by matching sizes
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --no-etag-check
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --ignore-etags
 # Check bucket contents by matching object list
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --no-size-check
+chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --ignore-sizes
 # Check bucket contents by matching last versions of object
 chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --last-versions-only`,
 	Args: cobra.MinimumNArgs(2),
@@ -67,15 +67,15 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --la
 			})
 		}
 
-		if doNotCheckSizes {
-			doNotCheckEtags = true
+		if ignoreSizes {
+			ignoreEtags = true
 		}
 
 		request := &pb.StartConsistencyCheckRequest{
 			Locations:             locations,
 			User:                  consistencyCheckUser,
-			DoNotCheckEtags:       doNotCheckEtags,
-			DoNotCheckSizes:       doNotCheckSizes,
+			IgnoreEtags:           ignoreEtags,
+			IgnoreSizes:           ignoreSizes,
 			CheckOnlyLastVersions: checkOnlyLastVersions,
 		}
 
@@ -96,8 +96,8 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --la
 func init() {
 	consistencyCmd.AddCommand(consistencyCheckCmd)
 	consistencyCheckCmd.Flags().StringVarP(&consistencyCheckUser, "user", "u", "", "storage user")
-	consistencyCheckCmd.Flags().BoolVarP(&doNotCheckEtags, "no-etag-check", "e", false, "do not perform etag check")
-	consistencyCheckCmd.Flags().BoolVarP(&doNotCheckSizes, "no-size-check", "s", false, "do not perform etag and size check")
+	consistencyCheckCmd.Flags().BoolVarP(&ignoreEtags, "ignore-etags", "e", false, "do not perform etag check")
+	consistencyCheckCmd.Flags().BoolVarP(&ignoreSizes, "ignore-sizes", "s", false, "do not perform etag and size check")
 	consistencyCheckCmd.Flags().BoolVarP(&checkOnlyLastVersions, "last-versions-only", "l", false, "check only last versions")
 	err := consistencyCheckCmd.MarkFlagRequired("user")
 	if err != nil {

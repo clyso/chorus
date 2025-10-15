@@ -99,8 +99,8 @@ message StartConsistencyCheckRequest {
   repeated MigrateLocation locations = 1;
   string user = 2;
   bool checkOnlyLastVersions = 3;
-  bool doNotCheckEtags = 4;
-  bool doNotCheckSizes = 5;
+  bool ignoreEtags = 4;
+  bool ignoreSizes = 5;
 }
 
 message ConsistencyCheckRequest {
