@@ -29,7 +29,7 @@ spec:
         imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
         env:
         - name: BACKEND_URL
-          value: {{ printf "http://%s-rest:%d" .Release.Name ( .Values.worker.restApiService.portRest.port | int) | quote }}
+          value: {{ printf "http://%s-rest:%d" (include "chorus.fullname" . ) ( .Values.worker.restApiService.portRest.port | int) | quote }}
         ports:
         - containerPort: 80
           name: http

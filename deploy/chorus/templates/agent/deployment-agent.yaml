@@ -38,6 +38,10 @@ spec:
               name: redis-secret
         - name: CFG_REDIS_ADDRESS
           value: {{ printf "%s-redis-master:6379" ( .Release.Name ) }}
+        {{- if empty .Values.agent.config.url }}
+        - name: CFG_URL
+          value: {{ printf "http://%s-agent.%s.svc.cluster.local:9672" (include "chorus.fullname" . ) ( .Release.Namespace  ) | quote }}
+        {{- end }}
         image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
         name: agent

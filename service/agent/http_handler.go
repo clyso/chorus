@@ -35,6 +35,7 @@ import (
 func HTTPHandler(policySvc policy.Service, handler *notifications.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
+		zerolog.Ctx(ctx).Debug().Msg("received s3 notification")
 		bytes, err := io.ReadAll(req.Body)
 		if err != nil {
 			zerolog.Ctx(ctx).Err(err).Msg("unable to read event body")
@@ -59,6 +60,7 @@ func HTTPHandler(policySvc policy.Service, handler *notifications.Handler) http.
 			reqCtx := xctx.SetUser(ctx, user)
 			reqCtx = xctx.SetBucket(reqCtx, bucket)
 			reqCtx = xctx.SetObject(reqCtx, object)
+			zerolog.Ctx(reqCtx).Debug().Msg("processing s3 notification record")
 
 			reqCtx, err = policySvc.BuildAgentContext(reqCtx, user, bucket)
 			if err != nil {
