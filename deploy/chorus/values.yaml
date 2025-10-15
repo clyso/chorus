@@ -6,12 +6,12 @@ proxy:
     pullPolicy: Always
   replicas: 2
   resources:
-    limits:
-      cpu: 100m
-      memory: 300Mi
-    requests:
-      cpu: 50m
-      memory: 150Mi
+    # limits:
+    #   cpu: 100m
+    #   memory: 300Mi
+    # requests:
+    #   cpu: 50m
+    #   memory: 150Mi
   proxyService:
     portHttp:
       port: 9669
@@ -49,12 +49,12 @@ worker:
     tag: "" # Chart appVersion will be used if empty
     pullPolicy: Always
   resources:
-    limits:
-      cpu: 100m
-      memory: 300Mi
-    requests:
-      cpu: 50m
-      memory: 150Mi
+    # limits:
+    #   cpu: 100m
+    #   memory: 300Mi
+    # requests:
+    #   cpu: 50m
+    #   memory: 150Mi
   restApiService:
     portRest:
       port: 9671
@@ -76,7 +76,7 @@ worker:
       endpoint: # url to Jaeger or other open trace provider
     rclone:
       memoryLimit:
-        enabled: true
+        enabled: false
         limit: 300M # Max RAM memory for file copy. Possible values: 50M <= mem <= (total app RAM - 50M). More memory -> faster s3 replication. # For example: if worker container resources.memory.limit = 500M, then mem = 450M
         retryMin: 2s
         retryMax: 20s
@@ -89,7 +89,7 @@ worker:
         retryMin: 2s
         retryMax: 20s
       globalFileLimit:
-        enabled: true
+        enabled: false
         limit: 3
         retryMin: 2s
         retryMax: 20s
@@ -120,8 +120,6 @@ commonConfig:
     tagging: true
     acl: true
   storage:
-    createRouting: true # create roting rules to route proxy requests to main storage
-    createReplication: false # create replication rules to replicate data from main to other storages
     defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
     storages:
       # one:
@@ -164,8 +162,12 @@ agent:
       enabled: false
       endpoint: # url to Jaeger or other open trace provider
     port: 9673 # agent port to listen incoming notifications
-    url: http://localhost:9673 # REQUIRED: url to be used by s3 storage to send notifications. The URL should be reachable for s3 storage.
-    fromStorage: "" # REQUIRED: notifications source storage name from Chorus config. Normally name of the main storage from storage config.
+    # REQUIRED: url to be used by s3 storage to send notifications. The URL should be reachable for s3 storage.
+    # set empty to use k8s service URL if fromStorage is in the same k8s cluster
+    # http://<helm_release>-agent.<release_ns>.svc.cluster.local:9672
+    url: ""
+    # REQUIRED: notifications source storage name from Chorus config. Normally name of the main storage from storage config.
+    fromStorage: ""
 existingSecret: "" # set name of existing secret with storage credentials or
 secret: "" #  set storage credentials here to create secret:
 # Example
@@ -199,6 +201,22 @@ secret: "" #  set storage credentials here to create secret:
 redis:
   enabled: true
   architecture: standalone
+  # uncomment to enable redis persistence. Required for production setup
+  #   master:
+  #     persistence:
+  #       enabled: true
+  #       size: 64Gi # conservative estimate
+  #       storageClass: "" # Use default storage class or specify (e.g., "gp2")
+  #   reesources: {} # Redis requests/limits.
+  #   commonConfiguration: |-
+  #     appendonly yes
+  #     appendfsync everysec
+  #   metrics: # enable redis metrics
+  #     enabled: true
+  #     serviceMonitor:
+  #       enabled: true
+  #       additionalLabels:
+  #         release: kube-prometheus-stack
   auth:
     existingSecret: redis-secret
     existingSecretPasswordKey: password

@@ -735,13 +735,13 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 		}
 		// validate agentURL
 		if err = h.validateAgentURL(ctx, req.FromStorage, req.AgentUrl); err != nil {
-			return err
+			return fmt.Errorf("%w: unable to validate agent URL", err)
 		}
 
 		// check if bucket exists in source
 		ok, err := client.S3().BucketExists(ctx, req.FromBucket)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: unable to validate source bucket", err)
 		}
 		if !ok {
 			return fmt.Errorf("%w: unknown bucket %s", dom.ErrInvalidArg, req.FromBucket)
@@ -757,12 +757,12 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 		// create policy:
 		err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, req.AgentUrl)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: unable to add bucket replication policy", err)
 		}
 		// create bucket notification for agent:
 		err = h.createAgentBucketNotification(ctx, replicationID, req.AgentUrl)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: unable to create agent bucket notification", err)
 		}
 		// create task
 		task := tasks.BucketCreatePayload{

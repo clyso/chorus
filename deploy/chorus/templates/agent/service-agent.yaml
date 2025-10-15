@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "chorus.fullname" . }}-agent-service
+  name: {{ include "chorus.fullname" . }}-agent
   labels:
     app: agent
   {{- include "chorus.labels" . | nindent 4 }}
