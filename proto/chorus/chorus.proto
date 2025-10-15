@@ -98,6 +98,9 @@ message MigrateLocation {
 message StartConsistencyCheckRequest {
   repeated MigrateLocation locations = 1;
   string user = 2;
+  bool checkOnlyLastVersions = 3;
+  bool doNotCheckEtags = 4;
+  bool doNotCheckSizes = 5;
 }
 
 message ConsistencyCheckRequest {
@@ -105,12 +108,14 @@ message ConsistencyCheckRequest {
 }
 
 message ConsistencyCheck {
-  string id = 1;
   repeated MigrateLocation locations = 2;
   uint64 queued = 3;
   uint64 completed = 4;
   bool ready = 5;
   bool consistent = 6;
+  bool versioned = 7;
+  bool withSize = 8;
+  bool withEtag =9;
 }
 
 message ListConsistencyChecksResponse {
@@ -132,8 +137,10 @@ message ConsistencyCheckStorageEntry {
 
 message ConsistencyCheckReportEntry {
   string object = 1;
-  string etag = 2;
-  repeated ConsistencyCheckStorageEntry storageEntries = 3;
+  uint64 versionIdx = 2;
+  uint64 size = 3;
+  string etag = 4;
+  repeated ConsistencyCheckStorageEntry storageEntries = 5;
 }
 
 message GetConsistencyCheckReportEntriesRequest {

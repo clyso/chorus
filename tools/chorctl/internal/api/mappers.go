@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -142,7 +143,7 @@ func DurationToStr(age time.Duration) string {
 }
 
 func ConsistencyCheckHeader() string {
-	return "READY\tQUEUED\tCOMPLETED\tSTORAGES"
+	return "READY\tQUEUED\tCOMPLETED\tCONSISTENT\tVERSIONED\tWITH SIZE\tWITH ETAG\tSTORAGES"
 }
 
 func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
@@ -150,33 +151,56 @@ func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
 	for _, location := range in.Locations {
 		storageLocations = append(storageLocations, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
 	}
-	return fmt.Sprintf("%t\t%d\t%d\t%s", in.Ready, in.Queued, in.Completed, strings.Join(storageLocations, ", "))
+	return fmt.Sprintf("%t\t%d\t%d\t%s", in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.WithSize, in.WithEtag, strings.Join(storageLocations, ", "))
 }
 
 func ConsistencyCheckReportBrief(in *pb.ConsistencyCheck) string {
 	briefTable := `READY:	%t
 QUEUED:	%d
 COMPLETED:	%d
-CONSISTENT:	%t`
-	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent)
+CONSISTENT:	%t
+VERSIONED:	%t
+WITH SIZE:	%t
+WITH ETAG:	%T`
+	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.WithSize, in.WithEtag)
 }
 
-func ConsistencyCheckReportHeader(storages []string) string {
-	return fmt.Sprintf("PATH\tETAG\t%s", strings.Join(storages, "\t"))
+func ConsistencyCheckReportHeader(storages []string, versioned bool, withSize bool, withEtag bool) string {
+	columns := []string{"PATH"}
+	if versioned {
+		columns = append(columns, "VERSION IDX")
+	}
+	if withSize {
+		columns = append(columns, "SIZE")
+	}
+	if withEtag {
+		columns = append(columns, "ETAG")
+	}
+	columns = append(columns, storages...)
+	return strings.Join(columns, "\t")
 }
 
-func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry) string {
-	storageMarkers := ""
+func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry, versioned bool, withSize bool, withEtag bool) string {
+	columns := []string{}
+	if versioned {
+		columns = append(columns, strconv.FormatUint(entry.VersionIdx, 10))
+	}
+	if withSize {
+		columns = append(columns, strconv.FormatUint(entry.Size, 10))
+	}
+	if withEtag {
+		columns = append(columns, entry.Etag)
+	}
 	for _, storage := range storages {
 		if slices.ContainsFunc(entry.StorageEntries, func(e *pb.ConsistencyCheckStorageEntry) bool {
 			return e.Storage == storage
 		}) {
-			storageMarkers += "\t✓"
+			columns = append(columns, "✓")
 		} else {
-			storageMarkers += "\tX"
+			columns = append(columns, "X")
 		}
 	}
-	return fmt.Sprintf("%s\t%s%s", entry.Object, entry.Etag, storageMarkers)
+	return strings.Join(columns, "\t")
 }
 
 func SwitchHeader() string {

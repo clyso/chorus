@@ -56,10 +56,12 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheck(ctx context.Context, t *as
 
 	for idx := range payload.Locations {
 		if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListObjectsPayload{
-			Locations: payload.Locations,
-			User:      payload.User,
-			Index:     idx,
-			Versioned: payload.Versioned,
+			Locations:       payload.Locations,
+			User:            payload.User,
+			Index:           idx,
+			Versioned:       payload.Versioned,
+			DoNotCheckEtags: payload.DoNotCheckEtags,
+			DoNotCheckSizes: payload.DoNotCheckSizes,
 		}); err != nil {
 			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
@@ -89,7 +91,8 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckList(ctx context.Context, t
 	ctx = log.WithBucket(ctx, bucket)
 
 	objectTasks := r.svc.ObjectTasks(ctx, checkID, payload.User,
-		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix, payload.Versioned)
+		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix,
+		payload.Versioned, payload.DoNotCheckEtags, payload.DoNotCheckSizes)
 	for objectTask, err := range objectTasks {
 		if err != nil {
 			return fmt.Errorf("unable to list object tasks: %w", err)
@@ -97,20 +100,24 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckList(ctx context.Context, t
 
 		if objectTask.Dir {
 			if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListObjectsPayload{
-				Locations: payload.Locations,
-				User:      payload.User,
-				Index:     payload.Index,
-				Prefix:    objectTask.Key,
-				Versioned: payload.Versioned,
+				Locations:       payload.Locations,
+				User:            payload.User,
+				Index:           payload.Index,
+				Prefix:          objectTask.Key,
+				Versioned:       payload.Versioned,
+				DoNotCheckEtags: payload.DoNotCheckEtags,
+				DoNotCheckSizes: payload.DoNotCheckSizes,
 			}); err != nil {
 				return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 			}
 		} else {
 			if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListVersionsPayload{
-				Locations: payload.Locations,
-				User:      payload.User,
-				Index:     payload.Index,
-				Prefix:    objectTask.Key,
+				Locations:       payload.Locations,
+				User:            payload.User,
+				Index:           payload.Index,
+				Prefix:          objectTask.Key,
+				DoNotCheckEtags: payload.DoNotCheckEtags,
+				DoNotCheckSizes: payload.DoNotCheckSizes,
 			}); err != nil {
 				return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 			}
@@ -137,7 +144,8 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckListVersions(ctx context.Co
 	storage := payload.Locations[payload.Index].Storage
 	bucket := payload.Locations[payload.Index].Bucket
 
-	if err := r.svc.AccountObjectVersions(ctx, checkID, payload.User, entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix); err != nil {
+	if err := r.svc.AccountObjectVersions(ctx, checkID, payload.User,
+		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix, payload.DoNotCheckEtags, payload.DoNotCheckSizes); err != nil {
 		return fmt.Errorf("unable to account object versions: %w", err)
 	}
 
@@ -146,15 +154,17 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckListVersions(ctx context.Co
 
 type ConsistencyCheckSvc struct {
 	idStore        *store.ConsistencyCheckIDStore
+	settingsStore  *store.ConsistencyCheckSettingsStore
 	listStateStore *store.ConsistencyCheckListStateStore
 	setStore       *store.ConsistencyCheckSetStore
 	copySvc        rclone.CopySvc
 	queueSvc       tasks.QueueService
 }
 
-func NewConsistencyCheckSvc(idStore *store.ConsistencyCheckIDStore, listStateStore *store.ConsistencyCheckListStateStore, setStore *store.ConsistencyCheckSetStore, copySvc rclone.CopySvc, queueSvc tasks.QueueService) *ConsistencyCheckSvc {
+func NewConsistencyCheckSvc(idStore *store.ConsistencyCheckIDStore, settingsStore *store.ConsistencyCheckSettingsStore, listStateStore *store.ConsistencyCheckListStateStore, setStore *store.ConsistencyCheckSetStore, copySvc rclone.CopySvc, queueSvc tasks.QueueService) *ConsistencyCheckSvc {
 	return &ConsistencyCheckSvc{
 		idStore:        idStore,
+		settingsStore:  settingsStore,
 		listStateStore: listStateStore,
 		setStore:       setStore,
 		copySvc:        copySvc,
@@ -183,7 +193,8 @@ type ObjectTask struct {
 	Dir bool
 }
 
-func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.ConsistencyCheckID, user string, location entity.ConsistencyCheckLocation, prefix string, versioned bool) iter.Seq2[ObjectTask, error] {
+func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.ConsistencyCheckID,
+	user string, location entity.ConsistencyCheckLocation, prefix string, versioned bool, doNotCheckEtags bool, doNotCheckSizes bool) iter.Seq2[ObjectTask, error] {
 	locationCount := len(checkID.Locations)
 	objectID := entity.NewConsistencyCheckObjectID(checkID, location.Storage, prefix)
 
@@ -219,7 +230,15 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 				continue
 			}
 
-			id := entity.NewConsistencyCheckSetID(checkID, object.Key, object.Etag)
+			var id entity.ConsistencyCheckSetID
+			switch {
+			case doNotCheckSizes:
+				id = entity.NewNameConsistencyCheckSetID(checkID, object.Key)
+			case doNotCheckEtags:
+				id = entity.NewSizeConsistencyCheckSetID(checkID, object.Key, object.Size)
+			default:
+				id = entity.NewEtagConsistencyCheckSetID(checkID, object.Key, object.Size, object.Etag)
+			}
 
 			entry := entity.NewConsistencyCheckSetEntry(location)
 			if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
@@ -236,7 +255,7 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 
 		isEmptyDir := lastObject == "" && objectCount == 0 && prefix != ""
 
-		id := entity.NewConsistencyCheckSetID(checkID, prefix, CEmptyDirETagPlaceholder)
+		id := entity.NewNameConsistencyCheckSetID(checkID, prefix)
 		entry := entity.NewConsistencyCheckSetEntry(location)
 		if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
 			yield(ObjectTask{}, fmt.Errorf("unable to add storage to consistency check set: %w", err))
@@ -251,7 +270,8 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 	}
 }
 
-func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID entity.ConsistencyCheckID, user string, location entity.ConsistencyCheckLocation, prefix string) error {
+func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID entity.ConsistencyCheckID,
+	user string, location entity.ConsistencyCheckLocation, prefix string, doNotCheckEtags bool, doNotCheckSizes bool) error {
 	locationCount := len(checkID.Locations)
 	listBucket := rclone.Bucket{
 		Storage: location.Storage,
@@ -264,9 +284,19 @@ func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID
 		if err != nil {
 			return fmt.Errorf("unable to list object versions: %w", err)
 		}
-		setID := entity.NewVersionedConsistencyCheckSetID(checkID, object.Key, versionIdx, object.Etag)
+
+		var id entity.ConsistencyCheckSetID
+		switch {
+		case doNotCheckSizes:
+			id = entity.NewVersionedNameConsistencyCheckSetID(checkID, object.Key, versionIdx)
+		case doNotCheckEtags:
+			id = entity.NewVersionedSizeConsistencyCheckSetID(checkID, object.Key, versionIdx, object.Size)
+		default:
+			id = entity.NewVersionedEtagConsistencyCheckSetID(checkID, object.Key, versionIdx, object.Size, object.Etag)
+		}
+
 		entry := entity.NewVersionedConsistencyCheckSetEntry(location, object.VersionID)
-		if err := r.setStore.Add(ctx, setID, entry, uint8(locationCount)); err != nil {
+		if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
 			return fmt.Errorf("unable to add to check set: %w", err)
 		}
 		versionIdx++
@@ -288,6 +318,7 @@ func (r *ConsistencyCheckSvc) DeleteConsistencyCheck(ctx context.Context, id ent
 
 	exec := r.idStore.GroupExecutor()
 	_ = r.idStore.WithExecutor(exec).RemoveOp(ctx, struct{}{}, id)
+	_ = r.settingsStore.WithExecutor(exec).DropOp(ctx, id)
 	_ = r.setStore.WithExecutor(exec).DropIDsOp(ctx, tokens...)
 	_ = r.listStateStore.WithExecutor(exec).DropIDsOp(ctx, tokens...)
 
@@ -298,7 +329,7 @@ func (r *ConsistencyCheckSvc) DeleteConsistencyCheck(ctx context.Context, id ent
 	return nil
 }
 
-func (r *ConsistencyCheckSvc) RegisterConsistencyCheck(ctx context.Context, id entity.ConsistencyCheckID, taskLocations []tasks.MigrateLocation) error {
+func (r *ConsistencyCheckSvc) RegisterConsistencyCheck(ctx context.Context, id entity.ConsistencyCheckID, settings entity.ConsistencyCheckSettings) error {
 	affected, err := r.idStore.Add(ctx, struct{}{}, id)
 	if err != nil {
 		return fmt.Errorf("unable to check if consistency check id exists: %w", err)
@@ -306,7 +337,9 @@ func (r *ConsistencyCheckSvc) RegisterConsistencyCheck(ctx context.Context, id e
 	if affected != 1 {
 		return errors.New("consistency check for this set of storage locations already exists")
 	}
-
+	if err := r.settingsStore.Set(ctx, id, settings); err != nil {
+		return fmt.Errorf("unable to save consistency check settings: %w", err)
+	}
 	return nil
 }
 
@@ -334,6 +367,11 @@ func (r *ConsistencyCheckSvc) GetConsistencyCheckList(ctx context.Context) ([]en
 func (r *ConsistencyCheckSvc) GetConsistencyCheckStatus(ctx context.Context, id entity.ConsistencyCheckID) (entity.ConsistencyCheckStatus, error) {
 	queue := tasks.ConsistencyCheckQueue(id)
 
+	settings, err := r.settingsStore.Get(ctx, id)
+	if err != nil {
+		return entity.ConsistencyCheckStatus{}, fmt.Errorf("unable to get consistency check settings: %w", err)
+	}
+
 	queueStats, err := r.queueSvc.Stats(ctx, queue)
 	if err != nil {
 		return entity.ConsistencyCheckStatus{}, fmt.Errorf("unable to get queue stats: %w", err)
@@ -342,10 +380,11 @@ func (r *ConsistencyCheckSvc) GetConsistencyCheckStatus(ctx context.Context, id 
 	ready := queueStats.Unprocessed == 0
 
 	status := entity.ConsistencyCheckStatus{
-		Locations: id.Locations,
-		Queued:    uint64(queueStats.Unprocessed + queueStats.ProcessedTotal),
-		Completed: uint64(queueStats.ProcessedTotal),
-		Ready:     ready,
+		Locations:                id.Locations,
+		Queued:                   uint64(queueStats.Unprocessed + queueStats.ProcessedTotal),
+		Completed:                uint64(queueStats.ProcessedTotal),
+		Ready:                    ready,
+		ConsistencyCheckSettings: settings,
 	}
 
 	if !ready {
@@ -396,7 +435,7 @@ func (r *ConsistencyCheckSvc) GetConsistencyCheckReportEntries(ctx context.Conte
 	for idx, op := range ops {
 		storageEntries, _ := op.Get()
 		id := idPage.Entries[idx]
-		entry := entity.NewConsistencyCheckReportEntry(id.Object, id.VersionIndex, id.Etag, storageEntries)
+		entry := entity.NewConsistencyCheckReportEntry(id.Object, id.VersionIndex, id.Size, id.Etag, storageEntries)
 		entries = append(entries, entry)
 	}
 

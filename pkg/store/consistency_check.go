@@ -87,6 +87,39 @@ func ConsistencyCheckIDToTokensConverter(id entity.ConsistencyCheckID) ([]string
 	return []string{buf.String()}, nil
 }
 
+func ConsistencyCheckSettingsToStringConverter(value entity.ConsistencyCheckSettings) (string, error) {
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("unable to serialize consistency check settings: %w", err)
+	}
+	return string(bytes), nil
+}
+
+func StringToConsistencyCheckSettingsConverter(value string) (entity.ConsistencyCheckSettings, error) {
+	var result entity.ConsistencyCheckSettings
+	if err := json.Unmarshal([]byte(value), &result); err != nil {
+		var noVal entity.ConsistencyCheckSettings
+		return noVal, fmt.Errorf("unable to deserialize consistency check set entry: %w", err)
+	}
+	return result, nil
+}
+
+type ConsistencyCheckSettingsStore struct {
+	RedisIDKeyValue[entity.ConsistencyCheckID, entity.ConsistencyCheckSettings]
+}
+
+func NewConsistencyCheckSettingsStore(client redis.Cmdable) *ConsistencyCheckSettingsStore {
+	return &ConsistencyCheckSettingsStore{
+		*NewRedisIDKeyValue(client, "cc:settings",
+			ConsistencyCheckIDToTokensConverter, TokensToConsistencyCheckIDConverter,
+			ConsistencyCheckSettingsToStringConverter, StringToConsistencyCheckSettingsConverter),
+	}
+}
+
+func (r *ConsistencyCheckSettingsStore) WithExecutor(exec Executor[redis.Pipeliner]) *ConsistencyCheckSettingsStore {
+	return NewConsistencyCheckSettingsStore(exec.Get())
+}
+
 func TokensToConsistencyCheckObjectIDConverter(tokens []string) (entity.ConsistencyCheckObjectID, error) {
 	consistencyCheckID, err := TokensToConsistencyCheckIDConverter([]string{tokens[0]})
 	if err != nil {
@@ -141,11 +174,16 @@ func TokensToConsistencyCheckSetIDConverter(tokens []string) (entity.Consistency
 	if err != nil {
 		return entity.ConsistencyCheckSetID{}, fmt.Errorf("unable to parse version index: %w", err)
 	}
+	size, err := strconv.ParseUint(tokens[3], 10, 64)
+	if err != nil {
+		return entity.ConsistencyCheckSetID{}, fmt.Errorf("unable to parse size: %w", err)
+	}
 	return entity.ConsistencyCheckSetID{
 		ConsistencyCheckID: consistencyCheckID,
 		Object:             tokens[1],
 		VersionIndex:       versionIdx,
-		Etag:               tokens[3],
+		Size:               size,
+		Etag:               tokens[4],
 	}, nil
 }
 
@@ -154,7 +192,7 @@ func ConsistencyCheckSetIDToTokensConverter(id entity.ConsistencyCheckSetID) ([]
 	if err != nil {
 		return nil, fmt.Errorf("unable to get consistency check id tokens: %w", err)
 	}
-	return []string{tokens[0], id.Object, strconv.FormatUint(id.VersionIndex, 10), id.Etag}, nil
+	return []string{tokens[0], id.Object, strconv.FormatUint(id.VersionIndex, 10), strconv.FormatUint(id.Size, 10), id.Etag}, nil
 }
 
 func ConsistencyCheckSetEntryToStringConverter(value entity.ConsistencyCheckSetEntry) (string, error) {

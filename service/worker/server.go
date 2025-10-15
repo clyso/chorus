@@ -149,9 +149,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
 
 	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
+	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
 	consistencyCheckListStateStore := store.NewConsistencyCheckListStateStore(confRedis)
 	consistencyCheckSetStore := store.NewConsistencyCheckSetStore(confRedis)
-	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
+	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
 	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)

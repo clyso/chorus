@@ -18,6 +18,20 @@ import (
 	"sort"
 )
 
+type ConsistencyCheckSettings struct {
+	Versioned bool
+	WithSize  bool
+	WithEtag  bool
+}
+
+func NewConsistencyCheckSettings(versioned bool, withSize bool, withEtag bool) ConsistencyCheckSettings {
+	return ConsistencyCheckSettings{
+		Versioned: versioned,
+		WithSize:  withSize,
+		WithEtag:  withEtag,
+	}
+}
+
 type ConsistencyCheckLocation struct {
 	Storage string
 	Bucket  string
@@ -67,23 +81,58 @@ type ConsistencyCheckSetID struct {
 	Object             string
 	Etag               string
 	ConsistencyCheckID ConsistencyCheckID
+	Size               uint64
 	VersionIndex       uint64
 }
 
-func NewConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, etag string) ConsistencyCheckSetID {
+func NewEtagConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, size uint64, etag string) ConsistencyCheckSetID {
 	return ConsistencyCheckSetID{
 		ConsistencyCheckID: consistencyCheckID,
 		Object:             object,
+		Size:               size,
 		Etag:               etag,
 	}
 }
 
-func NewVersionedConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, versionIndex uint64, etag string) ConsistencyCheckSetID {
+func NewVersionedEtagConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, versionIndex uint64, size uint64, etag string) ConsistencyCheckSetID {
 	return ConsistencyCheckSetID{
 		ConsistencyCheckID: consistencyCheckID,
 		Object:             object,
 		VersionIndex:       versionIndex,
+		Size:               size,
 		Etag:               etag,
+	}
+}
+
+func NewSizeConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, size uint64) ConsistencyCheckSetID {
+	return ConsistencyCheckSetID{
+		ConsistencyCheckID: consistencyCheckID,
+		Object:             object,
+		Size:               size,
+	}
+}
+
+func NewVersionedSizeConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, versionIndex uint64, size uint64) ConsistencyCheckSetID {
+	return ConsistencyCheckSetID{
+		ConsistencyCheckID: consistencyCheckID,
+		Object:             object,
+		VersionIndex:       versionIndex,
+		Size:               size,
+	}
+}
+
+func NewNameConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string) ConsistencyCheckSetID {
+	return ConsistencyCheckSetID{
+		ConsistencyCheckID: consistencyCheckID,
+		Object:             object,
+	}
+}
+
+func NewVersionedNameConsistencyCheckSetID(consistencyCheckID ConsistencyCheckID, object string, versionIndex uint64) ConsistencyCheckSetID {
+	return ConsistencyCheckSetID{
+		ConsistencyCheckID: consistencyCheckID,
+		Object:             object,
+		VersionIndex:       versionIndex,
 	}
 }
 
@@ -109,13 +158,15 @@ type ConsistencyCheckReportEntry struct {
 	Object         string
 	Etag           string
 	StorageEntries []ConsistencyCheckSetEntry
+	Size           uint64
 	VersionIndex   uint64
 }
 
-func NewConsistencyCheckReportEntry(object string, versionIndex uint64, etag string, storageEntries []ConsistencyCheckSetEntry) ConsistencyCheckReportEntry {
+func NewConsistencyCheckReportEntry(object string, versionIndex uint64, size uint64, etag string, storageEntries []ConsistencyCheckSetEntry) ConsistencyCheckReportEntry {
 	return ConsistencyCheckReportEntry{
 		Object:         object,
 		VersionIndex:   versionIndex,
+		Size:           size,
 		Etag:           etag,
 		StorageEntries: storageEntries,
 	}
@@ -139,4 +190,5 @@ type ConsistencyCheckStatus struct {
 	Completed  uint64
 	Ready      bool
 	Consistent bool
+	ConsistencyCheckSettings
 }

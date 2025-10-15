@@ -12,6 +12,9 @@ import (
 var _ = Describe("Consistency checker stores", func() {
 
 	const (
+		CMinSize = 0
+		CMaxSize = 10000
+
 		CMinStringLength = 0
 		CMaxStringLength = 10
 
@@ -50,7 +53,8 @@ var _ = Describe("Consistency checker stores", func() {
 		for i := int64(0); i < keyCount; i++ {
 			object := testRnd.VarLengthStringFromAlphabet(CGenAlphabet, CMinStringLength, CMaxStringLength)
 			etag := testRnd.VarLengthStringFromAlphabet(CGenAlphabet, CMinStringLength, CMaxStringLength)
-			ids = append(ids, entity.NewConsistencyCheckSetID(checkID, object, etag))
+			size := uint64(testRnd.Int64InRange(CMinSize, CMaxSize))
+			ids = append(ids, entity.NewEtagConsistencyCheckSetID(checkID, object, size, etag))
 		}
 
 		for i := 0; i < int(locationCount)-1; i++ {

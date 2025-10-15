@@ -912,9 +912,6 @@
     "chorusConsistencyCheck": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
         "locations": {
           "type": "array",
           "items": {
@@ -935,6 +932,15 @@
         },
         "consistent": {
           "type": "boolean"
+        },
+        "versioned": {
+          "type": "boolean"
+        },
+        "withSize": {
+          "type": "boolean"
+        },
+        "withEtag": {
+          "type": "boolean"
         }
       }
     },
@@ -943,6 +949,14 @@
       "properties": {
         "object": {
           "type": "string"
+        },
+        "versionIdx": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "size": {
+          "type": "string",
+          "format": "uint64"
         },
         "etag": {
           "type": "string"
@@ -1343,6 +1357,15 @@
         },
         "user": {
           "type": "string"
+        },
+        "checkOnlyLastVersions": {
+          "type": "boolean"
+        },
+        "doNotCheckEtags": {
+          "type": "boolean"
+        },
+        "doNotCheckSizes": {
+          "type": "boolean"
         }
       }
     },
