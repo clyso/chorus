@@ -35,12 +35,12 @@ type Router interface {
 	Route(r *http.Request) (resp *http.Response, task []tasks.ReplicationTask, storage string, isApiErr bool, err error)
 }
 
-func NewRouter(
+func NewS3Router(
 	clients s3client.Service,
 	versionSvc meta.VersionService,
 	storageSvc storage.Service,
 	limit ratelimit.RPM) Router {
-	return &router{
+	return &s3Router{
 		clients:    clients,
 		versionSvc: versionSvc,
 		storageSvc: storageSvc,
@@ -48,14 +48,14 @@ func NewRouter(
 	}
 }
 
-type router struct {
+type s3Router struct {
 	clients    s3client.Service
 	versionSvc meta.VersionService
 	storageSvc storage.Service
 	limit      ratelimit.RPM
 }
 
-func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
+func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	var (
 		ctx    = req.Context()
 		method = xctx.GetMethod(req.Context())

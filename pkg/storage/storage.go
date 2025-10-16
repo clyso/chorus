@@ -47,6 +47,10 @@ type Service interface {
 	DelLastListedObj(ctx context.Context, task tasks.MigrateBucketListObjectsPayload) error
 	CleanLastListedObj(ctx context.Context, fromStor, toStor, fromBucket string, toBucket string) error
 
+	GetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) (string, error)
+	SetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload, val string) error
+	DelLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) error
+
 	StoreUploadID(ctx context.Context, user, bucket, object, uploadID string, ttl time.Duration) error
 	DeleteUploadID(ctx context.Context, user, bucket, object, uploadID string) error
 	ExistsUploadID(ctx context.Context, user, bucket, object, uploadID string) (bool, error)
@@ -60,6 +64,38 @@ func New(client redis.UniversalClient) Service {
 
 type svc struct {
 	client redis.UniversalClient
+}
+
+func lastListedContainerKey(task tasks.SwiftAccountMigrationPayload) string {
+	return "s:c:" + task.ID.AsString()
+}
+
+func (s *svc) DelLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) error {
+	key := lastListedContainerKey(task)
+	if err := s.client.Del(ctx, key).Err(); err != nil {
+		return fmt.Errorf("unable to delete last listed container: %w", err)
+	}
+	return nil
+}
+
+func (s *svc) GetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload) (string, error) {
+	key := lastListedContainerKey(task)
+	val, err := s.client.Get(ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", nil
+		}
+		return "", fmt.Errorf("unable to get last listed container: %w", err)
+	}
+	return val, nil
+}
+
+func (s *svc) SetLastListedContainer(ctx context.Context, task tasks.SwiftAccountMigrationPayload, val string) error {
+	key := lastListedContainerKey(task)
+	if err := s.client.Set(ctx, key, val, lastListedObjTTL).Err(); err != nil {
+		return fmt.Errorf("unable to set last listed container: %w", err)
+	}
+	return nil
 }
 
 func (s *svc) CleanLastListedObj(ctx context.Context, fromStor string, toStor string, fromBucket string, toBucket string) error {

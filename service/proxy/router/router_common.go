@@ -28,7 +28,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func (r *router) commonRead(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) commonRead(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
@@ -51,7 +51,7 @@ func (r *router) commonRead(req *http.Request) (resp *http.Response, storage str
 	return
 }
 
-func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) commonWrite(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
@@ -67,7 +67,7 @@ func (r *router) commonWrite(req *http.Request) (resp *http.Response, storage st
 }
 
 // adjustObjReadRoute adjust routing policy for read requests during switch process if old storage still has most recent obj version
-func (r *router) adjustObjReadRoute(ctx context.Context, prevStorage string) (string, error) {
+func (r *s3Router) adjustObjReadRoute(ctx context.Context, prevStorage string) (string, error) {
 	inProgressZeroDowntime := xctx.GetInProgressZeroDowntime(ctx)
 	if inProgressZeroDowntime == nil {
 		// no zero-downtime switch in progress
@@ -92,7 +92,7 @@ func (r *router) adjustObjReadRoute(ctx context.Context, prevStorage string) (st
 	return string(maxVerStorage), nil
 }
 
-func (r *router) getVersion(ctx context.Context) (map[meta.Destination]int64, error) {
+func (r *s3Router) getVersion(ctx context.Context) (map[meta.Destination]int64, error) {
 	method := xctx.GetMethod(ctx)
 	switch {
 	case method == s3.GetObjectAcl || method == s3.PutObjectAcl:

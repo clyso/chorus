@@ -18,11 +18,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/dom"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-func StorageLocations(storages *s3.StorageConfig, locations []*pb.MigrateLocation) error {
+func StorageLocations(storages dom.Storages, locations []*pb.MigrateLocation) error {
 	if len(locations) < 2 {
 		return errors.New("at least 2 migration locations should be provided")
 	}
@@ -34,7 +34,7 @@ func StorageLocations(storages *s3.StorageConfig, locations []*pb.MigrateLocatio
 		if location.Storage == "" {
 			return fmt.Errorf("location %d storage is empty", idx)
 		}
-		if _, ok := storages.Storages[location.Storage]; !ok {
+		if _, ok := storages[location.Storage]; !ok {
 			return fmt.Errorf("unable to find storage %s in config", location.Storage)
 		}
 	}
@@ -42,7 +42,7 @@ func StorageLocations(storages *s3.StorageConfig, locations []*pb.MigrateLocatio
 	return nil
 }
 
-func StorageLocationsWithUser(storages *s3.StorageConfig, locations []*pb.MigrateLocation, user string) error {
+func StorageLocationsWithUser(storages dom.Storages, locations []*pb.MigrateLocation, user string) error {
 	if len(locations) < 2 {
 		return errors.New("at least 2 migration locations should be provided")
 	}
@@ -54,10 +54,10 @@ func StorageLocationsWithUser(storages *s3.StorageConfig, locations []*pb.Migrat
 		if location.Storage == "" {
 			return fmt.Errorf("location %d storage is empty", idx)
 		}
-		if _, ok := storages.Storages[location.Storage]; !ok {
+		if _, ok := storages[location.Storage]; !ok {
 			return fmt.Errorf("unable to find storage %s in config", location.Storage)
 		}
-		_, ok := storages.Storages[location.Storage].Credentials[user]
+		_, ok := storages[location.Storage].Credentials[user]
 		if !ok {
 			return fmt.Errorf("unable to find user %s storage %s in config", user, location.Storage)
 		}

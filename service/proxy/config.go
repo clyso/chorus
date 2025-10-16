@@ -25,6 +25,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
+	"github.com/clyso/chorus/service/proxy/router"
 )
 
 //go:embed config.yaml
@@ -46,12 +47,40 @@ type Config struct {
 	Port    int               `yaml:"port"`
 	Address string            `yaml:"address"`
 	Cors    *cors.Config      `yaml:"cors"`
+
+	Swift Swift `yaml:"swift,omitempty"`
+}
+
+func (c *Config) MainStorage() string {
+	if c.Swift.Enabled {
+		return c.Swift.Storages.MainStorage
+	}
+	return c.Storage.Main()
+}
+
+type Swift struct {
+	Enabled  bool               `yaml:"enabled"`
+	Storages router.SwiftConfig `yaml:"storages,omitempty"`
 }
 
 func (c *Config) Validate() error {
 	if err := c.Common.Validate(); err != nil {
 		return err
 	}
+	if c.Port <= 0 {
+		return fmt.Errorf("proxy config: Port must be positive: %d", c.Port)
+	}
+	if c.Swift.Enabled && c.Storage != nil && len(c.Storage.Storages) != 0 {
+		return fmt.Errorf("app config: cannot use both swift and s3 storage backends")
+	}
+	if c.Swift.Enabled {
+		// validate swift config
+		if err := c.Swift.Storages.Validate(); err != nil {
+			return fmt.Errorf("swift config: %w", err)
+		}
+		return nil
+	}
+	// validate s3 config
 	if c.Storage == nil {
 		return fmt.Errorf("app config: empty storages config")
 	}
@@ -82,9 +111,6 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("proxy config: auth credentials enabled but not set")
 	}
 
-	if c.Port <= 0 {
-		return fmt.Errorf("proxy config: Port must be positive: %d", c.Port)
-	}
 	return nil
 }
 

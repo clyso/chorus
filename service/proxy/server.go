@@ -101,7 +101,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main())
+	policySvc := policy.NewService(confRedis, queueSvc, conf.MainStorage())
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
@@ -111,17 +111,46 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	logger.Info().Msg("s3 clients connected")
 
-	routeSvc := router.NewRouter(s3Clients, verSvc, storageSvc, limiter)
-	replSvc := replication.New(queueSvc, verSvc, policySvc)
-	proxyMux := router.Serve(routeSvc, replSvc)
-	authCheck := auth.Middleware(conf.Auth, conf.Storage.Storages)
-	var handler http.Handler
-	if conf.Metrics.Enabled {
-		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.Middleware(policySvc, trace.HttpMiddleware(tp, metrics.ProxyMiddleware(proxyMux)))))
-	} else {
-		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.Middleware(policySvc, trace.HttpMiddleware(tp, proxyMux))))
+	middlewares := []func(next http.Handler) http.Handler{
+		metrics.ProxyMiddleware(conf.Metrics.Enabled),
+		trace.HttpMiddleware(tp),
 	}
-	handler = cors.HttpMiddleware(conf.Cors, handler)
+	var handler http.Handler
+	switch {
+	case conf.Storage != nil && len(conf.Storage.Storages) != 0:
+		// init s3 proxy
+		s3Router := router.NewS3Router(s3Clients, verSvc, storageSvc, limiter)
+		s3Replicator := replication.NewS3(queueSvc, verSvc, policySvc)
+		s3Proxy := router.Serve(s3Router, s3Replicator)
+		authCheck := auth.Middleware(conf.Auth, conf.Storage.Storages)
+
+		handler = s3Proxy
+		middlewares = append(middlewares,
+			router.S3Middleware(policySvc),
+			authCheck.Wrap,
+		)
+		logger.Info().Msg("s3 proxy configured")
+	case conf.Swift.Enabled:
+		// init swift proxy
+		swiftRouter := router.NewSwiftRouter(conf.Swift.Storages, limiter)
+		swiftReplicator := replication.NewSwift(queueSvc, policySvc)
+		swiftProxy := router.Serve(swiftRouter, swiftReplicator)
+
+		handler = swiftProxy
+		middlewares = append(middlewares, router.SwiftMiddleware(policySvc))
+
+		logger.Info().Msg("swift proxy configured")
+	default:
+		return fmt.Errorf("%w: no storages in config", dom.ErrInvalidStorageConfig)
+	}
+
+	middlewares = append(middlewares,
+		log.HttpMiddleware(conf.Log, app.App, app.AppID),
+		cors.HttpMiddleware(conf.Cors),
+	)
+	for _, m := range middlewares {
+		handler = m(handler)
+	}
 
 	proxyServer := http.Server{Addr: fmt.Sprintf(":%d", conf.Port), Handler: handler}
 

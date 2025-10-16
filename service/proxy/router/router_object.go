@@ -28,7 +28,7 @@ import (
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
-func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
+func (r *s3Router) putObject(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 
@@ -74,7 +74,7 @@ func (r *router) putObject(req *http.Request) (resp *http.Response, taskList []t
 	return
 }
 
-func (r *router) deleteObjects(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
+func (r *s3Router) deleteObjects(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
