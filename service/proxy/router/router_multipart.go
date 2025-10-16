@@ -28,7 +28,7 @@ import (
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
-func (r *router) createMultipartUpload(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) createMultipartUpload(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 
@@ -55,7 +55,7 @@ func (r *router) createMultipartUpload(req *http.Request) (resp *http.Response, 
 	return
 }
 
-func (r *router) completeMultipartUpload(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
+func (r *s3Router) completeMultipartUpload(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 	var switchInProgress bool
@@ -109,7 +109,7 @@ func (r *router) completeMultipartUpload(req *http.Request) (resp *http.Response
 
 }
 
-func (r *router) abortMultipartUpload(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) abortMultipartUpload(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 	var switchInProgress bool
@@ -132,7 +132,7 @@ func (r *router) abortMultipartUpload(req *http.Request) (resp *http.Response, s
 	return
 }
 
-func (r *router) listMultipartUploads(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) listMultipartUploads(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	storage, err = r.routeListMultipart(req)
@@ -147,7 +147,7 @@ func (r *router) listMultipartUploads(req *http.Request) (resp *http.Response, s
 	return
 }
 
-func (r *router) uploadPart(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) uploadPart(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	storage, _, err = r.routeMultipart(req)
@@ -163,7 +163,7 @@ func (r *router) uploadPart(req *http.Request) (resp *http.Response, storage str
 	return
 }
 
-func (r *router) routeMultipart(req *http.Request) (storage string, switchInProgress bool, err error) {
+func (r *s3Router) routeMultipart(req *http.Request) (storage string, switchInProgress bool, err error) {
 	ctx := req.Context()
 	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
@@ -190,7 +190,7 @@ func (r *router) routeMultipart(req *http.Request) (storage string, switchInProg
 	return oldReplicationID.FromStorage(), true, nil
 }
 
-func (r *router) routeListMultipart(req *http.Request) (storage string, err error) {
+func (r *s3Router) routeListMultipart(req *http.Request) (storage string, err error) {
 	ctx := req.Context()
 	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)

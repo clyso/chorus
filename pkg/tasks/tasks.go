@@ -43,6 +43,16 @@ const (
 
 	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
+
+	// swift tasks:
+	TypeSwiftAccountUpdate      = "account:update"
+	TypeSwiftContainerUpdate    = "container:update"
+	TypeSwiftObjUpdate          = "obj:update"
+	TypeSwiftObjMetaUpdate      = "obj:meta:update"
+	TypeSwiftObjDelete          = "obj:del"
+	TypeSwiftAccountMigration   = "migrate:swift:account"
+	TypeSwiftContainerMigration = "migrate:swift:container"
+	TypeSwiftObjectMigration    = "migrate:swift:obj"
 )
 
 type TaskPayload interface {
@@ -59,6 +69,14 @@ type TaskPayload interface {
 		MigrateVersionedObjectPayload |
 		ZeroDowntimeReplicationSwitchPayload |
 		SwitchWithDowntimePayload |
+		SwiftAccountUpdatePayload |
+		SwiftContainerUpdatePayload |
+		SwiftObjectMetaUpdatePayload |
+		SwiftObjectUpdatePayload |
+		SwiftObjectDeletePayload |
+		SwiftAccountMigrationPayload |
+		SwiftContainerMigrationPayload |
+		SwiftObjectMigrationPayload |
 		ConsistencyCheckPayload |
 		ConsistencyCheckListObjectsPayload |
 		ConsistencyCheckListVersionsPayload
@@ -202,3 +220,113 @@ type ConsistencyCheckListVersionsPayload struct {
 	IgonoreEtags bool
 	IgnoreSizes  bool
 }
+
+type SwiftAccountUpdatePayload struct {
+	replicationID
+
+	// Date of the server response. Not Account modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Account Updates
+	Date string
+}
+
+type SwiftContainerUpdatePayload struct {
+	replicationID
+
+	Bucket string
+	// Date of the server response. Not Container modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Container Updates
+	Date string
+}
+
+type SwiftObjectMetaUpdatePayload struct {
+	replicationID
+
+	Bucket string
+	Object string
+	// Date of the server response. Not Object modification date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object Meta Updates
+	Date string
+}
+
+type SwiftObjectUpdatePayload struct {
+	replicationID
+
+	Bucket       string
+	Object       string
+	VersionID    string
+	Etag         string
+	LastModified string
+}
+
+type SwiftObjectDeletePayload struct {
+	replicationID
+
+	Bucket    string
+	Object    string
+	VersionID string
+	// Date of the server response. Not Object deletion date, so it cannot be
+	// compared with Last-modified directly, but can be used as a reference
+	// because Openstack Swift does not return Last-Modified for Object delete
+	Date            string
+	DeleteMultipart bool
+}
+
+type SwiftAccountMigrationPayload struct {
+	replicationID
+}
+
+type SwiftContainerMigrationPayload struct {
+	replicationID
+
+	Bucket string
+}
+
+type SwiftObjectMigrationPayload struct {
+	replicationID
+
+	Bucket          string
+	ObjName         string
+	ObjVersion      string
+	ObjEtag         string
+	ObjLastModified string
+	ObjSize         int64
+}
+
+// case AccountUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeAccountUpdate
+// case ContainerUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeContainerUpdate
+// case ObjectUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeObjUpdate
+// case ObjectMetaUpdatePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeObjMetaUpdate
+// case ObjectDeletePayload:
+// 	queue := replicationQueueName(QueueEventsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue)}
+// 	taskType = TypeObjDelete
+// case SwiftAccountMigrationPayload:
+// 	id := fmt.Sprintf("mgr:swift:a:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount)
+// 	queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+// 	taskType = TypeSwiftAccountMigration
+// case SwiftContainerMigrationPayload:
+// 	id := fmt.Sprintf("mgr:swift:c:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier)
+// 	queue := replicationQueueName(QueueMigrateListObjectsPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+// 	taskType = TypeSwiftContainerMigration
+// case SwiftObjectMigrationPayload:
+// 	id := fmt.Sprintf("mgr:swift:o:%s:%s:%s:%s:%s:%s:%s:%s", p.FromStorage, p.ToStorage, p.FromAccount, p.ToAccount, p.FromContaier, p.ToContaier, p.ObjName, p.ObjVersion)
+// 	queue := replicationQueueName(QueueMigrateCopyObjectPrefix, replicationID)
+// 	optionList = []asynq.Option{asynq.Queue(queue), asynq.TaskID(id)}
+// 	taskType = TypeSwiftObjectMigration

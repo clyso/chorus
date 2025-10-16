@@ -43,11 +43,13 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker/handler"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -93,35 +95,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
-	s3Clients, err := s3client.New(ctx, conf.Storage, metricsSvc, tp)
-	if err != nil {
-		return err
-	}
-	logger.Info().Msg("s3 clients connected")
-
-	memLimitBytes, err := util.ParseBytes(conf.RClone.MemoryLimit.Limit)
-	if err != nil && conf.RClone.MemoryLimit.Enabled {
-		return err
-	}
-	memLimiter := ratelimit.LocalSemaphore(ratelimit.SemaphoreConfig{
-		Enabled:  conf.RClone.MemoryLimit.Enabled,
-		Limit:    memLimitBytes,
-		RetryMin: conf.RClone.MemoryLimit.RetryMin,
-		RetryMax: conf.RClone.MemoryLimit.RetryMax,
-	}, "rclone_mem")
-	var filesLimiter ratelimit.Semaphore
-	if conf.RClone.GlobalFileLimit.Enabled {
-		filesLimiter = ratelimit.GlobalSemaphore(appRedis, conf.RClone.GlobalFileLimit, "rclone_files")
-	} else {
-		filesLimiter = ratelimit.LocalSemaphore(conf.RClone.LocalFileLimit, "rclone_files")
-	}
-	memCalc := rclone.NewMemoryCalculator(conf.RClone.MemoryCalc)
-	rc, err := rclone.New(conf.Storage, conf.Log.Json, metricsSvc, memCalc, memLimiter, filesLimiter)
-	if err != nil {
-		return err
-	}
-	logger.Info().Msg("rclone connected")
-
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
@@ -132,7 +105,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main())
+	policySvc := policy.NewService(confRedis, queueSvc, conf.MainStorage())
 
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 	lockRedis := util.NewRedis(conf.Redis, conf.Redis.LockDB)
@@ -141,21 +114,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	userLocker := store.NewUserLocker(lockRedis, conf.Lock.Overlap)
 	objectLocker := store.NewObjectLocker(lockRedis, conf.Lock.Overlap)
 	bucketLocker := store.NewBucketLocker(lockRedis, conf.Lock.Overlap)
-
-	memoryLimiterSvc := rclone.NewMemoryLimiterSvc(memCalc, memLimiter, filesLimiter, metricsSvc)
-	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
-	copySvc := rclone.NewS3CopySvc(s3Clients, memoryLimiterSvc, limiter, metricsSvc)
-	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
-	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
-
-	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
-	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
-	consistencyCheckListStateStore := store.NewConsistencyCheckListStateStore(confRedis)
-	consistencyCheckSetStore := store.NewConsistencyCheckSetStore(confRedis)
-	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
-	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
-
-	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -203,22 +161,90 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Metrics.Enabled {
 		mux.Use(metrics.WorkerMiddleware())
 	}
-	mux.HandleFunc(tasks.TypeBucketCreate, workerSvc.HandleBucketCreate)
-	mux.HandleFunc(tasks.TypeBucketDelete, workerSvc.HandleBucketDelete)
-	mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
-	mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
-	mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
-	mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
-	mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
-	mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
-	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
-	mux.HandleFunc(tasks.TypeMigrateObjectListVersions, versionedMigrationCtrl.HandleObjectVersionList)
-	mux.HandleFunc(tasks.TypeMigrateVersionedObject, versionedMigrationCtrl.HandleVersionedObjectMigration)
-	mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
-	mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
-	mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
-	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, workerSvc.HandleZeroDowntimeReplicationSwitch)
-	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, workerSvc.HandleSwitchWithDowntime)
+	// common workers
+	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, storageSvc, replicationStatusLocker)
+	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, switchWorker.HandleZeroDowntimeReplicationSwitch)
+	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, switchWorker.HandleSwitchWithDowntime)
+
+	var s3Clients s3client.Service
+	var checkSvc *handler.ConsistencyCheckSvc
+	var rc rclone.Service
+	// s3 workers
+	if conf.Storage != nil && len(conf.Storage.Storages) != 0 {
+		s3Clients, err = s3client.New(ctx, conf.Storage, metricsSvc, tp)
+		if err != nil {
+			return err
+		}
+		memLimitBytes, err := util.ParseBytes(conf.RClone.MemoryLimit.Limit)
+		if err != nil && conf.RClone.MemoryLimit.Enabled {
+			return err
+		}
+		memLimiter := ratelimit.LocalSemaphore(ratelimit.SemaphoreConfig{
+			Enabled:  conf.RClone.MemoryLimit.Enabled,
+			Limit:    memLimitBytes,
+			RetryMin: conf.RClone.MemoryLimit.RetryMin,
+			RetryMax: conf.RClone.MemoryLimit.RetryMax,
+		}, "rclone_mem")
+		var filesLimiter ratelimit.Semaphore
+		if conf.RClone.GlobalFileLimit.Enabled {
+			filesLimiter = ratelimit.GlobalSemaphore(appRedis, conf.RClone.GlobalFileLimit, "rclone_files")
+		} else {
+			filesLimiter = ratelimit.LocalSemaphore(conf.RClone.LocalFileLimit, "rclone_files")
+		}
+		memCalc := rclone.NewMemoryCalculator(conf.RClone.MemoryCalc)
+		rc, err = rclone.New(conf.Storage, conf.Log.Json, metricsSvc, memCalc, memLimiter, filesLimiter)
+		if err != nil {
+			return err
+		}
+		logger.Info().Msg("rclone connected")
+		memoryLimiterSvc := rclone.NewMemoryLimiterSvc(memCalc, memLimiter, filesLimiter, metricsSvc)
+		objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
+		copySvc := rclone.NewS3CopySvc(s3Clients, memoryLimiterSvc, limiter, metricsSvc)
+		versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
+		versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
+
+		consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
+		consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
+		consistencyCheckListStateStore := store.NewConsistencyCheckListStateStore(confRedis)
+		consistencyCheckSetStore := store.NewConsistencyCheckSetStore(confRedis)
+		checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
+		checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
+
+		workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+		mux.HandleFunc(tasks.TypeBucketCreate, workerSvc.HandleBucketCreate)
+		mux.HandleFunc(tasks.TypeBucketDelete, workerSvc.HandleBucketDelete)
+		mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
+		mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
+		mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
+		mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
+		mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
+		mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
+		mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
+		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, versionedMigrationCtrl.HandleObjectVersionList)
+		mux.HandleFunc(tasks.TypeMigrateVersionedObject, versionedMigrationCtrl.HandleVersionedObjectMigration)
+		mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
+		mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
+		mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
+	}
+
+	// swift workers
+	var swiftClient swift.Client
+	if conf.Swift != nil && len(conf.Swift.Storages) != 0 {
+		swiftClient, err = swift.New(*conf.Swift)
+		if err != nil {
+			return fmt.Errorf("%w: unable to create swift client", err)
+		}
+		swiftWorkerSvc := swift_worker.New(conf.Worker, swiftClient, storageSvc, queueSvc, limiter, objectLocker, userLocker, bucketLocker)
+		// swift tasks:
+		mux.HandleFunc(tasks.TypeSwiftAccountUpdate, swiftWorkerSvc.HandleAccountUpdate)
+		mux.HandleFunc(tasks.TypeSwiftContainerUpdate, swiftWorkerSvc.HandleContainerUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjUpdate, swiftWorkerSvc.HandleObjectUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjMetaUpdate, swiftWorkerSvc.HandleObjectMetaUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjDelete, swiftWorkerSvc.HandleObjectDelete)
+		mux.HandleFunc(tasks.TypeSwiftAccountMigration, swiftWorkerSvc.HandleSwiftAccountMigration)
+		mux.HandleFunc(tasks.TypeSwiftContainerMigration, swiftWorkerSvc.HandleSwiftContainerMigration)
+		mux.HandleFunc(tasks.TypeSwiftObjectMigration, swiftWorkerSvc.HandleSwiftObjectMigration)
+	}
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
@@ -238,7 +264,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		handlers := api.GrpcHandlers(conf.Storage, s3Clients, queueSvc, rc, policySvc, versionSvc, storageSvc, checkSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), replicationStatusLocker, userLocker, &app)
+		handlers := api.GrpcHandlers(conf.GetStorages(), s3Clients, swiftClient, queueSvc, rc, policySvc, versionSvc, storageSvc, checkSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), replicationStatusLocker, userLocker, &app)
 		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, app)
 		if err != nil {
 			return err

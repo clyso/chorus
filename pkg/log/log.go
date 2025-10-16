@@ -28,6 +28,7 @@ const (
 	Object     = "obj_name"
 	Bucket     = "bucket"
 	Method     = "method"
+	storType   = "stor_type"
 	user       = "user"
 	TraceID    = "trace_id"
 	httpPath   = "http_path"

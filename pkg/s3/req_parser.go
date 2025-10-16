@@ -19,7 +19,58 @@ package s3
 import (
 	"net/http"
 	"strings"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
+
+// GetReqType detects swift or s3 request
+func GetReqType(r *http.Request) dom.StorageType {
+	for header := range r.Header {
+		if strings.HasPrefix(strings.ToLower(header), "x-amz-") {
+			return dom.S3
+		}
+		if strings.EqualFold(header, "Authorization") {
+			return dom.S3
+		}
+		if strings.EqualFold(header, "X-Auth-Token") {
+			return dom.Swift
+		}
+		if strings.EqualFold(header, "X-Service-Token") {
+			return dom.Swift
+		}
+		if strings.HasPrefix(strings.ToLower(header), "x-container-") {
+			return dom.Swift
+		}
+		if strings.HasPrefix(strings.ToLower(header), "x-object-") {
+			return dom.Swift
+		}
+		if strings.HasPrefix(strings.ToLower(header), "x-account-") {
+			return dom.Swift
+		}
+	}
+	var (
+		path  = strings.Trim(r.URL.Path, "/")
+		query = r.URL.Query()
+	)
+
+	if query.Has("temp_url_sig") {
+		return dom.Swift
+	}
+	if r.Method == "GET" && query.Has("format") {
+		return dom.Swift
+	}
+
+	if strings.HasPrefix(path, "v1/") {
+		return dom.Swift
+	}
+	if strings.Contains(path, "/v1/") {
+		return dom.Swift
+	}
+	if r.Method == "GET" && path == "info" {
+		return dom.Swift
+	}
+	return dom.S3
+}
 
 // ParseBucketAndObject extracts bucket and object from the request based on hostname and path
 // Returns bucket, object, and whether bucket was found in hostname (virtual host style)

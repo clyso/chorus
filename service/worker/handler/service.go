@@ -24,7 +24,6 @@ import (
 	"github.com/hibiken/asynq"
 
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -34,6 +33,7 @@ import (
 )
 
 type Config struct {
+	SwiftRetryInterval  time.Duration `yaml:"swiftRetryInterval"`
 	PauseRetryInterval  time.Duration `yaml:"pauseRetryInterval"`
 	SwitchRetryInterval time.Duration `yaml:"switchRetryInterval"`
 	QueueUpdateInterval time.Duration `yaml:"queueUpdateInterval"`
@@ -42,7 +42,6 @@ type Config struct {
 type svc struct {
 	clients                 s3client.Service
 	versionSvc              meta.VersionService
-	policySvc               policy.Service
 	storageSvc              storage.Service
 	rc                      rclone.Service
 	queueSvc                tasks.QueueService
@@ -55,14 +54,13 @@ type svc struct {
 }
 
 func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
-	policySvc policy.Service, storageSvc storage.Service, rc rclone.Service,
+	storageSvc storage.Service, rc rclone.Service,
 	queueSvc tasks.QueueService, limit ratelimit.RPM, objectLocker *store.ObjectLocker,
 	bucketLocker *store.BucketLocker, replicationstatusLocker *store.ReplicationStatusLocker) *svc {
 	return &svc{
 		conf:                    conf,
 		clients:                 clients,
 		versionSvc:              versionSvc,
-		policySvc:               policySvc,
 		storageSvc:              storageSvc,
 		rc:                      rc,
 		queueSvc:                queueSvc,

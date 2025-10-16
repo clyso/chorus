@@ -26,10 +26,12 @@ import (
 	"github.com/clyso/chorus/pkg/log"
 )
 
-func HttpMiddleware(tp trace.TracerProvider, next http.Handler) http.Handler {
-	return otelhttp.NewHandler(addTraceID(next), "", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-		return xctx.GetMethod(r.Context()).String()
-	}), otelhttp.WithTracerProvider(tp))
+func HttpMiddleware(tp trace.TracerProvider) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(addTraceID(next), "", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+			return xctx.GetMethod(r.Context()).String()
+		}), otelhttp.WithTracerProvider(tp))
+	}
 }
 
 func addTraceID(next http.Handler) http.Handler {

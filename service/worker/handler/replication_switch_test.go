@@ -10,7 +10,7 @@ import (
 )
 
 func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
-	worker := &svc{}
+	worker := &switchSvc{}
 
 	now := time.Now()
 	hourAgo := now.Add(-time.Hour)

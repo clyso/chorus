@@ -246,3 +246,57 @@ func Test_StoreUploadID(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 }
+
+func Test_svc_LastListedContainer(t *testing.T) {
+	r := require.New(t)
+	c := testutil.SetupRedis(t)
+	storage := New(c)
+	ctx := context.Background()
+
+	task := tasks.SwiftAccountMigrationPayload{}
+	task.SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "f",
+		ToStorage:   "t",
+	}))
+
+	res, err := storage.GetLastListedContainer(ctx, task)
+	r.NoError(err, "no error if no container is set")
+	r.Empty(res, "no container set, should return empty string")
+
+	err = storage.SetLastListedContainer(ctx, task, "container1")
+	r.NoError(err, "no error if container is set")
+
+	res, err = storage.GetLastListedContainer(ctx, task)
+	r.NoError(err, "no error if container is retrieved")
+	r.Equal("container1", res, "should return the set container")
+
+	other := []tasks.SwiftAccountMigrationPayload{task, task, task}
+	other[0].SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u2",
+		FromStorage: "f",
+		ToStorage:   "t",
+	}))
+	other[1].SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "f2",
+		ToStorage:   "t",
+	}))
+	other[2].SetReplicationID(entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+		User:        "u",
+		FromStorage: "f",
+		ToStorage:   "t2",
+	}))
+	for _, o := range other {
+		res, err = storage.GetLastListedContainer(ctx, o)
+		r.NoError(err, "no error if other container is retrieved %+v", o)
+		r.Empty(res, "should return empty string for other tasks %+v", o)
+	}
+
+	err = storage.DelLastListedContainer(ctx, task)
+	r.NoError(err, "no error if container is deleted")
+
+	res, err = storage.GetLastListedContainer(ctx, task)
+	r.NoError(err, "no error if container is retrieved after deletion")
+	r.Empty(res, "should return empty string after deletion")
+}
