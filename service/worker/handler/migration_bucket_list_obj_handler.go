@@ -46,7 +46,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		return err
 	}
 
-	fromClient, err := s.clients.GetByName(ctx, p.ID.User(), p.ID.FromStorage())
+	fromClient, err := s.clients.AsS3(ctx, p.ID.FromStorage(), p.ID.User())
 	if err != nil {
 		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.ID.FromStorage(), err, asynq.SkipRetry)
 	}

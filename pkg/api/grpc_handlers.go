@@ -20,9 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -34,11 +32,10 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/notifications"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/rpc"
-	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -52,16 +49,15 @@ const (
 	defaultZeroDowntimeMultipartTTL = time.Hour
 )
 
-func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, queueSvc tasks.QueueService,
+func GrpcHandlers(clients objstore.Clients, queueSvc tasks.QueueService,
 	rclone rclone.Service, policySvc policy.Service, versionSvc meta.VersionService,
 	storageSvc storage.Service, checkSvc *handler.ConsistencyCheckSvc, proxyClient rpc.Proxy,
 	agentClient *rpc.AgentClient, notificationSvc *notifications.Service,
 	replicationStatusLocker *store.ReplicationStatusLocker, userLocker *store.UserLocker,
 	appInfo *dom.AppInfo) pb.ChorusServer {
 	return &handlers{
-		storages:                storages,
 		rclone:                  rclone,
-		s3clients:               s3clients,
+		clients:                 clients,
 		queueSvc:                queueSvc,
 		policySvc:               policySvc,
 		versionSvc:              versionSvc,
@@ -79,8 +75,7 @@ func GrpcHandlers(storages *s3.StorageConfig, s3clients s3client.Service, queueS
 var _ pb.ChorusServer = &handlers{}
 
 type handlers struct {
-	storages                *s3.StorageConfig
-	s3clients               s3client.Service
+	clients                 objstore.Clients
 	queueSvc                tasks.QueueService
 	rclone                  rclone.Service
 	policySvc               policy.Service
@@ -96,7 +91,7 @@ type handlers struct {
 }
 
 func (h *handlers) StartConsistencyCheck(ctx context.Context, req *pb.StartConsistencyCheckRequest) (*emptypb.Empty, error) {
-	if err := validate.StorageLocationsWithUser(h.storages, req.Locations, req.User); err != nil {
+	if err := validate.StorageLocationsWithUser(h.clients.Config(), req.Locations, req.User); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -176,7 +171,7 @@ func (h *handlers) ListConsistencyChecks(ctx context.Context, _ *emptypb.Empty) 
 }
 
 func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*pb.GetConsistencyCheckReportResponse, error) {
-	if err := validate.StorageLocations(h.storages, req.Locations); err != nil {
+	if err := validate.StorageLocations(h.clients.Config(), req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -206,7 +201,7 @@ func (h *handlers) GetConsistencyCheckReport(ctx context.Context, req *pb.Consis
 }
 
 func (h *handlers) GetConsistencyCheckReportEntries(ctx context.Context, req *pb.GetConsistencyCheckReportEntriesRequest) (*pb.GetConsistencyCheckReportEntriesResponse, error) {
-	if err := validate.StorageLocations(h.storages, req.Locations); err != nil {
+	if err := validate.StorageLocations(h.clients.Config(), req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -246,7 +241,7 @@ func (h *handlers) GetConsistencyCheckReportEntries(ctx context.Context, req *pb
 }
 
 func (h *handlers) DeleteConsistencyCheckReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
-	if err := validate.StorageLocations(h.storages, req.Locations); err != nil {
+	if err := validate.StorageLocations(h.clients.Config(), req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -272,30 +267,7 @@ func (h *handlers) GetAppVersion(_ context.Context, _ *emptypb.Empty) (*pb.GetAp
 }
 
 func (h *handlers) GetStorages(_ context.Context, _ *emptypb.Empty) (*pb.GetStoragesResponse, error) {
-	res := make([]*pb.Storage, 0, len(h.storages.Storages))
-	for name, stor := range h.storages.Storages {
-		creds := make([]*pb.Credential, 0, len(stor.Credentials))
-		for alias, cred := range stor.Credentials {
-			creds = append(creds, &pb.Credential{
-				Alias:     alias,
-				AccessKey: cred.AccessKeyID,
-				SecretKey: "",
-			})
-		}
-		slices.SortFunc(creds, func(a, b *pb.Credential) int {
-			if n := strings.Compare(a.Alias, b.Alias); n != 0 {
-				return n
-			}
-			return strings.Compare(a.AccessKey, b.AccessKey)
-		})
-		res = append(res, &pb.Storage{
-			Name:        name,
-			Address:     stor.Address,
-			Provider:    pb.Storage_Provider(pb.Storage_Provider_value[stor.Provider]),
-			Credentials: creds,
-			IsMain:      stor.IsMain,
-		})
-	}
+	res := toPbStorages(h.clients.Config())
 	return &pb.GetStoragesResponse{Storages: res}, nil
 }
 
@@ -329,39 +301,40 @@ func (h *handlers) ListBucketsForReplication(ctx context.Context, req *pb.ListBu
 		}
 	}
 
-	client, err := h.s3clients.GetByName(ctx, req.User, req.From)
+	client, err := h.clients.AsCommon(ctx, req.From, req.User)
 	if err != nil {
 		return nil, err
 	}
-	buckets, err := client.S3().ListBuckets(ctx)
+	buckets, err := client.ListBuckets(ctx)
 	if err != nil {
 		return nil, err
 	}
 	res := &pb.ListBucketsForReplicationResponse{}
 	for _, bucket := range buckets {
-		_, used := usedBuckets[bucket.Name]
+		_, used := usedBuckets[bucket]
 		if !used {
-			res.Buckets = append(res.Buckets, bucket.Name)
+			res.Buckets = append(res.Buckets, bucket)
 			continue
 		}
 		// already used
 		if req.ShowReplicated {
-			res.ReplicatedBuckets = append(res.ReplicatedBuckets, bucket.Name)
+			res.ReplicatedBuckets = append(res.ReplicatedBuckets, bucket)
 		}
 	}
 	return res, nil
 }
 
 func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationRequest) (*emptypb.Empty, error) {
-	if _, ok := h.storages.Storages[req.From]; !ok {
-		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.From)
+	if err := h.clients.Config().Exists(req.From, req.User); err != nil {
+		return nil, err
 	}
-	if _, ok := h.storages.Storages[req.To]; !ok {
-		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.To)
+	if err := h.clients.Config().Exists(req.To, req.User); err != nil {
+		return nil, err
 	}
-	if _, ok := h.storages.Storages[req.From].Credentials[req.User]; !ok {
-		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.User)
+	if h.clients.Config().Storages[req.From].Type != h.clients.Config().Storages[req.To].Type {
+		return nil, fmt.Errorf("%w: replication between different storage types is not supported", dom.ErrInvalidArg)
 	}
+
 	if req.From == req.To {
 		return nil, fmt.Errorf("%w: from and to should be different", dom.ErrInvalidArg)
 	}
@@ -383,7 +356,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 		if len(req.Buckets) == 0 {
 			return fmt.Errorf("%w: buckets not set", dom.ErrInvalidArg)
 		}
-		client, err := h.s3clients.GetByName(ctx, req.User, req.From)
+		client, err := h.clients.AsCommon(ctx, req.From, req.User)
 		if err != nil {
 			return err
 		}
@@ -393,7 +366,7 @@ func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationReq
 		}
 		// validate buckets
 		for _, bucket := range req.Buckets {
-			ok, err := client.S3().BucketExists(ctx, bucket)
+			ok, err := client.BucketExists(ctx, bucket)
 			if err != nil {
 				return err
 			}
@@ -456,11 +429,11 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 	if err != nil && !errors.Is(err, dom.ErrAlreadyExists) {
 		return err
 	}
-	client, err := h.s3clients.GetByName(ctx, req.User, req.From)
+	client, err := h.clients.AsCommon(ctx, req.From, req.User)
 	if err != nil {
 		return err
 	}
-	buckets, err := client.S3().ListBuckets(ctx)
+	buckets, err := client.ListBuckets(ctx)
 	if err != nil {
 		return err
 	}
@@ -468,7 +441,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 	uid := entity.UniversalFromUserReplication(policy)
 	for _, bucket := range buckets {
 		task := tasks.BucketCreatePayload{
-			Bucket: bucket.Name,
+			Bucket: bucket,
 		}
 		task.SetReplicationID(uid)
 		err = h.queueSvc.EnqueueTask(ctx, task)
@@ -480,11 +453,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 }
 
 func (h *handlers) ListReplications(ctx context.Context, _ *emptypb.Empty) (*pb.ListReplicationsResponse, error) {
-	usersMap := h.storages.Storages[h.storages.Main()].Credentials
-	users := make([]string, 0, len(usersMap))
-	for user := range usersMap {
-		users = append(users, user)
-	}
+	users := h.clients.Config().GetMain().UserList()
 	usersRes := make([]map[entity.BucketReplicationPolicy]entity.ReplicationStatusExtended, len(users))
 	// list replications per user in parallel
 	g, gCtx := errgroup.WithContext(ctx)
@@ -636,14 +605,11 @@ func (h *handlers) DeleteReplication(ctx context.Context, req *pb.ReplicationReq
 }
 
 func (h *handlers) CompareBucket(ctx context.Context, req *pb.CompareBucketRequest) (*pb.CompareBucketResponse, error) {
-	if _, ok := h.storages.Storages[req.From]; !ok {
-		return nil, fmt.Errorf("%w: invalid FromStorage", dom.ErrInvalidArg)
+	if err := h.clients.Config().Exists(req.From, req.User); err != nil {
+		return nil, err
 	}
-	if _, ok := h.storages.Storages[req.To]; !ok {
-		return nil, fmt.Errorf("%w: invalid ToStorage", dom.ErrInvalidArg)
-	}
-	if _, ok := h.storages.Storages[req.To].Credentials[req.User]; !ok {
-		return nil, fmt.Errorf("%w: invalid User", dom.ErrInvalidArg)
+	if err := h.clients.Config().Exists(req.To, req.User); err != nil {
+		return nil, err
 	}
 
 	res, err := h.rclone.Compare(ctx, req.ShowMatch, req.User, req.From, req.To, req.Bucket, req.ToBucket)
@@ -713,14 +679,14 @@ func (h *handlers) GetAgents(ctx context.Context, _ *emptypb.Empty) (*pb.GetAgen
 
 func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketReplicationRequest) (*emptypb.Empty, error) {
 	// validate
-	if _, ok := h.storages.Storages[req.FromStorage]; !ok {
-		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.FromStorage)
+	if err := h.clients.Config().Exists(req.FromStorage, req.User); err != nil {
+		return nil, err
 	}
-	if _, ok := h.storages.Storages[req.ToStorage]; !ok {
-		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ToStorage)
+	if err := h.clients.Config().Exists(req.ToStorage, req.User); err != nil {
+		return nil, err
 	}
-	if _, ok := h.storages.Storages[req.FromStorage].Credentials[req.User]; !ok {
-		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.User)
+	if h.clients.Config().Storages[req.FromStorage].Type != h.clients.Config().Storages[req.ToStorage].Type {
+		return nil, fmt.Errorf("%w: replication between different storage types is not supported", dom.ErrInvalidArg)
 	}
 	lock, err := h.userLocker.Lock(ctx, req.User, store.WithDuration(time.Second*5), store.WithRetry(true))
 	if err != nil {
@@ -729,7 +695,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 	defer lock.Release(ctx)
 	// obtain lock and try to add replication policy
 	err = lock.Do(ctx, time.Second*5, func() error {
-		client, err := h.s3clients.GetByName(ctx, req.User, req.FromStorage)
+		client, err := h.clients.AsCommon(ctx, req.FromStorage, req.User)
 		if err != nil {
 			return err
 		}
@@ -739,7 +705,7 @@ func (h *handlers) AddBucketReplication(ctx context.Context, req *pb.AddBucketRe
 		}
 
 		// check if bucket exists in source
-		ok, err := client.S3().BucketExists(ctx, req.FromBucket)
+		ok, err := client.BucketExists(ctx, req.FromBucket)
 		if err != nil {
 			return fmt.Errorf("%w: unable to validate source bucket", err)
 		}
@@ -858,15 +824,6 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 			return nil, err
 		}
 	}
-	if _, ok := h.storages.Storages[req.ReplicationId.From]; !ok {
-		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.ReplicationId.From)
-	}
-	if _, ok := h.storages.Storages[req.ReplicationId.To]; !ok {
-		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ReplicationId.To)
-	}
-	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
-		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
-	}
 	if req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
 		// TODO: support replication to different bucket name in a separate PR.
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)
@@ -915,15 +872,6 @@ func (h *handlers) SwitchBucket(ctx context.Context, req *pb.SwitchBucketRequest
 
 func (h *handlers) SwitchBucketZeroDowntime(ctx context.Context, req *pb.SwitchBucketZeroDowntimeRequest) (*emptypb.Empty, error) {
 	// validate
-	if _, ok := h.storages.Storages[req.ReplicationId.From]; !ok {
-		return nil, fmt.Errorf("%w: unknown from storage %s", dom.ErrInvalidArg, req.ReplicationId.From)
-	}
-	if _, ok := h.storages.Storages[req.ReplicationId.To]; !ok {
-		return nil, fmt.Errorf("%w: unknown to storage %s", dom.ErrInvalidArg, req.ReplicationId.To)
-	}
-	if _, ok := h.storages.Storages[req.ReplicationId.From].Credentials[req.ReplicationId.User]; !ok {
-		return nil, fmt.Errorf("%w: unknown user %s", dom.ErrInvalidArg, req.ReplicationId.User)
-	}
 	if req.ReplicationId.ToBucket != req.ReplicationId.Bucket {
 		// TODO: support replication to different bucket name in a separate PR.
 		return nil, fmt.Errorf("%w: switch for replication to different bucket name is currently not supported", dom.ErrNotImplemented)

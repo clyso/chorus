@@ -37,6 +37,7 @@ import (
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/util"
@@ -101,8 +102,10 @@ type Service interface {
 	Compare(ctx context.Context, listMatch bool, user, from, to, fromBucket string, toBucket string) (*CompareRes, error)
 }
 
-func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mamCalc *MemCalculator, memLimiter, fileLimiter ratelimit.Semaphore) (Service, error) {
-	if len(conf.Storages) == 0 {
+func New(storagesConf objstore.Config, jsonLog bool, metricsSvc metrics.S3Service, mamCalc *MemCalculator, memLimiter, fileLimiter ratelimit.Semaphore) (Service, error) {
+	//Don't need to support swift - we are planning to replace rlcone anyway
+	conf := storagesConf.S3Storages()
+	if len(conf) == 0 {
 		return nil, dom.ErrInvalidStorageConfig
 	}
 	s3, err := fs.Find("s3")
@@ -110,9 +113,9 @@ func New(conf *s3.StorageConfig, jsonLog bool, metricsSvc metrics.S3Service, mam
 		return nil, err
 	}
 
-	s := svc{s3: s3, _configs: make(map[string]*configmap.Map, len(conf.Storages)), metricsSvc: metricsSvc, memCalc: mamCalc, memLimiter: memLimiter, fileLimiter: fileLimiter}
+	s := svc{s3: s3, _configs: make(map[string]*configmap.Map, len(conf)), metricsSvc: metricsSvc, memCalc: mamCalc, memLimiter: memLimiter, fileLimiter: fileLimiter}
 
-	for storName, stor := range conf.Storages {
+	for storName, stor := range conf {
 		for user, cred := range stor.Credentials {
 			name := storName + ":" + user
 			scm := configmap.Simple{}

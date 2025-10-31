@@ -36,6 +36,7 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/notifications"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/rclone"
@@ -43,6 +44,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
@@ -93,11 +95,27 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
-	s3Clients, err := s3client.New(ctx, conf.Storage, metricsSvc, tp)
+	clients := map[dom.StorageType]any{}
+	if s3Conf := conf.Storage.S3Storages(); len(s3Conf) != 0 {
+		s3Clients, err := s3client.New(ctx, s3Conf, metricsSvc, tp)
+		if err != nil {
+			return err
+		}
+		clients[dom.S3] = s3Clients
+		logger.Info().Msg("s3 clients connected")
+	}
+	if swiftConf := conf.Storage.SwiftStorages(); len(swiftConf) != 0 {
+		swiftClients, err := swift.New(swiftConf)
+		if err != nil {
+			return err
+		}
+		clients[dom.Swift] = swiftClients
+		logger.Info().Msg("swift clients connected")
+	}
+	clientRegistry, err := objstore.New(conf.Storage, clients)
 	if err != nil {
 		return err
 	}
-	logger.Info().Msg("s3 clients connected")
 
 	memLimitBytes, err := util.ParseBytes(conf.RClone.MemoryLimit.Limit)
 	if err != nil && conf.RClone.MemoryLimit.Enabled {
@@ -132,7 +150,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main())
+	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main)
 
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 	lockRedis := util.NewRedis(conf.Redis, conf.Redis.LockDB)
@@ -144,7 +162,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	memoryLimiterSvc := rclone.NewMemoryLimiterSvc(memCalc, memLimiter, filesLimiter, metricsSvc)
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
-	copySvc := rclone.NewS3CopySvc(s3Clients, memoryLimiterSvc, limiter, metricsSvc)
+	copySvc := rclone.NewS3CopySvc(clientRegistry, memoryLimiterSvc, limiter, metricsSvc)
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
 	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
 
@@ -155,7 +173,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -238,7 +256,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		handlers := api.GrpcHandlers(conf.Storage, s3Clients, queueSvc, rc, policySvc, versionSvc, storageSvc, checkSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), replicationStatusLocker, userLocker, &app)
+		handlers := api.GrpcHandlers(clientRegistry, queueSvc, rc, policySvc, versionSvc, storageSvc, checkSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker, &app)
 		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, app)
 		if err != nil {
 			return err

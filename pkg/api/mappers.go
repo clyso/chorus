@@ -17,12 +17,17 @@
 package api
 
 import (
+	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/objstore"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
@@ -187,4 +192,41 @@ func toPbDowntimeOpts(in entity.ReplicationSwitchDowntimeOpts) *pb.SwitchDowntim
 		SkipBucketCheck:     in.SkipBucketCheck,
 		ContinueReplication: in.ContinueReplication,
 	}
+}
+
+func toPbStorages(in objstore.Config) []*pb.Storage {
+	res := make([]*pb.Storage, 0, len(in.Storages))
+	for name, storConf := range in.Storages {
+		storage := &pb.Storage{
+			Name:     name,
+			IsMain:   name == in.Main,
+			Provider: pb.Storage_Type(pb.Storage_Type_value[string(storConf.Type)]),
+		}
+		switch storConf.Type {
+		case dom.S3:
+			for user, creds := range storConf.S3.Credentials {
+				storage.Credentials = append(storage.Credentials, &pb.Credential{
+					Alias:     user,
+					AccessKey: creds.AccessKeyID,
+				})
+			}
+			storage.Address = storConf.S3.Address
+		case dom.Swift:
+			for user, creds := range storConf.Swift.Credentials {
+				storage.Credentials = append(storage.Credentials, &pb.Credential{
+					Alias:     user,
+					AccessKey: creds.Username,
+				})
+			}
+			storage.Address = fmt.Sprintf("[%s, Endpoint: %s]", storConf.Swift.AuthURL, storConf.Swift.StorageEndpointName)
+		}
+		slices.SortFunc(storage.Credentials, func(a, b *pb.Credential) int {
+			if n := strings.Compare(a.Alias, b.Alias); n != 0 {
+				return n
+			}
+			return strings.Compare(a.AccessKey, b.AccessKey)
+		})
+		res = append(res, storage)
+	}
+	return res
 }

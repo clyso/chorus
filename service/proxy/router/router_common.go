@@ -45,7 +45,7 @@ func (r *router) commonRead(req *http.Request) (resp *http.Response, storage str
 	}
 
 	if xctx.GetMethod(ctx) == s3.GetObject {
-		_ = r.limit.StorReq(ctx, client.Name()) //todo: refactor rate-limiting
+		_ = r.limit.StorReq(ctx, storage) //todo: refactor rate-limiting
 	}
 	resp, isApiErr, err = client.Do(req)
 	return

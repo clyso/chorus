@@ -18,11 +18,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/objstore"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-func StorageLocations(storages *s3.StorageConfig, locations []*pb.MigrateLocation) error {
+var ccSupportedStorTypes = map[dom.StorageType]bool{
+	dom.S3: true,
+}
+
+func StorageLocations(storages objstore.Config, locations []*pb.MigrateLocation) error {
 	if len(locations) < 2 {
 		return errors.New("at least 2 migration locations should be provided")
 	}
@@ -34,15 +39,19 @@ func StorageLocations(storages *s3.StorageConfig, locations []*pb.MigrateLocatio
 		if location.Storage == "" {
 			return fmt.Errorf("location %d storage is empty", idx)
 		}
-		if _, ok := storages.Storages[location.Storage]; !ok {
+		stor, ok := storages.Storages[location.Storage]
+		if !ok {
 			return fmt.Errorf("unable to find storage %s in config", location.Storage)
+		}
+		if !ccSupportedStorTypes[stor.Type] {
+			return fmt.Errorf("storage %s of type %s is not supported storage location", location.Storage, stor.Type)
 		}
 	}
 
 	return nil
 }
 
-func StorageLocationsWithUser(storages *s3.StorageConfig, locations []*pb.MigrateLocation, user string) error {
+func StorageLocationsWithUser(storages objstore.Config, locations []*pb.MigrateLocation, user string) error {
 	if len(locations) < 2 {
 		return errors.New("at least 2 migration locations should be provided")
 	}
@@ -54,12 +63,15 @@ func StorageLocationsWithUser(storages *s3.StorageConfig, locations []*pb.Migrat
 		if location.Storage == "" {
 			return fmt.Errorf("location %d storage is empty", idx)
 		}
-		if _, ok := storages.Storages[location.Storage]; !ok {
+		stor, ok := storages.Storages[location.Storage]
+		if !ok {
 			return fmt.Errorf("unable to find storage %s in config", location.Storage)
 		}
-		_, ok := storages.Storages[location.Storage].Credentials[user]
-		if !ok {
-			return fmt.Errorf("unable to find user %s storage %s in config", user, location.Storage)
+		if !ccSupportedStorTypes[stor.Type] {
+			return fmt.Errorf("storage %s of type %s is not supported storage location", location.Storage, stor.Type)
+		}
+		if err := storages.Exists(location.Storage, user); err != nil {
+			return fmt.Errorf("%w: invalid storage location", err)
 		}
 	}
 

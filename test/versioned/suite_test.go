@@ -51,6 +51,7 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker"
 	"github.com/clyso/chorus/service/worker/handler"
+	"github.com/clyso/chorus/test/app"
 	"github.com/clyso/chorus/test/env"
 	"github.com/clyso/chorus/test/gen"
 
@@ -200,6 +201,33 @@ var _ = Describe("Minio versioned migration", func() {
 		httpPort, err := env.RandomFreePort()
 		Expect(err).NotTo(HaveOccurred())
 
+		s3Storages := map[string]s3.Storage{
+			CMinioSrcInstance: {
+				Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+				Credentials: map[string]s3.CredentialsV4{
+					CSyncUserKey: {
+						AccessKeyID:     CMinioSrcUser,
+						SecretAccessKey: CMinioSrcPass,
+					},
+				},
+				Provider: CMinioProvider,
+			},
+			CMinioDestInstance: {
+				Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
+				Credentials: map[string]s3.CredentialsV4{
+					CSyncUserKey: {
+						AccessKeyID:     CMinioDestUser,
+						SecretAccessKey: CMinioDestPass,
+					},
+				},
+				Provider: CMinioProvider,
+			},
+		}
+		mainStorage := CMinioSrcInstance
+		workerStorages := app.WorkerS3Config(mainStorage, s3Storages)
+		err = workerStorages.Validate()
+		Expect(err).NotTo(HaveOccurred())
+
 		workerConf := &worker.Config{
 			Common: config.Common{
 				Features: &features.Config{
@@ -239,41 +267,13 @@ var _ = Describe("Minio versioned migration", func() {
 				SwitchRetryInterval: time.Millisecond * 500,
 				PauseRetryInterval:  time.Millisecond * 500,
 			},
-			Storage: &s3.StorageConfig{
-				Storages: map[string]s3.Storage{
-					CMinioSrcInstance: {
-						Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
-						Credentials: map[string]s3.CredentialsV4{
-							CSyncUserKey: {
-								AccessKeyID:     CMinioSrcUser,
-								SecretAccessKey: CMinioSrcPass,
-							},
-						},
-						Provider: CMinioProvider,
-						IsMain:   true,
-					},
-					CMinioDestInstance: {
-						Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
-						Credentials: map[string]s3.CredentialsV4{
-							CSyncUserKey: {
-								AccessKeyID:     CMinioDestUser,
-								SecretAccessKey: CMinioDestPass,
-							},
-						},
-						Provider: CMinioProvider,
-						IsMain:   false,
-					},
-				},
-			},
+			Storage: workerStorages,
 			Api: &api.Config{
 				Enabled:  true,
 				GrpcPort: grpcPort,
 				HttpPort: httpPort,
 			},
 		}
-
-		err = workerConf.Storage.Init()
-		Expect(err).NotTo(HaveOccurred())
 
 		grpcAddr := fmt.Sprintf("%s:%d", "localhost", grpcPort)
 
@@ -509,6 +509,33 @@ var _ = Describe("Ceph versioned migration", func() {
 		httpPort, err := env.RandomFreePort()
 		Expect(err).NotTo(HaveOccurred())
 
+		s3Storages := map[string]s3.Storage{
+			CCephSrcInstance: {
+				Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+				Credentials: map[string]s3.CredentialsV4{
+					CSyncUserKey: {
+						AccessKeyID:     CCephSrcAccessKey,
+						SecretAccessKey: CCephSrcSecretKey,
+					},
+				},
+				Provider: CCephProvider,
+			},
+			CCephDestInstance: {
+				Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
+				Credentials: map[string]s3.CredentialsV4{
+					CSyncUserKey: {
+						AccessKeyID:     CCephDestAccessKey,
+						SecretAccessKey: CCephDestSecretKey,
+					},
+				},
+				Provider: CCephProvider,
+			},
+		}
+		mainStorage := CCephSrcInstance
+		workerStorages := app.WorkerS3Config(mainStorage, s3Storages)
+		err = workerStorages.Validate()
+		Expect(err).NotTo(HaveOccurred())
+
 		workerConf := &worker.Config{
 			Common: config.Common{
 				Features: &features.Config{
@@ -548,41 +575,13 @@ var _ = Describe("Ceph versioned migration", func() {
 				SwitchRetryInterval: time.Millisecond * 500,
 				PauseRetryInterval:  time.Millisecond * 500,
 			},
-			Storage: &s3.StorageConfig{
-				Storages: map[string]s3.Storage{
-					CCephSrcInstance: {
-						Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
-						Credentials: map[string]s3.CredentialsV4{
-							CSyncUserKey: {
-								AccessKeyID:     CCephSrcAccessKey,
-								SecretAccessKey: CCephSrcSecretKey,
-							},
-						},
-						Provider: CCephProvider,
-						IsMain:   true,
-					},
-					CCephDestInstance: {
-						Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
-						Credentials: map[string]s3.CredentialsV4{
-							CSyncUserKey: {
-								AccessKeyID:     CCephDestAccessKey,
-								SecretAccessKey: CCephDestSecretKey,
-							},
-						},
-						Provider: CCephProvider,
-						IsMain:   false,
-					},
-				},
-			},
+			Storage: workerStorages,
 			Api: &api.Config{
 				Enabled:  true,
 				GrpcPort: grpcPort,
 				HttpPort: httpPort,
 			},
 		}
-
-		err = workerConf.Storage.Init()
-		Expect(err).NotTo(HaveOccurred())
 
 		grpcAddr := fmt.Sprintf("%s:%d", "localhost", grpcPort)
 

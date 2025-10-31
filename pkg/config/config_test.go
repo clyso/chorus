@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/clyso/chorus/pkg/s3"
 )
 
 func TestGet(t *testing.T) {
@@ -73,44 +71,6 @@ func TestOverrideEnv(t *testing.T) {
 	r.NotEmpty(conf.Redis.Address)
 	r.EqualValues([]string{"a", "b", "c"}, conf.Redis.Addresses, "redis addresses set from env")
 	r.EqualValues([]string{"a", "b", "c"}, conf.Redis.GetAddresses(), "address is ignored")
-}
-
-func TestStorageConfig_RateLimitConf(t *testing.T) {
-	r := require.New(t)
-	conf := s3.StorageConfig{Storages: map[string]s3.Storage{
-		"main": {RateLimit: s3.RateLimit{
-			Enabled: false,
-			RPM:     1,
-		}},
-		"f1": {RateLimit: s3.RateLimit{
-			Enabled: true,
-			RPM:     2,
-		}},
-		"f2": {RateLimit: s3.RateLimit{
-			Enabled: false,
-			RPM:     3,
-		}},
-	}}
-	res := conf.RateLimitConf()
-	r.EqualValues(s3.RateLimit{
-		Enabled: false,
-		RPM:     1,
-	}, res["main"])
-	r.EqualValues(s3.RateLimit{
-		Enabled: true,
-		RPM:     2,
-	}, res["f1"])
-	r.EqualValues(s3.RateLimit{
-		Enabled: false,
-		RPM:     3,
-	}, res["f2"])
-	r.EqualValues(s3.RateLimit{
-		Enabled: false,
-		RPM:     1,
-	}, res["main"])
-	r.EqualValues(conf.Storages["main"].RateLimit, res["main"])
-	r.EqualValues(conf.Storages["f1"].RateLimit, res["f1"])
-	r.EqualValues(conf.Storages["f2"].RateLimit, res["f2"])
 }
 
 func TestRedis_validate(t *testing.T) {

@@ -102,13 +102,16 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 
 	// 2. sync obj ACL
-	err = s.syncObjectACL(ctx, fromClient, toClient, fromBucket, p.Obj.Name, toBucket)
+	err = s.syncObjectACL(ctx, fromClient, toClient, p.ID, dom.Object{
+		Bucket: p.Bucket,
+		Name:   p.Obj.Name,
+	})
 	if err != nil {
 		return err
 	}
 
 	// 3. sync obj tags
-	err = s.syncObjectTagging(ctx, fromClient, toClient, fromBucket, p.Obj.Name, toBucket)
+	err = s.syncObjectTagging(ctx, fromClient, toClient, p.ID, dom.Object{Bucket: p.Bucket, Name: p.Obj.Name})
 	if err != nil {
 		return err
 	}

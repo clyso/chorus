@@ -40,8 +40,8 @@ func Test_api_proxy_creds(t *testing.T) {
 	r.EqualValues(res.Credentials[0].Alias, user)
 	r.NotEmpty(res.Credentials[0].AccessKey)
 	r.NotEmpty(res.Credentials[0].SecretKey)
-	r.EqualValues(res.Credentials[0].AccessKey, proxyConf.Storage.Storages[proxyConf.Auth.UseStorage].Credentials[user].AccessKeyID)
-	r.EqualValues(res.Credentials[0].SecretKey, proxyConf.Storage.Storages[proxyConf.Auth.UseStorage].Credentials[user].SecretAccessKey)
+	r.EqualValues(res.Credentials[0].AccessKey, proxyConf.Storage.S3Storages()[proxyConf.Auth.UseStorage].Credentials[user].AccessKeyID)
+	r.EqualValues(res.Credentials[0].SecretKey, proxyConf.Storage.S3Storages()[proxyConf.Auth.UseStorage].Credentials[user].SecretAccessKey)
 }
 
 func Test_api_list_replications(t *testing.T) {

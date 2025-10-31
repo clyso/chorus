@@ -148,10 +148,6 @@ func (c *client) AWS() *AWS {
 	return c.aws
 }
 
-func (c *client) Name() string {
-	return c.name
-}
-
 func (c *client) Config() s3.Storage {
 	return c.conf
 }

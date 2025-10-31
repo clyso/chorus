@@ -34,6 +34,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
@@ -69,13 +70,13 @@ type CopySvc interface {
 }
 
 type S3CopySvc struct {
-	clientRegistry    s3client.Service
+	clientRegistry    objstore.Clients
 	memoryLimiterSvc  LimiterSvc
 	requestLimiterSvc ratelimit.RPM
 	metricsSvc        metrics.S3Service
 }
 
-func NewS3CopySvc(clientRegistry s3client.Service, memoryLimiterSvc LimiterSvc, requestLimiterSvc ratelimit.RPM, metricsSvc metrics.S3Service) *S3CopySvc {
+func NewS3CopySvc(clientRegistry objstore.Clients, memoryLimiterSvc LimiterSvc, requestLimiterSvc ratelimit.RPM, metricsSvc metrics.S3Service) *S3CopySvc {
 	return &S3CopySvc{
 		clientRegistry:    clientRegistry,
 		memoryLimiterSvc:  memoryLimiterSvc,
@@ -103,7 +104,7 @@ func WithAfter(after string) func(o *minio.ListObjectsOptions) {
 }
 
 func (r *S3CopySvc) BucketObjects(ctx context.Context, user string, bucket Bucket, opts ...func(o *minio.ListObjectsOptions)) iter.Seq2[ObjectInfo, error] {
-	storageClient, err := r.clientRegistry.GetByName(ctx, user, bucket.Storage)
+	storageClient, err := r.clientRegistry.AsS3(ctx, bucket.Storage, user)
 	if err != nil {
 		return func(yield func(ObjectInfo, error) bool) {
 			yield(ObjectInfo{}, fmt.Errorf("unable to get %s storage client: %w", bucket.Storage, err))
@@ -144,7 +145,7 @@ func (r *S3CopySvc) BucketObjects(ctx context.Context, user string, bucket Bucke
 }
 
 func (r *S3CopySvc) IsBucketVersioned(ctx context.Context, user string, bucket Bucket) (bool, error) {
-	storageClient, err := r.clientRegistry.GetByName(ctx, user, bucket.Storage)
+	storageClient, err := r.clientRegistry.AsS3(ctx, bucket.Storage, user)
 	if err != nil {
 		return false, fmt.Errorf("unable to get %s storage client: %w", bucket.Storage, err)
 	}
@@ -162,7 +163,7 @@ func (r *S3CopySvc) IsBucketVersioned(ctx context.Context, user string, bucket B
 }
 
 func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([]ObjectVersionInfo, error) {
-	storageClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
+	storageClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get %s storage client: %w", to.Storage, err)
 	}
@@ -194,7 +195,7 @@ func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([
 }
 
 func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (ObjectVersionInfo, error) {
-	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
+	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return ObjectVersionInfo{}, fmt.Errorf("unable to get to client: %w", err)
 	}
@@ -228,7 +229,7 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string,
 }
 
 func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, user string, to File) error {
-	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
+	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
 	}
@@ -244,11 +245,11 @@ func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, user string, to
 }
 
 func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to File) error {
-	fromClient, err := r.clientRegistry.GetByName(ctx, user, from.Storage)
+	fromClient, err := r.clientRegistry.AsS3(ctx, from.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get from client: %w", err)
 	}
-	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
+	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
 	}
@@ -371,11 +372,11 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 }
 
 func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to File) error {
-	fromClient, err := r.clientRegistry.GetByName(ctx, user, from.Storage)
+	fromClient, err := r.clientRegistry.AsS3(ctx, from.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get from client: %w", err)
 	}
-	toClient, err := r.clientRegistry.GetByName(ctx, user, to.Storage)
+	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
 	}

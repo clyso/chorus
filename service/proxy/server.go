@@ -101,11 +101,11 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return err
 	}
-	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main())
+	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main)
 
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
-	s3Clients, err := s3client.New(ctx, conf.Storage, metricsSvc, tp)
+	s3Clients, err := s3client.New(ctx, conf.Storage.S3Storages(), metricsSvc, tp)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	routeSvc := router.NewRouter(s3Clients, verSvc, storageSvc, limiter)
 	replSvc := replication.New(queueSvc, verSvc, policySvc)
 	proxyMux := router.Serve(routeSvc, replSvc)
-	authCheck := auth.Middleware(conf.Auth, conf.Storage.Storages)
+	authCheck := auth.Middleware(conf.Auth, conf.Storage.S3Storages())
 	var handler http.Handler
 	if conf.Metrics.Enabled {
 		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, authCheck.Wrap(router.Middleware(policySvc, trace.HttpMiddleware(tp, metrics.ProxyMiddleware(proxyMux)))))
@@ -134,8 +134,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	logger.Info().Msg("proxy created")
 
+	credentials := []map[string]s3.CredentialsV4{conf.Auth.Custom}
+	if s3torageConf, ok := conf.Storage.S3Storages()[conf.Auth.UseStorage]; ok {
+		credentials = append(credentials, s3torageConf.Credentials)
+	}
 	err = server.Add("proxy_request_reply", func(ctx context.Context) error {
-		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address, conf.Auth.Custom, conf.Storage.Storages[conf.Auth.UseStorage].Credentials))
+		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address, credentials...))
 	}, func(ctx context.Context) error { return nil })
 	if err != nil {
 		return err

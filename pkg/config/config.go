@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	stdlog "github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 
@@ -86,14 +87,20 @@ func (r *Redis) GetAddresses() []string {
 	return nil
 }
 
-func Get(conf any, sources ...Src) error {
+func Get(conf any, sources ...Opt) error {
 	data, err := configFile.Open("config.yaml")
 	if err != nil {
 		return fmt.Errorf("%w: unable to read config.yaml", err)
 	}
 	defer data.Close()
 
-	v := viper.NewWithOptions(viper.EnvKeyReplacer(strings.NewReplacer(".", "_")))
+	var opts options
+	for _, o := range sources {
+		o.apply(&opts)
+	}
+	opts.decoders = append(opts.decoders, mapstructure.StringToTimeDurationHookFunc(), mapstructure.StringToSliceHookFunc(","))
+	v := viper.NewWithOptions(viper.EnvKeyReplacer(strings.NewReplacer(".", "_")), viper.WithDecodeHook(mapstructure.ComposeDecodeHookFunc(opts.decoders...)))
+
 	v.SetConfigType("yaml")
 	err = v.ReadConfig(data)
 	if err != nil {
@@ -161,11 +168,22 @@ func (c *Common) Validate() error {
 }
 
 type options struct {
-	sources []any
+	sources  []any
+	decoders []mapstructure.DecodeHookFunc
 }
 
-type Src interface {
+type Opt interface {
 	apply(*options)
+}
+
+type decodeOpt mapstructure.DecodeHookFuncType
+
+func (p decodeOpt) apply(opts *options) {
+	opts.decoders = append(opts.decoders, p)
+}
+
+func Decoder(decoder mapstructure.DecodeHookFuncType) Opt {
+	return decodeOpt(decoder)
 }
 
 type pathOpt string
@@ -174,7 +192,7 @@ func (p pathOpt) apply(opts *options) {
 	opts.sources = append(opts.sources, p)
 }
 
-func Path(path string) Src {
+func Path(path string) Opt {
 	return pathOpt(path)
 }
 
@@ -187,6 +205,6 @@ func (r readerOpt) apply(opts *options) {
 	opts.sources = append(opts.sources, r)
 }
 
-func Reader(reader io.Reader, name string) Src {
+func Reader(reader io.Reader, name string) Opt {
 	return readerOpt{reader, name}
 }

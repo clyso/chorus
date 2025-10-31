@@ -40,7 +40,7 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
-	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
+	fromBucket, _ := p.ID.FromToBuckets(p.Bucket)
 
 	replicationID := p.ID
 
@@ -69,12 +69,12 @@ func (s *svc) HandleBucketCreate(ctx context.Context, t *asynq.Task) (err error)
 	}
 
 	// 2. copy tags
-	err = s.syncBucketTagging(ctx, fromClient, toClient, fromBucket, toBucket)
+	err = s.syncBucketTagging(ctx, fromClient, toClient, p.ID, p.Bucket)
 	if err != nil {
 		return err
 	}
 	// 3. copy ACL
-	err = s.syncBucketACL(ctx, fromClient, toClient, fromBucket, toBucket)
+	err = s.syncBucketACL(ctx, fromClient, toClient, p.ID, p.Bucket)
 	if err != nil {
 		return err
 	}
@@ -134,9 +134,6 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 	})
 	if err != nil && (dom.ErrContains(err, "region", "location")) {
 		defaultRegion := toClient.Config().DefaultRegion
-		if defaultRegion == "" {
-			defaultRegion = s.clients.DefaultRegion()
-		}
 		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
 		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
 			Bucket: &toBucket,

@@ -30,7 +30,7 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 )
 
-func Middleware(conf *Config, storages map[string]s3.Storage) *middleware {
+func Middleware(conf *Config, storages map[string]*s3.Storage) *middleware {
 	credentials := map[string]credMeta{}
 	for user, cred := range storages[conf.UseStorage].Credentials {
 		credentials[cred.AccessKeyID] = credMeta{

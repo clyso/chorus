@@ -6,124 +6,191 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStorageConfig_Validate(t *testing.T) {
-	s := StorageConfig{
-		Storages: map[string]Storage{
-			"a": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"b": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"c": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"d": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"e": {IsMain: true, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"f": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			"g": {IsMain: false, Address: "a", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-		},
-	}
-	r := require.New(t)
-	r.NoError(s.Init())
-	res1 := make([]string, len(s.Storages))
-	copy(res1, s.storageList)
-	r.NoError(s.Init())
-	res2 := make([]string, len(s.Storages))
-	copy(res2, s.storageList)
-	r.NoError(s.Init())
-	res3 := make([]string, len(s.Storages))
-	copy(res3, s.storageList)
-	r.EqualValues(res1, res2)
-	r.EqualValues(res3, res2)
-
-	r.EqualValues(res1[0], "e")
-	r.EqualValues(res1[1], "a")
-	r.EqualValues(res1[2], "b")
-	r.EqualValues(res1[3], "c")
-	r.EqualValues(res1[4], "d")
-	r.EqualValues(res1[5], "f")
-	r.EqualValues(res1[6], "g")
-
-	fol := s.Followers()
-	r.EqualValues(fol[0], "a")
-	r.EqualValues(fol[1], "b")
-	r.EqualValues(fol[2], "c")
-	r.EqualValues(fol[3], "d")
-	r.EqualValues(fol[4], "f")
-	r.EqualValues(fol[5], "g")
-	r.EqualValues(len(fol), len(res1)-1)
-}
-
 func TestStorageConfig_ValidateAddress(t *testing.T) {
 	t.Run("Add http", func(t *testing.T) {
 		r := require.New(t)
 
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.NoError(s.Init())
-		r.EqualValues("http://clyso.com", s.Storages["a"].Address)
+		s := Storage{Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.NoError(s.Validate())
+		r.EqualValues("http://clyso.com", s.Address)
 	})
 	t.Run("Add https", func(t *testing.T) {
 		r := require.New(t)
-
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.NoError(s.Init())
-		r.EqualValues("https://clyso.com", s.Storages["a"].Address)
+		s := Storage{IsSecure: true, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.NoError(s.Validate())
+		r.EqualValues("https://clyso.com", s.Address)
 	})
 
 	t.Run("Already http", func(t *testing.T) {
 		r := require.New(t)
-
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.NoError(s.Init())
-		r.EqualValues("http://clyso.com", s.Storages["a"].Address)
+		s := Storage{Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.NoError(s.Validate())
+		r.EqualValues("http://clyso.com", s.Address)
 	})
 	t.Run("Already https", func(t *testing.T) {
 		r := require.New(t)
 
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.NoError(s.Init())
-		r.EqualValues("https://clyso.com", s.Storages["a"].Address)
+		s := Storage{IsSecure: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.NoError(s.Validate())
+		r.EqualValues("https://clyso.com", s.Address)
 	})
 
 	t.Run("Invalid http", func(t *testing.T) {
 		r := require.New(t)
 
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.Error(s.Init())
+		s := Storage{Address: "https://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.Error(s.Validate())
 	})
 	t.Run("Invalid https", func(t *testing.T) {
 		r := require.New(t)
 
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.Error(s.Init())
+		s := Storage{IsSecure: true, Address: "http://clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.Error(s.Validate())
 	})
 	t.Run("Invalid url", func(t *testing.T) {
 		r := require.New(t)
 
-		s := StorageConfig{
-			Storages: map[string]Storage{
-				"a": {IsMain: true, IsSecure: true, Address: "http:/clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}},
-			},
-		}
-		r.Error(s.Init())
+		s := Storage{IsSecure: true, Address: "http:/clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.Error(s.Validate())
 	})
+}
+
+func TestStorageConfig_ValidateTimeout(t *testing.T) {
+	t.Run("default set when not provided", func(t *testing.T) {
+		r := require.New(t)
+		s := Storage{Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.NoError(s.Validate())
+		r.EqualValues(defaultHealthCheckInterval, s.HealthCheckInterval)
+		r.EqualValues(defaultHttpTimeout, s.HttpTimeout)
+	})
+	t.Run("default ignored if set", func(t *testing.T) {
+		r := require.New(t)
+		health := defaultHealthCheckInterval + 999
+		http := defaultHttpTimeout + 123
+		s := Storage{HealthCheckInterval: health, HttpTimeout: http, Address: "clyso.com", Provider: "p", Credentials: map[string]CredentialsV4{"user": {"1", "2"}}}
+		r.NoError(s.Validate())
+		r.EqualValues(health, s.HealthCheckInterval)
+		r.EqualValues(http, s.HttpTimeout)
+		r.NotEqualValues(defaultHealthCheckInterval, s.HealthCheckInterval)
+		r.NotEqualValues(defaultHttpTimeout, s.HttpTimeout)
+	})
+}
+
+func TestStorage_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Storage
+		wantErr bool
+	}{
+		{
+			name: "valid",
+			config: Storage{
+				Credentials: map[string]CredentialsV4{
+					"user": {
+						AccessKeyID:     "id",
+						SecretAccessKey: "key",
+					},
+				},
+				Address:             "clyso.com",
+				Provider:            "Ceph",
+				DefaultRegion:       "",
+				HealthCheckInterval: 0,
+				HttpTimeout:         0,
+				IsSecure:            false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "no credentials",
+			config: Storage{
+				Credentials:         map[string]CredentialsV4{},
+				Address:             "clyso.com",
+				Provider:            "Ceph",
+				DefaultRegion:       "",
+				HealthCheckInterval: 0,
+				HttpTimeout:         0,
+				IsSecure:            false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "no access key",
+			config: Storage{
+				Credentials: map[string]CredentialsV4{
+					"user": {
+						AccessKeyID:     "",
+						SecretAccessKey: "key",
+					},
+				},
+				Address:             "clyso.com",
+				Provider:            "Ceph",
+				DefaultRegion:       "",
+				HealthCheckInterval: 0,
+				HttpTimeout:         0,
+				IsSecure:            false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "no secret key",
+			config: Storage{
+				Credentials: map[string]CredentialsV4{
+					"user": {
+						AccessKeyID:     "id",
+						SecretAccessKey: "",
+					},
+				},
+				Address:             "clyso.com",
+				Provider:            "Ceph",
+				DefaultRegion:       "",
+				HealthCheckInterval: 0,
+				HttpTimeout:         0,
+				IsSecure:            false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "no address",
+			config: Storage{
+				Credentials: map[string]CredentialsV4{
+					"user": {
+						AccessKeyID:     "id",
+						SecretAccessKey: "key",
+					},
+				},
+				Address:             "",
+				Provider:            "Ceph",
+				DefaultRegion:       "",
+				HealthCheckInterval: 0,
+				HttpTimeout:         0,
+				IsSecure:            false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "no provider",
+			config: Storage{
+				Credentials: map[string]CredentialsV4{
+					"user": {
+						AccessKeyID:     "id",
+						SecretAccessKey: "key",
+					},
+				},
+				Address:             "clyso.com",
+				Provider:            "",
+				DefaultRegion:       "",
+				HealthCheckInterval: 0,
+				HttpTimeout:         0,
+				IsSecure:            false,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.config.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("Storage.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
