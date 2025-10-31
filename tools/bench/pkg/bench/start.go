@@ -220,7 +220,8 @@ func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.C
 	user := "user"
 	newCtx = xctx.SetUser(ctx, user)
 	_, tp, _ := trace.NewTracerProvider(&trace.Config{}, dom.AppInfo{})
-	clients, err := s3client.New(newCtx, &s3.StorageConfig{Storages: map[string]s3.Storage{
+
+	clients, err := s3client.New(newCtx, map[string]*s3.Storage{
 		"proxy": {
 			Address: "chorus-dev.clyso.cloud",
 			Credentials: map[string]s3.CredentialsV4{user: {
@@ -228,7 +229,6 @@ func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.C
 				SecretAccessKey: conf.SecretKey,
 			}},
 			Provider:            "Ceph",
-			IsMain:              true,
 			HealthCheckInterval: time.Second * 10,
 			HttpTimeout:         time.Minute * 2,
 			IsSecure:            true,
@@ -240,12 +240,11 @@ func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.C
 				SecretAccessKey: conf.SecretKey,
 			}},
 			Provider:            "Ceph",
-			IsMain:              false,
 			HealthCheckInterval: time.Second * 10,
 			HttpTimeout:         time.Minute * 2,
 			IsSecure:            true,
 		},
-	}}, metrics.NewS3Service(false), tp)
+	}, metrics.NewS3Service(false), tp)
 	if err != nil {
 		return
 	}

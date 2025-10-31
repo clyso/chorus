@@ -46,8 +46,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/testutil"
 	"github.com/clyso/chorus/pkg/util"
 	"github.com/clyso/chorus/service/proxy"
@@ -175,29 +177,28 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		e.TaskClient.Close()
 	})
 
-	proxyConf.Storage.Storages = map[string]s3.Storage{}
-	proxyConf.Storage.Storages["main"] = s3.Storage{
-		Address:     mainTs.URL,
-		Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-		Provider:    "Other",
-		IsMain:      true,
-	}
+	storages := map[string]s3.Storage{
+		"main": {
 
-	proxyConf.Storage.Storages["f1"] = s3.Storage{
-		Address:     f1Ts.URL,
-		Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-		Provider:    "Other",
-		IsMain:      false,
-	}
+			Address:     mainTs.URL,
+			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
+			Provider:    "Other",
+		},
+		"f1": {
 
-	proxyConf.Storage.Storages["f2"] = s3.Storage{
-		Address:     f2Ts.URL,
-		Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-		Provider:    "Other",
-		IsMain:      false,
+			Address:     f1Ts.URL,
+			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
+			Provider:    "Other",
+		},
+		"f2": {
+			Address:     f2Ts.URL,
+			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
+			Provider:    "Other",
+		},
 	}
+	proxyConf.Storage = ProxyS3Config("main", storages)
 
-	workerConf.Storage.Storages = proxyConf.Storage.Storages
+	workerConf.Storage = WorkerS3Config("main", storages)
 	// deep copy proxy config
 	pcBytes, err := yaml.Marshal(&workerConf.Storage)
 	if err != nil {
@@ -209,9 +210,9 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	}
 
 	proxyConf.Auth.UseStorage = "main"
-	e.MainClient, e.MpMainClient = createClient(proxyConf.Storage.Storages["main"])
-	e.F1Client, e.MpF1Client = createClient(proxyConf.Storage.Storages["f1"])
-	e.F2Client, e.MpF2Client = createClient(proxyConf.Storage.Storages["f2"])
+	e.MainClient, e.MpMainClient = createClient(storages["main"])
+	e.F1Client, e.MpF1Client = createClient(storages["f1"])
+	e.F2Client, e.MpF2Client = createClient(storages["f2"])
 
 	addr := ""
 	proxyConf.Port, addr = getRandomPort()
@@ -257,12 +258,12 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	})
 	e.ProxyClient, e.MpProxyClient = createClient(s3.Storage{
 		Address:     addr,
-		Credentials: proxyConf.Storage.Storages["main"].Credentials,
+		Credentials: storages["main"].Credentials,
 		IsSecure:    false,
 	})
 	e.ProxyAwsClient = newAWSClient(s3.Storage{
 		Address:     addr,
-		Credentials: proxyConf.Storage.Storages["main"].Credentials,
+		Credentials: storages["main"].Credentials,
 		IsSecure:    false,
 	})
 
@@ -427,4 +428,38 @@ func deepCopyStruct[T any](in T) (out T, err error) {
 	}
 	err = yaml.Unmarshal(b, &out)
 	return out, err
+}
+
+func WorkerS3Config(main string, storages map[string]s3.Storage) objstore.Config {
+	res := objstore.Config{
+		Main:     main,
+		Storages: map[string]objstore.GenericStorage[*s3.Storage, *swift.Storage]{},
+	}
+	for name, stor := range storages {
+		s := stor
+		res.Storages[name] = objstore.GenericStorage[*s3.Storage, *swift.Storage]{
+			S3: &s,
+			CommonConfig: objstore.CommonConfig{
+				Type: dom.S3,
+			},
+		}
+	}
+	return res
+}
+
+func ProxyS3Config(main string, storages map[string]s3.Storage) proxy.Storages {
+	res := proxy.Storages{
+		Main:     main,
+		Storages: map[string]objstore.GenericStorage[*s3.Storage, *proxy.SwiftStorage]{},
+	}
+	for name, stor := range storages {
+		s := stor
+		res.Storages[name] = objstore.GenericStorage[*s3.Storage, *proxy.SwiftStorage]{
+			S3: &s,
+			CommonConfig: objstore.CommonConfig{
+				Type: dom.S3,
+			},
+		}
+	}
+	return res
 }

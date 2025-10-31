@@ -31,6 +31,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/worker"
@@ -65,27 +66,34 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	// detect fake s3 storages in config
 	fake := map[string]int{}
 	for name, storage := range conf.Storage.Storages {
+		fmt.Println("aaaaaaaaaaaaaaaa", name, storage.Type, storage.S3.Address)
+		if storage.Type != dom.S3 {
+			// only fake s3 storages supported
+			continue
+		}
 		var err error
 		isFake := false
 		fakePort := 0
-		if storage.Address == "" {
+		if storage.S3.Address == "" {
 			_, fakePort, err = getRandomPort()
 			if err != nil {
 				return fmt.Errorf("%w: unable to get random port", err)
 			}
 			isFake = true
-		} else if strings.HasPrefix(storage.Address, ":") {
-			fakePort, err = strconv.Atoi(strings.TrimPrefix(storage.Address, ":"))
+		} else if strings.HasPrefix(storage.S3.Address, ":") {
+			fakePort, err = strconv.Atoi(strings.TrimPrefix(storage.S3.Address, ":"))
 			if err != nil {
-				return fmt.Errorf("%w: unable to parse storage address %s", err, storage.Address)
+				return fmt.Errorf("%w: unable to parse storage address %s", err, storage.S3.Address)
 			}
 			isFake = true
 		}
 		if isFake {
 			fake[name] = fakePort
-			storage.Address = httpLocalhost(fakePort)
-			storage.IsSecure = false
-			conf.Storage.Storages[name] = storage
+			conf.Storage.Storages[name].S3.IsSecure = false
+			conf.Storage.Storages[name].S3.Address = httpLocalhost(fakePort)
+
+			conf.Proxy.Storage.Storages[name].S3.IsSecure = false
+			conf.Proxy.Storage.Storages[name].S3.Address = httpLocalhost(fakePort)
 		}
 	}
 
@@ -149,7 +157,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			Auth:    conf.Proxy.Auth,
 			Port:    conf.Proxy.Port,
 			Address: conf.Proxy.Address,
-			Storage: conf.Storage,
+			Storage: conf.Proxy.Storage,
 			Cors:    conf.Proxy.Cors,
 		}
 		if len(proxyConf.Redis.Addresses) == 0 {
@@ -212,7 +220,9 @@ func printCreds(conf *Config, printSecrets bool) string {
 	}
 	var creds map[string]s3.CredentialsV4
 	if conf.Proxy.Auth.UseStorage != "" {
-		creds = conf.Storage.Storages[conf.Proxy.Auth.UseStorage].Credentials
+		if s3torageConf, ok := conf.Proxy.Storage.S3Storages()[conf.Proxy.Auth.UseStorage]; ok {
+			creds = s3torageConf.Credentials
+		}
 	} else {
 		creds = conf.Proxy.Auth.Custom
 	}
@@ -230,21 +240,28 @@ func printCreds(conf *Config, printSecrets bool) string {
 	return strings.Join(res, "\n")
 }
 
-func printStorages(fake map[string]int, conf *s3.StorageConfig) string {
+func printStorages(fake map[string]int, conf objstore.Config) string {
 	if len(conf.Storages) == 0 {
 		return "<no storages provided in config>"
 	}
 	res := make([]string, 0, len(conf.Storages))
-	for name, stor := range conf.Storages {
+	for name, stor := range conf.S3Storages() {
 		f := ""
 		if _, ok := fake[name]; ok {
 			f = "[\u001B[33mFAKE\u001B[0m] "
 		}
 		m := ""
-		if stor.IsMain {
+		if name == conf.Main {
 			m = " < \u001B[94mMAIN\u001B[0m"
 		}
-		res = append(res, fmt.Sprintf(" - %s%s: %s%s", f, name, stor.Address, m))
+		res = append(res, fmt.Sprintf(" - %s%s: %s [S3]%s", f, name, stor.Address, m))
+	}
+	for name, stor := range conf.SwiftStorages() {
+		m := ""
+		if name == conf.Main {
+			m = " < \u001B[94mMAIN\u001B[0m"
+		}
+		res = append(res, fmt.Sprintf(" - %s: %s [SWIFT]%s", name, stor.AuthURL, m))
 	}
 	return strings.Join(res, "\n")
 }

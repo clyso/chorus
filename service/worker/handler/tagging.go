@@ -42,7 +42,7 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("BucketSyncTagsPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
-	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
+	_, toBucket := p.ID.FromToBuckets(p.Bucket)
 
 	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
@@ -54,7 +54,7 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 	defer lock.Release(ctx)
-	err = s.syncBucketTagging(ctx, fromClient, toClient, fromBucket, toBucket)
+	err = s.syncBucketTagging(ctx, fromClient, toClient, p.ID, p.Bucket)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
-	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
+	_, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
 	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
@@ -82,24 +82,25 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	}
 	defer lock.Release(ctx)
 
-	err = s.syncObjectTagging(ctx, fromClient, toClient, fromBucket, p.Object.Name, toBucket)
+	err = s.syncObjectTagging(ctx, fromClient, toClient, p.ID, p.Object)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3client.Client, fromBucket string, toBucket string) error {
+func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3client.Client, replID entity.UniversalReplicationID, bucket string) error {
 	if !features.Tagging(ctx) {
 		zerolog.Ctx(ctx).Info().Msg("Tagging feature is disabled: skip bucket tags sync")
 		return nil
 	}
+	fromBucket, toBucket := replID.FromToBuckets(bucket)
 	versions, err := s.versionSvc.GetBucketTags(ctx, fromBucket)
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(fromClient.Name(), "")]
-	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
+	fromVer := versions[meta.ToDest(replID.FromStorage(), "")]
+	destVersionKey := meta.ToDest(replID.ToStorage(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip bucket tagging sync: already synced")
@@ -150,24 +151,25 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 	return nil
 }
 
-func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3client.Client, fromBucket, object string, toBucket string) error {
+func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3client.Client, replID entity.UniversalReplicationID, object dom.Object) error {
 	if !features.Tagging(ctx) {
 		zerolog.Ctx(ctx).Info().Msg("Tagging feature is disabled: skip object tags sync")
 		return nil
 	}
-	versions, err := s.versionSvc.GetTags(ctx, dom.Object{Bucket: fromBucket, Name: object})
+	fromBucket, toBucket := replID.FromToBuckets(object.Bucket)
+	versions, err := s.versionSvc.GetTags(ctx, dom.Object{Bucket: fromBucket, Name: object.Name})
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(fromClient.Name(), "")]
-	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
+	fromVer := versions[meta.ToDest(replID.FromStorage(), "")]
+	destVersionKey := meta.ToDest(replID.ToStorage(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip object Tagging sync: already synced")
 		return nil
 	}
 
-	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object, mclient.GetObjectTaggingOptions{VersionID: ""}) //todo: versioning
+	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object.Name, mclient.GetObjectTaggingOptions{VersionID: ""}) //todo: versioning
 
 	// destination bucket name is equal to source bucke name unless toBucket param is set
 	toBucketName := fromBucket
@@ -176,7 +178,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 	var mcErr mclient.ErrorResponse
 	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
-		err = toClient.S3().RemoveObjectTagging(ctx, toBucketName, object, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().RemoveObjectTagging(ctx, toBucketName, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
 		if err != nil {
 			if mclient.IsNetworkOrHostDown(err, true) {
 				return fmt.Errorf("sync object tags: remove tags err: %w", err)
@@ -194,9 +196,9 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 
 	if fromTags != nil && len(fromTags.ToMap()) != 0 {
-		err = toClient.S3().PutObjectTagging(ctx, toBucketName, object, fromTags, mclient.PutObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().PutObjectTagging(ctx, toBucketName, object.Name, fromTags, mclient.PutObjectTaggingOptions{VersionID: ""}) //todo: versioning
 	} else {
-		err = toClient.S3().RemoveObjectTagging(ctx, toBucketName, object, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().RemoveObjectTagging(ctx, toBucketName, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
 	}
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
@@ -206,7 +208,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	if fromVer != 0 {
-		return s.versionSvc.UpdateTagsIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object}, destVersionKey, fromVer)
+		return s.versionSvc.UpdateTagsIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object.Name}, destVersionKey, fromVer)
 	}
 	return nil
 }

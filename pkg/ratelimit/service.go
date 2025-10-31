@@ -26,8 +26,12 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/s3"
 )
+
+type RateLimit struct {
+	Enabled bool `yaml:"enabled"`
+	RPM     int  `yaml:"rpm"`
+}
 
 // RPM storage rate limit based on requests per minute
 type RPM interface {
@@ -37,7 +41,7 @@ type RPM interface {
 	StorReqN(ctx context.Context, storage string, n int) error
 }
 
-func New(rc redis.UniversalClient, conf map[string]s3.RateLimit) *Svc {
+func New(rc redis.UniversalClient, conf map[string]RateLimit) *Svc {
 	limiter := redis_rate.NewLimiter(rc)
 
 	return &Svc{
@@ -50,7 +54,7 @@ var _ RPM = &Svc{}
 
 type Svc struct {
 	limiter *redis_rate.Limiter
-	conf    map[string]s3.RateLimit
+	conf    map[string]RateLimit
 }
 
 func (s *Svc) StorReqN(ctx context.Context, storage string, n int) error {

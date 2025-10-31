@@ -40,19 +40,18 @@ func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("BucketSyncACLPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
-	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 
 	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
 		return err
 	}
 
-	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.ID.ToStorage(), toBucket))
+	lock, err := s.bucketLocker.Lock(ctx, entity.NewBucketLockID(p.ID.ToStorage(), p.Bucket))
 	if err != nil {
 		return err
 	}
 	defer lock.Release(ctx)
-	err = s.syncBucketACL(ctx, fromClient, toClient, fromBucket, toBucket)
+	err = s.syncBucketACL(ctx, fromClient, toClient, p.ID, p.Bucket)
 	if err != nil {
 		return err
 	}
@@ -67,7 +66,7 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
-	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
+	_, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
 	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
 	if err != nil {
@@ -81,7 +80,7 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	}
 	defer lock.Release(ctx)
 
-	err = s.syncObjectACL(ctx, fromClient, toClient, fromBucket, p.Object.Name, toBucket)
+	err = s.syncObjectACL(ctx, fromClient, toClient, p.ID, p.Object)
 	if err != nil {
 		return err
 	}
@@ -89,17 +88,18 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	return nil
 }
 
-func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.Client, fromBucket string, toBucket string) error {
+func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.Client, replID entity.UniversalReplicationID, bucket string) error {
 	if !features.ACL(ctx) {
 		zerolog.Ctx(ctx).Info().Msg("ACL feature is disabled: skip bucket ACL sync")
 		return nil
 	}
+	fromBucket, toBucket := replID.FromToBuckets(bucket)
 	versions, err := s.versionSvc.GetBucketACL(ctx, fromBucket)
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(fromClient.Name(), "")]
-	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
+	fromVer := versions[meta.ToDest(replID.FromStorage(), "")]
+	destVersionKey := meta.ToDest(replID.ToStorage(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip bucket ACL sync: already synced")
@@ -151,17 +151,18 @@ func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.C
 	return nil
 }
 
-func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.Client, fromBucket, object string, toBucket string) error {
+func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.Client, replID entity.UniversalReplicationID, object dom.Object) error {
 	if !features.ACL(ctx) {
 		zerolog.Ctx(ctx).Info().Msg("ACL feature is disabled: skip object ACL sync")
 		return nil
 	}
-	versions, err := s.versionSvc.GetACL(ctx, dom.Object{Bucket: fromBucket, Name: object})
+	fromBucket, toBucket := replID.FromToBuckets(object.Bucket)
+	versions, err := s.versionSvc.GetACL(ctx, dom.Object{Bucket: fromBucket, Name: object.Name})
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(fromClient.Name(), "")]
-	destVersionKey := meta.ToDest(toClient.Name(), toBucket)
+	fromVer := versions[meta.ToDest(replID.FromStorage(), "")]
+	destVersionKey := meta.ToDest(replID.ToStorage(), toBucket)
 	toVer := versions[destVersionKey]
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip object ACL sync: already synced")
@@ -170,7 +171,7 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 
 	fromACL, err := fromClient.AWS().GetObjectAclWithContext(ctx, &aws_s3.GetObjectAclInput{
 		Bucket:    &fromBucket,
-		Key:       &object,
+		Key:       &object.Name,
 		VersionId: nil, //todo: versioning
 	})
 	if err != nil {
@@ -182,13 +183,9 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 	}
 
 	// destination bucket name is equal to source bucke name unless toBucket param is set
-	toBucketName := fromBucket
-	if toBucket != "" {
-		toBucketName = toBucket
-	}
 	toACL, err := toClient.AWS().GetObjectAclWithContext(ctx, &aws_s3.GetObjectAclInput{
-		Bucket:    &toBucketName,
-		Key:       &object,
+		Bucket:    &toBucket,
+		Key:       &object.Name,
 		VersionId: nil, //todo: versioning
 	})
 	if err != nil {
@@ -205,8 +202,8 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 
 	_, err = toClient.AWS().PutObjectAclWithContext(ctx, &aws_s3.PutObjectAclInput{
 		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
-		Bucket:              &toBucketName,
-		Key:                 &object,
+		Bucket:              &toBucket,
+		Key:                 &object.Name,
 		VersionId:           nil, //todo: versioning
 	})
 	if err != nil {
@@ -217,7 +214,7 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 		return nil
 	}
 	if fromVer != 0 {
-		return s.versionSvc.UpdateACLIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object}, destVersionKey, fromVer)
+		return s.versionSvc.UpdateACLIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object.Name}, destVersionKey, fromVer)
 	}
 	return nil
 }

@@ -22,6 +22,7 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker"
 	"github.com/clyso/chorus/service/worker/handler"
+	"github.com/clyso/chorus/test/app"
 	"github.com/clyso/chorus/test/env"
 	"github.com/clyso/chorus/test/gen"
 	"github.com/minio/madmin-go/v4"
@@ -147,6 +148,29 @@ var _ = BeforeSuite(func() {
 	redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
 	Expect(err).NotTo(HaveOccurred())
 
+	s3Storages := map[string]s3.Storage{
+		CStorage1Key: {
+			Address: fmt.Sprintf("http://%s", minioS3Endpoint),
+			Credentials: map[string]s3.CredentialsV4{
+				CSyncUserKey: {
+					AccessKeyID:     CMinioUser,
+					SecretAccessKey: CMinioPass,
+				},
+			},
+			Provider: CMinioProvider,
+		},
+		CStorage2Key: {
+			Address: fmt.Sprintf("http://%s", minioS3Endpoint),
+			Credentials: map[string]s3.CredentialsV4{
+				CSyncUserKey: {
+					AccessKeyID:     CMinioUser,
+					SecretAccessKey: CMinioPass,
+				},
+			},
+			Provider: CMinioProvider,
+		},
+	}
+	mainStorage := CStorage1Key
 	workerConf := &worker.Config{
 		Common: config.Common{
 			Features: &features.Config{
@@ -186,32 +210,7 @@ var _ = BeforeSuite(func() {
 			SwitchRetryInterval: time.Millisecond * 500,
 			PauseRetryInterval:  time.Millisecond * 500,
 		},
-		Storage: &s3.StorageConfig{
-			Storages: map[string]s3.Storage{
-				CStorage1Key: {
-					Address: fmt.Sprintf("http://%s", minioS3Endpoint),
-					Credentials: map[string]s3.CredentialsV4{
-						CSyncUserKey: {
-							AccessKeyID:     CMinioUser,
-							SecretAccessKey: CMinioPass,
-						},
-					},
-					Provider: CMinioProvider,
-					IsMain:   true,
-				},
-				CStorage2Key: {
-					Address: fmt.Sprintf("http://%s", minioS3Endpoint),
-					Credentials: map[string]s3.CredentialsV4{
-						CSyncUserKey: {
-							AccessKeyID:     CMinioUser,
-							SecretAccessKey: CMinioPass,
-						},
-					},
-					Provider: CMinioProvider,
-					IsMain:   false,
-				},
-			},
-		},
+		Storage: app.WorkerS3Config(mainStorage, s3Storages),
 		Api: &api.Config{
 			Enabled:  true,
 			GrpcPort: grpcPort,
@@ -219,7 +218,7 @@ var _ = BeforeSuite(func() {
 		},
 	}
 
-	err = workerConf.Storage.Init()
+	err = workerConf.Storage.Validate()
 	Expect(err).NotTo(HaveOccurred())
 
 	grpcAddr := fmt.Sprintf("%s:%d", "localhost", grpcPort)

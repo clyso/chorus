@@ -33,12 +33,10 @@ import (
 
 type Service interface {
 	GetByName(ctx context.Context, user, storageName string) (Client, error)
-	DefaultRegion() string
 }
 
 type Client interface {
 	Config() s3.Storage
-	Name() string
 	S3() *S3
 	AWS() *AWS
 	SNS() *sns.Client
@@ -46,20 +44,18 @@ type Client interface {
 	IsOnline() bool
 }
 
-func New(ctx context.Context, conf *s3.StorageConfig, metricsSvc metrics.S3Service, tp trace.TracerProvider) (Service, error) {
+func New(ctx context.Context, conf map[string]*s3.Storage, metricsSvc metrics.S3Service, tp trace.TracerProvider) (*svc, error) {
 	s := &svc{
-		conf:     conf,
-		_clients: make(map[string]Client, len(conf.Storages)),
+		_clients: make(map[string]Client, len(conf)),
 	}
 
-	for storage, val := range conf.Storages {
-		clientConf := val
-		for user := range clientConf.Credentials {
-			c, err := newClient(ctx, clientConf, storage, user, metricsSvc, tp)
+	for storName, storConf := range conf {
+		for user := range storConf.Credentials {
+			c, err := newClient(ctx, *storConf, storName, user, metricsSvc, tp)
 			if err != nil {
-				return nil, fmt.Errorf("unable to create client for storage %q: %w", storage, err)
+				return nil, fmt.Errorf("unable to create client for storage %q: %w", storName, err)
 			}
-			s._clients[clientName(storage, user)] = c
+			s._clients[clientName(storName, user)] = c
 		}
 	}
 
@@ -68,7 +64,6 @@ func New(ctx context.Context, conf *s3.StorageConfig, metricsSvc metrics.S3Servi
 
 type svc struct {
 	_clients map[string]Client
-	conf     *s3.StorageConfig
 }
 
 func clientName(storage, user string) string {
@@ -85,10 +80,6 @@ func (s *svc) getClient(ctx context.Context, user, storage string) (Client, erro
 		zerolog.Ctx(ctx).Warn().Str(log.Storage, storage).Msg("storage is offline")
 	}
 	return c, nil
-}
-
-func (s *svc) DefaultRegion() string {
-	return s.conf.DefaultRegion
 }
 
 func (s *svc) GetByName(ctx context.Context, user, storageName string) (Client, error) {

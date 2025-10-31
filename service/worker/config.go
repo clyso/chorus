@@ -24,8 +24,8 @@ import (
 
 	"github.com/clyso/chorus/pkg/api"
 	"github.com/clyso/chorus/pkg/config"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/rclone"
-	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/worker/handler"
 )
 
@@ -42,7 +42,7 @@ func defaultConfig() fs.File {
 
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
-	Storage       *s3.StorageConfig `yaml:"storage,omitempty"`
+	Storage       objstore.Config `yaml:"storage,omitempty"`
 
 	Concurrency     int           `yaml:"concurrency"`
 	ShutdownTimeout time.Duration `yaml:"shutdownTimeout"`
@@ -61,10 +61,7 @@ func (c *Config) Validate() error {
 	if err := c.Common.Validate(); err != nil {
 		return err
 	}
-	if c.Storage == nil {
-		return fmt.Errorf("app config: empty storages config")
-	}
-	if err := c.Storage.Init(); err != nil {
+	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
 	if c.Concurrency <= 0 {
@@ -82,10 +79,10 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func GetConfig(src ...config.Src) (*Config, error) {
+func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Src{config.Reader(dc, "worker_default_cfg")}
+	cfgSource := []config.Opt{config.Reader(dc, "worker_default_cfg"), config.Decoder(objstore.Config{}.ViperUnmarshallerHookFunc())}
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

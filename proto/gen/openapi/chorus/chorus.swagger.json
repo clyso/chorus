@@ -758,19 +758,13 @@
     }
   },
   "definitions": {
-    "StorageProvider": {
+    "StorageType": {
       "type": "string",
       "enum": [
-        "Other",
-        "Ceph",
-        "Minio",
-        "AWS",
-        "GCS",
-        "Alibaba",
-        "Cloudflare",
-        "DigitalOcean"
+        "S3",
+        "SWIFT"
       ],
-      "default": "Other"
+      "default": "S3"
     },
     "chorusAddBucketReplicationRequest": {
       "type": "object",
@@ -1384,8 +1378,7 @@
           "title": "ex: s3.clyso.com"
         },
         "provider": {
-          "$ref": "#/definitions/StorageProvider",
-          "title": "s3 storage provider \u003cCeph|Minio|AWS|Other\u003e"
+          "$ref": "#/definitions/StorageType"
         },
         "credentials": {
           "type": "array",

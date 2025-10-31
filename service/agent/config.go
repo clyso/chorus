@@ -57,10 +57,10 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func GetConfig(src ...config.Src) (*Config, error) {
+func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Src{config.Reader(dc, "agent_default_cfg")}
+	cfgSource := []config.Opt{config.Reader(dc, "agent_default_cfg")}
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

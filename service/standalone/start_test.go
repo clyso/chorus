@@ -50,6 +50,7 @@ func TestStandaloneDefaultConfig(t *testing.T) {
 		grpc.WithInsecure(),
 		grpc.WithBackoffMaxDelay(time.Second),
 		grpc.WithBlock(),
+		grpc.WithTimeout(5*time.Second),
 	)
 	r.NoError(err)
 	apiClient := pb.NewChorusClient(grpcConn)

@@ -24,67 +24,49 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Storage_Provider int32
+type Storage_Type int32
 
 const (
-	Storage_Other        Storage_Provider = 0
-	Storage_Ceph         Storage_Provider = 1
-	Storage_Minio        Storage_Provider = 2
-	Storage_AWS          Storage_Provider = 3
-	Storage_GCS          Storage_Provider = 4
-	Storage_Alibaba      Storage_Provider = 5
-	Storage_Cloudflare   Storage_Provider = 6
-	Storage_DigitalOcean Storage_Provider = 7
+	Storage_S3    Storage_Type = 0
+	Storage_SWIFT Storage_Type = 1
 )
 
-// Enum value maps for Storage_Provider.
+// Enum value maps for Storage_Type.
 var (
-	Storage_Provider_name = map[int32]string{
-		0: "Other",
-		1: "Ceph",
-		2: "Minio",
-		3: "AWS",
-		4: "GCS",
-		5: "Alibaba",
-		6: "Cloudflare",
-		7: "DigitalOcean",
+	Storage_Type_name = map[int32]string{
+		0: "S3",
+		1: "SWIFT",
 	}
-	Storage_Provider_value = map[string]int32{
-		"Other":        0,
-		"Ceph":         1,
-		"Minio":        2,
-		"AWS":          3,
-		"GCS":          4,
-		"Alibaba":      5,
-		"Cloudflare":   6,
-		"DigitalOcean": 7,
+	Storage_Type_value = map[string]int32{
+		"S3":    0,
+		"SWIFT": 1,
 	}
 )
 
-func (x Storage_Provider) Enum() *Storage_Provider {
-	p := new(Storage_Provider)
+func (x Storage_Type) Enum() *Storage_Type {
+	p := new(Storage_Type)
 	*p = x
 	return p
 }
 
-func (x Storage_Provider) String() string {
+func (x Storage_Type) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (Storage_Provider) Descriptor() protoreflect.EnumDescriptor {
+func (Storage_Type) Descriptor() protoreflect.EnumDescriptor {
 	return file_chorus_chorus_proto_enumTypes[0].Descriptor()
 }
 
-func (Storage_Provider) Type() protoreflect.EnumType {
+func (Storage_Type) Type() protoreflect.EnumType {
 	return &file_chorus_chorus_proto_enumTypes[0]
 }
 
-func (x Storage_Provider) Number() protoreflect.EnumNumber {
+func (x Storage_Type) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Storage_Provider.Descriptor instead.
-func (Storage_Provider) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use Storage_Type.Descriptor instead.
+func (Storage_Type) EnumDescriptor() ([]byte, []int) {
 	return file_chorus_chorus_proto_rawDescGZIP(), []int{13, 0}
 }
 
@@ -912,9 +894,8 @@ type Storage struct {
 	Name   string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	IsMain bool   `protobuf:"varint,2,opt,name=is_main,json=isMain,proto3" json:"is_main,omitempty"`
 	// ex: s3.clyso.com
-	Address string `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
-	// s3 storage provider <Ceph|Minio|AWS|Other>
-	Provider Storage_Provider `protobuf:"varint,4,opt,name=provider,proto3,enum=chorus.Storage_Provider" json:"provider,omitempty"`
+	Address  string       `protobuf:"bytes,3,opt,name=address,proto3" json:"address,omitempty"`
+	Provider Storage_Type `protobuf:"varint,4,opt,name=provider,proto3,enum=chorus.Storage_Type" json:"provider,omitempty"`
 	// credentials: access key (public, aka username)
 	Credentials   []*Credential `protobuf:"bytes,5,rep,name=credentials,proto3" json:"credentials,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -972,11 +953,11 @@ func (x *Storage) GetAddress() string {
 	return ""
 }
 
-func (x *Storage) GetProvider() Storage_Provider {
+func (x *Storage) GetProvider() Storage_Type {
 	if x != nil {
 		return x.Provider
 	}
-	return Storage_Other
+	return Storage_S3
 }
 
 func (x *Storage) GetCredentials() []*Credential {
@@ -2738,23 +2719,16 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x12\n" +
 	"\x04date\x18\x03 \x01(\tR\x04date\"B\n" +
 	"\x13GetStoragesResponse\x12+\n" +
-	"\bstorages\x18\x01 \x03(\v2\x0f.chorus.StorageR\bstorages\"\xa9\x02\n" +
+	"\bstorages\x18\x01 \x03(\v2\x0f.chorus.StorageR\bstorages\"\xd3\x01\n" +
 	"\aStorage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
 	"\ais_main\x18\x02 \x01(\bR\x06isMain\x12\x18\n" +
-	"\aaddress\x18\x03 \x01(\tR\aaddress\x124\n" +
-	"\bprovider\x18\x04 \x01(\x0e2\x18.chorus.Storage.ProviderR\bprovider\x124\n" +
-	"\vcredentials\x18\x05 \x03(\v2\x12.chorus.CredentialR\vcredentials\"k\n" +
-	"\bProvider\x12\t\n" +
-	"\x05Other\x10\x00\x12\b\n" +
-	"\x04Ceph\x10\x01\x12\t\n" +
-	"\x05Minio\x10\x02\x12\a\n" +
-	"\x03AWS\x10\x03\x12\a\n" +
-	"\x03GCS\x10\x04\x12\v\n" +
-	"\aAlibaba\x10\x05\x12\x0e\n" +
-	"\n" +
-	"Cloudflare\x10\x06\x12\x10\n" +
-	"\fDigitalOcean\x10\a\"`\n" +
+	"\aaddress\x18\x03 \x01(\tR\aaddress\x120\n" +
+	"\bprovider\x18\x04 \x01(\x0e2\x14.chorus.Storage.TypeR\bprovider\x124\n" +
+	"\vcredentials\x18\x05 \x03(\v2\x12.chorus.CredentialR\vcredentials\"\x19\n" +
+	"\x04Type\x12\x06\n" +
+	"\x02S3\x10\x00\x12\t\n" +
+	"\x05SWIFT\x10\x01\"`\n" +
 	"\n" +
 	"Credential\x12\x14\n" +
 	"\x05alias\x18\x01 \x01(\tR\x05alias\x12\x1d\n" +
@@ -2980,7 +2954,7 @@ func file_chorus_chorus_proto_rawDescGZIP() []byte {
 var file_chorus_chorus_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_chorus_chorus_proto_goTypes = []any{
-	(Storage_Provider)(0),                            // 0: chorus.Storage.Provider
+	(Storage_Type)(0),                                // 0: chorus.Storage.Type
 	(GetBucketSwitchStatusResponse_Status)(0),        // 1: chorus.GetBucketSwitchStatusResponse.Status
 	(*MigrateLocation)(nil),                          // 2: chorus.MigrateLocation
 	(*StartConsistencyCheckRequest)(nil),             // 3: chorus.StartConsistencyCheckRequest
@@ -3032,7 +3006,7 @@ var file_chorus_chorus_proto_depIdxs = []int32{
 	2,  // 7: chorus.GetConsistencyCheckReportEntriesRequest.locations:type_name -> chorus.MigrateLocation
 	10, // 8: chorus.GetConsistencyCheckReportEntriesResponse.entries:type_name -> chorus.ConsistencyCheckReportEntry
 	15, // 9: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
-	0,  // 10: chorus.Storage.provider:type_name -> chorus.Storage.Provider
+	0,  // 10: chorus.Storage.provider:type_name -> chorus.Storage.Type
 	16, // 11: chorus.Storage.credentials:type_name -> chorus.Credential
 	16, // 12: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
 	23, // 13: chorus.ListReplicationsResponse.replications:type_name -> chorus.Replication

@@ -22,6 +22,7 @@ import (
 	"io/fs"
 
 	"github.com/clyso/chorus/pkg/config"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
@@ -38,24 +39,43 @@ func defaultConfig() fs.File {
 	return defaultFile
 }
 
+// TODO: move swift config to swift router package in swift-support branch
+type SwiftStorage struct {
+	StorageURL string `yaml:"storageURL"`
+}
+
+func (s *SwiftStorage) HasUser(user string) bool {
+	return false
+}
+
+func (s *SwiftStorage) UserList() []string {
+	return []string{}
+}
+
+func (s *SwiftStorage) Validate() error {
+	if s.StorageURL == "" {
+		return fmt.Errorf("swift storage config: empty StorageURL")
+	}
+	return nil
+}
+
+type Storages = objstore.StoragesConfig[*s3.Storage, *SwiftStorage]
+
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
 
-	Storage *s3.StorageConfig `yaml:"storage,omitempty"`
-	Auth    *auth.Config      `yaml:"auth,omitempty"`
-	Port    int               `yaml:"port"`
-	Address string            `yaml:"address"`
-	Cors    *cors.Config      `yaml:"cors"`
+	Storage Storages     `yaml:"storage,omitempty"`
+	Auth    *auth.Config `yaml:"auth,omitempty"`
+	Port    int          `yaml:"port"`
+	Address string       `yaml:"address"`
+	Cors    *cors.Config `yaml:"cors"`
 }
 
 func (c *Config) Validate() error {
 	if err := c.Common.Validate(); err != nil {
 		return err
 	}
-	if c.Storage == nil {
-		return fmt.Errorf("app config: empty storages config")
-	}
-	if err := c.Storage.Init(); err != nil {
+	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
 	if c.Auth == nil {
@@ -67,13 +87,8 @@ func (c *Config) Validate() error {
 		}
 	}
 	if len(c.Auth.Custom) != 0 {
-		var storCreds map[string]s3.CredentialsV4
-		for _, storage := range c.Storage.Storages {
-			storCreds = storage.Credentials
-			break
-		}
 		for user := range c.Auth.Custom {
-			if _, ok := storCreds[user]; !ok {
+			if err := c.Storage.Exists(c.Storage.Main, user); err != nil {
 				return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
 			}
 		}
@@ -88,10 +103,10 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func GetConfig(src ...config.Src) (*Config, error) {
+func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Src{config.Reader(dc, "proxy_default_cfg")}
+	cfgSource := []config.Opt{config.Reader(dc, "proxy_default_cfg"), config.Decoder(Storages{}.ViperUnmarshallerHookFunc())}
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

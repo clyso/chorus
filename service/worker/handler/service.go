@@ -24,6 +24,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"github.com/clyso/chorus/pkg/meta"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/rclone"
@@ -40,7 +41,7 @@ type Config struct {
 }
 
 type svc struct {
-	clients                 s3client.Service
+	clients                 objstore.Clients
 	versionSvc              meta.VersionService
 	policySvc               policy.Service
 	storageSvc              storage.Service
@@ -54,7 +55,7 @@ type svc struct {
 	rclone.CopySvc
 }
 
-func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
+func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
 	policySvc policy.Service, storageSvc storage.Service, rc rclone.Service,
 	queueSvc tasks.QueueService, limit ratelimit.RPM, objectLocker *store.ObjectLocker,
 	bucketLocker *store.BucketLocker, replicationstatusLocker *store.ReplicationStatusLocker) *svc {
@@ -74,12 +75,12 @@ func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
 }
 
 func (s *svc) getClients(ctx context.Context, user, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {
-	fromClient, err = s.clients.GetByName(ctx, user, fromStorage)
+	fromClient, err = s.clients.AsS3(ctx, fromStorage, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", fromStorage, err, asynq.SkipRetry)
 	}
 
-	toClient, err = s.clients.GetByName(ctx, user, toStorage)
+	toClient, err = s.clients.AsS3(ctx, toStorage, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", toStorage, err, asynq.SkipRetry)
 	}
