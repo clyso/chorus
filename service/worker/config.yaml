@@ -2,6 +2,7 @@ concurrency: 10 # max number of task that can be processed in parallel
 shutdownTimeout: 5s
 worker:
   queueUpdateInterval: 5s
+  swiftRetryInterval: 1m # used for swift task retries caused by swift inconsistent state
   pauseRetryInterval: 30s
   switchRetryInterval: 30s
 rclone:

@@ -33,6 +33,9 @@ http:
     - selector: chorus.Chorus.AddReplication
       post: /replication/add
       body: "*"
+    - selector: chorus.Chorus.AddSwiftAccountReplication
+      post: /replication/add-swift
+      body: "*"
     - selector: chorus.Chorus.PauseReplication
       put: /replication/pause
       body: "*"

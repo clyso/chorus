@@ -36,21 +36,21 @@ type Service interface {
 	Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error
 }
 
-func New(queueSvc tasks.QueueService, versionSvc meta.VersionService, policySvc policy.Service) Service {
-	return &svc{
+func NewS3(queueSvc tasks.QueueService, versionSvc meta.VersionService, policySvc policy.Service) Service {
+	return &s3Svc{
 		queueSvc:   queueSvc,
 		versionSvc: versionSvc,
 		policySvc:  policySvc,
 	}
 }
 
-type svc struct {
+type s3Svc struct {
 	queueSvc   tasks.QueueService
 	versionSvc meta.VersionService
 	policySvc  policy.Service
 }
 
-func (s *svc) Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error {
+func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.ReplicationTask) error {
 	if task == nil {
 		zerolog.Ctx(ctx).Info().Msg("replication task is nil")
 		return nil
@@ -131,7 +131,7 @@ func (s *svc) Replicate(ctx context.Context, routedTo string, task tasks.Replica
 	return nil
 }
 
-func (s *svc) getDestinations(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.UniversalReplicationID, err error) {
+func (s *s3Svc) getDestinations(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.UniversalReplicationID, err error) {
 	destinations := xctx.GetReplications(ctx)
 	if len(destinations) != 0 {
 		// normal flow increment source version and replicate to all followers

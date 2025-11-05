@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	_ "github.com/rclone/rclone/backend/s3"
+	_ "github.com/rclone/rclone/backend/swift"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/fserrors"
@@ -40,6 +41,7 @@ import (
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/util"
 )
 
@@ -102,36 +104,46 @@ type Service interface {
 	Compare(ctx context.Context, listMatch bool, user, from, to, fromBucket string, toBucket string) (*CompareRes, error)
 }
 
+var supported = map[dom.StorageType]string{
+	dom.S3:    "s3",
+	dom.Swift: "swift",
+}
+
 func New(storagesConf objstore.Config, jsonLog bool, metricsSvc metrics.S3Service, mamCalc *MemCalculator, memLimiter, fileLimiter ratelimit.Semaphore) (Service, error) {
-	//Don't need to support swift - we are planning to replace rlcone anyway
-	conf := storagesConf.S3Storages()
-	if len(conf) == 0 {
-		return nil, dom.ErrInvalidStorageConfig
-	}
-	s3, err := fs.Find("s3")
-	if err != nil {
-		return nil, err
-	}
-
-	s := svc{s3: s3, _configs: make(map[string]*configmap.Map, len(conf)), metricsSvc: metricsSvc, memCalc: mamCalc, memLimiter: memLimiter, fileLimiter: fileLimiter}
-
-	for storName, stor := range conf {
-		for user, cred := range stor.Credentials {
-			name := storName + ":" + user
-			scm := configmap.Simple{}
-			keyValues := rc.Params{
-				"env_auth":          false,
-				"access_key_id":     cred.AccessKeyID,
-				"secret_access_key": cred.SecretAccessKey,
-				"endpoint":          stor.Address,
-				"provider":          stor.Provider,
+	var err error
+	fsMap := make(map[dom.StorageType]*fs.RegInfo, len(supported))
+	res := svc{_configs: make(map[string]config), metricsSvc: metricsSvc, memCalc: mamCalc, memLimiter: memLimiter, fileLimiter: fileLimiter}
+	for storName, stor := range storagesConf.Storages {
+		fsInfo, ok := fsMap[stor.Type]
+		if !ok {
+			// init fs type and add to cache
+			fsName, ok := supported[stor.Type]
+			if !ok {
+				return nil, fmt.Errorf("%w: storage type %q not supported by RClone", dom.ErrInvalidStorageConfig, stor.Type)
 			}
-			for k, v := range keyValues {
-				vStr := fmt.Sprint(v)
-				scm.Set(k, vStr)
+			fsInfo, err = fs.Find(fsName)
+			if err != nil {
+				return nil, fmt.Errorf("%w: storage type %q not supported by RClone", dom.ErrInvalidStorageConfig, fsName)
 			}
-			cm := fs.ConfigMap(s3.Prefix, s3.Options, name, scm)
-			s._configs[name] = cm
+			fsMap[stor.Type] = fsInfo
+		}
+		switch stor.Type {
+		case dom.S3:
+			for user := range stor.S3.Credentials {
+				name := configKey(storName, user)
+				scm := s3ConfigMap(stor.S3, user)
+				cm := fs.ConfigMap(fsInfo.Prefix, fsInfo.Options, name, scm)
+				res._configs[name] = config{fs: fsInfo, cm: cm}
+			}
+		case dom.Swift:
+			for user := range stor.Swift.Credentials {
+				name := configKey(storName, user)
+				scm := swiftConfigMap(stor.Swift, user)
+				cm := fs.ConfigMap(fsInfo.Prefix, fsInfo.Options, name, scm)
+				res._configs[name] = config{fs: fsInfo, cm: cm}
+			}
+		default:
+			return nil, fmt.Errorf("%w: storage type %q not supported by RClone", dom.ErrInvalidStorageConfig, stor.Type)
 		}
 	}
 
@@ -140,7 +152,45 @@ func New(storagesConf objstore.Config, jsonLog bool, metricsSvc metrics.S3Servic
 	ci.LogLevel = mapLogLvl()
 	ci.Metadata = true
 
-	return &s, nil
+	return &res, nil
+}
+
+func s3ConfigMap(stor *s3.Storage, user string) configmap.Simple {
+	cred := stor.Credentials[user]
+	scm := configmap.Simple{}
+	keyValues := rc.Params{
+		"env_auth":          false,
+		"access_key_id":     cred.AccessKeyID,
+		"secret_access_key": cred.SecretAccessKey,
+		"endpoint":          stor.Address,
+		"provider":          stor.Provider,
+	}
+	for k, v := range keyValues {
+		vStr := fmt.Sprint(v)
+		scm.Set(k, vStr)
+	}
+	return scm
+}
+
+func swiftConfigMap(stor *swift.Storage, user string) configmap.Simple {
+	cred := stor.Credentials[user]
+	scm := configmap.Simple{}
+	keyValues := rc.Params{
+		"env_auth": false,
+		"user":     cred.Username,   //OS_USERNAME
+		"key":      cred.Password,   //OS_PASSWORD
+		"auth_url": stor.AuthURL,    //OS_AUTH_URL
+		"domain":   cred.DomainName, //OS_USER_DOMAIN_NAME
+		"tenant":   cred.TenantName, //OS_TENANT_NAME
+	}
+	if stor.Region != "" {
+		keyValues["region"] = stor.Region
+	}
+	for k, v := range keyValues {
+		vStr := fmt.Sprint(v)
+		scm.Set(k, vStr)
+	}
+	return scm
 }
 
 func mapLogLvl() fs.LogLevel {
@@ -155,8 +205,7 @@ func mapLogLvl() fs.LogLevel {
 }
 
 type svc struct {
-	s3         *fs.RegInfo
-	_configs   map[string]*configmap.Map
+	_configs   map[string]config
 	metricsSvc metrics.S3Service
 
 	memCalc     *MemCalculator
@@ -164,11 +213,20 @@ type svc struct {
 	fileLimiter ratelimit.Semaphore
 }
 
-func (s *svc) getConf(storage, user string) (*configmap.Map, error) {
-	name := storage + ":" + user
+type config struct {
+	fs *fs.RegInfo
+	cm *configmap.Map
+}
+
+func configKey(storage, user string) string {
+	return storage + ":" + user
+}
+
+func (s *svc) getConf(storage, user string) (config, error) {
+	name := configKey(storage, user)
 	res, ok := s._configs[name]
 	if !ok {
-		return nil, fmt.Errorf("%w: config for storage %q, user %q not found", dom.ErrInvalidStorageConfig, storage, user)
+		return config{}, fmt.Errorf("%w: config for storage %q, user %q not found", dom.ErrInvalidStorageConfig, storage, user)
 	}
 	return res, nil
 }
@@ -304,7 +362,7 @@ func (s *svc) getFS(ctx context.Context, user, storage, bucket string) (fs.Fs, e
 	}
 
 	configName, fsPath := storage, bucket
-	return s.s3.NewFs(ctx, configName, fsPath, storageConf)
+	return storageConf.fs.NewFs(ctx, configName, fsPath, storageConf.cm)
 }
 
 func (s *svc) checkLimit(ctx context.Context, fileSize int64) (release func(), err error) {

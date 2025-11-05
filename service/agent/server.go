@@ -25,6 +25,7 @@ import (
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 
+	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
@@ -91,14 +92,14 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	policySvc := policy.NewService(confRedis, queueSvc, conf.FromStorage)
 
-	replSvc := replication.New(queueSvc, verSvc, policySvc)
+	replSvc := replication.NewS3(queueSvc, verSvc, policySvc)
 
 	notificationHandler := notifications.NewHandler(conf.FromStorage, replSvc)
-	httpHandler := trace.HttpMiddleware(tp, HTTPHandler(policySvc, notificationHandler))
+	httpHandler := trace.HttpMiddleware(tp)(HTTPHandler(policySvc, notificationHandler))
 	if conf.Metrics.Enabled {
 		httpHandler = metrics.AgentMiddleware(httpHandler)
 	}
-	httpHandler = log.HttpMiddleware(conf.Log, app.App, app.AppID, httpHandler)
+	httpHandler = log.HttpMiddleware(conf.Log, app.App, app.AppID, xctx.Event)(httpHandler)
 
 	httpServer := http.Server{Addr: fmt.Sprintf(":%d", conf.Port), Handler: httpHandler}
 

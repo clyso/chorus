@@ -17,18 +17,105 @@
 package router
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/util"
 )
 
-func Serve(router Router, replSvc replication.Service) http.Handler {
+type Config struct {
+	Storages          map[dom.StorageType]StorageProxy
+	LogMiddleware     func(next http.Handler) http.Handler
+	TraceMiddleware   func(next http.Handler) http.Handler
+	MetricsMiddleware func(next http.Handler) http.Handler
+	PolicyMiddleware  func(next http.Handler) http.Handler
+}
+
+type StorageProxy struct {
+	Router             Router
+	Replicator         replication.Service
+	AuthMiddleware     func(next http.Handler) http.Handler
+	ReqParseMiddleware func(next http.Handler) http.Handler
+}
+
+func (c *Config) Validate() error {
+	if len(c.Storages) == 0 {
+		return fmt.Errorf("%w: at least one storage proxy must be configured", dom.ErrInternal)
+	}
+	for storType, storProxy := range c.Storages {
+		if storProxy.Router == nil {
+			return fmt.Errorf("%w: router is not configured for storage type %s", dom.ErrInternal, storType)
+		}
+		if storProxy.Replicator == nil {
+			return fmt.Errorf("%w: replicator service is not configured for storage type %s", dom.ErrInternal, storType)
+		}
+		if storProxy.ReqParseMiddleware == nil {
+			return fmt.Errorf("%w: request parse middleware is not configured for storage type %s", dom.ErrInternal, storType)
+		}
+	}
+	if c.LogMiddleware == nil {
+		return fmt.Errorf("%w: log middleware is not configured", dom.ErrInternal)
+	}
+	if c.PolicyMiddleware == nil {
+		return fmt.Errorf("%w: policy middleware is not configured", dom.ErrInternal)
+	}
+	return nil
+}
+
+func New(config Config) (http.Handler, error) {
+	// build proxy handlers. Middleware wraps request handler, so it is applied in reverse order
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+	handlers := make(map[dom.StorageType]http.Handler, len(config.Storages))
+	for storType, storProxy := range config.Storages {
+		// 8. main request handler. Forward request to storage backend and emit replication tasks
+		handler := serve(storProxy.Router, storProxy.Replicator)
+		if config.TraceMiddleware != nil {
+			// 7. tracing
+			handler = config.TraceMiddleware(handler)
+		}
+		if config.MetricsMiddleware != nil {
+			// 6. metrics collection
+			handler = config.MetricsMiddleware(handler)
+		}
+		// 5. set routing & replication policies to context
+		handler = config.PolicyMiddleware(handler)
+		// 4. parse storage-specific request method/user/bucket/object and set to context
+		handler = storProxy.ReqParseMiddleware(handler)
+		if storProxy.AuthMiddleware != nil {
+			// 3. storage-specific auth check
+			handler = storProxy.AuthMiddleware(handler)
+		}
+		handlers[storType] = handler
+	}
+	var result http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 2. detect storage type from request
+		storType := objstore.StorageTypeFromRequest(r)
+		ctx := log.WithStorType(r.Context(), storType)
+		handler, ok := handlers[storType]
+		if !ok {
+			util.WriteError(ctx, w, fmt.Errorf("%w: proxy handler is not configured for storage type %s", dom.ErrInternal, storType))
+			return
+		}
+		handler.ServeHTTP(w, r.WithContext(ctx))
+	})
+
+	// 1. init request scoped logger
+	result = config.LogMiddleware(result)
+	return result, nil
+
+}
+
+func serve(router Router, replSvc replication.Service) http.Handler {
 	// Use a custom handler function instead of ServeMux to avoid automatic redirects
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, span := otel.Tracer("").Start(r.Context(), "Route")

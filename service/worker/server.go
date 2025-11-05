@@ -50,6 +50,7 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker/handler"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -173,7 +174,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, policySvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -221,22 +222,54 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Metrics.Enabled {
 		mux.Use(metrics.WorkerMiddleware())
 	}
-	mux.HandleFunc(tasks.TypeBucketCreate, workerSvc.HandleBucketCreate)
-	mux.HandleFunc(tasks.TypeBucketDelete, workerSvc.HandleBucketDelete)
-	mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
-	mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
-	mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
-	mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
-	mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
-	mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
-	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
-	mux.HandleFunc(tasks.TypeMigrateObjectListVersions, versionedMigrationCtrl.HandleObjectVersionList)
-	mux.HandleFunc(tasks.TypeMigrateVersionedObject, versionedMigrationCtrl.HandleVersionedObjectMigration)
-	mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
-	mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
-	mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
-	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, workerSvc.HandleZeroDowntimeReplicationSwitch)
-	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, workerSvc.HandleSwitchWithDowntime)
+	// common workers
+	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, storageSvc, replicationStatusLocker)
+	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, switchWorker.HandleZeroDowntimeReplicationSwitch)
+	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, switchWorker.HandleSwitchWithDowntime)
+	logger.Info().Msg("registered common workers")
+
+	// S3 workers
+	if len(conf.Storage.S3Storages()) != 0 {
+		mux.HandleFunc(tasks.TypeBucketCreate, workerSvc.HandleBucketCreate)
+		mux.HandleFunc(tasks.TypeBucketDelete, workerSvc.HandleBucketDelete)
+		mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
+		mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
+		mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
+		mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
+		mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
+		mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
+		mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
+		logger.Info().Msg("registered S3 workers")
+
+		// versioned object migration workers
+		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, versionedMigrationCtrl.HandleObjectVersionList)
+		mux.HandleFunc(tasks.TypeMigrateVersionedObject, versionedMigrationCtrl.HandleVersionedObjectMigration)
+		logger.Info().Msg("registered S3 versioned workers")
+
+		mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
+		mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
+		mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
+		logger.Info().Msg("registered S3 consistency check workers")
+	} else {
+		logger.Info().Msg("s3 workers not registered: no s3 storage configured")
+	}
+
+	// swift workers
+	if len(conf.Storage.SwiftStorages()) != 0 {
+		swiftWorkerSvc := swift_worker.New(conf.Worker, clientRegistry, storageSvc, queueSvc, limiter, objectLocker, userLocker, bucketLocker)
+		// swift tasks:
+		mux.HandleFunc(tasks.TypeSwiftAccountUpdate, swiftWorkerSvc.HandleAccountUpdate)
+		mux.HandleFunc(tasks.TypeSwiftContainerUpdate, swiftWorkerSvc.HandleContainerUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjUpdate, swiftWorkerSvc.HandleObjectUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjMetaUpdate, swiftWorkerSvc.HandleObjectMetaUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjDelete, swiftWorkerSvc.HandleObjectDelete)
+		mux.HandleFunc(tasks.TypeSwiftAccountMigration, swiftWorkerSvc.HandleSwiftAccountMigration)
+		mux.HandleFunc(tasks.TypeSwiftContainerMigration, swiftWorkerSvc.HandleSwiftContainerMigration)
+		mux.HandleFunc(tasks.TypeSwiftObjectMigration, swiftWorkerSvc.HandleSwiftObjectMigration)
+		logger.Info().Msg("registered swift workers")
+	} else {
+		logger.Info().Msg("swift workers not registered: no swift storage configured")
+	}
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
