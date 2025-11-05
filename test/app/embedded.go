@@ -53,6 +53,7 @@ import (
 	"github.com/clyso/chorus/pkg/testutil"
 	"github.com/clyso/chorus/pkg/util"
 	"github.com/clyso/chorus/service/proxy"
+	"github.com/clyso/chorus/service/proxy/router"
 	"github.com/clyso/chorus/service/worker"
 )
 
@@ -450,11 +451,11 @@ func WorkerS3Config(main string, storages map[string]s3.Storage) objstore.Config
 func ProxyS3Config(main string, storages map[string]s3.Storage) proxy.Storages {
 	res := proxy.Storages{
 		Main:     main,
-		Storages: map[string]objstore.GenericStorage[*s3.Storage, *proxy.SwiftStorage]{},
+		Storages: map[string]objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]{},
 	}
 	for name, stor := range storages {
 		s := stor
-		res.Storages[name] = objstore.GenericStorage[*s3.Storage, *proxy.SwiftStorage]{
+		res.Storages[name] = objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]{
 			S3: &s,
 			CommonConfig: objstore.CommonConfig{
 				Type: dom.S3,

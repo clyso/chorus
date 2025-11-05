@@ -23,6 +23,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -324,6 +325,62 @@ func (h *handlers) ListBucketsForReplication(ctx context.Context, req *pb.ListBu
 	return res, nil
 }
 
+func (h *handlers) AddSwiftAccountReplication(ctx context.Context, req *pb.SwiftAccountReplicationRequest) (*emptypb.Empty, error) {
+	// validate request:
+	if err := h.clients.Config().Exists(req.FromStorage, req.Account); err != nil {
+		return nil, err
+	}
+	if err := h.clients.Config().Exists(req.ToStorage, req.Account); err != nil {
+		return nil, err
+	}
+	fromClient, err := h.clients.AsSwift(ctx, req.FromStorage, req.Account)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift client for storage %s and account %s: %w", req.FromStorage, req.Account, err)
+	}
+	err = accounts.Get(ctx, fromClient, accounts.GetOpts{}).Err
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift account %s on storage %s: %w", req.Account, req.FromStorage, err)
+	}
+	toClient, err := h.clients.AsSwift(ctx, req.ToStorage, req.Account)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift client for storage %s and account %s: %w", req.ToStorage, req.Account, err)
+	}
+	err = accounts.Get(ctx, toClient, accounts.GetOpts{}).Err
+	if err != nil {
+		return nil, fmt.Errorf("unable to get swift account %s on storage %s: %w", req.Account, req.ToStorage, err)
+	}
+
+	userPolicy := entity.UserReplicationPolicy{
+		User:        req.Account,
+		FromStorage: req.FromStorage,
+		ToStorage:   req.ToStorage,
+	}
+	uid := entity.UniversalFromUserReplication(userPolicy)
+	if err := userPolicy.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid user replication policy %v: %w", userPolicy, err)
+	}
+	lock, err := h.replicationStatusLocker.Lock(ctx, uid, store.WithDuration(time.Second), store.WithRetry(true))
+	if err != nil {
+		return nil, err
+	}
+	defer lock.Release(ctx)
+	err = lock.Do(ctx, time.Second, func() error {
+		// create account replication policy:
+		err = h.policySvc.AddUserReplicationPolicy(ctx, userPolicy)
+		if err != nil {
+			return err
+		}
+		// create task for replication:
+		task := tasks.SwiftAccountMigrationPayload{}
+		task.SetReplicationID(uid)
+		return h.queueSvc.EnqueueTask(ctx, task)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func (h *handlers) AddReplication(ctx context.Context, req *pb.AddReplicationRequest) (*emptypb.Empty, error) {
 	if err := h.clients.Config().Exists(req.From, req.User); err != nil {
 		return nil, err
@@ -455,7 +512,7 @@ func (h *handlers) addUserReplication(ctx context.Context, req *pb.AddReplicatio
 func (h *handlers) ListReplications(ctx context.Context, _ *emptypb.Empty) (*pb.ListReplicationsResponse, error) {
 	users := h.clients.Config().GetMain().UserList()
 	usersRes := make([]map[entity.BucketReplicationPolicy]entity.ReplicationStatusExtended, len(users))
-	// list replications per user in parallel
+	// list bucket replications per user in parallel
 	g, gCtx := errgroup.WithContext(ctx)
 	for i, user := range users {
 		g.Go(func() error {

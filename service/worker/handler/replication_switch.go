@@ -1,16 +1,18 @@
-// Copyright 2025 Clyso GmbH
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright © 2024 Clyso GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package handler
 
@@ -26,6 +28,9 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/policy"
+	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -34,7 +39,25 @@ var (
 	checkResultIsEqual, checkResultIsInProgress = true, false
 )
 
-func (s *svc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
+type switchSvc struct {
+	policySvc               policy.Service
+	storageSvc              storage.Service
+	replicationstatusLocker *store.ReplicationStatusLocker
+	conf                    *Config
+}
+
+func NewSwitchSvc(conf *Config,
+	policySvc policy.Service, storageSvc storage.Service,
+	replicationstatusLocker *store.ReplicationStatusLocker) *switchSvc {
+	return &switchSvc{
+		conf:                    conf,
+		policySvc:               policySvc,
+		storageSvc:              storageSvc,
+		replicationstatusLocker: replicationstatusLocker,
+	}
+}
+
+func (s *switchSvc) HandleSwitchWithDowntime(ctx context.Context, t *asynq.Task) error {
 	var p tasks.SwitchWithDowntimePayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwitchWithDowntimePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
@@ -106,7 +129,7 @@ type state struct {
 	message string
 }
 
-func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.UniversalReplicationID, replStatus entity.ReplicationStatusExtended, switchStatus entity.ReplicationSwitchInfo) (switchResult, error) {
+func (s *switchSvc) processSwitchWithDowntimeState(ctx context.Context, id entity.UniversalReplicationID, replStatus entity.ReplicationStatusExtended, switchStatus entity.ReplicationSwitchInfo) (switchResult, error) {
 	// state machine for switch with downtime:
 	// switch statement contain all states in logical order
 	// each task handling iteration handles one state and returns new state or error
@@ -279,10 +302,78 @@ func (s *svc) processSwitchWithDowntimeState(ctx context.Context, id entity.Univ
 	}
 }
 
-func (s *svc) checkBuckets(_ context.Context, _ entity.UniversalReplicationID, skip bool) (isEqual, isInProgress bool, err error) {
+func (s *switchSvc) checkBuckets(_ context.Context, _ entity.UniversalReplicationID, skip bool) (isEqual, isInProgress bool, err error) {
 	if skip {
 		return true, false, nil
 	}
 	// todo: implement when https://github.com/clyso/chorus/issues/38 is done
 	return checkResultIsEqual, checkResultIsInProgress, nil
+}
+
+func (s *switchSvc) HandleZeroDowntimeReplicationSwitch(ctx context.Context, t *asynq.Task) error {
+	var p tasks.ZeroDowntimeReplicationSwitchPayload
+	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+		return fmt.Errorf("ZeroDowntimeReplicationSwitchPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
+	}
+	policyID := p.ID
+
+	// acquire exclusive lock to switch task:
+	lock, err := s.replicationstatusLocker.Lock(ctx, policyID)
+	if err != nil {
+		return fmt.Errorf("unable to create lock: %w", err)
+	}
+	defer lock.Release(ctx)
+	return lock.Do(ctx, time.Second*2, func() error {
+		return s.handleZeroDowntimeReplicationSwitch(ctx, p)
+	})
+}
+
+func (s *switchSvc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p tasks.ZeroDowntimeReplicationSwitchPayload) error {
+	// get latest replication and switch state and execute switch state machine:
+	replicationID := p.ID
+
+	replStatus, err := s.policySvc.GetReplicationPolicyInfoExtended(ctx, replicationID)
+	if err != nil {
+		if errors.Is(err, dom.ErrNotFound) {
+			zerolog.Ctx(ctx).Err(err).Msg("drop switch with downtime task: replication metadata was deleted")
+			return nil
+		}
+		return err
+	}
+	if !replStatus.IsArchived {
+		zerolog.Ctx(ctx).Error().Msg("invalid replication state: replication is not archived")
+	}
+	if replStatus.Switch == nil {
+		zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch metadata was deleted")
+		return nil
+	}
+	switchPolicy := replStatus.Switch
+	if !switchPolicy.IsZeroDowntime() {
+		// wrong switch type - drop task
+		// should never happen
+		zerolog.Ctx(ctx).Error().Msg("drop switch with downtime task: switch is not switch with downtime")
+		return nil
+	}
+	done := replStatus.InitDone() && replStatus.EventMigration.Unprocessed == 0
+	// check if replication switch can be finished:
+	if !done {
+		// events queue is not drained yet - retry later
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+	}
+	var existsMultipartUploads bool
+	if bucketID, ok := replicationID.AsBucketID(); ok {
+		existsMultipartUploads, err = s.storageSvc.ExistsUploads(ctx, bucketID.FromStorage, bucketID.FromBucket)
+	} else if userID, ok := replicationID.AsUserID(); ok {
+		existsMultipartUploads, err = s.storageSvc.ExistsUploadsForUser(ctx, userID.User)
+	}
+	if err != nil {
+		return err
+	}
+	if existsMultipartUploads {
+		// there are pending multipart uploads - retry later
+		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+	}
+	// all good - finish zero downtime replication switch:
+
+	return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, replicationID)
 }

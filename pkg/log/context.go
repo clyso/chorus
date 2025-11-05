@@ -22,7 +22,9 @@ import (
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 )
 
 func WithMethod(ctx context.Context, method s3.Method) context.Context {
@@ -30,6 +32,20 @@ func WithMethod(ctx context.Context, method s3.Method) context.Context {
 		return c.Str(Method, method.String())
 	})
 	return xctx.SetMethod(ctx, method)
+}
+
+func WithSwiftMethod(ctx context.Context, method swift.Method) context.Context {
+	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str(Method, method.String())
+	})
+	return xctx.SetSwiftMethod(ctx, method)
+}
+
+func WithStorType(ctx context.Context, in dom.StorageType) context.Context {
+	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str(storType, string(in))
+	})
+	return xctx.SetStorType(ctx, in)
 }
 
 func WithObjName(ctx context.Context, objName string) context.Context {

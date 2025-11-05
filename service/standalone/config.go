@@ -76,26 +76,9 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Proxy.Enabled {
-		if c.Proxy.Auth == nil {
-			return fmt.Errorf("chorus config: empty Auth config")
+		if err := proxy.ValidateAuth(c.Proxy.Storage, c.Proxy.Auth); err != nil {
+			return err
 		}
-		if c.Proxy.Auth.UseStorage != "" {
-			if _, ok := c.Storage.Storages[c.Proxy.Auth.UseStorage]; !ok {
-				return fmt.Errorf("chorus config: auth UseStorage points to unknown storage")
-			}
-		}
-		if len(c.Proxy.Auth.Custom) != 0 {
-			users := c.Storage.GetMain().UserList()
-			for user := range c.Proxy.Auth.Custom {
-				if !slices.Contains(users, user) {
-					return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
-				}
-			}
-		}
-		if c.Proxy.Auth.UseStorage == "" && len(c.Proxy.Auth.Custom) == 0 {
-			return fmt.Errorf("chorus config: auth credentials enabled but not set")
-		}
-
 		if c.Proxy.Port <= 0 {
 			return fmt.Errorf("chorus config: Port must be positive: %d", c.Proxy.Port)
 		}

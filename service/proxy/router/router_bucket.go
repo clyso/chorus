@@ -28,7 +28,7 @@ import (
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
-func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tasks.BucketCreatePayload, storage string, isApiErr bool, err error) {
+func (r *s3Router) createBucket(req *http.Request) (resp *http.Response, task *tasks.BucketCreatePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
@@ -59,7 +59,7 @@ func (r *router) createBucket(req *http.Request) (resp *http.Response, task *tas
 	return
 }
 
-func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tasks.BucketDeletePayload, storage string, isApiErr bool, err error) {
+func (r *s3Router) deleteBucket(req *http.Request) (resp *http.Response, task *tasks.BucketDeletePayload, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 	user := xctx.GetUser(ctx)
 	bucket := xctx.GetBucket(ctx)
@@ -80,7 +80,7 @@ func (r *router) deleteBucket(req *http.Request) (resp *http.Response, task *tas
 	return
 }
 
-func (r *router) listBuckets(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
+func (r *s3Router) listBuckets(req *http.Request) (resp *http.Response, storage string, isApiErr bool, err error) {
 	ctx := req.Context()
 
 	user := xctx.GetUser(ctx)

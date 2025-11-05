@@ -266,6 +266,39 @@
         ]
       }
     },
+    "/replication/add-swift": {
+      "post": {
+        "operationId": "Chorus_AddSwiftAccountReplication",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSwiftAccountReplicationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/replication/compare-bucket": {
       "post": {
         "summary": "Compares contents of given bucket in given storages",
@@ -1387,6 +1420,20 @@
             "$ref": "#/definitions/chorusCredential"
           },
           "title": "credentials: access key (public, aka username)"
+        }
+      }
+    },
+    "chorusSwiftAccountReplicationRequest": {
+      "type": "object",
+      "properties": {
+        "fromStorage": {
+          "type": "string"
+        },
+        "toStorage": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string"
         }
       }
     },

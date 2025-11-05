@@ -21,6 +21,7 @@ service Chorus {
   rpc ListBucketsForReplication(ListBucketsForReplicationRequest) returns (ListBucketsForReplicationResponse);
   // Configures new replication for user or bucket(-s)
   rpc AddReplication(AddReplicationRequest) returns (google.protobuf.Empty);
+  rpc AddSwiftAccountReplication(SwiftAccountReplicationRequest) returns (google.protobuf.Empty);
   // Lists configured replications with statuses
   rpc ListReplications(google.protobuf.Empty) returns (ListReplicationsResponse);
   rpc ListUserReplications(google.protobuf.Empty) returns (ListUserReplicationsResponse);
@@ -198,6 +199,12 @@ message AddReplicationRequest {
   bool is_for_all_buckets = 6;
   optional string agent_url = 7;
   string to_bucket = 8;
+}
+
+message SwiftAccountReplicationRequest {
+  string from_storage = 1;
+  string to_storage = 2;
+  string account = 3;
 }
 
 message AddBucketReplicationRequest {

@@ -26,6 +26,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
+	"github.com/clyso/chorus/service/proxy/router"
 )
 
 //go:embed config.yaml
@@ -39,27 +40,8 @@ func defaultConfig() fs.File {
 	return defaultFile
 }
 
-// TODO: move swift config to swift router package in swift-support branch
-type SwiftStorage struct {
-	StorageURL string `yaml:"storageURL"`
-}
-
-func (s *SwiftStorage) HasUser(user string) bool {
-	return false
-}
-
-func (s *SwiftStorage) UserList() []string {
-	return []string{}
-}
-
-func (s *SwiftStorage) Validate() error {
-	if s.StorageURL == "" {
-		return fmt.Errorf("swift storage config: empty StorageURL")
-	}
-	return nil
-}
-
-type Storages = objstore.StoragesConfig[*s3.Storage, *SwiftStorage]
+type Storages = objstore.StoragesConfig[*s3.Storage, *router.SwiftStorage]
+type Storage = objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]
 
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
@@ -78,27 +60,34 @@ func (c *Config) Validate() error {
 	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
-	if c.Auth == nil {
+	if err := ValidateAuth(c.Storage, c.Auth); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ValidateAuth(storage Storages, auth *auth.Config) error {
+	if len(storage.S3Storages()) == 0 {
+		return nil
+	}
+	// S3 storages set: validate auth config
+	if auth == nil {
 		return fmt.Errorf("proxy config: empty Auth config")
 	}
-	if c.Auth.UseStorage != "" {
-		if _, ok := c.Storage.Storages[c.Auth.UseStorage]; !ok {
+	if auth.UseStorage != "" {
+		if _, ok := storage.Storages[auth.UseStorage]; !ok {
 			return fmt.Errorf("proxy config: auth UseStorage points to unknown storage")
 		}
 	}
-	if len(c.Auth.Custom) != 0 {
-		for user := range c.Auth.Custom {
-			if err := c.Storage.Exists(c.Storage.Main, user); err != nil {
+	if len(auth.Custom) != 0 {
+		for user := range auth.Custom {
+			if err := storage.Exists(storage.Main, user); err != nil {
 				return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
 			}
 		}
 	}
-	if c.Auth.UseStorage == "" && len(c.Auth.Custom) == 0 {
+	if auth.UseStorage == "" && len(auth.Custom) == 0 {
 		return fmt.Errorf("proxy config: auth credentials enabled but not set")
-	}
-
-	if c.Port <= 0 {
-		return fmt.Errorf("proxy config: Port must be positive: %d", c.Port)
 	}
 	return nil
 }

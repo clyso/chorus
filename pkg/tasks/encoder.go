@@ -147,6 +147,38 @@ func enqueueAny(ctx context.Context, taskClient *asynq.Client, payload any) erro
 		return consistencyCheckListVersions.Enqueue(ctx, taskClient, *p)
 	case ConsistencyCheckListVersionsPayload:
 		return consistencyCheckListVersions.Enqueue(ctx, taskClient, p)
+	case *SwiftAccountUpdatePayload:
+		return swiftAccountUpdate.Enqueue(ctx, taskClient, *p)
+	case SwiftAccountUpdatePayload:
+		return swiftAccountUpdate.Enqueue(ctx, taskClient, p)
+	case *SwiftContainerUpdatePayload:
+		return swiftContainerUpdate.Enqueue(ctx, taskClient, *p)
+	case SwiftContainerUpdatePayload:
+		return swiftContainerUpdate.Enqueue(ctx, taskClient, p)
+	case *SwiftObjectMetaUpdatePayload:
+		return swiftObjectMetaUpdate.Enqueue(ctx, taskClient, *p)
+	case SwiftObjectMetaUpdatePayload:
+		return swiftObjectMetaUpdate.Enqueue(ctx, taskClient, p)
+	case *SwiftObjectUpdatePayload:
+		return swiftObjectUpdate.Enqueue(ctx, taskClient, *p)
+	case SwiftObjectUpdatePayload:
+		return swiftObjectUpdate.Enqueue(ctx, taskClient, p)
+	case *SwiftObjectDeletePayload:
+		return swiftObjectDelete.Enqueue(ctx, taskClient, *p)
+	case SwiftObjectDeletePayload:
+		return swiftObjectDelete.Enqueue(ctx, taskClient, p)
+	case *SwiftAccountMigrationPayload:
+		return swiftAccountMigration.Enqueue(ctx, taskClient, *p)
+	case SwiftAccountMigrationPayload:
+		return swiftAccountMigration.Enqueue(ctx, taskClient, p)
+	case *SwiftContainerMigrationPayload:
+		return swiftContainerMigration.Enqueue(ctx, taskClient, *p)
+	case SwiftContainerMigrationPayload:
+		return swiftContainerMigration.Enqueue(ctx, taskClient, p)
+	case *SwiftObjectMigrationPayload:
+		return swiftObjectMigration.Enqueue(ctx, taskClient, *p)
+	case SwiftObjectMigrationPayload:
+		return swiftObjectMigration.Enqueue(ctx, taskClient, p)
 	default:
 		return fmt.Errorf("%w: unsupported payload type %T. Define encoder[%T] instance in pkg/tasks/encoder.go and add it to encodeAny switch statement", dom.ErrNotImplemented, payload, payload)
 	}
@@ -315,6 +347,68 @@ var (
 			return ConsistencyCheckQueue(checkID)
 		},
 		taskType: TypeConsistencyCheckListVersions,
+	}
+	swiftAccountUpdate = encoder[SwiftAccountUpdatePayload]{
+		taskID: nil,
+		queue: func(p SwiftAccountUpdatePayload) string {
+			return eventQueue(&p)
+		},
+		taskType: TypeSwiftAccountUpdate,
+	}
+	swiftContainerUpdate = encoder[SwiftContainerUpdatePayload]{
+		taskID: nil,
+		queue: func(p SwiftContainerUpdatePayload) string {
+			return eventQueue(&p)
+		},
+		taskType: TypeSwiftContainerUpdate,
+	}
+	swiftObjectMetaUpdate = encoder[SwiftObjectMetaUpdatePayload]{
+		taskID: nil,
+		queue: func(p SwiftObjectMetaUpdatePayload) string {
+			return eventQueue(&p)
+		},
+		taskType: TypeSwiftObjMetaUpdate,
+	}
+	swiftObjectUpdate = encoder[SwiftObjectUpdatePayload]{
+		taskID: nil,
+		queue: func(p SwiftObjectUpdatePayload) string {
+			return eventQueue(&p)
+		},
+		taskType: TypeSwiftObjUpdate,
+	}
+	swiftObjectDelete = encoder[SwiftObjectDeletePayload]{
+		taskID: nil,
+		queue: func(p SwiftObjectDeletePayload) string {
+			return eventQueue(&p)
+		},
+		taskType: TypeSwiftObjDelete,
+	}
+	swiftAccountMigration = encoder[SwiftAccountMigrationPayload]{
+		taskID: func(p SwiftAccountMigrationPayload) string {
+			return toTaskID("mgr:sw:a", p.ID.AsString())
+		},
+		queue: func(p SwiftAccountMigrationPayload) string {
+			return initMigrationListQueue(&p)
+		},
+		taskType: TypeSwiftAccountMigration,
+	}
+	swiftContainerMigration = encoder[SwiftContainerMigrationPayload]{
+		taskID: func(p SwiftContainerMigrationPayload) string {
+			return toTaskID("mgr:sw:c", p.ID.AsString(), p.Bucket)
+		},
+		queue: func(p SwiftContainerMigrationPayload) string {
+			return initMigrationListQueue(&p)
+		},
+		taskType: TypeSwiftContainerMigration,
+	}
+	swiftObjectMigration = encoder[SwiftObjectMigrationPayload]{
+		taskID: func(p SwiftObjectMigrationPayload) string {
+			return toTaskID("mgr:sw:o", p.ID.AsString(), p.Bucket, p.ObjName)
+		},
+		queue: func(p SwiftObjectMigrationPayload) string {
+			return initMigrationCopyQueue(&p)
+		},
+		taskType: TypeSwiftObjectMigration,
 	}
 )
 
