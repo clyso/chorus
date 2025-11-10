@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"iter"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -43,7 +44,8 @@ import (
 
 const (
 	CChorusSourceVersionIDMetaHeader = "x-amz-meta-chorus-source-version-id"
-	CRGWVersionMigrationMetaHeader   = "x-amz-meta-rgwx-version-id"
+
+	CRGWVersionMigrationQueryParam = "rgwx-version-id"
 )
 
 type ObjectVersionInfo struct {
@@ -324,7 +326,9 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 
 		switch provider {
 		case "ceph":
-			// putObjectOpts.UserMetadata[CRGWVersionMigrationMetaHeader] = to.Version
+			putObjectOpts.Internal.CustomQueryParams = url.Values{
+				CRGWVersionMigrationQueryParam: []string{to.Version},
+			}
 		case "minio":
 			// minio will accept only uuid as a version id
 			if _, err := uuid.Parse(to.Version); err == nil {

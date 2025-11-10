@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"net/url"
 	"runtime"
@@ -88,14 +89,18 @@ const (
 	CMinioS3Port         = 9000
 	CMinioManagementPort = 9001
 
-	CCephX8664Image       = "quay.io/ceph/demo:main-985bb830-main-centos-stream8-x86_64"
-	CCephARM64Image       = "quay.io/ceph/demo:main-985bb83-main-centos-arm64-stream8-aarch64"
-	CCephPublicNetwork    = "127.0.0.1/32"
-	CCephMonIP            = "127.0.0.1"
-	CCephDomainName       = "localhost"
-	CCephDemoUID          = "cephuid"
-	CCephOSDDirectoryMode = "directory"
-	CCephAPIPort          = 8080
+	CCephX8664Image            = "quay.io/ceph/demo:main-985bb830-main-centos-stream8-x86_64"
+	CCephARM64Image            = "quay.io/ceph/demo:main-985bb83-main-centos-arm64-stream8-aarch64"
+	CCephPublicNetwork         = "127.0.0.1/32"
+	CCephMonIP                 = "127.0.0.1"
+	CCephDomainName            = "localhost"
+	CCephDemoUID               = "cephuid"
+	CCephOSDDirectoryMode      = "directory"
+	CCephSystemUserUID         = "superuser"
+	CCephSystemUserDisplayName = "superuser"
+	CCephSystemUserAccessToken = "superuser"
+	CCephSystemUserSecretToken = "superuser"
+	CCephAPIPort               = 8080
 
 	CContainerStopDeadline = 10 * time.Second
 
@@ -116,24 +121,38 @@ type ComponentOption interface {
 
 type disableContainerSTDOut struct{}
 
-type disableContainerSTDErr struct{}
-
-func (o disableContainerSTDOut) apply(cfg *ComponentCreationConfig) {
+func (r *disableContainerSTDOut) apply(cfg *ComponentCreationConfig) {
 	cfg.DisabledLogs = append(cfg.DisabledLogs, testcontainers.StdoutLog)
 }
 
-func (o disableContainerSTDErr) apply(cfg *ComponentCreationConfig) {
+type disableContainerSTDErr struct{}
+
+func (r *disableContainerSTDErr) apply(cfg *ComponentCreationConfig) {
 	cfg.DisabledLogs = append(cfg.DisabledLogs, testcontainers.StderrLog)
+}
+
+type addDependency struct {
+	instanceName string
+}
+
+func (r *addDependency) apply(cfg *ComponentCreationConfig) {
+	cfg.Dependencies = append(cfg.Dependencies, r.instanceName)
 }
 
 // WithDisabledSTDOutLog disables STDOUT logs for the container.
 func WithDisabledSTDOutLog() ComponentOption {
-	return disableContainerSTDOut{}
+	return &disableContainerSTDOut{}
 }
 
 // WithDisabledSTDErrLog disables STDERR logs for the container.
 func WithDisabledSTDErrLog() ComponentOption {
-	return disableContainerSTDErr{}
+	return &disableContainerSTDErr{}
+}
+
+func WithKeystone(instanceName string) ComponentOption {
+	return &addDependency{
+		instanceName: instanceName,
+	}
 }
 
 type ContainerLogConsumer struct {
@@ -225,9 +244,11 @@ type MinioAccessConfig struct {
 }
 
 type CephAccessConfig struct {
-	Keystone StorageKeystoneAccessConfig
-	Host     ContainerHost
-	Port     ContainerPort
+	Keystone       StorageKeystoneAccessConfig
+	Host           ContainerHost
+	SystemUser     string
+	SystemPassword string
+	Port           ContainerPort
 }
 
 type SwiftProxyConfigTemplateValues struct {
@@ -251,6 +272,7 @@ type CephRGWTemplateValues struct {
 	OperatorRole     string
 	ResellerRole     string
 	ExternalAuthPort int
+	WithKeystone     bool
 }
 
 type Terminator func(context.Context) error
@@ -448,9 +470,8 @@ func AsSwift(keystoneInstance string, opts ...ComponentOption) ComponentCreation
 	return cfg
 }
 
-func AsCeph(keystoneInstance string, opts ...ComponentOption) ComponentCreationConfig {
+func AsCeph(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		Dependencies:    []string{keystoneInstance},
 		InstantiateFunc: startCephInstance,
 	}
 	for _, opt := range opts {
@@ -994,7 +1015,6 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 		User:     CMinioUsername,
 		Password: CMinioPassword,
 	}
-	// env.containers[componentName] = container
 	env.terminators[componentName] = func(ctx context.Context) error {
 		return stopContainer(ctx, container)
 	}
@@ -1003,6 +1023,15 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 }
 
 func startCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	withKeystone := len(componentConfig.Dependencies) != 0
+	if withKeystone {
+		return startCephInstanceWithKeystone(ctx, env, componentName, componentConfig)
+	} else {
+		return startStandaloneCephInstance(ctx, env, componentName, componentConfig)
+	}
+}
+
+func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	keystoneEnv, err := env.GetKeystoneAccessConfig(componentConfig.Dependencies[0])
 	if err != nil {
 		return fmt.Errorf("unable to get keystone env: %w", err)
@@ -1063,16 +1092,6 @@ func startCephInstance(ctx context.Context, env *TestEnvironment, componentName 
 		return fmt.Errorf("unable to add user to admin role: %w", err)
 	}
 
-	cephService, err := services.Create(ctx, identityClient, services.CreateOpts{
-		Type: CKeystoneObjectStoreServiceType,
-		Extra: map[string]any{
-			"name": CKeystoneCephServiceName,
-		},
-	}).Extract()
-	if err != nil {
-		return fmt.Errorf("unable to create ceph service: %w", err)
-	}
-
 	operatorRole, err := roles.Create(ctx, identityClient, roles.CreateOpts{
 		Name: CKeystoneCephOperatorRole,
 	}).Extract()
@@ -1088,6 +1107,7 @@ func startCephInstance(ctx context.Context, env *TestEnvironment, componentName 
 	}
 
 	cephRGWConfig := CephRGWTemplateValues{
+		WithKeystone:     true,
 		AuthHost:         keystoneEnv.Host.NAT,
 		ExternalAuthPort: keystoneEnv.ExternalPort.Exposed,
 		AdminProject:     keystoneEnv.ServiceProject.Name,
@@ -1157,6 +1177,25 @@ func startCephInstance(ctx context.Context, env *TestEnvironment, componentName 
 		return fmt.Errorf("unable to start ceph container: %w", err)
 	}
 
+	retCode, outReader, err := container.Exec(ctx,
+		[]string{"radosgw-admin", "user", "create",
+			"--uid", CCephSystemUserUID,
+			"--display-name", CCephSystemUserDisplayName,
+			"--access-key", CCephSystemUserAccessToken,
+			"--secret-key", CCephSystemUserSecretToken,
+			"--system"})
+	if err != nil {
+		return fmt.Errorf("unable to execute command: %w", err)
+	}
+	if retCode != 0 {
+		outBytes, err := io.ReadAll(outReader)
+		if err != nil {
+			return fmt.Errorf("unable to read output: %w", err)
+		}
+		out := string(outBytes)
+		return fmt.Errorf("command exit code %d: %s", retCode, out)
+	}
+
 	containerIP, err := container.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph container ip: %w", err)
@@ -1170,6 +1209,16 @@ func startCephInstance(ctx context.Context, env *TestEnvironment, componentName 
 	apiForwardedPort, err := container.MappedPort(ctx, apiNatPort)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph api forwarded port: %w", err)
+	}
+
+	cephService, err := services.Create(ctx, identityClient, services.CreateOpts{
+		Type: CKeystoneObjectStoreServiceType,
+		Extra: map[string]any{
+			"name": CKeystoneCephServiceName,
+		},
+	}).Extract()
+	if err != nil {
+		return fmt.Errorf("unable to create ceph service: %w", err)
 	}
 
 	_, err = endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
@@ -1205,6 +1254,101 @@ func startCephInstance(ctx context.Context, env *TestEnvironment, componentName 
 			OperatorRole: operatorRole,
 			ResellerRole: resellerRole,
 		},
+		SystemUser:     CCephSystemUserAccessToken,
+		SystemPassword: CCephSystemUserSecretToken,
+	}
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
+
+	return nil
+}
+
+func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	var imageName string
+	switch runtime.GOARCH {
+	case "amd64":
+		imageName = CCephX8664Image
+	case "arm64":
+		imageName = CCephARM64Image
+	default:
+		return fmt.Errorf("platform %s not supported for ceph image", runtime.GOARCH)
+	}
+
+	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
+	apiNatPort := nat.Port(apiNatPortString)
+	req := testcontainers.ContainerRequest{
+		Image:      imageName,
+		WaitingFor: wait.ForHTTP("/").WithStartupTimeout(5 * time.Minute).WithPort(apiNatPort),
+		Env: map[string]string{
+			"RGW_NAME":            CCephDomainName,
+			"CEPH_PUBLIC_NETWORK": CCephPublicNetwork,
+			"MON_IP":              CCephMonIP,
+			"CEPH_DEMO_UID":       CCephDemoUID,
+			"OSD_TYPE":            CCephOSDDirectoryMode,
+		},
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.AutoRemove = true
+		},
+		HostAccessPorts: []int{CCephAPIPort},
+		ExposedPorts:    []string{apiNatPortString},
+		Networks:        []string{env.network.Name},
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
+			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
+		},
+	}
+
+	container, err := startContainer(ctx, req)
+	if err != nil {
+		return fmt.Errorf("unable to start ceph container: %w", err)
+	}
+
+	retCode, outReader, err := container.Exec(ctx,
+		[]string{"radosgw-admin", "user", "create",
+			"--uid", CCephSystemUserUID,
+			"--display-name", CCephSystemUserDisplayName,
+			"--access-key", CCephSystemUserAccessToken,
+			"--secret-key", CCephSystemUserSecretToken,
+			"--system"})
+	if err != nil {
+		return fmt.Errorf("unable to execute command: %w", err)
+	}
+	if retCode != 0 {
+		outBytes, err := io.ReadAll(outReader)
+		if err != nil {
+			return fmt.Errorf("unable to read output: %w", err)
+		}
+		out := string(outBytes)
+		return fmt.Errorf("command exit code %d: %s", retCode, out)
+	}
+
+	containerIP, err := container.ContainerIP(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get ceph container ip: %w", err)
+	}
+
+	containerHost, err := container.Host(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get ceph container host: %w", err)
+	}
+
+	apiForwardedPort, err := container.MappedPort(ctx, apiNatPort)
+	if err != nil {
+		return fmt.Errorf("unable to get ceph api forwarded port: %w", err)
+	}
+
+	env.accessConfigs[componentName] = CephAccessConfig{
+		Port: ContainerPort{
+			Exposed:   CCephAPIPort,
+			Forwarded: apiForwardedPort.Int(),
+		},
+		Host: ContainerHost{
+			NAT:   containerIP,
+			Local: containerHost,
+		},
+		SystemUser:     CCephSystemUserAccessToken,
+		SystemPassword: CCephSystemUserSecretToken,
 	}
 	env.terminators[componentName] = func(ctx context.Context) error {
 		return stopContainer(ctx, container)

@@ -81,7 +81,7 @@ var _ = BeforeSuite(func() {
 		CKeystoneTestComponentKey: AsKeystone(),
 		CRedisTestComponentKey:    AsRedis(WithDisabledSTDOutLog()), // Example:Disable stdout logs for redis component
 		CSwiftTestComponentKey:    AsSwift(CKeystoneTestComponentKey),
-		CCephTestComponentKey:     AsCeph(CKeystoneTestComponentKey),
+		CCephTestComponentKey:     AsCeph(WithKeystone(CKeystoneTestComponentKey)),
 	}
 	testEnv, err := NewTestEnvironment(suiteCtx, componentConfig)
 	Expect(err).NotTo(HaveOccurred())
