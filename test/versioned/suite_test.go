@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	cadmin "github.com/ceph/go-ceph/rgw/admin"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack"
 	kcredentials "github.com/gophercloud/gophercloud/v2/openstack/identity/v3/credentials"
@@ -44,6 +45,7 @@ import (
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3"
@@ -366,7 +368,7 @@ var _ = Describe("Minio versioned migration", func() {
 	})
 })
 
-var _ = Describe("Ceph versioned migration", func() {
+var _ = Describe("Ceph keystone versioned migration", func() {
 	const (
 		CKeystoneUrlTemplate = "http://%s:%d/v3"
 
@@ -410,12 +412,12 @@ var _ = Describe("Ceph versioned migration", func() {
 	}
 
 	BeforeEach(func() {
-		Skip("skip ceph test, since runner can't run ceph yet")
+		Skip("skip ceph test, since runner can't run ceph with keystone yet")
 
 		ctx := context.WithoutCancel(testCtx)
 		localTestEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
 			CKeystoneSrcInstance: env.AsKeystone(),
-			CCephSrcInstance:     env.AsCeph(CKeystoneSrcInstance),
+			CCephSrcInstance:     env.AsCeph(env.WithKeystone(CKeystoneSrcInstance)),
 			CRedisInstance:       env.AsRedis(),
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -676,6 +678,281 @@ var _ = Describe("Ceph versioned migration", func() {
 
 				Expect(srcObject.ETag).To(Equal(destObject.ETag))
 				Expect(srcObject.Size).To(Equal(destObject.Size))
+				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
+				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)][0]))
+			}
+		}
+	})
+})
+
+var _ = Describe("Ceph system user versioned migration", func() {
+	const (
+		CCephSrcInstance  = "ceph1"
+		CCephDestInstance = "ceph2"
+		CRedisInstance    = "redis"
+
+		CCephProvider = "ceph"
+
+		CSyncUserKey = "test"
+
+		CCephSrcUserUID         = "user"
+		CCephSrcUserDisplayName = "user"
+		CCephSrcUserAccessKey   = "AKIAIOSFODNN7EXAMPLE"
+		CCephSrcUserSecretKey   = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+		CCephSrcBucket  = "buck1"
+		CCephDestBucket = "buck2"
+	)
+
+	var (
+		testEnv *env.TestEnvironment
+
+		testMinioSrcUserClient  *minio.Client
+		testMinioDestUserClient *minio.Client
+
+		testApiClient pb.ChorusClient
+	)
+
+	BeforeEach(func() {
+		ctx := context.WithoutCancel(testCtx)
+		localTestEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
+			CCephSrcInstance:  env.AsCeph(),
+			CCephDestInstance: env.AsCeph(),
+			CRedisInstance:    env.AsRedis(),
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		cephSrcAccessConfig, err := localTestEnv.GetCephAccessConfig(CCephSrcInstance)
+		Expect(err).NotTo(HaveOccurred())
+		cephDestAccessConfig, err := localTestEnv.GetCephAccessConfig(CCephDestInstance)
+		Expect(err).NotTo(HaveOccurred())
+
+		cephSrcAdminEndpoint := fmt.Sprintf("http://%s:%d", cephSrcAccessConfig.Host.Local, cephSrcAccessConfig.Port.Forwarded)
+		cephSrcAdminClient, err := cadmin.New(cephSrcAdminEndpoint, cephSrcAccessConfig.SystemUser, cephSrcAccessConfig.SystemPassword, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		srcCephUser := cadmin.User{
+			ID:          CCephSrcUserUID,
+			DisplayName: CCephSrcUserDisplayName,
+			Keys: []cadmin.UserKeySpec{
+				{
+					AccessKey: CCephSrcUserAccessKey,
+					SecretKey: CCephSrcUserSecretKey,
+				},
+			},
+		}
+		_, err = cephSrcAdminClient.CreateUser(ctx, srcCephUser)
+		Expect(err).NotTo(HaveOccurred())
+
+		minioSrcS3Endpoint := fmt.Sprintf("%s:%d", cephSrcAccessConfig.Host.Local, cephSrcAccessConfig.Port.Forwarded)
+		minioSrcUserClient, err := minio.New(minioSrcS3Endpoint, &minio.Options{
+			Creds:  mcredentials.NewStaticV4(CCephSrcUserAccessKey, CCephSrcUserSecretKey, ""),
+			Secure: false,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		minioDestS3Endpoint := fmt.Sprintf("%s:%d", cephDestAccessConfig.Host.Local, cephDestAccessConfig.Port.Forwarded)
+		minioDestUserClient, err := minio.New(minioDestS3Endpoint, &minio.Options{
+			Creds:  mcredentials.NewStaticV4(cephDestAccessConfig.SystemUser, cephDestAccessConfig.SystemPassword, ""),
+			Secure: false,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		err = minioSrcUserClient.MakeBucket(ctx, CCephSrcBucket, minio.MakeBucketOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		err = minioSrcUserClient.EnableVersioning(ctx, CCephSrcBucket)
+		Expect(err).NotTo(HaveOccurred())
+
+		filler := gen.NewS3Filler(testTree, minioSrcUserClient)
+		err = filler.Fill(ctx, CCephSrcBucket)
+		Expect(err).NotTo(HaveOccurred())
+
+		redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
+		Expect(err).NotTo(HaveOccurred())
+
+		grpcPort, err := env.RandomFreePort()
+		Expect(err).NotTo(HaveOccurred())
+		httpPort, err := env.RandomFreePort()
+		Expect(err).NotTo(HaveOccurred())
+
+		workerConf := &worker.Config{
+			Common: config.Common{
+				Features: &features.Config{
+					ACL:        false,
+					Tagging:    false,
+					Versioning: true,
+				},
+				Log: &log.Config{
+					Level: "debug",
+				},
+				Redis: &config.Redis{
+					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
+				},
+				Metrics: &metrics.Config{
+					Enabled: false,
+				},
+				Trace: &trace.Config{
+					Enabled: false,
+				},
+			},
+			Concurrency: 10,
+			Lock: &worker.Lock{
+				Overlap: time.Second,
+			},
+			RClone: &rclone.Config{
+				MemoryLimit: rclone.MemoryLimit{
+					Enabled: false,
+				},
+				LocalFileLimit: ratelimit.SemaphoreConfig{
+					Enabled: false,
+				},
+				GlobalFileLimit: ratelimit.SemaphoreConfig{
+					Enabled: false,
+				},
+			},
+			Worker: &handler.Config{
+				SwitchRetryInterval: time.Millisecond * 500,
+				PauseRetryInterval:  time.Millisecond * 500,
+			},
+			Storage: objstore.Config{
+				Main: CCephSrcInstance,
+				Storages: map[string]objstore.Storage{
+					CCephSrcInstance: {
+						CommonConfig: objstore.CommonConfig{
+							Type: dom.S3,
+						},
+						S3: &s3.Storage{
+							Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+							Credentials: map[string]s3.CredentialsV4{
+								CSyncUserKey: {
+									AccessKeyID:     CCephSrcUserAccessKey,
+									SecretAccessKey: CCephSrcUserSecretKey,
+								},
+							},
+							Provider: CCephProvider,
+						},
+					},
+					CCephDestInstance: {
+						CommonConfig: objstore.CommonConfig{
+							Type: dom.S3,
+						},
+						S3: &s3.Storage{
+							Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
+							Credentials: map[string]s3.CredentialsV4{
+								CSyncUserKey: {
+									AccessKeyID:     cephSrcAccessConfig.SystemUser,
+									SecretAccessKey: cephSrcAccessConfig.SystemPassword,
+								},
+							},
+							Provider: CCephProvider,
+						},
+					},
+				},
+			},
+			Api: &api.Config{
+				Enabled:  true,
+				GrpcPort: grpcPort,
+				HttpPort: httpPort,
+			},
+		}
+
+		err = workerConf.Storage.Validate()
+		Expect(err).NotTo(HaveOccurred())
+
+		grpcAddr := fmt.Sprintf("%s:%d", "localhost", grpcPort)
+
+		app := dom.AppInfo{
+			Version: "test",
+			App:     "worker",
+			AppID:   xid.New().String(),
+		}
+
+		go func() {
+			defer GinkgoRecover()
+			err = worker.Start(ctx, app, workerConf)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+
+		grpcConn, err := grpc.NewClient(grpcAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:                10 * time.Second,
+				Timeout:             time.Second,
+				PermitWithoutStream: true,
+			}),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		apiClient := pb.NewChorusClient(grpcConn)
+
+		Eventually(func() bool {
+			_, err := apiClient.GetAppVersion(ctx, &emptypb.Empty{})
+			if err != nil {
+				return false
+			}
+			return true
+		}, 1*time.Minute, time.Second).Should(BeTrue())
+
+		testEnv = localTestEnv
+		testMinioSrcUserClient = minioSrcUserClient
+		testMinioDestUserClient = minioDestUserClient
+		testApiClient = apiClient
+	})
+
+	AfterEach(func() {
+		testEnv.Terminate(context.WithoutCancel(testCtx))
+	})
+
+	It("Should migrate and preserve version ids", func() {
+		ctx := context.Background()
+
+		_, err := testApiClient.AddBucketReplication(ctx, &pb.AddBucketReplicationRequest{
+			User:        CSyncUserKey,
+			FromStorage: CCephSrcInstance,
+			FromBucket:  CCephSrcBucket,
+			ToStorage:   CCephDestInstance,
+			ToBucket:    CCephDestBucket,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		resp, err := testApiClient.ListReplications(ctx, &emptypb.Empty{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.Replications).To(HaveLen(1))
+
+		Eventually(func() bool {
+			resp, err = testApiClient.ListReplications(ctx, &emptypb.Empty{})
+			if err != nil {
+				return false
+			}
+			if len(resp.Replications) != 1 {
+				return false
+			}
+			return resp.Replications[0].IsInitDone
+		}, 60*time.Second, time.Second).Should(BeTrue())
+
+		for treeObject := range testTree.DepthFirstValueIterator().Must() {
+			if treeObject.GetVersionCount() == 0 || treeObject.GetVersionCount() == 1 && treeObject.GetContentReader().Len() == 0 {
+				continue
+			}
+			srcObjectList := testMinioSrcUserClient.ListObjects(ctx, CCephSrcBucket, minio.ListObjectsOptions{
+				WithVersions: true,
+				Prefix:       treeObject.GetFullPath(),
+			})
+			destObjectList := testMinioDestUserClient.ListObjects(ctx, CCephDestBucket, minio.ListObjectsOptions{
+				WithVersions: true,
+				Prefix:       treeObject.GetFullPath(),
+			})
+
+			for srcObject := range srcObjectList {
+				destObject := <-destObjectList
+
+				destObjectInfo, err := testMinioDestUserClient.StatObject(ctx, CCephDestBucket, treeObject.GetFullPath(), minio.StatObjectOptions{
+					VersionID: destObject.VersionID,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(srcObject.ETag).To(Equal(destObject.ETag))
+				Expect(srcObject.Size).To(Equal(destObject.Size))
+				Expect(srcObject.VersionID).To(Equal(destObject.VersionID))
 				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
 				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)][0]))
 			}
