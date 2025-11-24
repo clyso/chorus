@@ -203,6 +203,20 @@ func (r *UserReplicationStatusStore) List(ctx context.Context) (map[entity.UserR
 	return result, nil
 }
 
+// returns true if there is at least one user-replication for given user
+func (r *UserReplicationStatusStore) Exists(ctx context.Context, user string) (bool, error) {
+	policies, err := r.index.Get(ctx, "")
+	if err != nil {
+		return false, fmt.Errorf("unable to list user replication policies from index: %w", err)
+	}
+	for _, v := range policies {
+		if v.User == user {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *UserReplicationStatusStore) AddOp(ctx context.Context, id entity.UserReplicationPolicy, status entity.ReplicationStatus) OperationStatus {
 	status.CreatedAt = entity.TimeNow()
 	res := map[string]OperationStatus{}

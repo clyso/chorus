@@ -48,14 +48,14 @@ chorctl repl add-user -f main -t follower -u admin
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
 		_, err = client.AddReplication(ctx, &pb.AddReplicationRequest{
-			User:            ruaUser,
-			From:            ruaFrom,
-			To:              ruaTo,
-			Buckets:         nil,
-			IsForAllBuckets: true,
+			Id: &pb.ReplicationID{
+				User:        ruaUser,
+				FromStorage: ruaFrom,
+				ToStorage:   ruaTo,
+			},
 		})
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to add replication")

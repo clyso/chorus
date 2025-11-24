@@ -3,18 +3,20 @@ config_version: 3
 
 http:
   rules:
-    - selector: chorus.Chorus.StartConsistencyCheck
+    # Diff service:
+    - selector: chorus.Diff.Start
       post: /consistency/start
       body: "*"
-    - selector: chorus.Chorus.ListConsistencyChecks
+    - selector: chorus.Diff.List
       get: /consistency/list
-    - selector: chorus.Chorus.GetConsistencyCheckReport
+    - selector: chorus.Diff.GetReport
       get: /consistency/report
-    - selector: chorus.Chorus.GetConsistencyCheckReportEntries
+    - selector: chorus.Diff.GetReportEntries
       get: /consistency/report-entries
-    - selector: chorus.Chorus.DeleteConsistencyCheckReport
+    - selector: chorus.Diff.DeleteReport
       put: /consistency/delete
       body: "*"
+      # Chorus service:
     - selector: chorus.Chorus.GetAppVersion
       get: /version
     - selector: chorus.Chorus.GetStorages
@@ -23,51 +25,39 @@ http:
       get: /proxy
     - selector: chorus.Chorus.GetAgents
       get: /agents
-    - selector: chorus.Chorus.ListBucketsForReplication
+      # Policy service
+    - selector: chorus.Policy.AvailableBuckets
       post: /replication/list-buckets
       body: "*"
-    - selector: chorus.Chorus.ListReplications
-      get: /replication
-    - selector: chorus.Chorus.ListUserReplications
-      get: /replication/user
-    - selector: chorus.Chorus.AddReplication
+    - selector: chorus.Policy.AddReplication
       post: /replication/add
       body: "*"
-    - selector: chorus.Chorus.AddSwiftAccountReplication
-      post: /replication/add-swift
+    - selector: chorus.Policy.GetReplication
+      post: /replication/get
       body: "*"
-    - selector: chorus.Chorus.PauseReplication
+    - selector: chorus.Policy.ListReplications
+      get: /replication
+    - selector: chorus.Policy.PauseReplication
       put: /replication/pause
       body: "*"
-    - selector: chorus.Chorus.ResumeReplication
+    - selector: chorus.Policy.ResumeReplication
       put: /replication/resume
       body: "*"
-    - selector: chorus.Chorus.DeleteReplication
+    - selector: chorus.Policy.DeleteReplication
       put: /replication/delete
       body: "*"
-    - selector: chorus.Chorus.DeleteUserReplication
-      put: /replication/user/delete
-      body: "*"
-    - selector: chorus.Chorus.CompareBucket
-      post: /replication/compare-bucket
-      body: "*"
-    - selector: chorus.Chorus.SwitchBucketZeroDowntime
+    - selector: chorus.Policy.SwitchWithZeroDowntime
       post: /replication/switch/zero-downtime
       body: "*"
-    - selector: chorus.Chorus.SwitchBucket
+    - selector: chorus.Policy.SwitchWithDowntime
       post: /replication/switch
       body: "*"
-    - selector: chorus.Chorus.DeleteBucketSwitch
+    - selector: chorus.Policy.DeleteSwitch
       post: /replication/switch/delete
       body: "*"
-    - selector: chorus.Chorus.GetBucketSwitchStatus
-      post: /replication/switch/status
+    - selector: chorus.Policy.GetSwitchStatus
+      post: /replication/switch/get
       body: "*"
-    - selector: chorus.Chorus.ListReplicationSwitches
-      get: /replication/switch
-    - selector: chorus.Chorus.AddBucketReplication
-      post: /v2/replication/add
-      body: "*"
-    - selector: chorus.Chorus.GetReplication
-      post: /replication/get
+    - selector: chorus.Policy.CompareBucket
+      post: /replication/compare-bucket
       body: "*"

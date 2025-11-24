@@ -58,7 +58,7 @@ func Test_e2e(t *testing.T) {
 
 	// ----------------------------------------------- start chorus -----------------------------------------------
 	e := app.SetupChorus(t, workerConf, proxyConf)
-	chorusStorages, err := e.ApiClient.GetStorages(ctx, &emptypb.Empty{})
+	chorusStorages, err := e.ChorusClient.GetStorages(ctx, &emptypb.Empty{})
 	r.NoError(err, "failed to get storages from api")
 	t.Log(chorusStorages.Storages)
 
@@ -124,31 +124,28 @@ func Test_e2e(t *testing.T) {
 	r.Equal("obj1-metadata", obj1GetRes.Header.Get("X-Object-Meta-Test"), "object 1 metadata should match")
 
 	// ----------------------------------------------- start migration -----------------------------------------------
-	_, err = e.ApiClient.AddSwiftAccountReplication(ctx, &pb.SwiftAccountReplicationRequest{
+	replID := &pb.ReplicationID{
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-		Account:     testAcc,
+		User:        testAcc,
+	}
+	_, err = e.PolicyClient.AddReplication(ctx, &pb.AddReplicationRequest{
+		Id: replID,
 	})
 	r.NoError(err, "failed to start account migration")
 
-	replID := &pb.ReplicationRequest{
-		From: swiftTestKey,
-		To:   cephTestKey,
-		User: testAcc,
-	}
-
-	replList, err := e.ApiClient.ListUserReplications(ctx, &emptypb.Empty{})
+	replList, err := e.PolicyClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 	r.NoError(err, "failed to list replications")
 	r.Len(replList.Replications, 1, "there should be one replication")
-	r.Equal(testAcc, replList.Replications[0].User)
-	r.Equal(swiftTestKey, replList.Replications[0].From)
-	r.Equal(cephTestKey, replList.Replications[0].To)
+	r.Equal(testAcc, replList.Replications[0].Id.User)
+	r.Equal(swiftTestKey, replList.Replications[0].Id.FromStorage)
+	r.Equal(cephTestKey, replList.Replications[0].Id.ToStorage)
 
-	repl, err := e.ApiClient.GetReplication(ctx, replID)
+	repl, err := e.PolicyClient.GetReplication(ctx, replID)
 	r.NoError(err, "failed to get replication")
-	r.Equal(testAcc, repl.User)
-	r.Equal(swiftTestKey, repl.From)
-	r.Equal(cephTestKey, repl.To)
+	r.Equal(testAcc, repl.Id.User)
+	r.Equal(swiftTestKey, repl.Id.FromStorage)
+	r.Equal(cephTestKey, repl.Id.ToStorage)
 
 	// create second container in proxy
 	tstCont2 := "chorus-container-2"
@@ -192,7 +189,7 @@ func Test_e2e(t *testing.T) {
 
 	// wait for init replication to finish
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.GetReplication(ctx, replID)
+		repl, err = e.PolicyClient.GetReplication(ctx, replID)
 		if err != nil {
 			return false
 		}
@@ -207,7 +204,7 @@ func Test_e2e(t *testing.T) {
 
 	// ----------------------------------------------- finish migration -----------------------------------------------
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.GetReplication(ctx, replID)
+		repl, err = e.PolicyClient.GetReplication(ctx, replID)
 		if err != nil {
 			return false
 		}
@@ -313,7 +310,7 @@ func Test_e2e(t *testing.T) {
 	})
 	r.NoError(obj6Res.Err, "failed to upload object 6 to proxy")
 	// ------------------------------------------------ create switch -----------------------------------------------
-	_, err = e.ApiClient.SwitchBucket(ctx, &pb.SwitchBucketRequest{
+	_, err = e.PolicyClient.SwitchWithDowntime(ctx, &pb.SwitchDowntimeRequest{
 		ReplicationId: replID,
 		DowntimeOpts: &pb.SwitchDowntimeOpts{
 			StartOnInitDone: true,
@@ -323,11 +320,11 @@ func Test_e2e(t *testing.T) {
 
 	// wait for switch to be in progress
 	r.Eventually(func() bool {
-		switchStatus, err := e.ApiClient.GetBucketSwitchStatus(ctx, replID)
+		switchStatus, err := e.PolicyClient.GetSwitchStatus(ctx, replID)
 		if err != nil {
 			return false
 		}
-		return switchStatus.LastStatus >= pb.GetBucketSwitchStatusResponse_InProgress
+		return switchStatus.LastStatus >= pb.ReplicationSwitch_InProgress
 	}, e.WaitShort, e.RetryShort)
 	// create container in proxy should return error
 	cont3 := "chorus-container-3"
@@ -338,11 +335,11 @@ func Test_e2e(t *testing.T) {
 
 	//wait for switch to be done
 	r.Eventually(func() bool {
-		switchStatus, err := e.ApiClient.GetBucketSwitchStatus(ctx, replID)
+		switchStatus, err := e.PolicyClient.GetSwitchStatus(ctx, replID)
 		if err != nil {
 			return false
 		}
-		return switchStatus.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+		return switchStatus.LastStatus == pb.ReplicationSwitch_Done
 	}, e.WaitLong*3, e.RetryLong)
 	// ------------------------------------------------ switch done -----------------------------------------------
 

@@ -62,7 +62,7 @@ var (
 	testTree        *gen.Tree[*gen.GeneratedS3Object]
 	testTreePicker  *gen.TreeRandomElementPicker[*gen.GeneratedS3Object]
 	testMinioClient *minio.Client
-	testAPIClient   pb.ChorusClient
+	testAPIClient   pb.DiffClient
 
 	locations = []*pb.MigrateLocation{
 		{
@@ -179,7 +179,7 @@ var _ = BeforeSuite(func() {
 				Versioning: true,
 			},
 			Log: &log.Config{
-				Level: "debug",
+				Level: "warn",
 			},
 			Redis: &config.Redis{
 				Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
@@ -244,10 +244,11 @@ var _ = BeforeSuite(func() {
 		}),
 	)
 	Expect(err).NotTo(HaveOccurred())
-	apiClient := pb.NewChorusClient(grpcConn)
+	apiClient := pb.NewDiffClient(grpcConn)
+	chorusClient := pb.NewChorusClient(grpcConn)
 
 	Eventually(func(g Gomega) {
-		_, err := apiClient.GetAppVersion(ctx, &emptypb.Empty{})
+		_, err := chorusClient.GetAppVersion(ctx, &emptypb.Empty{})
 		g.Expect(err).NotTo(HaveOccurred())
 	}, 1*time.Minute, time.Second).Should(Succeed())
 
@@ -293,7 +294,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = testAPIClient.DeleteConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{
+		_, err = testAPIClient.DeleteReport(ctx, &pb.ConsistencyCheckRequest{
 			Locations: locations,
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -306,12 +307,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err := testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err := testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -323,7 +324,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
 		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -356,12 +357,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			User:        CSyncUserKey,
 			IgnoreEtags: true,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -373,7 +374,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
 		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -406,12 +407,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			User:        CSyncUserKey,
 			IgnoreSizes: true,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -423,7 +424,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeFalse())
 		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -454,12 +455,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -474,7 +475,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -526,12 +527,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -546,7 +547,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -597,12 +598,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -617,7 +618,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -667,12 +668,12 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -687,7 +688,7 @@ var _ = Describe("Consistency checker for unversioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -748,7 +749,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = testAPIClient.DeleteConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{
+		_, err = testAPIClient.DeleteReport(ctx, &pb.ConsistencyCheckRequest{
 			Locations: locations,
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -761,12 +762,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err := testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err := testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -778,7 +779,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
 		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -811,12 +812,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			User:        CSyncUserKey,
 			IgnoreEtags: true,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -828,7 +829,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
 		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -861,12 +862,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			User:        CSyncUserKey,
 			IgnoreSizes: true,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -878,7 +879,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeFalse())
 		Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -934,12 +935,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			User:                  CSyncUserKey,
 			CheckOnlyLastVersions: true,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -951,7 +952,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		Expect(getCheckResponse.Check.WithSize).To(BeTrue())
 		Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-		checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+		checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 			Locations: locations,
 			PageSize:  10,
 		})
@@ -982,12 +983,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1002,7 +1003,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -1054,12 +1055,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1074,7 +1075,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -1125,12 +1126,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1145,7 +1146,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -1195,12 +1196,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1215,7 +1216,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,
@@ -1290,12 +1291,12 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 			Locations: locations,
 			User:      CSyncUserKey,
 		}
-		_, err = testAPIClient.StartConsistencyCheck(ctx, checkRequest)
+		_, err = testAPIClient.Start(ctx, checkRequest)
 		Expect(err).NotTo(HaveOccurred())
 
 		var getCheckResponse *pb.GetConsistencyCheckReportResponse
 		Eventually(func(g Gomega) {
-			getCheckResponse, err = testAPIClient.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			getCheckResponse, err = testAPIClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(getCheckResponse).NotTo(BeNil())
 			g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1310,7 +1311,7 @@ var _ = Describe("Consistency checker for versioned buckets", func() {
 		var entries []*pb.ConsistencyCheckReportEntry
 		var cursor uint64
 		for {
-			checkEntries, err := testAPIClient.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			checkEntries, err := testAPIClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				PageSize:  1000,
 				Cursor:    cursor,

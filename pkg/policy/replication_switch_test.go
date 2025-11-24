@@ -685,7 +685,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl)
+				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -699,11 +699,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				var agent *string
-				if tt.before.bucketReplAgent != "" {
-					agent = &tt.before.bucketReplAgent
-				}
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, agent)
+				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{AgentURL: tt.before.bucketReplAgent})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -1137,7 +1133,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl)
+				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -1154,11 +1150,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				var agent *string
-				if tt.before.bucketReplAgent != "" {
-					agent = &tt.before.bucketReplAgent
-				}
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, agent)
+				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{AgentURL: tt.before.bucketReplAgent})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -1489,9 +1481,9 @@ func setupDowntimeSwitchState(t *testing.T, svc *policySvc, queuesMock *tasks.Qu
 
 	// create routing and replication
 	if bucketID, ok := replID.AsBucketID(); ok {
-		r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, nil))
+		r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{}))
 	} else if userID, ok := replID.AsUserID(); ok {
-		r.NoError(svc.AddUserReplicationPolicy(ctx, userID))
+		r.NoError(svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{}))
 	} else {
 		t.Fatal("invalid replication ID type")
 	}
@@ -1645,9 +1637,9 @@ func Test_ZeroDowntimeSwitch_E2E(t *testing.T) {
 
 			// create routing and replication
 			if bucketID, ok := replID.AsBucketID(); ok {
-				r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, nil))
+				r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{}))
 			} else if userID, ok := replID.AsUserID(); ok {
-				r.NoError(svc.AddUserReplicationPolicy(ctx, userID))
+				r.NoError(svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{}))
 			} else {
 				t.Fatal("invalid replication ID type")
 			}
@@ -1754,9 +1746,9 @@ func Test_ZeroDowntimeSwitch_E2E(t *testing.T) {
 
 			// recreate replication and switch again
 			if bucketID, ok := replID.AsBucketID(); ok {
-				r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, nil))
+				r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{}))
 			} else if userID, ok := replID.AsUserID(); ok {
-				r.NoError(svc.AddUserReplicationPolicy(ctx, userID))
+				r.NoError(svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{}))
 			} else {
 				t.Fatal("invalid replication ID type")
 			}

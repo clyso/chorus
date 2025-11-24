@@ -32,7 +32,8 @@ import (
 )
 
 type Chorus struct {
-	ApiClient pb.ChorusClient
+	PolicyClient pb.PolicyClient
+	ChorusClient pb.ChorusClient
 
 	UrlHttpApi string
 	ProxyAddr  string
@@ -128,6 +129,7 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 	if err != nil {
 		t.Fatal("failed to dial grpc api:", err)
 	}
-	e.ApiClient = pb.NewChorusClient(grpcConn)
+	e.PolicyClient = pb.NewPolicyClient(grpcConn)
+	e.ChorusClient = pb.NewChorusClient(grpcConn)
 	return e
 }

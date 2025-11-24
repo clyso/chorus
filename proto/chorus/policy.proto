@@ -1,0 +1,396 @@
+syntax = "proto3";
+
+package chorus;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/clyso/chorus/proto/chorus;pb";
+
+// Manages chorus routing/replication policies
+service Policy {
+
+  // Returns list of buckets available for replication.
+  rpc AvailableBuckets(AvailableBucketsRequest)
+      returns (AvailableBucketsResponse);
+
+  // Configures new bucket-level or user-level replication.
+  rpc AddReplication(AddReplicationRequest) returns (google.protobuf.Empty);
+
+  // Returns replication info by ID.
+  rpc GetReplication(ReplicationID) returns (Replication);
+
+  // Lists configured replications info.
+  rpc ListReplications(ListReplicationsRequest)
+      returns (ListReplicationsResponse);
+
+  // Subscribes to replication updates stream.
+  rpc StreamReplication(ReplicationID) returns (stream Replication);
+
+  // Pauses given replication
+  rpc PauseReplication(ReplicationID) returns (google.protobuf.Empty);
+  // Resumes given replication
+  rpc ResumeReplication(ReplicationID) returns (google.protobuf.Empty);
+  // Deletes given replication
+  rpc DeleteReplication(ReplicationID) returns (google.protobuf.Empty);
+
+  // Switches source<->destination replication targets without downtime.
+  // Zero-downtime switch will take effect immediately on chorus proxy:
+  // - all writes will be now routed to replication destination
+  // - all reads will be routed to target with latest data
+  // When all replication tasks will be processed, switch will be completed and
+  // all reads and writes will be routed to destination target only.
+  //
+  // Unlike switch with downtime, zero-downtime switch is not checking bucket
+  // contents on completion and cannot be aborted or reverted without risk of
+  // data loss.
+  // Requirements for zero-downtime switch:
+  //   - replication must exist
+  //   - replication must be proxy-based (agent replication is not supported)
+  //   - for bucket-level replication, from/to bucket names must be the same
+  //   - no existing switch must exist for given replication. Zero downtime
+  //   switch cannot be updated. Use DeleteBucketSwitch in this case.
+  rpc SwitchWithZeroDowntime(SwitchZeroDowntimeRequest)
+      returns (google.protobuf.Empty);
+
+  // Schedules downtime window to switch source<->destination replication
+  // targets. See SwitchDowntimeOpts for downtime scheduling options.
+  // Can be edited if downtime window has not started yet.
+  //
+  // During downtime window all requests to replication target are blocked on
+  // chorus proxy. When all replication tasks are processed, chorus can perform
+  // optional data equality check and complete the switch. On completion, proxy
+  // unblocks requests to target and routes all requests to destination target.
+  //
+  // Unlike zero-downtime switch, downtime switch can perform optional data
+  // equality check and rollback to source target without data loss.
+  // Requirements:
+  //   - replication must exist
+  //   - replication must be proxy-based (agent replication is not supported)
+  //   - for bucket-level replication, from/to bucket names must be the same
+  //   - switch is not started. Use DeleteBucketSwitch in this case.
+  rpc SwitchWithDowntime(SwitchDowntimeRequest) returns (google.protobuf.Empty);
+
+  // Deletes Switch with following implications:
+  // !!!Use with caution for ZeroDowntime switch.
+  //
+  // - [OK] If switch was in not_started, error, or skipped state, it will not
+  // be attempted anymore. Routing will not be affected.
+  // - If switch was in_progress, it will be aborted:
+  //      * [OK] For downtime switch, block will be removed and proxy will
+  //      route all requests to source target, no data will be lost.
+  //      * [WARN] For ZeroDowntime switch, routing will be reverted back to
+  //      source target. Meaning that targets may end up in inconsistent state
+  //      because some writes were already routed to destination target.
+  // - [OK] If switch was done. Only switch metadata will be removed,
+  // replication or routing will not be affected.
+  rpc DeleteSwitch(ReplicationID) returns (google.protobuf.Empty);
+
+  // Returns Switch status
+  rpc GetSwitchStatus(ReplicationID) returns (ReplicationSwitch);
+
+  // Compares contents of given bucket in given storages
+  rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse) {
+    option deprecated = true; // Diff service to compare buckets
+  };
+}
+
+// Represents user-level and bucket-level replication source and destination
+// targets.
+// - User-level replicates all existing and future buckets of the user.
+// - Bucket-level  replicates a single bucket.
+message ReplicationID {
+  // REQUIRED: Replication user from chorus storage credential config.
+  // Selected user must be configured for both from/to storages.
+  string user = 1;
+  // REQUIRED: source storage name from chorus storage config.
+  string from_storage = 2;
+  // REQUIRED: destination storage name from chorus storage config.
+  // Can be equal to from_storage if both from/to buckets are set and different.
+  string to_storage = 3;
+  // OPTIONAL: source bucket name.
+  // For user-level replication, this field must be empty.
+  // For bucket-level replication, this field must be set.
+  optional string from_bucket = 4;
+  // OPTIONAL: destination bucket name.
+  // For user-level replication, this field must be empty.
+  // For bucket-level replication, this field must be set. From/to buckets can
+  // be different.
+  optional string to_bucket = 5;
+}
+
+// Configures new user-level or bucket-level replication.
+message AddReplicationRequest {
+  // REQUIRED: Specifies replication source and destination.
+  ReplicationID id = 1;
+  // OPTIONAL: Additional replication options.
+  ReplicationOpts opts = 2;
+}
+
+// Additional replication options for bucket and user-level replications.
+message ReplicationOpts {
+  // Webhook URL of chorus agent. Can be configured only for bucket-level.
+  // Required if chorus agent setup is used to capture ongoing storage events.
+  optional string agent_url = 1;
+
+  // TODO: implement for https://github.com/clyso/chorus/issues/141
+  // message OriginToMeta {
+  //   // OPTIONAL: If set, chorus will copy source object creation date
+  //   // into provided user metadata field on destination object.
+  //   // For example, for S3, "my-origin-creation-date" will add
+  //   // "x-amz-meta-my-origin-creation-date" user metadata header with
+  //   // original object's creation date value in destination object.
+  //   string creation_date = 1;
+  //   // OPTIONAL: If set, chorus will copy source object modification date
+  //   // into provided user metadata field on destination object.
+  //   string modification_date = 2;
+  //   // OPTIONAL: If set, chorus will copy source object version ID
+  //   // into provided user metadata field on destination object.
+  //   string version_id = 3;
+  // }
+  //
+  // // OPTIONAL: allows to copy internal source object properties
+  // // as user metadata on destination objects.
+  // optional OriginToMeta origin_to_meta = 6;
+}
+
+// Filters replications list.
+message ListReplicationsRequest {
+  // if true, user-level replications will be excluded from response.
+  bool hide_user_replications = 1;
+  // if true, bucket-level replications will be excluded from response.
+  bool hide_bucket_replications = 2;
+  // if true, replications will be listed without switch info.
+  bool hide_switch_info = 3;
+
+  // OPTIONAL: filter to apply to replications list.
+  Filter filter = 4;
+  message Filter {
+    // If set, filters replications by exact user.
+    optional string user = 1;
+    // If set, filters replications by exact source storage.
+    optional string from_storage = 2;
+    // If set, filters replications by exact destination storage.
+    optional string to_storage = 3;
+    // If set, filters bucket-level replications by exact source bucket.
+    optional string from_bucket = 4;
+    // If set, filters bucket-level replications by exact destination bucket.
+    optional string to_bucket = 5;
+    // If set, filters replications by archived status.
+    optional bool is_archived = 6;
+    // If set, filters replications by paused status.
+    optional bool is_paused = 7;
+    // If set, filters replications by completion of initial replication phase.
+    optional bool is_init_done = 8;
+    // If set, filters replications that have or not have associated switch.
+    optional bool has_switch = 9;
+    // If set, filters replications by agent-based or proxy-based replication.
+    optional bool is_agent = 10;
+  }
+}
+
+message ListReplicationsResponse { repeated Replication replications = 1; }
+
+// Represents specification and status of user-level or bucket-level
+// replication.
+message Replication {
+  // Specifies replication source and destination.
+  ReplicationID id = 1;
+  // Additional replication options.
+  ReplicationOpts opts = 2;
+
+  // Replication creation time
+  google.protobuf.Timestamp created_at = 3;
+
+  // true if replication is paused
+  bool is_paused = 4;
+  // true if initial replication phase is done.
+  // Initial phase copies all data existing in source at the moment of
+  // replication creation.
+  bool is_init_done = 5;
+
+  // Approximate number of objects listed during initial replication.
+  // Corresponds to total number of tasks created for initial replication queue.
+  int64 init_obj_listed = 6;
+  // Approximate number of objects processed during initial replication.
+  // Corresponds to total number of tasks completed from initial replication
+  // queue.
+  int64 init_obj_done = 7;
+
+  // Number of source data change events captured and queued for replication.
+  // Corresponds to total number of tasks created for event replication queue.
+  int64 events = 8;
+  // Number of source data change events synced to destination.
+  // Corresponds to total number of tasks completed from event replication
+  // queue.
+  int64 events_done = 9;
+
+  // Approximate time lag for syncing events to destination.
+  // Corresponds to age of the oldest unprocessed task in event replication
+  // queue (aka replication queue latency).
+  google.protobuf.Duration event_lag = 10;
+
+  bool has_switch = 11;
+  // true if replication is archived. Archived replication will not generate or
+  // sync new events. The main purpose of archived replication is to keep
+  // replication metadata for future reference. Archived replication can be
+  // safely deleted.
+  bool is_archived = 12;
+  google.protobuf.Timestamp archived_at = 13;
+  // If replication has associated switch, contains its status info.
+  optional ReplicationSwitch switch_info = 14;
+}
+
+// Request list of bucket available for replication for given user and from/to
+// storages.
+message AvailableBucketsRequest {
+  string user = 1;
+  string from_storage = 2;
+  string to_storage = 3;
+  bool show_replicated = 4;
+}
+
+message AvailableBucketsResponse {
+  repeated string buckets = 1;
+  repeated string replicated_buckets = 2;
+}
+
+message CompareBucketRequest {
+  // Represents source and destination bucket to compare.
+  ReplicationID target = 1;
+  // set true to get list of matching files (match) in response
+  bool show_match = 2;
+}
+
+message CompareBucketResponse {
+  // true if storage's buckets have the same content
+  bool is_match = 1;
+  // list of missing files in 'from storage' bucket
+  repeated string miss_from = 2;
+  // list of missing files in 'to storage' bucket
+  repeated string miss_to = 3;
+  // list of files with different content
+  repeated string differ = 4;
+  // list of errors occurred during comparison
+  repeated string error = 5;
+
+  // list matched files in storages bucket.
+  // will be empty if request parameter show_match set to false.
+  repeated string match = 6;
+}
+
+message SwitchZeroDowntimeRequest {
+  // Id of user- or bucket- level replication policy to switch source and
+  // destination targets on proxy. Replication policy should already exist.
+  // Agent-based replication is not supported.
+  // Bucket-level replication with different from/to bucket names is not
+  // supported.
+  ReplicationID replication_id = 1;
+
+  // Max Amount of time to wait for uncompleted multipart uploads to finish
+  // before switching targets. Default is 1 hour.
+  optional google.protobuf.Duration multipart_ttl = 2;
+}
+
+// Request to configure switch between replication source and destination
+// with downtime window.
+message SwitchDowntimeRequest {
+  // Id of user- or bucket- level replication policy to switch source and
+  // destination targets on proxy. Replication policy should already exist.
+  // Agent-based replication is not supported.
+  // Bucket-level replication with different from/to bucket names is not
+  // supported.
+  ReplicationID replication_id = 1;
+
+  // Configures downtime window for switch. During downtime all requests to
+  // target will be blocked on proxy. If options are not set, downtime will be
+  // started right away and will last until all replication tasks are processed.
+  optional SwitchDowntimeOpts downtime_opts = 2;
+}
+
+// Defines downtime window for replication switch with downtime.
+// All dates and times depends on local times of machine running chorus worker.
+// Time precision is ~1 minute.
+message SwitchDowntimeOpts {
+  // If true, chorus will perform switch automatically when initial migration
+  // will be done. Initial migration copies all objects that existed in source
+  // bucket before replication started. default is false
+  bool start_on_init_done = 1;
+
+  // If set, chorus will try or retry to start downtime window according to CRON
+  // schedule.
+  // It is not makes sense to set cron frequency less than one hour or less than
+  // max_duration if used. Either cron or start_at can be set, but not both.
+  optional string cron = 2;
+
+  // If set, downtime window will be attempted at given time only once.
+  // If at this point initial migration will not be done, switch will be marked
+  // as failed and not executed. Either cron or start_at can be set, not both.
+  optional google.protobuf.Timestamp start_at = 3;
+
+  // If set, chorus will abort downtime window if it will not be able to
+  // complete in given time. In this case, switch will be marked as failed and
+  // will be retried on next cron execution if set.
+  optional google.protobuf.Duration max_duration = 4;
+
+  // If set, switch execution will be skipped if number of unprocessed events is
+  // more than max_event_lag. Switch will be marked as failed and will be
+  // retried on next cron execution if set.
+  optional uint32 max_event_lag = 5;
+
+  // if true, chorus will not perform equality check of target contents before
+  // completing switch with downtime. Might be useful for buckets with large
+  // number of objects. In this case check will consume a lot of time and memory
+  // in Redis. Default is false.
+  bool skip_bucket_check = 6;
+
+  // Set true to replicate data updates from new main to old main bucket after
+  // successful switch. Default is false.
+  bool continue_replication = 7;
+}
+
+message ReplicationSwitch {
+  enum Status {
+    // Switch is not started yet
+    NotStarted = 0;
+    // Switch is in progress. Draining replication events queue.
+    // For switch with downtime, requests to target are blocked at this point.
+    InProgress = 1;
+    // Switch is in progress. Queue is drained. Checking if source and
+    // destination targets are the same. Requests are still blocked. Used only
+    // for switch with downtime with enabled bucket check.
+    CheckInProgress = 2;
+    // Switch failed to complete in downtime window and was aborted.
+    // Requests to target are unblocked. Used only for switch with downtime.
+    // If cron downtime_window is used, switch will be retried on next cron
+    // execution.
+    Error = 3;
+    // Switch was not able to start in given downtime window because conditions
+    // were not met. Used only for switch with downtime. If cron downtime_window
+    // is used, switch will be retried on next cron execution.
+    Skipped = 4;
+    // Switch was successfully completed.
+    // All data was replicated to replication destination target and all read
+    // and all requests are now routed to it.
+    Done = 5;
+  }
+
+  // Current switch status
+  Status last_status = 1;
+  // true if switch is zero downtime
+  bool zero_downtime = 2;
+  // multipart uploads TTL for zero downtime switch
+  optional google.protobuf.Duration multipart_ttl = 3;
+  optional SwitchDowntimeOpts downtime_opts = 4;
+
+  // Time of last switch attempt - last time when switch was moved to InProgress
+  // status.
+  optional google.protobuf.Timestamp last_started_at = 5;
+  // Time of last switch completion. Set only if switch status is Done.
+  optional google.protobuf.Timestamp done_at = 6;
+  // History of switch status changes
+  repeated string history = 7;
+
+  ReplicationID replication_id = 8;
+}

@@ -38,53 +38,22 @@ func tsToPb(ts *time.Time) *timestamppb.Timestamp {
 	return timestamppb.New(*ts)
 }
 
-func replicationToPb(id entity.BucketReplicationPolicy, value entity.ReplicationStatusExtended) *pb.Replication {
+func replicationToPb(id entity.UniversalReplicationID, value entity.ReplicationStatusExtended) *pb.Replication {
 	return &pb.Replication{
-		User:            id.User,
-		Bucket:          id.FromBucket,
-		From:            id.FromStorage,
-		To:              id.ToStorage,
-		ToBucket:        id.ToBucket,
-		CreatedAt:       timestamppb.New(value.CreatedAt),
-		IsPaused:        value.IsPaused,
-		IsInitDone:      value.InitDone(),
-		InitObjListed:   toListed(value.InitMigration),
-		InitObjDone:     int64(value.InitMigration.Done),
-		InitBytesListed: 0, //TODO: remove from api
-		InitBytesDone:   0, //TODO: remove from api
-		Events:          toListed(value.EventMigration),
-		EventsDone:      int64(value.EventMigration.Done),
-		InitDoneAt:      nil, //TODO: remove from api
-		LastEmittedAt:   nil, // TODO: change api to latency
-		LastProcessedAt: nil, // TODO: change api to latency
-		AgentUrl:        strPtr(value.AgentURL),
-		HasSwitch:       value.Switch != nil,
-		IsArchived:      value.IsArchived,
-		ArchivedAt:      tsToPb(value.ArchivedAt),
-	}
-}
-
-func userReplicationToPb(id entity.UserReplicationPolicy, value entity.ReplicationStatusExtended) *pb.UserReplication {
-	return &pb.UserReplication{
-		User:            id.User,
-		From:            id.FromStorage,
-		To:              id.ToStorage,
-		CreatedAt:       timestamppb.New(value.CreatedAt),
-		IsPaused:        value.IsPaused,
-		IsInitDone:      value.InitDone(),
-		InitObjListed:   toListed(value.InitMigration),
-		InitObjDone:     int64(value.InitMigration.Done),
-		InitBytesListed: 0, //TODO: remove from api
-		InitBytesDone:   0, //TODO: remove from api
-		Events:          toListed(value.EventMigration),
-		EventsDone:      int64(value.EventMigration.Done),
-		InitDoneAt:      nil, //TODO: remove from api
-		LastEmittedAt:   nil, // TODO: change api to latency
-		LastProcessedAt: nil, // TODO: change api to latency
-		AgentUrl:        strPtr(value.AgentURL),
-		HasSwitch:       value.Switch != nil,
-		IsArchived:      value.IsArchived,
-		ArchivedAt:      tsToPb(value.ArchivedAt),
+		CreatedAt:     timestamppb.New(value.CreatedAt),
+		IsPaused:      value.IsPaused,
+		IsInitDone:    value.InitDone(),
+		InitObjListed: toListed(value.InitMigration),
+		InitObjDone:   int64(value.InitMigration.Done),
+		Events:        toListed(value.EventMigration),
+		EventsDone:    int64(value.EventMigration.Done),
+		HasSwitch:     value.Switch != nil,
+		IsArchived:    value.IsArchived,
+		ArchivedAt:    tsToPb(value.ArchivedAt),
+		Id:            replicationIDToPb(id),
+		Opts:          replicationOptsToPb(value.ReplicationStatus),
+		EventLag:      durationToPb(value.Latency()),
+		SwitchInfo:    toPbSwitchStatus(value.Switch),
 	}
 }
 
@@ -129,25 +98,29 @@ func pbToDuration(in *durationpb.Duration) time.Duration {
 	return in.AsDuration()
 }
 
-func toPbSwitchStatus(in entity.ReplicationSwitchInfo) (*pb.GetBucketSwitchStatusResponse, error) {
+func toPbSwitchStatus(in *entity.ReplicationSwitchInfo) *pb.ReplicationSwitch {
+	if in == nil {
+		return nil
+	}
+
 	id := in.ReplicationID()
 	fromBucket, toBucket := "", ""
 	if bucketID, ok := id.AsBucketID(); ok {
 		fromBucket = bucketID.FromBucket
 		toBucket = bucketID.ToBucket
 	}
-	res := &pb.GetBucketSwitchStatusResponse{
+	res := &pb.ReplicationSwitch{
 		LastStatus:    toPbSwitchWithDowntimeStatus(in.LastStatus),
 		ZeroDowntime:  in.IsZeroDowntime(),
 		LastStartedAt: tsToPb(in.LastStartedAt),
 		DoneAt:        tsToPb(in.DoneAt),
 		History:       in.History,
-		ReplicationId: &pb.ReplicationRequest{
-			User:     id.User(),
-			Bucket:   fromBucket,
-			From:     id.FromStorage(),
-			To:       id.ToStorage(),
-			ToBucket: toBucket,
+		ReplicationId: &pb.ReplicationID{
+			User:        id.User(),
+			ToBucket:    strPtr(toBucket),
+			FromStorage: id.FromStorage(),
+			ToStorage:   id.ToStorage(),
+			FromBucket:  strPtr(fromBucket),
 		},
 	}
 	if in.IsZeroDowntime() {
@@ -155,23 +128,23 @@ func toPbSwitchStatus(in entity.ReplicationSwitchInfo) (*pb.GetBucketSwitchStatu
 	} else {
 		res.DowntimeOpts = toPbDowntimeOpts(in.ReplicationSwitchDowntimeOpts)
 	}
-	return res, nil
+	return res
 }
 
-func toPbSwitchWithDowntimeStatus(in entity.ReplicationSwitchStatus) pb.GetBucketSwitchStatusResponse_Status {
+func toPbSwitchWithDowntimeStatus(in entity.ReplicationSwitchStatus) pb.ReplicationSwitch_Status {
 	switch in {
 	case entity.StatusInProgress:
-		return pb.GetBucketSwitchStatusResponse_InProgress
+		return pb.ReplicationSwitch_InProgress
 	case entity.StatusCheckInProgress:
-		return pb.GetBucketSwitchStatusResponse_CheckInProgress
+		return pb.ReplicationSwitch_CheckInProgress
 	case entity.StatusSkipped:
-		return pb.GetBucketSwitchStatusResponse_Skipped
+		return pb.ReplicationSwitch_Skipped
 	case entity.StatusError:
-		return pb.GetBucketSwitchStatusResponse_Error
+		return pb.ReplicationSwitch_Error
 	case entity.StatusDone:
-		return pb.GetBucketSwitchStatusResponse_Done
+		return pb.ReplicationSwitch_Done
 	default:
-		return pb.GetBucketSwitchStatusResponse_NotStarted
+		return pb.ReplicationSwitch_NotStarted
 	}
 }
 
@@ -229,4 +202,67 @@ func toPbStorages(in objstore.Config) []*pb.Storage {
 		res = append(res, storage)
 	}
 	return res
+}
+
+func pbToReplicationID(in *pb.ReplicationID) (entity.UniversalReplicationID, error) {
+	if in == nil {
+		return entity.UniversalReplicationID{}, fmt.Errorf("%w: replication ID is not set", dom.ErrInvalidArg)
+	}
+	fromBucket, toBucket := dereferStr(in.FromBucket), dereferStr(in.ToBucket)
+	isUser := fromBucket == "" && toBucket == ""
+	var result entity.UniversalReplicationID
+	if isUser {
+		// user replication
+		result = entity.UniversalFromUserReplication(entity.NewUserReplicationPolicy(in.User, in.FromStorage, in.ToStorage))
+	} else {
+		// bucket replication
+		result = entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
+			User:        in.User,
+			FromStorage: in.FromStorage,
+			FromBucket:  fromBucket,
+			ToStorage:   in.ToStorage,
+			ToBucket:    toBucket,
+		})
+	}
+	return result, result.Validate()
+}
+
+func replicationIDToPb(in entity.UniversalReplicationID) *pb.ReplicationID {
+	fromBucket, toBucket := "", ""
+	if bucketID, ok := in.AsBucketID(); ok {
+		fromBucket = bucketID.FromBucket
+		toBucket = bucketID.ToBucket
+	}
+	return &pb.ReplicationID{
+		User:        in.User(),
+		FromStorage: in.FromStorage(),
+		ToStorage:   in.ToStorage(),
+		FromBucket:  strPtr(fromBucket),
+		ToBucket:    strPtr(toBucket),
+	}
+}
+
+func dereferStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func pbToReplicationOpts(in *pb.ReplicationOpts) entity.ReplicationOptions {
+	if in == nil {
+		return entity.ReplicationOptions{}
+	}
+	return entity.ReplicationOptions{
+		AgentURL: dereferStr(in.AgentUrl),
+	}
+}
+
+func replicationOptsToPb(in *entity.ReplicationStatus) *pb.ReplicationOpts {
+	if in == nil {
+		return nil
+	}
+	return &pb.ReplicationOpts{
+		AgentUrl: strPtr(in.AgentURL),
+	}
 }

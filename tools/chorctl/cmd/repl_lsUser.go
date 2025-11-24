@@ -23,7 +23,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
@@ -45,9 +44,12 @@ chorctl repl ls-user`,
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
-		res, err := client.ListUserReplications(ctx, &emptypb.Empty{})
+		res, err := client.ListReplications(ctx, &pb.ListReplicationsRequest{
+			HideUserReplications:   false,
+			HideBucketReplications: true,
+		})
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get buckets for replication")
 		}
@@ -56,7 +58,7 @@ chorctl repl ls-user`,
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 		fmt.Fprintln(w, "FROM\tTO\tUSER")
 		for _, m := range res.Replications {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", m.From, m.To, m.User)
+			fmt.Fprintf(w, "%s\t%s\t%s\n", m.Id.FromStorage, m.Id.ToStorage, m.Id.User)
 		}
 		w.Flush()
 	},

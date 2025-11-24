@@ -58,7 +58,7 @@ func Start(conf *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to connect to api %s", err, conf.Api)
 	}
-	apiClient := pb.NewChorusClient(conn)
+	apiClient := pb.NewPolicyClient(conn)
 	defer conn.Close()
 
 	kv, err := db.New(conf.DB, false)
@@ -192,7 +192,7 @@ func restoreState(conf *config.Config, kv *db.DB) error {
 	return kv.PutInt(db.Parallel, conf.ParallelWrites)
 }
 
-func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Client, apiClient pb.ChorusClient) error {
+func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Client, apiClient pb.PolicyClient) error {
 	exists, err := proxy.S3().BucketExists(ctx, conf.Bucket)
 	if err != nil {
 		return err
@@ -207,11 +207,13 @@ func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Clie
 	}
 	logrus.Infof("bucket %s exists", conf.Bucket)
 	_, err = apiClient.AddReplication(ctx, &pb.AddReplicationRequest{
-		User:            "admin",
-		From:            "one",
-		To:              "two",
-		Buckets:         []string{conf.Bucket},
-		IsForAllBuckets: false,
+		Id: &pb.ReplicationID{
+			FromStorage: "one",
+			ToStorage:   "two",
+			FromBucket:  &conf.Bucket,
+			ToBucket:    &conf.Bucket,
+			User:        "admin",
+		},
 	})
 	return err
 }

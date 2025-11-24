@@ -8,7 +8,7 @@ import (
 
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/test/app"
@@ -34,13 +34,16 @@ func TestApi_Migrate_test(t *testing.T) {
 	err = e.MainClient.MakeBucket(tstCtx, b2, mclient.MakeBucketOptions{})
 	r.NoError(err)
 
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    b1,
-		ToBucket:  b1,
-		From:      "main",
-		To:        "f1",
+	id1 := &pb.ReplicationID{
+		FromBucket:  &b1,
+		ToBucket:    &b1,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		User:        user,
+	}
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id1,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -49,13 +52,16 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    b2,
-		ToBucket:  b2,
-		From:      "main",
-		To:        "f1",
+	id2 := &pb.ReplicationID{
+		FromBucket:  &b2,
+		ToBucket:    &b2,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		User:        user,
+	}
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id2,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -91,13 +97,9 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.NoError(err)
 	r.Empty(buckets)
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    b1,
-		ToBucket:  b1,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id1,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
@@ -107,13 +109,9 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Len(diff.MissTo, 3)
 	r.ElementsMatch([]string{"obj1", "photo/sept/obj2", "photo/obj3"}, diff.MissTo)
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    b2,
-		ToBucket:  b2,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id2,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
@@ -123,14 +121,14 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Len(diff.MissTo, 3)
 	r.ElementsMatch([]string{"obj4", "obj5", "obj6"}, diff.MissTo)
 
-	ur, err := e.ApiClient.ListUserReplications(tstCtx, &emptypb.Empty{})
+	ur, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Empty(ur.Replications)
 
-	bfr, err := e.ApiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
+	bfr, err := e.PolicyClient.AvailableBuckets(tstCtx, &pb.AvailableBucketsRequest{
 		User:           user,
-		From:           "main",
-		To:             "f1",
+		FromStorage:    "main",
+		ToStorage:      "f1",
 		ShowReplicated: true,
 	})
 	r.NoError(err)
@@ -138,30 +136,31 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Len(bfr.Buckets, 2)
 	r.ElementsMatch([]string{b1, b2}, bfr.Buckets)
 
-	repl, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Empty(repl.Replications)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:    user,
-		From:    "f1",
-		To:      "main",
-		Buckets: []string{b1, b2},
+	wrongID := proto.Clone(id1).(*pb.ReplicationID)
+	wrongID.FromStorage = "f1"
+	wrongID.ToStorage = "main"
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: wrongID,
 	})
 	r.Error(err)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:    user,
-		From:    "main",
-		To:      "f1",
-		Buckets: []string{b1, b2},
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id1,
+	})
+	r.NoError(err)
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id2,
 	})
 	r.NoError(err)
 
-	bfr, err = e.ApiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
+	bfr, err = e.PolicyClient.AvailableBuckets(tstCtx, &pb.AvailableBucketsRequest{
 		User:           user,
-		From:           "main",
-		To:             "f1",
+		FromStorage:    "main",
+		ToStorage:      "f1",
 		ShowReplicated: true,
 	})
 	r.NoError(err)
@@ -169,7 +168,7 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Len(bfr.ReplicatedBuckets, 2)
 	r.ElementsMatch([]string{b1, b2}, bfr.ReplicatedBuckets)
 
-	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repl.Replications, 2)
 
@@ -280,13 +279,9 @@ func TestApi_Migrate_test(t *testing.T) {
 		return bytes.Equal(obj1upd.data, f1Obj1UpdBytes)
 	}, e.WaitLong, e.RetryLong)
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    b1,
-		ToBucket:  b1,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id1,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -296,13 +291,9 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Empty(diff.MissTo)
 	r.ElementsMatch([]string{"obj1", "photo/sept/obj2", "photo/obj3", "photo/sept/obj7"}, diff.Match)
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    b2,
-		ToBucket:  b2,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id2,
 		ShowMatch: false,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -312,7 +303,7 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Empty(diff.MissTo)
 
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -330,17 +321,16 @@ func TestApi_Migrate_test(t *testing.T) {
 		return true
 	}, e.WaitLong, e.RetryLong)
 
-	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repl.Replications, 2)
 	for i := 0; i < len(repl.Replications); i++ {
-		r.EqualValues("main", repl.Replications[i].From)
-		r.EqualValues("f1", repl.Replications[i].To)
-		r.EqualValues(user, repl.Replications[i].User)
+		r.EqualValues("main", repl.Replications[i].Id.FromStorage)
+		r.EqualValues("f1", repl.Replications[i].Id.ToStorage)
+		r.EqualValues(user, repl.Replications[i].Id.User)
 		r.True(repl.Replications[i].IsInitDone)
 		r.False(repl.Replications[i].IsPaused)
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
-		r.EqualValues(repl.Replications[i].InitBytesListed, repl.Replications[i].InitBytesDone)
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.False(repl.Replications[i].CreatedAt.AsTime().IsZero())
 
@@ -350,27 +340,33 @@ func TestApi_Migrate_test(t *testing.T) {
 	}
 
 	// start migration to f2
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "f1",
-		To:              "f2",
-		Buckets:         []string{b1},
-		IsForAllBuckets: false,
+	wrongID = &pb.ReplicationID{
+		FromStorage: "f1",
+		ToStorage:   "f2",
+		User:        user,
+		FromBucket:  &b1,
+		ToBucket:    &b1,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: wrongID,
 	})
 	r.Error(err)
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f2",
-		Buckets:         []string{b1},
-		IsForAllBuckets: false,
+	id3 := &pb.ReplicationID{
+		FromStorage: "main",
+		ToStorage:   "f2",
+		User:        user,
+		FromBucket:  &b1,
+		ToBucket:    &b1,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id3,
 	})
 	r.NoError(err)
 
-	bfr, err = e.ApiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
+	bfr, err = e.PolicyClient.AvailableBuckets(tstCtx, &pb.AvailableBucketsRequest{
 		User:           user,
-		From:           "main",
-		To:             "f2",
+		FromStorage:    "main",
+		ToStorage:      "f2",
 		ShowReplicated: true,
 	})
 	r.NoError(err)
@@ -379,23 +375,26 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Len(bfr.ReplicatedBuckets, 1)
 	r.EqualValues(b1, bfr.ReplicatedBuckets[0])
 
-	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repl.Replications, 3)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f2",
-		Buckets:         []string{b2},
-		IsForAllBuckets: false,
+	id4 := &pb.ReplicationID{
+		FromStorage: "main",
+		ToStorage:   "f2",
+		User:        user,
+		FromBucket:  &b2,
+		ToBucket:    &b2,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id4,
 	})
 	r.NoError(err)
 
-	bfr, err = e.ApiClient.ListBucketsForReplication(tstCtx, &pb.ListBucketsForReplicationRequest{
+	bfr, err = e.PolicyClient.AvailableBuckets(tstCtx, &pb.AvailableBucketsRequest{
 		User:           user,
-		From:           "main",
-		To:             "f2",
+		FromStorage:    "main",
+		ToStorage:      "f2",
 		ShowReplicated: true,
 	})
 	r.NoError(err)
@@ -403,7 +402,7 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Len(bfr.ReplicatedBuckets, 2)
 	r.ElementsMatch([]string{b1, b2}, bfr.ReplicatedBuckets)
 
-	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repl.Replications, 4)
 
@@ -452,23 +451,22 @@ func TestApi_Migrate_test(t *testing.T) {
 		return bytes.Equal(obj4upd.data, f2Obj4UpdBytes)
 	}, e.WaitLong, e.RetryLong)
 
-	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repl.Replications, 4)
 	cnt := 0
 
 	for i := 0; i < len(repl.Replications); i++ {
-		r.EqualValues("main", repl.Replications[i].From)
-		if repl.Replications[i].To != "f2" {
+		r.EqualValues("main", repl.Replications[i].Id.FromStorage)
+		if repl.Replications[i].Id.ToStorage != "f2" {
 			continue
 		}
 		cnt++
-		r.EqualValues("f2", repl.Replications[i].To)
-		r.EqualValues(user, repl.Replications[i].User)
+		r.EqualValues("f2", repl.Replications[i].Id.ToStorage)
+		r.EqualValues(user, repl.Replications[i].Id.User)
 		r.True(repl.Replications[i].IsInitDone)
 		r.False(repl.Replications[i].IsPaused)
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
-		r.EqualValues(repl.Replications[i].InitBytesListed, repl.Replications[i].InitBytesDone)
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.False(repl.Replications[i].CreatedAt.AsTime().IsZero())
 
@@ -523,23 +521,22 @@ func TestApi_Migrate_test(t *testing.T) {
 		return bytes.Equal(obj9.data, objBytes)
 	}, e.WaitLong, e.RetryLong)
 
-	repl, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repl.Replications, 4)
 	for i := 0; i < len(repl.Replications); i++ {
-		r.EqualValues("main", repl.Replications[i].From)
+		r.EqualValues("main", repl.Replications[i].Id.FromStorage)
 
-		r.EqualValues(user, repl.Replications[i].User)
+		r.EqualValues(user, repl.Replications[i].Id.User)
 		r.True(repl.Replications[i].IsInitDone)
 		r.False(repl.Replications[i].IsPaused)
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
-		r.EqualValues(repl.Replications[i].InitBytesListed, repl.Replications[i].InitBytesDone)
 		r.EqualValues(repl.Replications[i].Events, repl.Replications[i].EventsDone)
 		r.False(repl.Replications[i].CreatedAt.AsTime().IsZero())
 
 		r.EqualValues(repl.Replications[i].InitObjListed, repl.Replications[i].InitObjDone)
-		if repl.Replications[i].To == "f2" {
-			if repl.Replications[i].Bucket == b1 {
+		if repl.Replications[i].Id.ToStorage == "f2" {
+			if *repl.Replications[i].Id.FromBucket == b1 {
 				r.EqualValues(1, repl.Replications[i].Events)
 			} else {
 				r.EqualValues(0, repl.Replications[i].Events)
@@ -551,7 +548,7 @@ func TestApi_Migrate_test(t *testing.T) {
 func Test_User_migration(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const (
+	var (
 		bucket1 = "user-migration-1"
 		bucket2 = "user-migration-2"
 		bucket3 = "user-migration-3"
@@ -577,13 +574,12 @@ func Test_User_migration(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	_, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User:     user,
-		From:     "main",
-		To:       "f1",
-		Bucket:   "",
-		ToBucket: "",
-	})
+	id := &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+	}
+	_, err = e.PolicyClient.GetReplication(tstCtx, id)
 	r.Error(err)
 
 	// fill main buckets with init data
@@ -630,15 +626,12 @@ func Test_User_migration(t *testing.T) {
 	r.False(exists)
 
 	// create replication for user
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		IsForAllBuckets: true,
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id,
 	})
 	r.NoError(err)
 	// get replication from list
-	repls, err := e.ApiClient.ListUserReplications(tstCtx, &emptypb.Empty{})
+	repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	userRepl := repls.Replications[0]
@@ -646,30 +639,16 @@ func Test_User_migration(t *testing.T) {
 	r.False(userRepl.IsArchived)
 
 	// get replication by id
-	repl, err := e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User:     user,
-		From:     "main",
-		To:       "f1",
-		Bucket:   "",
-		ToBucket: "",
-	})
+	repl, err := e.PolicyClient.GetReplication(tstCtx, id)
 	r.NoError(err)
-	r.EqualValues(user, repl.User)
-	r.EqualValues("main", repl.From)
-	r.EqualValues("f1", repl.To)
-	r.Empty(repl.Bucket)
-	r.Empty(repl.ToBucket)
+	r.True(proto.Equal(repl.Id, id))
 	r.False(repl.HasSwitch)
 	r.False(repl.IsArchived)
 	r.NotNil(repl.CreatedAt)
 
 	// wait until repl started
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-			User: user,
-			From: "main",
-			To:   "f1",
-		})
+		repl, err = e.PolicyClient.GetReplication(tstCtx, id)
 		if err != nil {
 			return false
 		}
@@ -695,11 +674,7 @@ func Test_User_migration(t *testing.T) {
 
 	// wait init done
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-			User: user,
-			From: "main",
-			To:   "f1",
-		})
+		repl, err = e.PolicyClient.GetReplication(tstCtx, id)
 		if err != nil {
 			return false
 		}
@@ -716,11 +691,7 @@ func Test_User_migration(t *testing.T) {
 
 	// wait events done
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-			User: user,
-			From: "main",
-			To:   "f1",
-		})
+		repl, err = e.PolicyClient.GetReplication(tstCtx, id)
 		if err != nil {
 			return false
 		}
@@ -728,33 +699,39 @@ func Test_User_migration(t *testing.T) {
 	}, e.WaitLong*2, e.RetryLong)
 
 	// check that data is in sync
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket1,
-		ToBucket:  bucket1,
-		From:      "main",
-		To:        "f1",
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: &pb.ReplicationID{
+			User:        user,
+			FromStorage: "main",
+			ToStorage:   "f1",
+			FromBucket:  &bucket1,
+			ToBucket:    &bucket1,
+		},
 		ShowMatch: false,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket2,
-		ToBucket:  bucket2,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: &pb.ReplicationID{
+			User:        user,
+			FromStorage: "main",
+			ToStorage:   "f1",
+			FromBucket:  &bucket2,
+			ToBucket:    &bucket2,
+		},
 		ShowMatch: false,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket3,
-		ToBucket:  bucket3,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: &pb.ReplicationID{
+			User:        user,
+			FromStorage: "main",
+			ToStorage:   "f1",
+			FromBucket:  &bucket3,
+			ToBucket:    &bucket3,
+		},
 		ShowMatch: false,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)

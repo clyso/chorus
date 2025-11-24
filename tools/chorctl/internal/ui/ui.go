@@ -50,14 +50,15 @@ var (
 	maxWidth = 120
 )
 
-func New(ctx context.Context, client pb.ChorusClient) tea.Model {
+func New(ctx context.Context, policyClient pb.PolicyClient, client pb.ChorusClient) tea.Model {
 	model := &UI{
-		client:   client,
-		ctx:      ctx,
-		selected: "",
-		table:    nil,
-		events:   make(chan tea.Msg),
-		spinner:  spinner.New(spinner.WithSpinner(spinner.Points), spinner.WithStyle(lipgloss.NewStyle().Foreground(borderCol).AlignHorizontal(lipgloss.Center))),
+		client:       policyClient,
+		chorusClient: client,
+		ctx:          ctx,
+		selected:     "",
+		table:        nil,
+		events:       make(chan tea.Msg),
+		spinner:      spinner.New(spinner.WithSpinner(spinner.Points), spinner.WithStyle(lipgloss.NewStyle().Foreground(borderCol).AlignHorizontal(lipgloss.Center))),
 	}
 	return model
 }
@@ -65,8 +66,9 @@ func New(ctx context.Context, client pb.ChorusClient) tea.Model {
 var _ tea.Model = &UI{}
 
 type UI struct {
-	client pb.ChorusClient
-	ctx    context.Context
+	client       pb.PolicyClient
+	chorusClient pb.ChorusClient
+	ctx          context.Context
 
 	err error
 
@@ -86,7 +88,7 @@ func (u *UI) Init() tea.Cmd {
 }
 
 func (u *UI) loadStorages() tea.Msg {
-	res, err := u.client.GetStorages(u.ctx, &emptypb.Empty{})
+	res, err := u.chorusClient.GetStorages(u.ctx, &emptypb.Empty{})
 	if err != nil {
 		return errMsg(err)
 	}
@@ -102,7 +104,7 @@ func (u *UI) loadMigrations() tea.Msg {
 			case <-u.ctx.Done():
 				return
 			case <-ticker.C:
-				res, err := u.client.ListReplications(u.ctx, &emptypb.Empty{})
+				res, err := u.client.ListReplications(u.ctx, &pb.ListReplicationsRequest{})
 				if err != nil {
 					u.events <- errMsg(err)
 					return
@@ -242,22 +244,30 @@ func (u *UI) updateTable(changeSelection bool) {
 		for i := range u.data {
 			d := u.data[i]
 			p := 0.0
-			if d.InitBytesListed != 0 {
-				p = float64(d.InitBytesDone) / float64(d.InitBytesListed)
+			if d.InitObjListed != 0 {
+				p = float64(d.InitObjDone) / float64(d.InitObjListed)
 			}
-			bytes := fmt.Sprintf("%s/%s", api.ByteCountIEC(d.InitBytesDone), api.ByteCountIEC(d.InitBytesListed))
 			objects := fmt.Sprintf("%d/%d", d.InitObjDone, d.InitObjListed)
 			events := fmt.Sprintf("%d/%d", d.EventsDone, d.Events)
+			lag := api.DurationToStr(d.EventLag.AsDuration())
+			from := d.Id.FromStorage
+			if d.Id.FromBucket != nil && *d.Id.FromBucket != "" {
+				from += ":" + *d.Id.FromBucket
+			}
+			to := d.Id.ToStorage
+			if d.Id.ToBucket != nil && *d.Id.ToBucket != "" {
+				to += ":" + *d.Id.ToBucket
+			}
 
-			rows[i] = table.Row{fmt.Sprintf("%s:%s:%s->%s", d.User, d.Bucket, d.From, d.To), api.ToPercentage(p), bytes, objects, events, fmt.Sprintf("%v", d.IsPaused), api.DateToAge(d.CreatedAt)}
+			rows[i] = table.Row{fmt.Sprintf("%s:%s->%s", d.Id.User, from, to), api.ToPercentage(p), objects, events, lag, fmt.Sprintf("%v", d.IsPaused), api.DateToAge(d.CreatedAt)}
 			updateLen(maxLen, rows[i])
 		}
 		columns = []table.Column{
 			{Title: "Name", Width: maxLen[0]},
 			{Title: "Progress", Width: maxLen[1]},
-			{Title: "Bytes", Width: maxLen[2]},
-			{Title: "Objects", Width: maxLen[3]},
-			{Title: "Events", Width: maxLen[4]},
+			{Title: "Objects", Width: maxLen[2]},
+			{Title: "Events", Width: maxLen[3]},
+			{Title: "Lag", Width: maxLen[4]},
 			{Title: "Paused", Width: maxLen[5]},
 			{Title: "Age", Width: maxLen[6]},
 		}
@@ -324,7 +334,7 @@ func (u *UI) updateTable(changeSelection bool) {
 }
 
 func updateLen(lens []int, row table.Row) {
-	for i := 0; i < len(row); i++ {
+	for i := range row {
 		lens[i] = max(lens[i], len([]rune(row[i])))
 	}
 }

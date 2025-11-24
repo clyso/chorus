@@ -85,8 +85,8 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --la
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
-		if _, err = client.StartConsistencyCheck(ctx, request); err != nil {
+		client := pb.NewDiffClient(conn)
+		if _, err = client.Start(ctx, request); err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}
 		fmt.Println("Consistency check has been created.")

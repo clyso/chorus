@@ -69,7 +69,7 @@ var checkCmd = &cobra.Command{
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 		if checkBucket != "" {
 			fmt.Println("Checking files in bucket", checkBucket, "...")
 			max := 6
@@ -83,16 +83,20 @@ var checkCmd = &cobra.Command{
 
 		fmt.Println("Getting list of buckets...")
 
-		m, err := client.ListReplications(ctx, &emptypb.Empty{})
+		m, err := client.ListReplications(ctx, &pb.ListReplicationsRequest{
+			HideUserReplications: true,
+			HideSwitchInfo:       true,
+			Filter: &pb.ListReplicationsRequest_Filter{
+				FromStorage: &from,
+				ToStorage:   &to,
+			},
+		})
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to get migration")
 		}
 		var buckets []string
 		for _, repl := range m.Replications {
-			if repl.From != from || repl.To != to {
-				continue
-			}
-			buckets = append(buckets, repl.Bucket)
+			buckets = append(buckets, *repl.Id.FromBucket)
 		}
 		if len(buckets) == 0 {
 			logrus.Fatal("unable to get buckets list: no migration")
@@ -118,13 +122,16 @@ var checkCmd = &cobra.Command{
 	},
 }
 
-func check(ctx context.Context, client pb.ChorusClient, from, to, bucket string, max int) {
+func check(ctx context.Context, client pb.PolicyClient, from, to, bucket string, max int) {
 	res, err := client.CompareBucket(ctx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		From:      from,
-		To:        to,
+		Target: &pb.ReplicationID{
+			FromBucket:  &bucket,
+			ToBucket:    &bucket,
+			FromStorage: from,
+			ToStorage:   to,
+			User:        user,
+		},
 		ShowMatch: true,
-		User:      user,
 	})
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to check bucket")

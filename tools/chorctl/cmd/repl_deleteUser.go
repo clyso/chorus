@@ -47,12 +47,12 @@ chorctl repl delete -f main -t follower -u admin`,
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
-		_, err = client.DeleteUserReplication(ctx, &pb.DeleteUserReplicationRequest{
-			User: rduUser,
-			From: rduFrom,
-			To:   rduTo,
+		_, err = client.DeleteReplication(ctx, &pb.ReplicationID{
+			User:        rduUser,
+			FromStorage: rduFrom,
+			ToStorage:   rduTo,
 		})
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to delete replication")

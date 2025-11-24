@@ -6,7 +6,7 @@ import (
 
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/test/app"
@@ -39,23 +39,25 @@ func Test_Restart_Replication(t *testing.T) {
 	r.NoError(err)
 
 	// start replication
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:    user,
-		From:    "main",
-		To:      "f1",
-		Buckets: []string{bucket},
+	id := &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		FromBucket:  &bucket,
+		ToBucket:    &bucket,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id,
 	})
 	r.NoError(err)
 
-	reps, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	reps, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(reps.Replications, 1)
-	r.EqualValues(user, reps.Replications[0].User)
-	r.EqualValues("main", reps.Replications[0].From)
-	r.EqualValues("f1", reps.Replications[0].To)
+	r.True(proto.Equal(id, reps.Replications[0].Id))
 
 	r.Eventually(func() bool {
-		reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -72,7 +74,7 @@ func Test_Restart_Replication(t *testing.T) {
 
 	// wait replication to be done
 	r.Eventually(func() bool {
-		reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -82,13 +84,9 @@ func Test_Restart_Replication(t *testing.T) {
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
 	}, e.WaitShort, e.RetryShort)
 
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -98,49 +96,36 @@ func Test_Restart_Replication(t *testing.T) {
 	r.Empty(diff.MissTo)
 
 	// delete replication
-	_, err = e.ApiClient.DeleteReplication(tstCtx, &pb.ReplicationRequest{
-		User:     user,
-		Bucket:   bucket,
-		ToBucket: bucket,
-		From:     "main",
-		To:       "f1",
-	})
+	_, err = e.PolicyClient.DeleteReplication(tstCtx, id)
 	r.NoError(err)
 
 	// delete dest bucket
 	r.NoError(rmBucket(e.F1Client, bucket))
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
 
-	reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Empty(reps.Replications)
 
 	// restart replication
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:    user,
-		From:    "main",
-		To:      "f1",
-		Buckets: []string{bucket},
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id,
 	})
 	r.NoError(err)
 
-	reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(reps.Replications, 1)
 
 	// wait replication to be done
 	r.Eventually(func() bool {
-		reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -152,13 +137,9 @@ func Test_Restart_Replication(t *testing.T) {
 	}, e.WaitShort, e.RetryShort)
 
 	// check that sync was correct
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id,
 		ShowMatch: true,
-		User:      user,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)

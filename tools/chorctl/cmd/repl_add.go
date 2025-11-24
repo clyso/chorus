@@ -53,23 +53,27 @@ chorctl repl add -f main -t follower -u admin -b src-bucket --to-buckt=dest-buck
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
-		req := &pb.AddBucketReplicationRequest{
-			User:        raUser,
-			FromStorage: raFrom,
-			ToStorage:   raTo,
-			FromBucket:  raBucket,
-			ToBucket:    raToBucket,
+		req := &pb.AddReplicationRequest{
+			Id: &pb.ReplicationID{
+				User:        raUser,
+				FromStorage: raFrom,
+				ToStorage:   raTo,
+				FromBucket:  &raBucket,
+				ToBucket:    &raToBucket,
+			},
 		}
 		if raAgentURL != "" {
-			req.AgentUrl = &raAgentURL
+			req.Opts = &pb.ReplicationOpts{
+				AgentUrl: &raAgentURL,
+			}
 		}
 		if raToBucket == "" {
-			req.ToBucket = raBucket
+			req.Id.ToBucket = &raBucket
 		}
 
-		_, err = client.AddBucketReplication(ctx, req)
+		_, err = client.AddReplication(ctx, req)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to add replication")
 		}

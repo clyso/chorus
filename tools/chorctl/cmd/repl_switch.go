@@ -24,7 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -71,31 +70,36 @@ chorctl repl switch`,
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
-		resp, err := client.ListReplicationSwitches(ctx, &emptypb.Empty{})
+		True := true
+		resp, err := client.ListReplications(ctx, &pb.ListReplicationsRequest{
+			Filter: &pb.ListReplicationsRequest_Filter{
+				HasSwitch: &True,
+			},
+		})
 		api.PrintGrpcError(err)
 
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
 		fmt.Fprintln(w, api.SwitchHeader())
-		for _, switchStatus := range resp.Switches {
-			if !shouldPrint(switchStatus.ReplicationId) {
+		for _, repl := range resp.Replications {
+			if !shouldPrint(repl.Id) {
 				continue
 			}
-			api.PrintSwitchRow(w, switchStatus, switchCmdWide)
+			api.PrintSwitchRow(w, repl.SwitchInfo, switchCmdWide)
 		}
 		w.Flush()
 	},
 }
 
-func shouldPrint(in *pb.ReplicationRequest) bool {
-	if switchCmdBucket != "" && in.Bucket != switchCmdBucket {
+func shouldPrint(in *pb.ReplicationID) bool {
+	if switchCmdBucket != "" && in.FromBucket != nil && *in.FromBucket != switchCmdBucket {
 		return false
 	}
-	if switchCmdFrom != "" && in.From != switchCmdFrom {
+	if switchCmdFrom != "" && in.FromStorage != switchCmdFrom {
 		return false
 	}
-	if switchCmdTo != "" && in.To != switchCmdTo {
+	if switchCmdTo != "" && in.ToStorage != switchCmdTo {
 		return false
 	}
 	if switchCmdUser != "" && in.User != switchCmdUser {
@@ -149,18 +153,19 @@ chorctl repl switch zero-downtime -f main -t follower -u admin -b bucket1
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
-		req := &pb.SwitchBucketZeroDowntimeRequest{
-			ReplicationId: &pb.ReplicationRequest{
-				User:   switchZeroDowntimeCmdUser,
-				Bucket: switchZeroDowntimeCmdBucket,
-				From:   switchZeroDowntimeCmdFrom,
-				To:     switchZeroDowntimeCmdTo,
+		client := pb.NewPolicyClient(conn)
+		req := &pb.SwitchZeroDowntimeRequest{
+			ReplicationId: &pb.ReplicationID{
+				User:        switchZeroDowntimeCmdUser,
+				FromBucket:  &switchZeroDowntimeCmdBucket,
+				FromStorage: switchZeroDowntimeCmdFrom,
+				ToStorage:   switchZeroDowntimeCmdTo,
+				ToBucket:    &switchZeroDowntimeCmdBucket,
 			},
 			MultipartTtl: durationpb.New(switchZeroDowntimeCmdMultipartTTL),
 		}
 
-		_, err = client.SwitchBucketZeroDowntime(ctx, req)
+		_, err = client.SwitchWithZeroDowntime(ctx, req)
 		api.PrintGrpcError(err)
 	},
 }
@@ -247,13 +252,14 @@ chorctl repl switch scheduled -f main -t follower -u admin -b bucket1 \
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
-		req := &pb.SwitchBucketRequest{
-			ReplicationId: &pb.ReplicationRequest{
-				User:   switchScheduledCmdUser,
-				Bucket: switchScheduledCmdBucket,
-				From:   switchScheduledCmdFrom,
-				To:     switchScheduledCmdTo,
+		client := pb.NewPolicyClient(conn)
+		req := &pb.SwitchDowntimeRequest{
+			ReplicationId: &pb.ReplicationID{
+				User:        switchScheduledCmdUser,
+				FromBucket:  &switchScheduledCmdBucket,
+				FromStorage: switchScheduledCmdFrom,
+				ToStorage:   switchScheduledCmdTo,
+				ToBucket:    &switchScheduledCmdBucket,
 			},
 			DowntimeOpts: &pb.SwitchDowntimeOpts{
 				StartOnInitDone:     switchScheduledCmdStartOnInitDone,
@@ -278,7 +284,7 @@ chorctl repl switch scheduled -f main -t follower -u admin -b bucket1 \
 			req.DowntimeOpts.MaxEventLag = &switchScheduledCmdMaxEventLag
 		}
 
-		_, err = client.SwitchBucket(ctx, req)
+		_, err = client.SwitchWithDowntime(ctx, req)
 		api.PrintGrpcError(err)
 	},
 }
@@ -327,15 +333,16 @@ chorctl repl switch delete -f main -t follower -u admin -b bucket1
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
-		req := &pb.ReplicationRequest{
-			User:   switchDeleteCmdUser,
-			Bucket: switchDeleteCmdBucket,
-			From:   switchDeleteCmdFrom,
-			To:     switchDeleteCmdTo,
+		client := pb.NewPolicyClient(conn)
+		req := &pb.ReplicationID{
+			User:        switchDeleteCmdUser,
+			FromBucket:  &switchDeleteCmdBucket,
+			FromStorage: switchDeleteCmdFrom,
+			ToStorage:   switchDeleteCmdTo,
+			ToBucket:    &switchDeleteCmdBucket,
 		}
 
-		_, err = client.DeleteBucketSwitch(ctx, req)
+		_, err = client.DeleteSwitch(ctx, req)
 		api.PrintGrpcError(err)
 	},
 }
