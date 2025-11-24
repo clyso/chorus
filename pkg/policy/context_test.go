@@ -365,7 +365,7 @@ func Test_getActiveZeroDowntimeSwitch(t *testing.T) {
 			ToStorage:   "follower",
 		}
 		uid := entity.UniversalFromUserReplication(policy)
-		err := svc.AddUserReplicationPolicy(ctx, policy)
+		err := svc.AddUserReplicationPolicy(ctx, policy, entity.ReplicationOptions{})
 		r.NoError(err)
 		// create zero downtime switch
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, uid, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute})
@@ -405,7 +405,7 @@ func Test_getActiveZeroDowntimeSwitch(t *testing.T) {
 			ToBucket:    "bucket2",
 		}
 		uid := entity.UniversalFromBucketReplication(policy)
-		err := svc.AddBucketReplicationPolicy(ctx, policy, nil)
+		err := svc.AddBucketReplicationPolicy(ctx, policy, entity.ReplicationOptions{})
 		r.NoError(err)
 		// create zero downtime switch
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, uid, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute})
@@ -462,7 +462,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromStorage: "main",
 			ToStorage:   "follower",
 		}
-		err := svc.AddUserReplicationPolicy(ctx, userPolicy)
+		err := svc.AddUserReplicationPolicy(ctx, userPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		// other user returns no policies
@@ -583,7 +583,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			ToStorage:   "follower",
 		}
 
-		err = svc.AddUserReplicationPolicy(ctx, otherUserPolicy)
+		err = svc.AddUserReplicationPolicy(ctx, otherUserPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err = svc.BuildProxyContext(ctx, "other-user", "bucket")
@@ -659,7 +659,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromStorage: "main",
 			ToStorage:   "follower",
 		}
-		err := svc.AddUserReplicationPolicy(ctx, userPolicy1)
+		err := svc.AddUserReplicationPolicy(ctx, userPolicy1, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err := svc.BuildProxyContext(ctx, "user", "bucket")
@@ -687,7 +687,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromStorage: "main",
 			ToStorage:   "follower2",
 		}
-		err = svc.AddUserReplicationPolicy(ctx, userPolicy2)
+		err = svc.AddUserReplicationPolicy(ctx, userPolicy2, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err = svc.BuildProxyContext(ctx, "user", "bucket")
@@ -728,7 +728,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromBucket:  "bucket",
 			ToBucket:    "bucket",
 		}
-		err := svc.AddBucketReplicationPolicy(ctx, bucketPolicy, nil)
+		err := svc.AddBucketReplicationPolicy(ctx, bucketPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		// other user returns no policies
@@ -893,7 +893,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			ToBucket:    "other-bucket",
 		}
 
-		err = svc.AddBucketReplicationPolicy(ctx, otherBucketPolicy, nil)
+		err = svc.AddBucketReplicationPolicy(ctx, otherBucketPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err = svc.BuildProxyContext(ctx, "user", "other-bucket")

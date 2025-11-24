@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package chorus;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/clyso/chorus/proto/chorus;pb";
+
+service Diff {
+  rpc Start(StartConsistencyCheckRequest) returns (google.protobuf.Empty);
+
+  rpc List(google.protobuf.Empty) returns (ListConsistencyChecksResponse);
+
+  rpc GetReport(ConsistencyCheckRequest)
+      returns (GetConsistencyCheckReportResponse);
+
+  rpc GetReportEntries(GetConsistencyCheckReportEntriesRequest)
+      returns (GetConsistencyCheckReportEntriesResponse);
+
+  rpc DeleteReport(ConsistencyCheckRequest) returns (google.protobuf.Empty);
+}
+
+message MigrateLocation {
+  string storage = 1;
+  string bucket = 2;
+}
+
+message StartConsistencyCheckRequest {
+  repeated MigrateLocation locations = 1;
+  string user = 2;
+  bool check_only_last_versions = 3;
+  bool ignore_etags = 4;
+  bool ignore_sizes = 5;
+}
+
+message ConsistencyCheckRequest { repeated MigrateLocation locations = 1; }
+
+message ConsistencyCheck {
+  repeated MigrateLocation locations = 2;
+  uint64 queued = 3;
+  uint64 completed = 4;
+  bool ready = 5;
+  bool consistent = 6;
+  bool versioned = 7;
+  bool with_size = 8;
+  bool with_etag = 9;
+}
+
+message ListConsistencyChecksResponse { repeated ConsistencyCheck checks = 1; }
+
+message GetConsistencyCheckReportRequest {
+  repeated MigrateLocation locations = 1;
+}
+
+message GetConsistencyCheckReportResponse { ConsistencyCheck check = 1; }
+
+message ConsistencyCheckStorageEntry {
+  string storage = 1;
+  string version_id = 2;
+}
+
+message ConsistencyCheckReportEntry {
+  string object = 1;
+  uint64 version_idx = 2;
+  uint64 size = 3;
+  string etag = 4;
+  repeated ConsistencyCheckStorageEntry storage_entries = 5;
+}
+
+message GetConsistencyCheckReportEntriesRequest {
+  repeated MigrateLocation locations = 1;
+  uint64 cursor = 2;
+  uint64 pageSize = 3;
+}
+
+message GetConsistencyCheckReportEntriesResponse {
+  repeated ConsistencyCheckReportEntry entries = 1;
+  uint64 cursor = 2;
+}

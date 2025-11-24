@@ -237,6 +237,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
 		mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
 		mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
+		mux.HandleFunc(tasks.TypeMigrateS3User, workerSvc.HandleMigrationS3User)
 		mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
 		mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
 		logger.Info().Msg("registered S3 workers")
@@ -289,8 +290,15 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		handlers := api.GrpcHandlers(clientRegistry, queueSvc, rc, policySvc, versionSvc, storageSvc, checkSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker, &app)
-		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, app)
+		chorusHandler := api.ChorusHandlers(clientRegistry.Config(), rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
+		diffHandler := api.DiffHandlers(clientRegistry.Config(), queueSvc, checkSvc)
+		policyHandler := api.PolicyHandlers(clientRegistry, queueSvc, rc, policySvc, versionSvc, storageSvc, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
+		registerServices := func(srv *grpc.Server) {
+			pb.RegisterChorusServer(srv, chorusHandler)
+			pb.RegisterDiffServer(srv, diffHandler)
+			pb.RegisterPolicyServer(srv, policyHandler)
+		}
+		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, registerServices, tp, conf.Log, app)
 		if err != nil {
 			return err
 		}
@@ -299,8 +307,13 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			return err
 		}
 		start, stop, err = api.GRPCGateway(ctx, conf.Api, func(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) error {
-			err = pb.RegisterChorusHandlerFromEndpoint(ctx, mux, endpoint, opts)
-			if err != nil {
+			if err := pb.RegisterChorusHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
+				return err
+			}
+			if err := pb.RegisterDiffHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
+				return err
+			}
+			if err := pb.RegisterPolicyHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
 				return err
 			}
 			return nil

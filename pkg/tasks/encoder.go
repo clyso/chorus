@@ -111,6 +111,10 @@ func enqueueAny(ctx context.Context, taskClient *asynq.Client, payload any) erro
 		return objSyncACL.Enqueue(ctx, taskClient, *p)
 	case ObjSyncACLPayload:
 		return objSyncACL.Enqueue(ctx, taskClient, p)
+	case *MigrateS3UserPayload:
+		return migrateS3User.Enqueue(ctx, taskClient, *p)
+	case MigrateS3UserPayload:
+		return migrateS3User.Enqueue(ctx, taskClient, p)
 	case *MigrateBucketListObjectsPayload:
 		return migrateBucketListObjects.Enqueue(ctx, taskClient, *p)
 	case MigrateBucketListObjectsPayload:
@@ -236,6 +240,15 @@ var (
 			return eventQueue(&p)
 		},
 		taskType: TypeObjectSyncACL,
+	}
+	migrateS3User = encoder[MigrateS3UserPayload]{
+		taskID: func(p MigrateS3UserPayload) string {
+			return toTaskID("mgr:s3u", p.ID.AsString())
+		},
+		queue: func(p MigrateS3UserPayload) string {
+			return initMigrationListQueue(&p)
+		},
+		taskType: TypeMigrateS3User,
 	}
 	migrateBucketListObjects = encoder[MigrateBucketListObjectsPayload]{
 		taskID: func(p MigrateBucketListObjectsPayload) string {

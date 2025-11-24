@@ -7,7 +7,7 @@ import (
 
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/test/app"
@@ -60,32 +60,30 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	r.NoError(err)
 
 	// start replication to same storage and custom bucket
-	repl, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repl, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Empty(repl.Replications)
 
-	_, err = e.ApiClient.AddBucketReplication(tstCtx, &pb.AddBucketReplicationRequest{
+	id := &pb.ReplicationID{
 		User:        user,
 		FromStorage: "main",
-		FromBucket:  bucketSrc,
+		FromBucket:  &bucketSrc,
 		ToStorage:   "main",
-		ToBucket:    bucketDst,
+		ToBucket:    &bucketDst,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id,
 	})
 	r.NoError(err)
 
-	reps, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	reps, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(reps.Replications, 1)
-	r.EqualValues(user, reps.Replications[0].User)
-	r.EqualValues("main", reps.Replications[0].From)
-	r.EqualValues("main", reps.Replications[0].To)
-	r.EqualValues(bucketSrc, reps.Replications[0].Bucket)
-	r.NotNil(reps.Replications[0].ToBucket)
-	r.EqualValues(bucketDst, reps.Replications[0].ToBucket)
+	r.True(proto.Equal(id, reps.Replications[0].Id))
 
 	//w8 replication to start
 	r.Eventually(func() bool {
-		reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -102,7 +100,7 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 
 	// wait replication to be done
 	r.Eventually(func() bool {
-		reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -112,13 +110,9 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
 	}, e.WaitLong, e.RetryLong)
 
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucketSrc,
-		From:      "main",
-		To:        "main",
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id,
 		ShowMatch: true,
-		User:      user,
-		ToBucket:  bucketDst,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -154,28 +148,26 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	r.True(ok)
 
 	// create replication to different storage and different bucket
-	_, err = e.ApiClient.AddBucketReplication(tstCtx, &pb.AddBucketReplicationRequest{
+	idDiffStor := &pb.ReplicationID{
 		User:        user,
 		FromStorage: "main",
-		FromBucket:  bucketSrc,
+		FromBucket:  &bucketSrc,
 		ToStorage:   "f1",
-		ToBucket:    bucketDst,
+		ToBucket:    &bucketDst,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: idDiffStor,
 	})
 	r.NoError(err)
 
-	reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(reps.Replications, 2)
-	r.EqualValues(user, reps.Replications[0].User)
-	r.EqualValues("main", reps.Replications[0].From)
-	r.EqualValues("f1", reps.Replications[0].To)
-	r.EqualValues(bucketSrc, reps.Replications[0].Bucket)
-	r.NotNil(reps.Replications[0].ToBucket)
-	r.EqualValues(bucketDst, reps.Replications[0].ToBucket)
+	r.True(proto.Equal(idDiffStor, reps.Replications[0].Id))
 
 	//w8 replication to finish
 	r.Eventually(func() bool {
-		reps, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -183,20 +175,16 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 			return false
 		}
 		rep := reps.Replications[0]
-		if rep.To != "f1" {
+		if rep.Id.ToStorage != "f1" {
 			return false
 		}
 		return rep.IsInitDone && rep.InitObjDone > 4
 	}, e.WaitLong, e.RetryLong)
 
 	//check that all 3 buckets are the same
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucketSrc,
-		From:      "main",
-		To:        "main",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    id,
 		ShowMatch: true,
-		User:      user,
-		ToBucket:  bucketDst,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -205,13 +193,9 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucketSrc,
-		From:      "main",
-		To:        "f1",
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target:    idDiffStor,
 		ShowMatch: true,
-		User:      user,
-		ToBucket:  bucketDst,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)

@@ -11,7 +11,6 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
@@ -42,12 +41,13 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 		t.Log(bucketName, "created")
 	}
 
-	_, err := e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         nil,
-		IsForAllBuckets: true,
+	id := &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+	}
+	_, err := e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: id,
 	})
 	r.NoError(err)
 	time.Sleep(time.Millisecond * 50)
@@ -72,15 +72,13 @@ func TestApi_Migrate_Load_test(t *testing.T) {
 		}, e.WaitLong, e.RetryLong)
 	}
 
-	m, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	m, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 
 	r.Len(m.Replications, bucketsNum)
 	for _, buck := range m.Replications {
 		r.True(buck.IsInitDone)
 		r.EqualValues(buck.InitObjListed, buck.InitObjDone)
-		r.EqualValues(buck.InitBytesListed, buck.InitBytesDone)
-		r.EqualValues(buck.InitBytesListed, buck.InitBytesDone)
 		r.EqualValues(objPerBucket, buck.InitObjDone)
 	}
 }

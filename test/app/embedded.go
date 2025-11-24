@@ -95,7 +95,9 @@ type EmbeddedEnv struct {
 
 	TaskClient *asynq.Client
 
-	ApiClient pb.ChorusClient
+	PolicyClient pb.PolicyClient
+	ChorusClient pb.ChorusClient
+	DiffClient   pb.DiffClient
 
 	StorageSvc storage.Service
 
@@ -112,20 +114,20 @@ func (e *EmbeddedEnv) CreateMainFollowerUserReplications(t testing.TB) {
 	ctx := t.Context()
 	r := require.New(t)
 
-	_, err := e.ApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         []string{},
-		IsForAllBuckets: true,
+	_, err := e.PolicyClient.AddReplication(ctx, &pb.AddReplicationRequest{
+		Id: &pb.ReplicationID{
+			User:        user,
+			FromStorage: "main",
+			ToStorage:   "f1",
+		},
 	})
 	r.NoError(err)
-	_, err = e.ApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f2",
-		Buckets:         []string{},
-		IsForAllBuckets: true,
+	_, err = e.PolicyClient.AddReplication(ctx, &pb.AddReplicationRequest{
+		Id: &pb.ReplicationID{
+			User:        user,
+			FromStorage: "main",
+			ToStorage:   "f2",
+		},
 	})
 	r.NoError(err)
 }
@@ -276,7 +278,9 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	if err != nil {
 		panic(err)
 	}
-	e.ApiClient = pb.NewChorusClient(grpcConn)
+	e.PolicyClient = pb.NewPolicyClient(grpcConn)
+	e.ChorusClient = pb.NewChorusClient(grpcConn)
+	e.DiffClient = pb.NewDiffClient(grpcConn)
 	return e
 }
 

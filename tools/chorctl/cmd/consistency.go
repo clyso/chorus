@@ -48,8 +48,8 @@ chorctl consistency`,
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
-		res, err := client.ListConsistencyChecks(ctx, &emptypb.Empty{})
+		client := pb.NewDiffClient(conn)
+		res, err := client.List(ctx, &emptypb.Empty{})
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency checks")
 		}

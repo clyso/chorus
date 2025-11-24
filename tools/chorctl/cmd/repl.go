@@ -24,7 +24,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
@@ -46,8 +45,8 @@ chorctl repl`,
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
-		res, err := client.ListReplications(ctx, &emptypb.Empty{})
+		client := pb.NewPolicyClient(conn)
+		res, err := client.ListReplications(ctx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}

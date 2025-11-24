@@ -32,6 +32,7 @@ const (
 	TypeObjectSyncTags = "object:sync:tags"
 	TypeObjectSyncACL  = "object:sync:acl"
 
+	TypeMigrateS3User             = "migrate:user"
 	TypeMigrateBucketListObjects  = "migrate:bucket:list_objects"
 	TypeMigrateObjCopy            = "migrate:object:copy"
 	TypeMigrateObjectListVersions = "migrate:object:list_versions"
@@ -63,6 +64,7 @@ type TaskPayload interface {
 		ObjectSyncPayload |
 		ObjSyncTagsPayload |
 		ObjSyncACLPayload |
+		MigrateS3UserPayload |
 		MigrateBucketListObjectsPayload |
 		MigrateObjCopyPayload |
 		ListObjectVersionsPayload |
@@ -166,6 +168,10 @@ type MigrateVersionedObjectPayload struct {
 	replicationID
 	Bucket string
 	Prefix string
+}
+
+type MigrateS3UserPayload struct {
+	replicationID
 }
 
 type MigrateBucketListObjectsPayload struct {

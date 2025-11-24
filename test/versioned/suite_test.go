@@ -114,21 +114,22 @@ var _ = Describe("Minio versioned migration", func() {
 
 		CSyncUserKey = "test"
 
-		CMinioSrcUser    = "user"
-		CMinioSrcPass    = "userpass"
-		CMinioSrcBucket  = "buck"
-		CMinioDestUser   = "user"
-		CMinioDestPass   = "userpass"
-		CMinioDestBucket = "buck"
+		CMinioSrcUser  = "user"
+		CMinioSrcPass  = "userpass"
+		CMinioDestUser = "user"
+		CMinioDestPass = "userpass"
 	)
 
 	var (
+		CMinioDestBucket = "buck"
+		CMinioSrcBucket  = "buck"
+
 		testEnv *env.TestEnvironment
 
 		testMinioSrcUserClient  *minio.Client
 		testMinioDestUserClient *minio.Client
 
-		testApiClient pb.ChorusClient
+		testApiClient pb.PolicyClient
 	)
 
 	BeforeEach(func() {
@@ -238,7 +239,7 @@ var _ = Describe("Minio versioned migration", func() {
 					Versioning: true,
 				},
 				Log: &log.Config{
-					Level: "debug",
+					Level: "warn",
 				},
 				Redis: &config.Redis{
 					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
@@ -300,10 +301,11 @@ var _ = Describe("Minio versioned migration", func() {
 			}),
 		)
 		Expect(err).NotTo(HaveOccurred())
-		apiClient := pb.NewChorusClient(grpcConn)
+		apiClient := pb.NewPolicyClient(grpcConn)
+		chorusClient := pb.NewChorusClient(grpcConn)
 
 		Eventually(func() bool {
-			_, err := apiClient.GetAppVersion(ctx, &emptypb.Empty{})
+			_, err := chorusClient.GetAppVersion(ctx, &emptypb.Empty{})
 			if err != nil {
 				return false
 			}
@@ -323,21 +325,23 @@ var _ = Describe("Minio versioned migration", func() {
 	It("Should migrate and preserve version ids", func() {
 		ctx := context.Background()
 
-		_, err := testApiClient.AddBucketReplication(ctx, &pb.AddBucketReplicationRequest{
-			User:        CSyncUserKey,
-			FromStorage: CMinioSrcInstance,
-			FromBucket:  CMinioSrcBucket,
-			ToStorage:   CMinioDestInstance,
-			ToBucket:    CMinioDestBucket,
+		_, err := testApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
+			Id: &pb.ReplicationID{
+				User:        CSyncUserKey,
+				FromStorage: CMinioSrcInstance,
+				FromBucket:  &CMinioSrcBucket,
+				ToStorage:   CMinioDestInstance,
+				ToBucket:    &CMinioDestBucket,
+			},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		resp, err := testApiClient.ListReplications(ctx, &emptypb.Empty{})
+		resp, err := testApiClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Replications).To(HaveLen(1))
 
 		Eventually(func() bool {
-			resp, err = testApiClient.ListReplications(ctx, &emptypb.Empty{})
+			resp, err = testApiClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 			if err != nil {
 				return false
 			}
@@ -389,21 +393,22 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 		CCephSrcPass       = "userpass"
 		CCephSrcAccessKey  = "AKIAIOSFODNN7EXAMPLE"
 		CCephSrcSecretKey  = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-		CCephSrcBucket     = "buck1"
 		CCephDestUser      = "user"
 		CCephDestPass      = "userpass"
 		CCephDestAccessKey = "AKIAIOSFODNN7EXAMPLE"
 		CCephDestSecretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-		CCephDestBucket    = "buck2"
 	)
 
 	var (
+		CCephDestBucket = "buck2"
+		CCephSrcBucket  = "buck1"
+
 		testEnv *env.TestEnvironment
 
 		testMinioSrcUserClient  *minio.Client
 		testMinioDestUserClient *minio.Client
 
-		testApiClient pb.ChorusClient
+		testApiClient pb.PolicyClient
 	)
 
 	type EC2Creds struct {
@@ -608,10 +613,11 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 			}),
 		)
 		Expect(err).NotTo(HaveOccurred())
-		apiClient := pb.NewChorusClient(grpcConn)
+		apiClient := pb.NewPolicyClient(grpcConn)
+		chorusClient := pb.NewChorusClient(grpcConn)
 
 		Eventually(func() bool {
-			_, err := apiClient.GetAppVersion(ctx, &emptypb.Empty{})
+			_, err := chorusClient.GetAppVersion(ctx, &emptypb.Empty{})
 			if err != nil {
 				return false
 			}
@@ -631,21 +637,23 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 	It("Should migrate and preserve version ids", func() {
 		ctx := context.Background()
 
-		_, err := testApiClient.AddBucketReplication(ctx, &pb.AddBucketReplicationRequest{
-			User:        CSyncUserKey,
-			FromStorage: CCephSrcInstance,
-			FromBucket:  CCephSrcBucket,
-			ToStorage:   CCephDestInstance,
-			ToBucket:    CCephDestBucket,
+		_, err := testApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
+			Id: &pb.ReplicationID{
+				User:        CSyncUserKey,
+				FromStorage: CCephSrcInstance,
+				FromBucket:  &CCephSrcBucket,
+				ToStorage:   CCephDestInstance,
+				ToBucket:    &CCephDestBucket,
+			},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		resp, err := testApiClient.ListReplications(ctx, &emptypb.Empty{})
+		resp, err := testApiClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Replications).To(HaveLen(1))
 
 		Eventually(func() bool {
-			resp, err = testApiClient.ListReplications(ctx, &emptypb.Empty{})
+			resp, err = testApiClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 			if err != nil {
 				return false
 			}
@@ -699,9 +707,6 @@ var _ = Describe("Ceph system user versioned migration", func() {
 		CCephSrcUserDisplayName = "user"
 		CCephSrcUserAccessKey   = "AKIAIOSFODNN7EXAMPLE"
 		CCephSrcUserSecretKey   = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-
-		CCephSrcBucket  = "buck1"
-		CCephDestBucket = "buck2"
 	)
 
 	var (
@@ -710,7 +715,10 @@ var _ = Describe("Ceph system user versioned migration", func() {
 		testMinioSrcUserClient  *minio.Client
 		testMinioDestUserClient *minio.Client
 
-		testApiClient pb.ChorusClient
+		testApiClient pb.PolicyClient
+
+		CCephSrcBucket  = "buck1"
+		CCephDestBucket = "buck2"
 	)
 
 	BeforeEach(func() {
@@ -882,10 +890,11 @@ var _ = Describe("Ceph system user versioned migration", func() {
 			}),
 		)
 		Expect(err).NotTo(HaveOccurred())
-		apiClient := pb.NewChorusClient(grpcConn)
+		apiClient := pb.NewPolicyClient(grpcConn)
+		chorusClient := pb.NewChorusClient(grpcConn)
 
 		Eventually(func() bool {
-			_, err := apiClient.GetAppVersion(ctx, &emptypb.Empty{})
+			_, err := chorusClient.GetAppVersion(ctx, &emptypb.Empty{})
 			if err != nil {
 				return false
 			}
@@ -905,21 +914,23 @@ var _ = Describe("Ceph system user versioned migration", func() {
 	It("Should migrate and preserve version ids", func() {
 		ctx := context.Background()
 
-		_, err := testApiClient.AddBucketReplication(ctx, &pb.AddBucketReplicationRequest{
-			User:        CSyncUserKey,
-			FromStorage: CCephSrcInstance,
-			FromBucket:  CCephSrcBucket,
-			ToStorage:   CCephDestInstance,
-			ToBucket:    CCephDestBucket,
+		_, err := testApiClient.AddReplication(ctx, &pb.AddReplicationRequest{
+			Id: &pb.ReplicationID{
+				User:        CSyncUserKey,
+				FromStorage: CCephSrcInstance,
+				FromBucket:  &CCephSrcBucket,
+				ToStorage:   CCephDestInstance,
+				ToBucket:    &CCephDestBucket,
+			},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		resp, err := testApiClient.ListReplications(ctx, &emptypb.Empty{})
+		resp, err := testApiClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.Replications).To(HaveLen(1))
 
 		Eventually(func() bool {
-			resp, err = testApiClient.ListReplications(ctx, &emptypb.Empty{})
+			resp, err = testApiClient.ListReplications(ctx, &pb.ListReplicationsRequest{})
 			if err != nil {
 				return false
 			}

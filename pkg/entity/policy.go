@@ -45,6 +45,10 @@ type UserReplicationPolicy struct {
 	ToStorage   string
 }
 
+type ReplicationOptions struct {
+	AgentURL string
+}
+
 func (p UserReplicationPolicy) LookupID() string {
 	return p.User
 }
@@ -93,13 +97,25 @@ type ReplicationStatus struct {
 	CreatedAt time.Time `redis:"created_at"`
 
 	ArchivedAt *time.Time `redis:"archived_at,omitempty"`
-	AgentURL   string     `redis:"agent_url,omitempty"`
+
+	// Options belongs to status to store in the same hash in Redis.
+	// Embedded stucts are not supported by redis tag parser.
+	// TODO: add other replication options here, like copy origin timestamp, etc.
+	AgentURL string `redis:"agent_url,omitempty"`
 
 	IsArchived bool `redis:"archived"`
 }
 
+func StatusFromOptions(opts ReplicationOptions) ReplicationStatus {
+	// TODO: add other replication options here, like copy origin timestamp, etc.
+	return ReplicationStatus{
+		AgentURL: opts.AgentURL,
+	}
+}
+
 type ReplicationStatusExtended struct {
 	*ReplicationStatus
+
 	Switch *ReplicationSwitchInfo `redis:"-"`
 
 	// True if at least one of the queues is paused.
@@ -112,6 +128,13 @@ type ReplicationStatusExtended struct {
 
 func (r *ReplicationStatusExtended) InitDone() bool {
 	return r.InitMigration.Unprocessed == 0
+}
+
+func (r *ReplicationStatusExtended) Latency() time.Duration {
+	if r.InitDone() {
+		return r.EventMigration.Latency
+	}
+	return r.InitMigration.Latency
 }
 
 type QueueStats struct {

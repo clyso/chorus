@@ -46,21 +46,36 @@ func StorageRow(in *pb.Storage) string {
 }
 
 func ReplHeader() string {
-	return "NAME\tPROGRESS\tSIZE\tOBJECTS\tEVENTS\tPAUSED\tAGE\tHAS_SWITCH"
+	return "NAME\tPROGRESS\tOBJECTS\tEVENTS\tLAG\tPAUSED\tAGE\tHAS_SWITCH"
 }
 
 func ReplRow(in *pb.Replication) string {
 	p := 0.0
-	if in.InitBytesListed != 0 {
-		p = float64(in.InitBytesDone) / float64(in.InitBytesListed)
+	if in.InitObjListed != 0 {
+		p = float64(in.InitObjDone) / float64(in.InitObjListed)
 	}
-	bytes := fmt.Sprintf("%s/%s", ByteCountIEC(in.InitBytesDone), ByteCountIEC(in.InitBytesListed))
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
-	if in.ToBucket != "" {
-		in.To += ":" + in.ToBucket
+	from := in.Id.FromStorage
+	if in.Id.FromBucket != nil && *in.Id.FromBucket != "" {
+		from += ":" + *in.Id.FromBucket
 	}
-	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, DateToAge(in.CreatedAt), in.HasSwitch)
+	to := in.Id.ToStorage
+	if in.Id.ToBucket != nil && *in.Id.ToBucket != "" {
+		to += ":" + *in.Id.ToBucket
+	}
+	return fmt.Sprintf("%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v",
+		in.Id.User,
+		from,
+		to,
+		ToPercentage(p),
+		objects,
+		events,
+		DurationToStr(in.EventLag.AsDuration()),
+		in.IsPaused,
+		DateToAge(in.CreatedAt),
+		in.HasSwitch,
+	)
 }
 
 func ToPercentage(in float64) string {
@@ -207,12 +222,16 @@ func SwitchHeader() string {
 	return "USER\tBUCKET\tFROM\tTO\tSTATUS\tLAST_STARTED\tDONE"
 }
 
-func PrintSwitchRow(w io.Writer, in *pb.GetBucketSwitchStatusResponse, wide bool) {
+func PrintSwitchRow(w io.Writer, in *pb.ReplicationSwitch, wide bool) {
+	fromBucket := ""
+	if in.ReplicationId.FromBucket != nil {
+		fromBucket = *in.ReplicationId.FromBucket
+	}
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		in.ReplicationId.User,
-		in.ReplicationId.Bucket,
-		in.ReplicationId.From,
-		in.ReplicationId.To,
+		fromBucket,
+		in.ReplicationId.FromStorage,
+		in.ReplicationId.ToStorage,
 		in.LastStatus.String(),
 		DateToAge(in.LastStartedAt),
 		DateToAge(in.DoneAt))

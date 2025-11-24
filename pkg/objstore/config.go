@@ -23,6 +23,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/ratelimit"
 )
 
@@ -117,6 +118,22 @@ func (s StoragesConfig[S3Config, SwiftConfig]) Exists(stor, user string) error {
 	default:
 		return fmt.Errorf("%w: cannot get user: unsupported storage type %q", dom.ErrInvalidStorageConfig, got.Type)
 	}
+}
+
+func (s StoragesConfig[S3Config, SwiftConfig]) ValidateReplicationID(id entity.UniversalReplicationID) error {
+	if err := s.Exists(id.FromStorage(), id.User()); err != nil {
+		return fmt.Errorf("%w: unknown replication source", err)
+	}
+	if err := s.Exists(id.ToStorage(), id.User()); err != nil {
+		return fmt.Errorf("%w: unknown replication destination", err)
+	}
+	fromType, toType := s.Storages[id.FromStorage()].Type, s.Storages[id.ToStorage()].Type
+	if fromType != toType {
+		// TODO: allow cross-type replication in the future?
+		return fmt.Errorf("%w: from_storage %q type %q is different from to_storage %q type %q",
+			dom.ErrInvalidArg, id.FromStorage(), fromType, id.ToStorage(), toType)
+	}
+	return nil
 }
 
 func (s StoragesConfig[S3conf, SwiftConf]) S3Storages() map[string]S3conf {

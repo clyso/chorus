@@ -30,14 +30,15 @@ import (
 var _repl *pb.Replication
 var _replM sync.RWMutex
 
-func WatchReplicationMeta(ctx context.Context, conf *config.Config, apiClient pb.ChorusClient) (<-chan error, error) {
-	req := &pb.ReplicationRequest{
-		User:   "admin",
-		Bucket: conf.Bucket,
-		From:   "one",
-		To:     "two",
+func WatchReplicationMeta(ctx context.Context, conf *config.Config, apiClient pb.PolicyClient) (<-chan error, error) {
+	req := &pb.ReplicationID{
+		User:        "admin",
+		FromBucket:  &conf.Bucket,
+		ToBucket:    &conf.Bucket,
+		FromStorage: "one",
+		ToStorage:   "two",
 	}
-	stream, err := apiClient.StreamBucketReplication(ctx, req)
+	stream, err := apiClient.StreamReplication(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func WatchReplicationMeta(ctx context.Context, conf *config.Config, apiClient pb
 				}
 				logrus.WithError(err).Error("received replication stream error. Reconnect...")
 				_ = stream.CloseSend()
-				stream, err = apiClient.StreamBucketReplication(ctx, req)
+				stream, err = apiClient.StreamReplication(ctx, req)
 				if err != nil {
 					done <- err
 					return

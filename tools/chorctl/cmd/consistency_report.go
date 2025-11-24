@@ -61,8 +61,8 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
-		res, err := client.GetConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+		client := pb.NewDiffClient(conn)
+		res, err := client.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency check report")
 		}
@@ -91,7 +91,7 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 		cursor := uint64(0)
 
 		for {
-			page, err := client.GetConsistencyCheckReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			page, err := client.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
 				Locations: locations,
 				Cursor:    cursor,
 				PageSize:  pageSize,

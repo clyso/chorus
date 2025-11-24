@@ -30,7 +30,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/test/app"
@@ -39,7 +38,7 @@ import (
 func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const (
+	var (
 		bucket = "switch-bucket"
 	)
 
@@ -87,25 +86,21 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         []string{bucket},
-		IsForAllBuckets: false,
+	replID := &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		FromBucket:  &bucket,
+		ToBucket:    &bucket,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: replID,
 	})
 	r.NoError(err)
-	replID := &pb.ReplicationRequest{
-		User:     user,
-		Bucket:   bucket,
-		From:     "main",
-		To:       "f1",
-		ToBucket: bucket,
-	}
 
 	// wait until repl started
 	r.Eventually(func() bool {
-		repl, err := e.ApiClient.GetReplication(tstCtx, replID)
+		repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
 		if err != nil {
 			return false
 		}
@@ -145,7 +140,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 
 	// wait init replication is done
 	r.Eventually(func() bool {
-		repl, err := e.ApiClient.GetReplication(tstCtx, replID)
+		repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
 		if err != nil {
 			return false
 		}
@@ -153,13 +148,8 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
-		diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Bucket:    bucket,
-			ToBucket:  bucket,
-			From:      "main",
-			To:        "f1",
-			ShowMatch: false,
-			User:      user,
+		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+			Target: replID,
 		})
 		if err != nil {
 			return false
@@ -167,7 +157,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		return diff.IsMatch
 	}, e.WaitLong, e.RetryLong)
 
-	repl, err := e.ApiClient.GetReplication(tstCtx, replID)
+	repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
 	r.NoError(err)
 	t.Log("repl events", repl.Events, repl.EventsDone)
 	r.NotNil(repl)
@@ -262,7 +252,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		t.Log("end write", time.Now())
 	}()
 	time.Sleep(666 * time.Millisecond)
-	_, err = e.ApiClient.SwitchBucketZeroDowntime(tstCtx, &pb.SwitchBucketZeroDowntimeRequest{
+	_, err = e.PolicyClient.SwitchWithZeroDowntime(tstCtx, &pb.SwitchZeroDowntimeRequest{
 		ReplicationId: replID,
 		MultipartTtl:  durationpb.New(time.Minute),
 	})
@@ -270,10 +260,10 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	t.Log("switch created", time.Now())
 
 	repl = nil
-	repls, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	for i, rr := range repls.Replications {
-		if rr.Bucket == bucket && rr.From == "main" && rr.To == "f1" {
+		if *rr.Id.FromBucket == bucket && rr.Id.FromStorage == "main" && rr.Id.ToStorage == "f1" {
 			repl = repls.Replications[i]
 			break
 		}
@@ -281,9 +271,9 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	r.NotNil(repl)
 	r.True(repl.HasSwitch)
 
-	switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+	switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 	r.NoError(err)
-	r.EqualValues(pb.GetBucketSwitchStatusResponse_InProgress, switchInfo.LastStatus)
+	r.EqualValues(pb.ReplicationSwitch_InProgress, switchInfo.LastStatus)
 	r.Nil(switchInfo.DowntimeOpts)
 	r.NotNil(switchInfo.LastStartedAt)
 	r.EqualValues(time.Minute, switchInfo.MultipartTtl.AsDuration())
@@ -292,16 +282,16 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	<-writeCtx.Done()
 
 	r.Eventually(func() bool {
-		switchInfo, err = e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err = e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
 	}, e.WaitLong*2, e.RetryLong)
 
 	r.Eventually(func() bool {
 		// wait for completion of multipart uploads to old storage started before switch.
-		repl, err = e.ApiClient.GetReplication(tstCtx, replID)
+		repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
 		if err != nil {
 			return false
 		}
@@ -334,9 +324,9 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		r.True(bytes.Equal(object.data, objBytes), object.name)
 	}
 
-	switchInfo, err = e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+	switchInfo, err = e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 	r.NoError(err)
-	r.EqualValues(pb.GetBucketSwitchStatusResponse_Done, switchInfo.LastStatus)
+	r.EqualValues(pb.ReplicationSwitch_Done, switchInfo.LastStatus)
 	r.Nil(switchInfo.DowntimeOpts)
 	r.NotNil(switchInfo.LastStartedAt)
 	r.NotNil(switchInfo.DoneAt)
@@ -349,7 +339,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 func TestApi_switch_multipart(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const (
+	var (
 		bucket = "switch-bucket-multipart"
 	)
 
@@ -391,25 +381,21 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         []string{bucket},
-		IsForAllBuckets: false,
+	replID := &pb.ReplicationID{
+		User:        user,
+		FromBucket:  &bucket,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		ToBucket:    &bucket,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: replID,
 	})
 	r.NoError(err)
-	replID := &pb.ReplicationRequest{
-		User:     user,
-		Bucket:   bucket,
-		From:     "main",
-		To:       "f1",
-		ToBucket: bucket,
-	}
 
 	// wait until repl started
 	r.Eventually(func() bool {
-		repl, err := e.ApiClient.GetReplication(tstCtx, replID)
+		repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
 		if err != nil {
 			return false
 		}
@@ -434,7 +420,7 @@ func TestApi_switch_multipart(t *testing.T) {
 		return f1e
 	}, e.WaitLong, e.RetryLong)
 
-	f1Stream, err := e.ApiClient.StreamBucketReplication(tstCtx, replID)
+	f1Stream, err := e.PolicyClient.StreamReplication(tstCtx, replID)
 	r.NoError(err)
 	defer f1Stream.CloseSend()
 	r.Eventually(func() bool {
@@ -446,13 +432,8 @@ func TestApi_switch_multipart(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
-		diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Bucket:    bucket,
-			ToBucket:  bucket,
-			From:      "main",
-			To:        "f1",
-			ShowMatch: false,
-			User:      user,
+		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+			Target: replID,
 		})
 		if err != nil {
 			return false
@@ -487,7 +468,7 @@ func TestApi_switch_multipart(t *testing.T) {
 	parts := make([]*aws_s3.CompletedPart, pn)
 	for n := len(partBuf); n >= len(partBuf); {
 		if (partID - 1) == pn/2 {
-			_, err = e.ApiClient.SwitchBucketZeroDowntime(tstCtx, &pb.SwitchBucketZeroDowntimeRequest{
+			_, err = e.PolicyClient.SwitchWithZeroDowntime(tstCtx, &pb.SwitchZeroDowntimeRequest{
 				ReplicationId: replID,
 				MultipartTtl:  durationpb.New(time.Minute),
 			})
@@ -526,16 +507,16 @@ func TestApi_switch_multipart(t *testing.T) {
 	r.NoError(err)
 
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
 	}, e.WaitLong*2, e.RetryLong)
 
 	r.Eventually(func() bool {
 		// wait for completion of multipart uploads to old storage started before switch.
-		repl, err := e.ApiClient.GetReplication(tstCtx, replID)
+		repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
 		if err != nil {
 			return false
 		}
@@ -559,7 +540,7 @@ func TestApi_switch_multipart(t *testing.T) {
 func TestApi_scheduled_switch(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const (
+	var (
 		bucket = "switch-bucket-scheduled"
 	)
 
@@ -601,16 +582,19 @@ func TestApi_scheduled_switch(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         []string{bucket},
-		IsForAllBuckets: false,
+	replID := &pb.ReplicationID{
+		User:        user,
+		FromBucket:  &bucket,
+		ToBucket:    &bucket,
+		FromStorage: "main",
+		ToStorage:   "f1",
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: replID,
 	})
 	r.NoError(err)
 	var repl *pb.Replication
-	repls, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	repl = repls.Replications[0]
@@ -619,13 +603,13 @@ func TestApi_scheduled_switch(t *testing.T) {
 
 	// wait until repl started
 	r.Eventually(func() bool {
-		repls, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
 		started := false
 		for _, repl := range repls.Replications {
-			if repl.To == "f1" {
+			if repl.Id.ToStorage == "f1" {
 				started = started || (repl.InitObjListed > 0)
 			}
 		}
@@ -642,14 +626,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	r.NoError(err)
 
 	// start scheduled switch on init done:
-	replID := &pb.ReplicationRequest{
-		User:     user,
-		Bucket:   bucket,
-		ToBucket: bucket,
-		From:     "main",
-		To:       "f1",
-	}
-	_, err = e.ApiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
+	_, err = e.PolicyClient.SwitchWithDowntime(tstCtx, &pb.SwitchDowntimeRequest{
 		ReplicationId: replID,
 		DowntimeOpts: &pb.SwitchDowntimeOpts{
 			StartOnInitDone:     true,
@@ -660,7 +637,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	r.NoError(err)
 
 	// check that replication policy now has linked switch
-	repls, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	repl = repls.Replications[0]
@@ -669,11 +646,11 @@ func TestApi_scheduled_switch(t *testing.T) {
 
 	// wait until switch is in progress
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
+		return switchInfo.LastStatus > pb.ReplicationSwitch_NotStarted
 	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket is blocked
@@ -682,20 +659,15 @@ func TestApi_scheduled_switch(t *testing.T) {
 
 	// wait for switch to be done
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
 	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
-		ShowMatch: false,
-		User:      user,
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: replID,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -723,13 +695,8 @@ func TestApi_scheduled_switch(t *testing.T) {
 	objects[0] = obj1
 
 	// now updates only in f1:
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
-		ShowMatch: false,
-		User:      user,
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: replID,
 	})
 	r.NoError(err)
 	r.False(diff.IsMatch)
@@ -765,7 +732,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	}
 
 	// check that replication is archived
-	repls, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	repl = repls.Replications[0]
@@ -779,7 +746,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const (
+	var (
 		bucket = "switch-bucket-scheduled-continue"
 	)
 
@@ -821,16 +788,19 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		Buckets:         []string{bucket},
-		IsForAllBuckets: false,
+	replID := &pb.ReplicationID{
+		User:        user,
+		FromBucket:  &bucket,
+		ToBucket:    &bucket,
+		FromStorage: "main",
+		ToStorage:   "f1",
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: replID,
 	})
 	r.NoError(err)
 	var repl *pb.Replication
-	repls, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	repl = repls.Replications[0]
@@ -839,13 +809,13 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 
 	// wait until repl started
 	r.Eventually(func() bool {
-		repls, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
 		started := false
 		for _, repl := range repls.Replications {
-			if repl.To == "f1" {
+			if repl.Id.ToStorage == "f1" {
 				started = started || (repl.InitObjListed > 0)
 			}
 		}
@@ -862,14 +832,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	r.NoError(err)
 
 	// start scheduled switch on init done with continue replication:
-	replID := &pb.ReplicationRequest{
-		User:     user,
-		Bucket:   bucket,
-		ToBucket: bucket,
-		From:     "main",
-		To:       "f1",
-	}
-	_, err = e.ApiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
+	_, err = e.PolicyClient.SwitchWithDowntime(tstCtx, &pb.SwitchDowntimeRequest{
 		ReplicationId: replID,
 		DowntimeOpts: &pb.SwitchDowntimeOpts{
 			StartOnInitDone:     true,
@@ -880,7 +843,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	r.NoError(err)
 
 	// check that replication policy now has linked switch
-	repls, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	repl = repls.Replications[0]
@@ -889,11 +852,11 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 
 	// wait until switch is in progress
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
+		return switchInfo.LastStatus > pb.ReplicationSwitch_NotStarted
 	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket is blocked
@@ -902,20 +865,15 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 
 	// wait for switch to be done
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
 	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
-		ShowMatch: false,
-		User:      user,
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: replID,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -943,7 +901,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	objects[0] = obj1
 
 	// check that there is new replication to previous main
-	repls, err = e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+	repls, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 2)
 
@@ -957,22 +915,22 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	r.True(replPrev.HasSwitch)
 	r.True(replPrev.IsInitDone)
 	r.EqualValues(replPrev.Events, replPrev.EventsDone)
-	r.EqualValues(replPrev.From, "main")
-	r.EqualValues(replPrev.To, "f1")
-	r.EqualValues(replPrev.Bucket, bucket)
-	r.EqualValues(replPrev.User, user)
+	r.EqualValues(replPrev.Id.FromStorage, "main")
+	r.EqualValues(replPrev.Id.ToStorage, "f1")
+	r.EqualValues(*replPrev.Id.FromBucket, bucket)
+	r.EqualValues(replPrev.Id.User, user)
 	// validate new replication
 	r.False(replNew.IsArchived)
 	r.True(replNew.IsInitDone)
 	r.True(replNew.HasSwitch)
-	r.EqualValues(replNew.From, "f1")
-	r.EqualValues(replNew.To, "main")
-	r.EqualValues(replNew.Bucket, bucket)
-	r.EqualValues(replNew.User, user)
+	r.EqualValues(replNew.Id.FromStorage, "f1")
+	r.EqualValues(replNew.Id.ToStorage, "main")
+	r.EqualValues(*replNew.Id.FromBucket, bucket)
+	r.EqualValues(replNew.Id.User, user)
 
 	// wait until new replication catch up
 	r.Eventually(func() bool {
-		repls, err := e.ApiClient.ListReplications(tstCtx, &emptypb.Empty{})
+		repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 		if err != nil {
 			return false
 		}
@@ -986,13 +944,8 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	// now f1 and main are in sync again
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket,
-		ToBucket:  bucket,
-		From:      "main",
-		To:        "f1",
-		ShowMatch: false,
-		User:      user,
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: replID,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -1016,16 +969,16 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 		r.NoError(err)
 		r.True(bytes.Equal(object.data, objBytes), object.name)
 	}
-	switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+	switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 	r.NoError(err)
 	r.True(proto.Equal(replID, switchInfo.ReplicationId))
-	r.EqualValues(pb.GetBucketSwitchStatusResponse_Done, switchInfo.LastStatus)
+	r.EqualValues(pb.ReplicationSwitch_Done, switchInfo.LastStatus)
 }
 
 func Test_User_switch(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()
-	const (
+	var (
 		bucket1 = "user-switch-1"
 		bucket2 = "user-switch-2"
 	)
@@ -1050,13 +1003,12 @@ func Test_User_switch(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 
-	_, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User:     user,
-		From:     "main",
-		To:       "f1",
-		Bucket:   "",
-		ToBucket: "",
-	})
+	replID := &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+	}
+	_, err = e.PolicyClient.GetReplication(tstCtx, replID)
 	r.Error(err)
 
 	// fill main buckets with init data
@@ -1103,46 +1055,46 @@ func Test_User_switch(t *testing.T) {
 	r.False(exists)
 
 	// create replication for user
-	_, err = e.ApiClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
-		User:            user,
-		From:            "main",
-		To:              "f1",
-		IsForAllBuckets: true,
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
+		Id: replID,
 	})
 	r.NoError(err)
 	// get replication from list
-	repls, err := e.ApiClient.ListUserReplications(tstCtx, &emptypb.Empty{})
+	repls, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)
 	r.Len(repls.Replications, 1)
 	userRepl := repls.Replications[0]
 	r.False(userRepl.HasSwitch)
 	r.False(userRepl.IsArchived)
 
-	// get replication by id
-	repl, err := e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User:     user,
-		From:     "main",
-		To:       "f1",
-		Bucket:   "",
-		ToBucket: "",
+	repls, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{
+		HideUserReplications:   false,
+		HideBucketReplications: true,
 	})
 	r.NoError(err)
-	r.EqualValues(user, repl.User)
-	r.EqualValues("main", repl.From)
-	r.EqualValues("f1", repl.To)
-	r.Empty(repl.Bucket)
-	r.Empty(repl.ToBucket)
+	r.Len(repls.Replications, 1)
+	repls, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{
+		HideUserReplications:   true,
+		HideBucketReplications: false,
+	})
+	r.NoError(err)
+	r.Len(repls.Replications, 0)
+
+	// get replication by id
+	repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
+	r.NoError(err)
+	r.EqualValues(user, repl.Id.User)
+	r.EqualValues("main", repl.Id.FromStorage)
+	r.EqualValues("f1", repl.Id.ToStorage)
+	r.Nil(repl.Id.FromBucket)
+	r.Nil(repl.Id.ToBucket)
 	r.False(repl.HasSwitch)
 	r.False(repl.IsArchived)
 	r.NotNil(repl.CreatedAt)
 
 	// wait until repl started
 	r.Eventually(func() bool {
-		repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-			User: user,
-			From: "main",
-			To:   "f1",
-		})
+		repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
 		if err != nil {
 			return false
 		}
@@ -1167,12 +1119,7 @@ func Test_User_switch(t *testing.T) {
 	r.NoError(err)
 
 	// start scheduled switch on init done:
-	replID := &pb.ReplicationRequest{
-		User: user,
-		From: "main",
-		To:   "f1",
-	}
-	_, err = e.ApiClient.SwitchBucket(tstCtx, &pb.SwitchBucketRequest{
+	_, err = e.PolicyClient.SwitchWithDowntime(tstCtx, &pb.SwitchDowntimeRequest{
 		ReplicationId: replID,
 		DowntimeOpts: &pb.SwitchDowntimeOpts{
 			StartOnInitDone:     true,
@@ -1183,22 +1130,18 @@ func Test_User_switch(t *testing.T) {
 	r.NoError(err)
 
 	// check that replication policy now has linked switch
-	repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User: user,
-		From: "main",
-		To:   "f1",
-	})
+	repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
 	r.NoError(err)
 	r.True(repl.HasSwitch)
 	r.False(repl.IsArchived)
 
 	// wait until switch is in progress
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus > pb.GetBucketSwitchStatusResponse_NotStarted
+		return switchInfo.LastStatus > pb.ReplicationSwitch_NotStarted
 	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket1 is blocked
@@ -1210,42 +1153,34 @@ func Test_User_switch(t *testing.T) {
 
 	// wait for switch to be done
 	r.Eventually(func() bool {
-		switchInfo, err := e.ApiClient.GetBucketSwitchStatus(tstCtx, replID)
+		switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.GetBucketSwitchStatusResponse_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
 	}, e.WaitLong*2, e.RetryLong)
 
 	// check that all events are processed
-	repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User: user,
-		From: "main",
-		To:   "f1",
-	})
+	repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
 	r.NoError(err)
 	r.True(repl.HasSwitch)
 	r.True(repl.IsInitDone)
 	r.EqualValues(repl.Events, repl.EventsDone)
 
 	// check that data is in sync
-	diff, err := e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket1,
-		ToBucket:  bucket1,
-		From:      "main",
-		To:        "f1",
-		ShowMatch: false,
-		User:      user,
+	b1ID := proto.Clone(replID).(*pb.ReplicationID)
+	b1ID.ToBucket = &bucket1
+	b1ID.FromBucket = &bucket1
+	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: b1ID,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
-	diff, err = e.ApiClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Bucket:    bucket2,
-		ToBucket:  bucket2,
-		From:      "main",
-		To:        "f1",
-		ShowMatch: false,
-		User:      user,
+	b2ID := proto.Clone(replID).(*pb.ReplicationID)
+	b2ID.ToBucket = &bucket2
+	b2ID.FromBucket = &bucket2
+	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
+		Target: b2ID,
 	})
 	r.NoError(err)
 	r.True(diff.IsMatch)
@@ -1334,13 +1269,7 @@ func Test_User_switch(t *testing.T) {
 	r.Error(err)
 
 	// check that replication is archived
-	repl, err = e.ApiClient.GetReplication(tstCtx, &pb.ReplicationRequest{
-		User:     user,
-		From:     "main",
-		To:       "f1",
-		Bucket:   "",
-		ToBucket: "",
-	})
+	repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
 	r.NoError(err)
 	r.True(repl.HasSwitch)
 	r.True(repl.IsInitDone)

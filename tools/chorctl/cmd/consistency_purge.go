@@ -59,9 +59,9 @@ chorctl consistency purge oldstorage:bucket newstorage:altbucket`,
 		}
 		defer conn.Close()
 
-		client := pb.NewChorusClient(conn)
+		client := pb.NewDiffClient(conn)
 		for _, id := range args {
-			_, err := client.DeleteConsistencyCheckReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			_, err := client.DeleteReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
 			if err != nil {
 				logrus.WithError(err).WithField("address", address).Fatal("unable to delete consistency check", id)
 			} else {

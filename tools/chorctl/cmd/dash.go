@@ -43,7 +43,8 @@ var dashCmd = &cobra.Command{
 		}
 		defer conn.Close()
 		client := pb.NewChorusClient(conn)
-		model := ui.New(ctx, client)
+		policyClient := pb.NewPolicyClient(conn)
+		model := ui.New(ctx, policyClient, client)
 		p := tea.NewProgram(model, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Println("could not start program:", err)

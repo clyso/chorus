@@ -51,11 +51,11 @@ chorctl repl buckets -f main -t follower -u admin`,
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
-		res, err := client.ListBucketsForReplication(ctx, &pb.ListBucketsForReplicationRequest{
+		client := pb.NewPolicyClient(conn)
+		res, err := client.AvailableBuckets(ctx, &pb.AvailableBucketsRequest{
 			User:           rbUser,
-			From:           rbFrom,
-			To:             rbTo,
+			FromStorage:    rbFrom,
+			ToStorage:      rbTo,
 			ShowReplicated: false,
 		})
 		if err != nil {

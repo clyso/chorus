@@ -49,17 +49,17 @@ chorctl repl resume -f main -t follower -u admin -b bucket1`,
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
-		req := &pb.ReplicationRequest{
-			User:     rrUser,
-			Bucket:   rrBucket,
-			From:     rrFrom,
-			To:       rrTo,
-			ToBucket: rrToBucket,
+		req := &pb.ReplicationID{
+			User:        rrUser,
+			FromBucket:  &rrBucket,
+			FromStorage: rrFrom,
+			ToStorage:   rrTo,
+			ToBucket:    &rrToBucket,
 		}
 		if rrToBucket == "" {
-			req.ToBucket = rrBucket
+			req.ToBucket = &rrBucket
 		}
 		_, err = client.ResumeReplication(ctx, req)
 		if err != nil {

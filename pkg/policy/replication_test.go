@@ -225,7 +225,7 @@ func Test_AddUserReplicationPolicy(t *testing.T) {
 			}
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl)
+				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -234,7 +234,7 @@ func Test_AddUserReplicationPolicy(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, nil)
+				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -243,7 +243,7 @@ func Test_AddUserReplicationPolicy(t *testing.T) {
 				}
 			}
 
-			err := svc.AddUserReplicationPolicy(ctx, tt.policy)
+			err := svc.AddUserReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{})
 			if tt.wantErr != nil {
 				r.ErrorIs(err, tt.wantErr)
 				return
@@ -580,7 +580,7 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 			}
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl)
+				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -589,7 +589,7 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, nil)
+				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -598,7 +598,7 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 				}
 			}
 
-			err := svc.AddBucketReplicationPolicy(ctx, tt.policy, &tt.name)
+			err := svc.AddBucketReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{AgentURL: tt.name})
 			if tt.wantErr != nil {
 				r.ErrorIs(err, tt.wantErr)
 				return
@@ -831,7 +831,7 @@ func Test_DeleteBucketReplicationPolicy(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl)
+				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -840,7 +840,7 @@ func Test_DeleteBucketReplicationPolicy(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, nil)
+				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -867,7 +867,7 @@ func Test_DeleteBucketReplicationPolicy(t *testing.T) {
 				r.NoError(err)
 			}
 			// can recreate
-			err = svc.AddBucketReplicationPolicy(ctx, tt.policy, nil)
+			err = svc.AddBucketReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{})
 			r.NoError(err)
 			// check if added
 			uid = entity.UniversalFromBucketReplication(tt.policy)
@@ -1014,7 +1014,7 @@ func Test_DeleteUserReplicationPolicy(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl)
+				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -1023,7 +1023,7 @@ func Test_DeleteUserReplicationPolicy(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, nil)
+				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -1050,7 +1050,7 @@ func Test_DeleteUserReplicationPolicy(t *testing.T) {
 				r.NoError(err)
 			}
 			// can recreate
-			err = svc.AddUserReplicationPolicy(ctx, tt.policy)
+			err = svc.AddUserReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{})
 			r.NoError(err)
 			// check if added
 			uid = entity.UniversalFromUserReplication(tt.policy)

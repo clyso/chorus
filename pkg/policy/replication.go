@@ -35,12 +35,13 @@ type ReplicationSvc interface {
 	GetReplicationPolicyInfoExtended(ctx context.Context, id entity.UniversalReplicationID) (entity.ReplicationStatusExtended, error)
 
 	// user replication policies
-	AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy) error
+	AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) error
 	DeleteUserReplication(ctx context.Context, policy entity.UserReplicationPolicy) error
 	ListUserReplicationsInfo(ctx context.Context) (map[entity.UserReplicationPolicy]entity.ReplicationStatusExtended, error)
+	IsUserReplicationExists(ctx context.Context, user string) (bool, error)
 
 	// bucket replication policies
-	AddBucketReplicationPolicy(ctx context.Context, id entity.BucketReplicationPolicy, agentURL *string) error
+	AddBucketReplicationPolicy(ctx context.Context, id entity.BucketReplicationPolicy, opts entity.ReplicationOptions) error
 	ListBucketReplicationsInfo(ctx context.Context, user string) (map[entity.BucketReplicationPolicy]entity.ReplicationStatusExtended, error)
 	DeleteBucketReplication(ctx context.Context, id entity.BucketReplicationPolicy) error
 }
@@ -185,7 +186,7 @@ func (r *policySvc) buildQueueStats(ctx context.Context, queues []string) (bool,
 	return isPaused, result, nil
 }
 
-func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy) error {
+func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) error {
 	if err := policy.Validate(); err != nil {
 		return fmt.Errorf("unable to validate user replication policy: %w", err)
 	}
@@ -236,9 +237,7 @@ func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.
 	// 2. add replication policy
 	_ = r.userReplicationPolicyStore.WithExecutor(tx).AddOp(ctx, policy)
 	// 3. add replication status
-	_ = r.userReplicationStatusStore.WithExecutor(tx).AddOp(ctx, policy, entity.ReplicationStatus{
-		AgentURL: "", // user-level replication does not have agent URL because agent works with BUCKET notifications
-	})
+	_ = r.userReplicationStatusStore.WithExecutor(tx).AddOp(ctx, policy, entity.StatusFromOptions(opts))
 
 	if err := tx.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to execute transaction: %w", err)
@@ -292,7 +291,7 @@ func (r *policySvc) DeleteUserReplication(ctx context.Context, policy entity.Use
 	return nil
 }
 
-func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entity.BucketReplicationPolicy, agentURL *string) error {
+func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entity.BucketReplicationPolicy, opts entity.ReplicationOptions) error {
 	if err := policy.Validate(); err != nil {
 		return fmt.Errorf("unable to validate bucket replication policy: %w", err)
 	}
@@ -353,9 +352,7 @@ func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entit
 	// 2. add replication policy
 	_ = r.bucketReplicationPolicyStore.WithExecutor(tx).AddOp(ctx, policy)
 	// 3. add replication status
-	_ = r.bucketReplicationStatusStore.WithExecutor(tx).AddOp(ctx, policy, entity.ReplicationStatus{
-		AgentURL: fromStrPtr(agentURL),
-	})
+	_ = r.bucketReplicationStatusStore.WithExecutor(tx).AddOp(ctx, policy, entity.StatusFromOptions(opts))
 	// 4. block routing for custom destination bucket to avoid many-to-one writes from proxy
 	if policy.ToBucket != policy.FromBucket {
 		_ = r.bucketRoutingStore.WithExecutor(tx).BlockOp(ctx, entity.NewBucketRoutingPolicyID(policy.User, policy.ToBucket))
@@ -412,13 +409,6 @@ func (r *policySvc) DeleteBucketReplication(ctx context.Context, policy entity.B
 		}
 	}
 	return nil
-}
-
-func fromStrPtr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 func (r *policySvc) ListBucketReplicationsInfo(ctx context.Context, user string) (map[entity.BucketReplicationPolicy]entity.ReplicationStatusExtended, error) {
@@ -489,6 +479,10 @@ func (r *policySvc) ListUserReplicationsInfo(ctx context.Context) (map[entity.Us
 		result[policy] = extendedStatus
 	}
 	return result, nil
+}
+
+func (r *policySvc) IsUserReplicationExists(ctx context.Context, user string) (bool, error) {
+	return r.userReplicationStatusStore.Exists(ctx, user)
 }
 
 func (r *policySvc) archieveReplicationStatusInTx(ctx context.Context, tx store.Executor[redis.Pipeliner], policy entity.UniversalReplicationID) {

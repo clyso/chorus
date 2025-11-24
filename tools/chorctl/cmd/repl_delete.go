@@ -49,17 +49,17 @@ chorctl repl delete -f main -t follower -u admin -b bucket1`,
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
+		client := pb.NewPolicyClient(conn)
 
-		req := &pb.ReplicationRequest{
-			User:     rdUser,
-			Bucket:   rdBucket,
-			From:     rdFrom,
-			To:       rdTo,
-			ToBucket: rdToBucket,
+		req := &pb.ReplicationID{
+			User:        rdUser,
+			FromBucket:  &rdBucket,
+			FromStorage: rdFrom,
+			ToStorage:   rdTo,
+			ToBucket:    &rdToBucket,
 		}
 		if rdToBucket == "" {
-			req.ToBucket = rdBucket
+			req.ToBucket = &rdBucket
 		}
 		_, err = client.DeleteReplication(ctx, req)
 		if err != nil {
