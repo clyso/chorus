@@ -14,6 +14,6 @@ plugins:
       - paths=source_relative
       - grpc_api_configuration=http.yaml
   - local: ["go", "tool", "protoc-gen-openapiv2"]
-    out: gen/openapi
+    out: gen/openapi/chorus
     opt:
-      - grpc_api_configuration=http.yaml
+      - grpc_api_configuration=http.yaml,allow_merge=true,merge_file_name=chorus
