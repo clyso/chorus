@@ -38,12 +38,12 @@ type Router interface {
 func NewS3Router(
 	clients s3client.Service,
 	versionSvc meta.VersionService,
-	storageSvc storage.Service,
+	uploadSvc *storage.UploadSvc,
 	limit ratelimit.RPM) Router {
 	return &s3Router{
 		clients:    clients,
 		versionSvc: versionSvc,
-		storageSvc: storageSvc,
+		uploadSvc:  uploadSvc,
 		limit:      limit,
 	}
 }
@@ -51,8 +51,10 @@ func NewS3Router(
 type s3Router struct {
 	clients    s3client.Service
 	versionSvc meta.VersionService
-	storageSvc storage.Service
-	limit      ratelimit.RPM
+	// userUploadStore *store.UserUploadStore
+	uploadSvc *storage.UploadSvc
+	// storageSvc      storage.Service
+	limit ratelimit.RPM
 }
 
 func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {

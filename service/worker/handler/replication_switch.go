@@ -41,18 +41,17 @@ var (
 
 type switchSvc struct {
 	policySvc               policy.Service
-	storageSvc              storage.Service
+	uploadSvc               *storage.UploadSvc
 	replicationstatusLocker *store.ReplicationStatusLocker
 	conf                    *Config
 }
 
-func NewSwitchSvc(conf *Config,
-	policySvc policy.Service, storageSvc storage.Service,
+func NewSwitchSvc(conf *Config, policySvc policy.Service, uploadSvc *storage.UploadSvc,
 	replicationstatusLocker *store.ReplicationStatusLocker) *switchSvc {
 	return &switchSvc{
 		conf:                    conf,
 		policySvc:               policySvc,
-		storageSvc:              storageSvc,
+		uploadSvc:               uploadSvc,
 		replicationstatusLocker: replicationstatusLocker,
 	}
 }
@@ -362,9 +361,9 @@ func (s *switchSvc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p t
 	}
 	var existsMultipartUploads bool
 	if bucketID, ok := replicationID.AsBucketID(); ok {
-		existsMultipartUploads, err = s.storageSvc.ExistsUploads(ctx, bucketID.FromStorage, bucketID.FromBucket)
+		existsMultipartUploads, err = s.uploadSvc.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(bucketID.FromStorage, bucketID.FromBucket))
 	} else if userID, ok := replicationID.AsUserID(); ok {
-		existsMultipartUploads, err = s.storageSvc.ExistsUploadsForUser(ctx, userID.User)
+		existsMultipartUploads, err = s.uploadSvc.UploadsExistForUser(ctx, userID.User)
 	}
 	if err != nil {
 		return err

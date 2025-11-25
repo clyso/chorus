@@ -17,35 +17,36 @@ package swift
 import (
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/service/worker/handler"
 )
 
 type svc struct {
-	clients      objstore.Clients
-	storageSvc   storage.Service
-	queueSvc     tasks.QueueService
-	limit        ratelimit.RPM
-	objectLocker *store.ObjectLocker
-	bucketLocker *store.BucketLocker
-	userLocker   *store.UserLocker
-	conf         *handler.Config
+	clients              objstore.Clients
+	bucketListStateStore *store.MigrationBucketListStateStore
+	objectListStateStore *store.MigrationObjectListStateStore
+	queueSvc             tasks.QueueService
+	limit                ratelimit.RPM
+	objectLocker         *store.ObjectLocker
+	bucketLocker         *store.BucketLocker
+	userLocker           *store.UserLocker
+	conf                 *handler.Config
 }
 
-func New(conf *handler.Config, clients objstore.Clients,
-	storageSvc storage.Service,
-	queueSvc tasks.QueueService, limit ratelimit.RPM, objectLocker *store.ObjectLocker, userLocker *store.UserLocker,
+func New(conf *handler.Config, clients objstore.Clients, bucketListStateStore *store.MigrationBucketListStateStore,
+	objectListStateStore *store.MigrationObjectListStateStore, queueSvc tasks.QueueService,
+	limit ratelimit.RPM, objectLocker *store.ObjectLocker, userLocker *store.UserLocker,
 	bucketLocker *store.BucketLocker) *svc {
 	return &svc{
-		conf:         conf,
-		clients:      clients,
-		storageSvc:   storageSvc,
-		queueSvc:     queueSvc,
-		limit:        limit,
-		userLocker:   userLocker,
-		objectLocker: objectLocker,
-		bucketLocker: bucketLocker,
+		conf:                 conf,
+		clients:              clients,
+		bucketListStateStore: bucketListStateStore,
+		objectListStateStore: objectListStateStore,
+		queueSvc:             queueSvc,
+		limit:                limit,
+		userLocker:           userLocker,
+		objectLocker:         objectLocker,
+		bucketLocker:         bucketLocker,
 	}
 }

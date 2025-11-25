@@ -82,7 +82,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("app redis connected")
 
 	verSvc := meta.NewVersionService(appRedis)
-	storageSvc := storage.New(appRedis)
+	uploadSvc := storage.NewUploadSvc(appRedis)
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 
 	confRedis := util.NewRedis(conf.Redis, conf.Redis.ConfigDB)
@@ -123,7 +123,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		if err != nil {
 			return err
 		}
-		routeSvc := router.NewS3Router(s3Clients, verSvc, storageSvc, limiter)
+		routeSvc := router.NewS3Router(s3Clients, verSvc, uploadSvc, limiter)
 		replSvc := replication.NewS3(queueSvc, verSvc, policySvc)
 		authCheck := auth.Middleware(conf.Auth, conf.Storage.S3Storages())
 		proxyConfig.Storages[dom.S3] = router.StorageProxy{

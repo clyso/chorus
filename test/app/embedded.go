@@ -48,7 +48,6 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/testutil"
 	"github.com/clyso/chorus/pkg/util"
@@ -98,8 +97,6 @@ type EmbeddedEnv struct {
 	PolicyClient pb.PolicyClient
 	ChorusClient pb.ChorusClient
 	DiffClient   pb.DiffClient
-
-	StorageSvc storage.Service
 
 	UrlHttpApi string
 

@@ -17,12 +17,15 @@ package swift
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/pagination"
 	"github.com/hibiken/asynq"
 
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -42,8 +45,9 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 	}
 
 	// resume from last container
-	lastContainerName, err := s.storageSvc.GetLastListedContainer(ctx, p)
-	if err != nil {
+	migrationBucketID := entity.NewMigrationBucketIDFromUniversalReplicationID(p.ID)
+	lastContainerName, err := s.bucketListStateStore.Get(ctx, migrationBucketID)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
 		return err
 	}
 
@@ -68,7 +72,7 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 				return false, err
 			}
 			// checkpoint last container
-			if err = s.storageSvc.SetLastListedContainer(ctx, p, container); err != nil {
+			if err = s.bucketListStateStore.Set(ctx, migrationBucketID, container); err != nil {
 				return false, fmt.Errorf("error setting last listed container: %w", err)
 			}
 		}
@@ -82,8 +86,10 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 	}
 
 	// cleanup last listed container
-	if err = s.storageSvc.DelLastListedContainer(ctx, p); err != nil {
+
+	if _, err := s.bucketListStateStore.Drop(ctx, migrationBucketID); err != nil {
 		return fmt.Errorf("error deleting last listed container: %w", err)
 	}
-	return err
+
+	return nil
 }

@@ -37,7 +37,6 @@ import (
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/rpc"
-	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -54,7 +53,7 @@ func PolicyHandlers(
 	rclone rclone.Service,
 	policySvc policy.Service,
 	versionSvc meta.VersionService,
-	storageSvc storage.Service,
+	objectListStateStore *store.MigrationObjectListStateStore,
 	agentClient *rpc.AgentClient,
 	notificationSvc *notifications.Service,
 	replicationStatusLocker *store.ReplicationStatusLocker,
@@ -66,7 +65,7 @@ func PolicyHandlers(
 		queueSvc:                queueSvc,
 		policySvc:               policySvc,
 		versionSvc:              versionSvc,
-		storageSvc:              storageSvc,
+		objectListStateStore:    objectListStateStore,
 		agentClient:             agentClient,
 		notificationSvc:         notificationSvc,
 		replicationStatusLocker: replicationStatusLocker,
@@ -82,7 +81,7 @@ type policyHandlers struct {
 	rclone                  rclone.Service
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
-	storageSvc              storage.Service
+	objectListStateStore    *store.MigrationObjectListStateStore
 	agentClient             *rpc.AgentClient
 	notificationSvc         *notifications.Service
 	replicationStatusLocker *store.ReplicationStatusLocker
@@ -308,7 +307,7 @@ func (h *policyHandlers) DeleteReplication(ctx context.Context, req *pb.Replicat
 			if err != nil {
 				return fmt.Errorf("%w: unable to delete version metadata", err)
 			}
-			err = h.storageSvc.CleanLastListedObj(ctx, bucketRepl.FromStorage, bucketRepl.ToStorage, bucketRepl.FromBucket, bucketRepl.ToBucket)
+			_, err = h.objectListStateStore.DropIDs(ctx, bucketRepl.FromStorage, bucketRepl.FromBucket, bucketRepl.ToStorage, bucketRepl.ToBucket)
 			if err != nil {
 				return fmt.Errorf("%w: unable to delete list obj metadata", err)
 			}

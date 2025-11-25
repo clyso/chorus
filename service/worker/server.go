@@ -85,7 +85,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("app redis connected")
 
 	versionSvc := meta.NewVersionService(appRedis)
-	storageSvc := storage.New(appRedis)
+	uploadSvc := storage.NewUploadSvc(appRedis)
+	objectListStateStore := store.NewMigrationObjectListStateStore(appRedis)
+	bucketListStateStore := store.NewMigrationBucketListStateStore(appRedis)
 
 	confRedis := util.NewRedis(conf.Redis, conf.Redis.ConfigDB)
 	defer confRedis.Close()
@@ -174,7 +176,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, storageSvc, rc, queueSvc, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, rc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -223,7 +225,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		mux.Use(metrics.WorkerMiddleware())
 	}
 	// common workers
-	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, storageSvc, replicationStatusLocker)
+	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, uploadSvc, replicationStatusLocker)
 	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, switchWorker.HandleZeroDowntimeReplicationSwitch)
 	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, switchWorker.HandleSwitchWithDowntime)
 	logger.Info().Msg("registered common workers")
@@ -257,7 +259,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	// swift workers
 	if len(conf.Storage.SwiftStorages()) != 0 {
-		swiftWorkerSvc := swift_worker.New(conf.Worker, clientRegistry, storageSvc, queueSvc, limiter, objectLocker, userLocker, bucketLocker)
+		swiftWorkerSvc := swift_worker.New(conf.Worker, clientRegistry, bucketListStateStore, objectListStateStore, queueSvc, limiter, objectLocker, userLocker, bucketLocker)
 		// swift tasks:
 		mux.HandleFunc(tasks.TypeSwiftAccountUpdate, swiftWorkerSvc.HandleAccountUpdate)
 		mux.HandleFunc(tasks.TypeSwiftContainerUpdate, swiftWorkerSvc.HandleContainerUpdate)
@@ -292,7 +294,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Api.Enabled {
 		chorusHandler := api.ChorusHandlers(clientRegistry.Config(), rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
 		diffHandler := api.DiffHandlers(clientRegistry.Config(), queueSvc, checkSvc)
-		policyHandler := api.PolicyHandlers(clientRegistry, queueSvc, rc, policySvc, versionSvc, storageSvc, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
+		policyHandler := api.PolicyHandlers(clientRegistry, queueSvc, rc, policySvc, versionSvc, objectListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
 		registerServices := func(srv *grpc.Server) {
 			pb.RegisterChorusServer(srv, chorusHandler)
 			pb.RegisterDiffServer(srv, diffHandler)

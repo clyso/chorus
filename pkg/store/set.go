@@ -145,3 +145,72 @@ func (r *RedisIDKeySet[ID, V]) IsMemberOp(ctx context.Context, id ID, value V) O
 func (r *RedisIDKeySet[ID, V]) IsMember(ctx context.Context, id ID, value V) (bool, error) {
 	return r.IsMemberOp(ctx, id, value).Get()
 }
+
+func (r *RedisIDKeySet[ID, V]) LenOp(ctx context.Context, id ID) OperationResult[uint64] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[uint64](fmt.Errorf("unable to make key: %w", err))
+	}
+
+	cmd := r.client.SCard(ctx, key)
+
+	collectFunc := func() (uint64, error) {
+		card, err := cmd.Result()
+		if err != nil {
+			return 0, err
+		}
+		return uint64(card), nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDKeySet[ID, V]) Len(ctx context.Context, id ID) (uint64, error) {
+	return r.LenOp(ctx, id).Get()
+}
+
+func (r *RedisIDKeySet[ID, V]) EmptyOp(ctx context.Context, id ID) OperationResult[bool] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[bool](fmt.Errorf("unable to make key: %w", err))
+	}
+
+	cmd := r.client.SCard(ctx, key)
+
+	collectFunc := func() (bool, error) {
+		card, err := cmd.Result()
+		if err != nil {
+			return false, err
+		}
+		return card == 0, nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDKeySet[ID, V]) Empty(ctx context.Context, id ID) (bool, error) {
+	return r.EmptyOp(ctx, id).Get()
+}
+
+func (r *RedisIDKeySet[ID, V]) NotEmptyOp(ctx context.Context, id ID) OperationResult[bool] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[bool](fmt.Errorf("unable to make key: %w", err))
+	}
+
+	cmd := r.client.SCard(ctx, key)
+
+	collectFunc := func() (bool, error) {
+		card, err := cmd.Result()
+		if err != nil {
+			return false, err
+		}
+		return card != 0, nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDKeySet[ID, V]) NotEmpty(ctx context.Context, id ID) (bool, error) {
+	return r.NotEmptyOp(ctx, id).Get()
+}

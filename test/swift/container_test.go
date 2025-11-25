@@ -34,7 +34,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 	r := require.New(t)
 
 	// setup clients
-	svc := swift_worker.New(nil, clients, nil, nil, nil, nil, nil, nil)
+	svc := swift_worker.New(nil, clients, nil, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := clients.AsSwift(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := clients.AsSwift(tstCtx, cephTestKey, testAcc)
