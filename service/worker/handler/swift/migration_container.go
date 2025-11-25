@@ -17,6 +17,7 @@ package swift
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -43,10 +46,6 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 	if err != nil {
 		return fmt.Errorf("get swift client: %w", err)
 	}
-	lastListedKey := tasks.MigrateBucketListObjectsPayload{
-		Bucket: p.Bucket,
-	}
-	lastListedKey.SetReplicationID(p.ID)
 
 	// check rate limits:
 	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
@@ -64,10 +63,11 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 		return fmt.Errorf("handle container update: %w", err)
 	}
 
+	migrationObjectID := entity.NewNonRecursiveMigrationObjectIDFromUniversalReplicationID(p.ID, p.Bucket)
 	// list objects in the container:
 	// resume from last listed object:
-	lastObjectName, err := s.storageSvc.GetLastListedObj(ctx, lastListedKey)
-	if err != nil {
+	lastObjectName, err := s.objectListStateStore.Get(ctx, migrationObjectID)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
 		return fmt.Errorf("get last listed object: %w", err)
 	}
 	listOpts := objects.ListOpts{
@@ -98,8 +98,7 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 			}
 
 			// checkpoint last listed object:
-			err = s.storageSvc.SetLastListedObj(ctx, lastListedKey, object.Name)
-			if err != nil {
+			if err = s.objectListStateStore.Set(ctx, migrationObjectID, object.Name); err != nil {
 				return false, fmt.Errorf("migration bucket list obj: unable to set last listed object: %w", err)
 			}
 		}
@@ -110,7 +109,10 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 	}
 
 	// cleanup listing checkpoint:
-	_ = s.storageSvc.DelLastListedObj(ctx, lastListedKey)
+	_, err = s.objectListStateStore.Drop(ctx, migrationObjectID)
+	if err != nil {
+		zerolog.Ctx(ctx).Debug().Err(err).Msg("unable to drop last listed object")
+	}
 
 	return nil
 }

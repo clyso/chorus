@@ -63,3 +63,60 @@ func NewVersionedObjectID(storage string, bucket string, name string) VersionedO
 		Name:    name,
 	}
 }
+
+type MigrationObjectID struct {
+	FromStorage string
+	FromBucket  string
+	ToStorage   string
+	ToBucket    string
+	Prefix      string
+}
+
+func NewMigrationObjectID(fromStorage string, fromBucket string, toStorage string, toBucket string, prefix string) MigrationObjectID {
+	return MigrationObjectID{
+		FromStorage: fromStorage,
+		FromBucket:  fromBucket,
+		ToStorage:   toStorage,
+		ToBucket:    toBucket,
+		Prefix:      prefix,
+	}
+}
+
+func NewMigrationObjectIDFromUniversalReplicationID(replicationID UniversalReplicationID, bucket string, prefix string) MigrationObjectID {
+	fromBucket, toBucket := replicationID.FromToBuckets(bucket)
+	return MigrationObjectID{
+		FromStorage: replicationID.fromStorage,
+		FromBucket:  fromBucket,
+		ToStorage:   replicationID.toStorage,
+		ToBucket:    toBucket,
+		Prefix:      prefix,
+	}
+}
+
+func NewNonRecursiveMigrationObjectIDFromUniversalReplicationID(replicationID UniversalReplicationID, bucket string) MigrationObjectID {
+	fromBucket, toBucket := replicationID.FromToBuckets(bucket)
+	return MigrationObjectID{
+		FromStorage: replicationID.fromStorage,
+		FromBucket:  fromBucket,
+		ToStorage:   replicationID.toStorage,
+		ToBucket:    toBucket,
+	}
+}
+
+type MigrationBucketID struct {
+	User        string
+	FromStorage string
+	FromBucket  string
+	ToStorage   string
+	ToBucket    string
+}
+
+func NewMigrationBucketIDFromUniversalReplicationID(replicationID UniversalReplicationID) MigrationBucketID {
+	return MigrationBucketID{
+		User:        replicationID.user,
+		FromStorage: replicationID.fromStorage,
+		FromBucket:  replicationID.fromBucket,
+		ToStorage:   replicationID.toStorage,
+		ToBucket:    replicationID.toBucket,
+	}
+}

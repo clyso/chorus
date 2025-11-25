@@ -24,6 +24,7 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -50,7 +51,9 @@ func (r *s3Router) createMultipartUpload(req *http.Request) (resp *http.Response
 		zerolog.Ctx(ctx).Err(err).Msg("unable to unmarshal initiateMultipartUploadResult response body")
 		return
 	}
-	err = r.storageSvc.StoreUploadID(ctx, user, bucket, object, respBody.UploadID, inProgressSwitch.MultipartTTL)
+	id := entity.NewUserUploadObjectID(user, bucket)
+	val := entity.NewUserUploadObject(object, respBody.UploadID)
+	err = r.uploadSvc.StoreUpload(ctx, id, val, inProgressSwitch.MultipartTTL)
 
 	return
 }
@@ -73,7 +76,9 @@ func (r *s3Router) completeMultipartUpload(req *http.Request) (resp *http.Respon
 		return
 	}
 	if switchInProgress {
-		_ = r.storageSvc.DeleteUploadID(ctx, user, bucket, object, req.URL.Query().Get("uploadId"))
+		id := entity.NewUserUploadObjectID(user, bucket)
+		val := entity.NewUserUploadObject(object, req.URL.Query().Get("uploadId"))
+		_ = r.uploadSvc.DeleteUpload(ctx, id, val)
 	}
 
 	var res completeMultipartUploadResult
@@ -127,7 +132,10 @@ func (r *s3Router) abortMultipartUpload(req *http.Request) (resp *http.Response,
 		return
 	}
 	if switchInProgress {
-		_ = r.storageSvc.DeleteUploadID(ctx, user, bucket, object, req.URL.Query().Get("uploadId"))
+		id := entity.NewUserUploadObjectID(user, bucket)
+		val := entity.NewUserUploadObject(object, req.URL.Query().Get("uploadId"))
+
+		_ = r.uploadSvc.DeleteUpload(ctx, id, val)
 	}
 	return
 }
@@ -165,7 +173,6 @@ func (r *s3Router) uploadPart(req *http.Request) (resp *http.Response, storage s
 
 func (r *s3Router) routeMultipart(req *http.Request) (storage string, switchInProgress bool, err error) {
 	ctx := req.Context()
-	user, bucket, object := xctx.GetUser(ctx), xctx.GetBucket(ctx), xctx.GetObject(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 
 	inProgressSwitch := xctx.GetInProgressZeroDowntime(ctx)
@@ -173,9 +180,12 @@ func (r *s3Router) routeMultipart(req *http.Request) (storage string, switchInPr
 		// no switch in progress
 		return storage, false, nil
 	}
-	uploadID := req.URL.Query().Get("uploadId")
 	var exists bool
-	exists, err = r.storageSvc.ExistsUploadID(ctx, user, bucket, object, uploadID)
+
+	id := entity.NewUserUploadObjectID(xctx.GetUser(ctx), xctx.GetBucket(ctx))
+	val := entity.NewUserUploadObject(xctx.GetObject(ctx), req.URL.Query().Get("uploadId"))
+	exists, err = r.uploadSvc.UploadExists(ctx, id, val)
+
 	if err != nil {
 		return storage, true, err
 	}
@@ -192,7 +202,6 @@ func (r *s3Router) routeMultipart(req *http.Request) (storage string, switchInPr
 
 func (r *s3Router) routeListMultipart(req *http.Request) (storage string, err error) {
 	ctx := req.Context()
-	user, bucket := xctx.GetUser(ctx), xctx.GetBucket(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 
 	inProgressSwitch := xctx.GetInProgressZeroDowntime(ctx)
@@ -201,7 +210,9 @@ func (r *s3Router) routeListMultipart(req *http.Request) (storage string, err er
 		return storage, nil
 	}
 	// todo: maybe better always return old?
-	exists, err := r.storageSvc.ExistsUploads(ctx, user, bucket)
+	id := entity.NewUserUploadObjectID(xctx.GetUser(ctx), xctx.GetBucket(ctx))
+	exists, err := r.uploadSvc.UploadsExistForUserBucket(ctx, id)
+
 	if err != nil {
 		return "", err
 	}

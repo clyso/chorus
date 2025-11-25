@@ -19,6 +19,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -26,6 +27,8 @@ import (
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -51,9 +54,10 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		return fmt.Errorf("migration bucket list obj: unable to get %q s3 client: %w: %w", p.ID.FromStorage(), err, asynq.SkipRetry)
 	}
 
-	lastObjName, err := s.storageSvc.GetLastListedObj(ctx, p)
-	if err != nil {
-		return err
+	migrationID := entity.NewMigrationObjectIDFromUniversalReplicationID(p.ID, p.Bucket, p.Prefix)
+	lastObjName, err := s.listStateStore.Get(ctx, migrationID)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("unable to get last listed object: %w", err)
 	}
 
 	objects := fromClient.S3().ListObjects(ctx, p.Bucket, mclient.ListObjectsOptions{StartAfter: lastObjName, Prefix: p.Prefix})
@@ -71,7 +75,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			if err = s.queueSvc.EnqueueTask(ctx, subP); err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to enqueue list obj sub task: %w", err)
 			}
-			err = s.storageSvc.SetLastListedObj(ctx, p, object.Key)
+			err = s.listStateStore.Set(ctx, migrationID, object.Key)
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to update last obj meta: %w", err)
 			}
@@ -105,8 +109,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 				return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)
 			}
 		}
-		err = s.storageSvc.SetLastListedObj(ctx, p, object.Key)
-		if err != nil {
+		if err = s.listStateStore.Set(ctx, migrationID, object.Key); err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to update last obj meta: %w", err)
 		}
 	}
@@ -125,7 +128,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		}
 	}
-	_ = s.storageSvc.DelLastListedObj(ctx, p)
+	_, _ = s.listStateStore.Drop(ctx, migrationID)
 
 	logger.Info().Msg("migration bucket list obj: done")
 	return nil

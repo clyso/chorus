@@ -18,3 +18,4 @@ standalone/
 build/
 .tools/
 .build
+test.log

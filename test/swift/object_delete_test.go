@@ -21,7 +21,7 @@ func Test_handleObjectDelete(t *testing.T) {
 	bucket, obj := "test-obj-delete", "test-obj-del"
 
 	// setup clients
-	svc := swift_worker.New(nil, clients, nil, nil, nil, nil, nil, nil)
+	svc := swift_worker.New(nil, clients, nil, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := clients.AsSwift(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := clients.AsSwift(tstCtx, cephTestKey, testAcc)
@@ -110,7 +110,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 	bucket, sloBucket, obj := "test-obj-delete-multipart", "tst-delete-slo", "test-obj-del-multipart"
 
 	// setup clients
-	svc := swift_worker.New(nil, clients, nil, nil, nil, nil, nil, nil)
+	svc := swift_worker.New(nil, clients, nil, nil, nil, nil, nil, nil, nil)
 	cephClient, err := clients.AsSwift(tstCtx, cephTestKey, testAcc)
 	r.NoError(err, "failed to get ceph client for test account")
 

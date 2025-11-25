@@ -43,7 +43,8 @@ type Config struct {
 type svc struct {
 	clients                 objstore.Clients
 	versionSvc              meta.VersionService
-	storageSvc              storage.Service
+	listStateStore          *store.MigrationObjectListStateStore
+	uploadSvc               *storage.UploadSvc
 	rc                      rclone.Service
 	queueSvc                tasks.QueueService
 	limit                   ratelimit.RPM
@@ -55,14 +56,16 @@ type svc struct {
 }
 
 func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
-	storageSvc storage.Service, rc rclone.Service,
-	queueSvc tasks.QueueService, limit ratelimit.RPM, objectLocker *store.ObjectLocker,
-	bucketLocker *store.BucketLocker, replicationstatusLocker *store.ReplicationStatusLocker) *svc {
+	rc rclone.Service, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
+	limit ratelimit.RPM, listStateStore *store.MigrationObjectListStateStore,
+	objectLocker *store.ObjectLocker, bucketLocker *store.BucketLocker,
+	replicationstatusLocker *store.ReplicationStatusLocker) *svc {
 	return &svc{
 		conf:                    conf,
 		clients:                 clients,
 		versionSvc:              versionSvc,
-		storageSvc:              storageSvc,
+		listStateStore:          listStateStore,
+		uploadSvc:               uploadSvc,
 		rc:                      rc,
 		queueSvc:                queueSvc,
 		limit:                   limit,

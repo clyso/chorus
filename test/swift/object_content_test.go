@@ -25,7 +25,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 	bucket, obj := "test-obj-cont-bucket", "test-obj-cont-object"
 
 	// setup clients
-	svc := swift_worker.New(&handler.Config{}, clients, nil, nil, nil, nil, nil, nil)
+	svc := swift_worker.New(&handler.Config{}, clients, nil, nil, nil, nil, nil, nil, nil)
 	swiftClient, err := clients.AsSwift(tstCtx, swiftTestKey, testAcc)
 	r.NoError(err, "failed to get swift client for test account")
 	cephClient, err := clients.AsSwift(tstCtx, cephTestKey, testAcc)

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -374,6 +375,29 @@ func (r *RedisIDCommonStore[ID]) DropOp(ctx context.Context, id ID) OperationRes
 
 func (r *RedisIDCommonStore[ID]) Drop(ctx context.Context, id ID) (uint64, error) {
 	return r.DropOp(ctx, id).Get()
+}
+
+func (r *RedisIDCommonStore[ID]) SetTTLOp(ctx context.Context, id ID, ttl time.Duration) OperationResult[bool] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[bool](fmt.Errorf("unable to make key: %w", err))
+	}
+
+	cmd := r.client.Expire(ctx, key, ttl)
+
+	collectFunc := func() (bool, error) {
+		set, err := cmd.Result()
+		if err != nil {
+			return false, fmt.Errorf("unable to unlink key: %w", err)
+		}
+		return set, nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDCommonStore[ID]) SetTTL(ctx context.Context, id ID, ttl time.Duration) (bool, error) {
+	return r.SetTTLOp(ctx, id, ttl).Get()
 }
 
 func (r *RedisIDCommonStore[ID]) MakeKey(id ID) (string, error) {
