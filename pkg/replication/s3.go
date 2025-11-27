@@ -77,50 +77,53 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 		}
 
 	}
-
-	// 2. increment versions in source storage
-	switch t := task.(type) {
-	case *tasks.BucketCreatePayload:
-	// no version increment needed
-	case *tasks.BucketDeletePayload:
-		err = s.versionSvc.DeleteBucketAll(ctx, t.Bucket)
-		if err != nil {
-			return err
-		}
-	case *tasks.BucketSyncACLPayload:
-		_, err = s.versionSvc.IncrementBucketACL(ctx, t.Bucket, meta.ToDest(routedTo, ""))
-		if err != nil {
-			return err
-		}
-	case *tasks.BucketSyncTagsPayload:
-		_, err = s.versionSvc.IncrementBucketTags(ctx, t.Bucket, meta.ToDest(routedTo, ""))
-		if err != nil {
-			return err
-		}
-	case *tasks.ObjectSyncPayload:
-		if t.Deleted {
-			err = s.versionSvc.DeleteObjAll(ctx, t.Object)
-		} else {
-			_, err = s.versionSvc.IncrementObj(ctx, t.Object, meta.ToDest(routedTo, ""))
-		}
-		if err != nil {
-			return err
-		}
-	case *tasks.ObjSyncACLPayload:
-		_, err = s.versionSvc.IncrementACL(ctx, t.Object, meta.ToDest(routedTo, ""))
-		if err != nil {
-			return err
-		}
-	case *tasks.ObjSyncTagsPayload:
-		_, err = s.versionSvc.IncrementTags(ctx, t.Object, meta.ToDest(routedTo, ""))
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("%w: unsupported replication task type %T", dom.ErrInternal, task)
+	destination := meta.Destination{
+		Storage: routedTo,
+		Bucket:  xctx.GetBucket(ctx),
 	}
-	// 3. fan out tasks for each destination
 	for _, replID := range replications {
+		// 2. increment versions in source storage
+		switch t := task.(type) {
+		case *tasks.BucketCreatePayload:
+		// no version increment needed
+		case *tasks.BucketDeletePayload:
+			err = s.versionSvc.DeleteBucketAll(ctx, replID, t.Bucket)
+			if err != nil {
+				return err
+			}
+		case *tasks.BucketSyncACLPayload:
+			_, err = s.versionSvc.IncrementBucketACL(ctx, replID, t.Bucket, destination)
+			if err != nil {
+				return err
+			}
+		case *tasks.BucketSyncTagsPayload:
+			_, err = s.versionSvc.IncrementBucketTags(ctx, replID, t.Bucket, destination)
+			if err != nil {
+				return err
+			}
+		case *tasks.ObjectSyncPayload:
+			if t.Deleted {
+				err = s.versionSvc.DeleteObjAll(ctx, replID, t.Object)
+			} else {
+				_, err = s.versionSvc.IncrementObj(ctx, replID, t.Object, destination)
+			}
+			if err != nil {
+				return err
+			}
+		case *tasks.ObjSyncACLPayload:
+			_, err = s.versionSvc.IncrementACL(ctx, replID, t.Object, destination)
+			if err != nil {
+				return err
+			}
+		case *tasks.ObjSyncTagsPayload:
+			_, err = s.versionSvc.IncrementTags(ctx, replID, t.Object, destination)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%w: unsupported replication task type %T", dom.ErrInternal, task)
+		}
+		// 3. fan out tasks for each destination
 		task.SetReplicationID(replID)
 		err := s.queueSvc.EnqueueTask(ctx, task)
 		if err != nil {

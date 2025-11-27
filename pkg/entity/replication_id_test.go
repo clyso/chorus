@@ -34,21 +34,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 			wantPanic: false,
 		},
 		{
-			name: "invalid bucket is not equal to from bucket",
-			args: args{
-				id: BucketReplicationPolicy{
-					User:        "u",
-					FromStorage: "fs",
-					FromBucket:  "fb",
-					ToStorage:   "ts",
-					ToBucket:    "tb",
-				},
-				bucket: "tb",
-			},
-			wantPanic: true,
-		},
-		{
-			name: "invalid bucket is not equal to from bucket",
+			name: "invalid bucket is not equal to from/to bucket",
 			args: args{
 				id: BucketReplicationPolicy{
 					User:        "u",
@@ -62,7 +48,7 @@ func TestIDFromBucketReplication(t *testing.T) {
 			wantPanic: true,
 		},
 		{
-			name: "invalid bucket is not equal to from bucket",
+			name: "invalid bucket is not equal to from/to bucket",
 			args: args{
 				id: BucketReplicationPolicy{
 					User:        "u",

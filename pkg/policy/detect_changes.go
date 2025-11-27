@@ -25,10 +25,16 @@ import (
 )
 
 const (
-	minSchemaVersion     = 2
-	currentSchemaVersion = 2
+	minSchemaVersion     = 3
+	currentSchemaVersion = 3
 	schemaVersionKey     = "chorus_schema"
 )
+
+var supportedSchemaVersions = map[int]string{
+	0: "v0.5.15 or older",
+	1: "v0.5.15 or older",
+	2: "v0.6.0",
+}
 
 func CheckSchemaCompatibility(ctx context.Context, chorusVersion string, client redis.UniversalClient) error {
 	// Check current schema version in Redis
@@ -49,7 +55,8 @@ func CheckSchemaCompatibility(ctx context.Context, chorusVersion string, client 
 	onlySchemaVersionKey := len(keys) == 1 && keys[0] == schemaVersionKey
 
 	if !onlySchemaVersionKey && len(keys) > 0 {
-		return fmt.Errorf("%w: Chorus version %s is incompatible with existing Redis schema from previous Chorus installations. Please remove all data in Redis to continue with the current version, or use Chorus v0.5.15 or older", dom.ErrInternal, chorusVersion)
+		supportedVersion := supportedSchemaVersions[version]
+		return fmt.Errorf("%w: Chorus version %s is incompatible with existing Redis schema from previous Chorus installations. Please remove all data in Redis to continue with the current version, or use Chorus %s", dom.ErrInternal, chorusVersion, supportedVersion)
 	}
 	// No legacy keys found, consider schema compatible
 	// Set the current schema version to not check again next time

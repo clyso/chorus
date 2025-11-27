@@ -65,15 +65,14 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 		return err
 	}
 	defer lock.Release(ctx)
-	objMeta, err := s.versionSvc.GetObj(ctx, domObj)
+	versions, err := s.versionSvc.GetObj(ctx, p.ID, domObj)
 	if err != nil {
 		return fmt.Errorf("migration obj copy: unable to get obj meta: %w", err)
 	}
-	destVersionKey := meta.ToDest(p.ID.ToStorage(), toBucket)
-	fromVer, toVer := objMeta[meta.ToDest(p.ID.FromStorage(), "")], objMeta[destVersionKey]
+	fromVer, toVer := versions.From, versions.To
 
 	if fromVer != 0 && fromVer <= toVer {
-		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("migration obj copy: identical from/to obj version: skip copy")
+		logger.Info().Int("from_ver", fromVer).Int("to_ver", toVer).Msg("migration obj copy: identical from/to obj version: skip copy")
 		return nil
 	}
 	// 1. sync obj meta and content
@@ -117,7 +116,8 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 
 	if fromVer != 0 {
-		err = s.versionSvc.UpdateIfGreater(ctx, domObj, destVersionKey, fromVer)
+		destination := meta.Destination{Storage: p.ID.ToStorage(), Bucket: toBucket}
+		err = s.versionSvc.UpdateIfGreater(ctx, p.ID, domObj, destination, fromVer)
 		if err != nil {
 			return fmt.Errorf("migration obj copy: unable to update obj meta: %w", err)
 		}
