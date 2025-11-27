@@ -98,9 +98,9 @@ func (r *UniversalReplicationID) FromToBuckets(taskBucket string) (from, to stri
 		// should never happen
 		panic(fmt.Sprintf("trying to access empty replication ID: %#v", *r))
 	}
-	if taskBucket != r.fromBucket {
+	if taskBucket != r.fromBucket && taskBucket != r.toBucket {
 		// should never happen
-		panic(fmt.Sprintf("task bucket %q does not match replication from bucket %q", taskBucket, r.fromBucket))
+		panic(fmt.Sprintf("task bucket %q does not match replication buckets %q-%q", taskBucket, r.fromBucket, r.toBucket))
 	}
 	// bucket replication
 	return r.fromBucket, r.toBucket

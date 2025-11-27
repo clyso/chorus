@@ -54,6 +54,7 @@ func PolicyHandlers(
 	policySvc policy.Service,
 	versionSvc meta.VersionService,
 	objectListStateStore *store.MigrationObjectListStateStore,
+	bucketListStateStore *store.MigrationBucketListStateStore,
 	agentClient *rpc.AgentClient,
 	notificationSvc *notifications.Service,
 	replicationStatusLocker *store.ReplicationStatusLocker,
@@ -66,6 +67,7 @@ func PolicyHandlers(
 		policySvc:               policySvc,
 		versionSvc:              versionSvc,
 		objectListStateStore:    objectListStateStore,
+		bucketListStateStore:    bucketListStateStore,
 		agentClient:             agentClient,
 		notificationSvc:         notificationSvc,
 		replicationStatusLocker: replicationStatusLocker,
@@ -82,6 +84,7 @@ type policyHandlers struct {
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
 	objectListStateStore    *store.MigrationObjectListStateStore
+	bucketListStateStore    *store.MigrationBucketListStateStore
 	agentClient             *rpc.AgentClient
 	notificationSvc         *notifications.Service
 	replicationStatusLocker *store.ReplicationStatusLocker
@@ -294,31 +297,37 @@ func (h *policyHandlers) DeleteReplication(ctx context.Context, req *pb.Replicat
 	}
 	err = h.inReplicationLock(ctx, uid, func() error {
 		if userRepl, ok := uid.AsUserID(); ok {
-			// create user replication
-			// TODO: refactor version meta service to cleanup data by universal replicationID
-			return h.policySvc.DeleteUserReplication(ctx, userRepl)
+			// delete user replication
+			err = h.policySvc.DeleteUserReplication(ctx, userRepl)
+			if err != nil {
+				return err
+			}
 		} else if bucketRepl, ok := uid.AsBucketID(); ok {
 			// create bucket replication
 			err = h.policySvc.DeleteBucketReplication(ctx, bucketRepl)
 			if err != nil {
 				return fmt.Errorf("%w: unable to delete replication policy", err)
 			}
-			err = h.versionSvc.DeleteBucketMeta(ctx, meta.ToDest(bucketRepl.ToStorage, bucketRepl.ToBucket), bucketRepl.FromBucket)
-			if err != nil {
-				return fmt.Errorf("%w: unable to delete version metadata", err)
-			}
-			_, err = h.objectListStateStore.DropIDs(ctx, bucketRepl.FromStorage, bucketRepl.FromBucket, bucketRepl.ToStorage, bucketRepl.ToBucket)
-			if err != nil {
-				return fmt.Errorf("%w: unable to delete list obj metadata", err)
-			}
 			err = h.notificationSvc.DeleteBucketNotification(ctx, bucketRepl.FromStorage, bucketRepl.User, bucketRepl.FromBucket)
 			if err != nil {
 				zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
 			}
-			return nil
 		} else {
 			return fmt.Errorf("%w: invalid replication ID", dom.ErrInvalidArg)
 		}
+		err = h.versionSvc.Cleanup(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("%w: unable to delete version metadata", err)
+		}
+		err = h.objectListStateStore.DeleteForReplication(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("%w: unable to delete list obj metadata", err)
+		}
+		err = h.bucketListStateStore.DeleteForReplication(ctx, uid)
+		if err != nil {
+			return fmt.Errorf("%w: unable to delete list bucket metadata", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

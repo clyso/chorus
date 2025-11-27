@@ -51,4 +51,22 @@ func TestCheckSchemaCompatibility(t *testing.T) {
 		r.Error(err)
 		r.ErrorIs(err, dom.ErrInternal)
 	})
+
+	t.Run("has schema verstion 2", func(t *testing.T) {
+		c.FlushAll(ctx)
+		// add at least one key
+		err := c.ZAdd(ctx, "p:repl:from", redis.Z{
+			Score:  5,
+			Member: "to:buck",
+		}).Err()
+		r.NoError(err)
+
+		err = c.Set(ctx, schemaVersionKey, 2, 0).Err()
+		r.NoError(err)
+
+		err = CheckSchemaCompatibility(ctx, "", c)
+		r.Error(err)
+		r.ErrorIs(err, dom.ErrInternal)
+		r.Contains(err.Error(), "v0.6.0")
+	})
 }

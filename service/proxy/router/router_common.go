@@ -18,12 +18,14 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3"
 )
@@ -74,43 +76,58 @@ func (r *s3Router) adjustObjReadRoute(ctx context.Context, prevStorage string) (
 		return prevStorage, nil
 	}
 	// since switch is in progress, we need to check if the object version is higher in other storage
-	objMeta, err := r.getVersion(ctx)
+
+	// zero-downtime switch allowed only for a single replication:
+	replications := xctx.GetReplications(ctx)
+	if len(replications) != 1 {
+		return "", fmt.Errorf("%w: in-progress zero-downtime switch can have only one replication", dom.ErrInternal)
+	}
+	replID := replications[0]
+	version, err := r.getVersion(ctx, replID)
 	if err != nil {
 		return "", err
 	}
-	prevStorageVer := objMeta[meta.Destination(prevStorage)]
-	maxVerStorage, maxVer := meta.Destination(prevStorage), prevStorageVer
-	for storage, version := range objMeta {
-		if version > maxVer {
-			maxVerStorage = storage
-			maxVer = version
-		}
+	if version.From == version.To {
+		// versions are equal, no need to change route
+		return prevStorage, nil
 	}
-	if string(maxVerStorage) != prevStorage {
-		zerolog.Ctx(ctx).Info().Msgf("change read route during switch process: storage %s obj ver %d is higher than main storage %s %d", maxVerStorage, maxVer, prevStorage, prevStorageVer)
+	currentDest := meta.Destination{Storage: prevStorage, Bucket: xctx.GetBucket(ctx)}
+	currVer, otherVer := version.From, version.To
+	if !currentDest.IsFrom(replID) {
+		//swap
+		currVer, otherVer = version.To, version.From
 	}
-	return string(maxVerStorage), nil
+	if currVer > otherVer {
+		return prevStorage, nil
+	}
+	// return other storage as destination
+	otherStorage := replID.FromStorage()
+	if otherStorage == prevStorage {
+		otherStorage = replID.ToStorage()
+	}
+	zerolog.Ctx(ctx).Info().Msgf("change read route during switch process: storage %s has higher obj ver %d than main storage %s ver %d", otherStorage, otherVer, prevStorage, currVer)
+	return otherStorage, nil
 }
 
-func (r *s3Router) getVersion(ctx context.Context) (map[meta.Destination]int64, error) {
+func (r *s3Router) getVersion(ctx context.Context, replID entity.UniversalReplicationID) (meta.Version, error) {
 	method := xctx.GetMethod(ctx)
 	switch {
 	case method == s3.GetObjectAcl || method == s3.PutObjectAcl:
-		return r.versionSvc.GetACL(ctx, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
+		return r.versionSvc.GetACL(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
 	case method == s3.GetObjectTagging || method == s3.PutObjectTagging || method == s3.DeleteObjectTagging:
-		return r.versionSvc.GetTags(ctx, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
+		return r.versionSvc.GetTags(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
 	case method == s3.GetBucketAcl || method == s3.PutBucketAcl:
-		return r.versionSvc.GetBucketACL(ctx, xctx.GetBucket(ctx))
+		return r.versionSvc.GetBucketACL(ctx, replID, xctx.GetBucket(ctx))
 	case method == s3.GetBucketTagging || method == s3.PutBucketTagging || method == s3.DeleteBucketTagging:
-		return r.versionSvc.GetBucketTags(ctx, xctx.GetBucket(ctx))
+		return r.versionSvc.GetBucketTags(ctx, replID, xctx.GetBucket(ctx))
 	case xctx.GetObject(ctx) != "":
-		return r.versionSvc.GetObj(ctx, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
+		return r.versionSvc.GetObj(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
 	case xctx.GetBucket(ctx) != "":
-		return r.versionSvc.GetBucket(ctx, xctx.GetBucket(ctx))
+		return r.versionSvc.GetBucket(ctx, replID, xctx.GetBucket(ctx))
 
 	}
 	zerolog.Ctx(ctx).Warn().Msg("trying to obtain version metadata for unsupported method")
-	return map[meta.Destination]int64{}, nil
+	return meta.Version{}, nil
 }
 
 func hasACLChanged(r *http.Request) bool {

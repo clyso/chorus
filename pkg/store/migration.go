@@ -15,23 +15,28 @@
 package store
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/redis/go-redis/v9"
 
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 )
 
 func TokensToMigrationObjectIDConverter(tokens []string) (entity.MigrationObjectID, error) {
 	return entity.MigrationObjectID{
-		FromStorage: tokens[0],
-		FromBucket:  tokens[1],
+		User:        tokens[0],
+		FromStorage: tokens[1],
 		ToStorage:   tokens[2],
-		ToBucket:    tokens[3],
-		Prefix:      tokens[4],
+		FromBucket:  tokens[3],
+		ToBucket:    tokens[4],
+		Prefix:      tokens[5],
 	}, nil
 }
 
 func MigrationObjectIDToTokensConverter(id entity.MigrationObjectID) ([]string, error) {
-	return []string{id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket, id.Prefix}, nil
+	return []string{id.User, id.FromStorage, id.ToStorage, id.FromBucket, id.ToBucket, id.Prefix}, nil
 }
 
 type MigrationObjectListStateStore struct {
@@ -50,18 +55,29 @@ func (r *MigrationObjectListStateStore) WithExecutor(exec Executor[redis.Pipelin
 	return NewMigrationObjectListStateStore(exec.Get())
 }
 
+func (r *MigrationObjectListStateStore) DeleteForReplication(ctx context.Context, id entity.UniversalReplicationID) error {
+	if bucketID, ok := id.AsBucketID(); ok {
+		_, err := r.DropIDs(ctx, bucketID.User, bucketID.FromStorage, bucketID.ToStorage, bucketID.FromBucket, bucketID.ToBucket)
+		return err
+	} else if userID, ok := id.AsUserID(); ok {
+		_, err := r.DropIDs(ctx, userID.User, userID.FromStorage, userID.ToStorage)
+		return err
+	}
+	return fmt.Errorf("%w: unsupported replication ID type %#v", dom.ErrInternal, id)
+}
+
 func TokensToMigrationBucketIDConverter(tokens []string) (entity.MigrationBucketID, error) {
 	return entity.MigrationBucketID{
 		User:        tokens[0],
 		FromStorage: tokens[1],
-		FromBucket:  tokens[2],
-		ToStorage:   tokens[3],
+		ToStorage:   tokens[2],
+		FromBucket:  tokens[3],
 		ToBucket:    tokens[4],
 	}, nil
 }
 
 func MigrationBucketIDToTokensConverter(id entity.MigrationBucketID) ([]string, error) {
-	return []string{id.User, id.FromStorage, id.FromBucket, id.ToStorage, id.ToBucket}, nil
+	return []string{id.User, id.FromStorage, id.ToStorage, id.FromBucket, id.ToBucket}, nil
 }
 
 type MigrationBucketListStateStore struct {
@@ -74,6 +90,11 @@ func NewMigrationBucketListStateStore(client redis.Cmdable) *MigrationBucketList
 			MigrationBucketIDToTokensConverter, TokensToMigrationBucketIDConverter,
 			StringValueConverter, StringValueConverter),
 	}
+}
+
+func (r *MigrationBucketListStateStore) DeleteForReplication(ctx context.Context, id entity.UniversalReplicationID) error {
+	_, err := r.Drop(ctx, entity.NewMigrationBucketIDFromUniversalReplicationID(id))
+	return err
 }
 
 func (r *MigrationBucketListStateStore) WithExecutor(exec Executor[redis.Pipeliner]) *MigrationBucketListStateStore {

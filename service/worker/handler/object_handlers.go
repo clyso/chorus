@@ -60,19 +60,18 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		return err
 	}
 	defer lock.Release(ctx)
-	objMeta, err := s.versionSvc.GetObj(ctx, p.Object)
+	versions, err := s.versionSvc.GetObj(ctx, p.ID, p.Object)
 	if err != nil {
 		return err
 	}
-	isObjDeleted := len(objMeta) == 0
+	isObjDeleted := versions.IsEmpty()
 	if isObjDeleted {
 		return s.objectDelete(ctx, p)
 	}
 
-	destVersionKey := meta.ToDest(p.ID.ToStorage(), toBucket)
-	fromVer, toVer := objMeta[meta.ToDest(p.ID.FromStorage(), "")], objMeta[destVersionKey]
+	fromVer, toVer := versions.From, versions.To
 	if fromVer <= toVer {
-		logger.Info().Int64("from_ver", fromVer).Int64("to_ver", toVer).Msg("object sync: identical from/to obj version: skip copy")
+		logger.Info().Int("from_ver", fromVer).Int("to_ver", toVer).Msg("object sync: identical from/to obj version: skip copy")
 		return nil
 	}
 
@@ -97,7 +96,8 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	logger.Info().Msg("object sync: done")
 
 	if fromVer != 0 {
-		return s.versionSvc.UpdateIfGreater(ctx, p.Object, destVersionKey, fromVer)
+		destination := meta.Destination{Storage: p.ID.ToStorage(), Bucket: toBucket}
+		return s.versionSvc.UpdateIfGreater(ctx, p.ID, p.Object, destination, fromVer)
 	}
 
 	return nil

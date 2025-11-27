@@ -26,110 +26,74 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/entity"
 )
 
-var (
-	// key = version key, args {1: user, 2: bucket 3: storage}
-	luaHIncVersion = redis.NewScript(`local max_ver = 0
-	for _, ver in ipairs(redis.call('HVALS', KEYS[1])) do
-		max_ver = math.max(max_ver, tonumber(ver))
-	end
-	max_ver = max_ver + 1
-	redis.call('HSET',KEYS[1], ARGV[1], max_ver )
-	return max_ver`)
-
-	luaHSetIfExAndGreater = redis.NewScript(`
-if redis.call('exists',KEYS[1]) ~= 1 then return -1 end
-local prev = redis.call('hget', KEYS[1], ARGV[1]);
-if prev and (tonumber(prev) >= tonumber(ARGV[2])) then return 0
-else 
-	redis.call("hset", KEYS[1], ARGV[1], ARGV[2]);
-	return 1
-end`)
-	luaDelKeysWithPrefix = redis.NewScript(`local cursor = tonumber(ARGV[1]) or 0
-local pattern = ARGV[2]
-local count = tonumber(ARGV[3]) or 1000
-local field = KEYS[1]
-
-local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', count)
-local new_cursor = tonumber(scan_result[1])
-local keys = scan_result[2]
-
-for _, key in ipairs(keys) do
-    redis.call('HDEL', key, field)
-end
-
-return new_cursor`)
-)
-
-// Destination - string alias for version destination
-// can be storage or storage and bucket
-type Destination string
-
-func (d Destination) Parse() (storage string, bucket *string) {
-	if dArr := strings.Split(string(d), ":"); len(dArr) == 2 {
-		return dArr[0], &dArr[1]
-	}
-	return string(d), nil
+type Destination struct {
+	Storage string
+	Bucket  string
 }
 
-// ToDest builds destination from storage name and optional bucket name
-func ToDest(storage string, bucket string) Destination {
-	if bucket == "" {
-		return Destination(storage)
+func (d Destination) Validate() error {
+	if d.Storage == "" {
+		return fmt.Errorf("%w: empty storage in destination", dom.ErrInvalidArg)
 	}
-	return Destination(fmt.Sprintf("%s:%s", storage, bucket))
+	if d.Bucket == "" {
+		return fmt.Errorf("%w: empty bucket in destination", dom.ErrInvalidArg)
+	}
+	return nil
+}
+
+func (d Destination) IsFrom(replID entity.UniversalReplicationID) bool {
+	fromBucket, toBucket := replID.FromToBuckets(d.Bucket)
+
+	if d.Storage == replID.FromStorage() && fromBucket == d.Bucket {
+		return true
+	}
+	if d.Storage == replID.ToStorage() && toBucket == d.Bucket {
+		return false
+	}
+	// should not happen: destinations must match replication ID
+	panic(fmt.Sprintf("destination storage/bucket %s/%s does not match replication ID %s", d.Storage, d.Bucket, replID.AsString()))
+}
+
+type Version struct {
+	From int
+	To   int
+}
+
+func (v Version) IsEmpty() bool {
+	return v.From == 0 && v.To == 0
 }
 
 type VersionService interface {
-	// GetObj returns object content versions in s3 storages
-	GetObj(ctx context.Context, obj dom.Object) (map[Destination]int64, error)
-	// IncrementObj increments object content version in given storage
-	IncrementObj(ctx context.Context, obj dom.Object, dest Destination) (int64, error)
-	// UpdateIfGreater updates object content version in given storage if it is greater than previous value
-	UpdateIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error
-	// DeleteObjAll deletes all obj meta for all storages
-	DeleteObjAll(ctx context.Context, obj dom.Object) error
-	// DeleteBucketMeta deletes all versions info for bucket and version info for all bucket objects
-	DeleteBucketMeta(ctx context.Context, dest Destination, bucket string) error
+	Cleanup(ctx context.Context, replID entity.UniversalReplicationID) error
 
-	// GetACL returns object ACL versions in s3 storages
-	GetACL(ctx context.Context, obj dom.Object) (map[Destination]int64, error)
-	// IncrementACL increments object ACL version in given storage
-	IncrementACL(ctx context.Context, obj dom.Object, dest Destination) (int64, error)
-	// UpdateACLIfGreater updates object ACL version in given storage if it is greater than previous value
-	UpdateACLIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error
+	GetObj(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) (Version, error)
+	IncrementObj(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination) (int, error)
+	UpdateIfGreater(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination, version int) error
+	DeleteObjAll(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) error
 
-	// GetTags returns object Tagging versions in s3 storages
-	GetTags(ctx context.Context, obj dom.Object) (map[Destination]int64, error)
-	// IncrementTags increments object Tagging version in given storage
-	IncrementTags(ctx context.Context, obj dom.Object, dest Destination) (int64, error)
-	// UpdateTagsIfGreater updates object Tagging version in given storage if it is greater than previous value
-	UpdateTagsIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error
+	GetACL(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) (Version, error)
+	IncrementACL(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination) (int, error)
+	UpdateACLIfGreater(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination, version int) error
 
-	// GetBucket returns bucket content versions in s3 storages
-	GetBucket(ctx context.Context, bucket string) (map[Destination]int64, error)
-	// IncrementBucket increments bucket content version in given storage
-	IncrementBucket(ctx context.Context, bucket string, dest Destination) (int64, error)
-	// UpdateBucketIfGreater updates bucket content version in given storage if it is greater than previous value
-	UpdateBucketIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error
-	// DeleteBucketAll deletes all bucket meta for all storages
-	DeleteBucketAll(ctx context.Context, bucket string) error
+	GetTags(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) (Version, error)
+	IncrementTags(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination) (int, error)
+	UpdateTagsIfGreater(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination, version int) error
 
-	// GetBucketACL returns bucket ACL versions in s3 storages
-	GetBucketACL(ctx context.Context, bucket string) (map[Destination]int64, error)
-	// IncrementBucketACL increments bucket ACL version in given storage
-	IncrementBucketACL(ctx context.Context, bucket string, dest Destination) (int64, error)
-	// UpdateBucketACLIfGreater updates bucket ACL version in given storage if it is greater than previous value
-	UpdateBucketACLIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error
+	GetBucket(ctx context.Context, replID entity.UniversalReplicationID, bucket string) (Version, error)
+	IncrementBucket(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination) (int, error)
+	UpdateBucketIfGreater(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination, version int) error
+	DeleteBucketAll(ctx context.Context, replID entity.UniversalReplicationID, bucket string) error
 
-	// GetBucketTags returns bucket Tagging versions in s3 storages
-	GetBucketTags(ctx context.Context, bucket string) (map[Destination]int64, error)
-	// IncrementBucketTags increments bucket Tagging version in given storage
-	IncrementBucketTags(ctx context.Context, bucket string, dest Destination) (int64, error)
-	// UpdateBucketTagsIfGreater updates bucket Tagging version in given storage if it is greater than previous value
-	UpdateBucketTagsIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error
+	GetBucketACL(ctx context.Context, replID entity.UniversalReplicationID, bucket string) (Version, error)
+	IncrementBucketACL(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination) (int, error)
+	UpdateBucketACLIfGreater(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination, version int) error
+
+	GetBucketTags(ctx context.Context, replID entity.UniversalReplicationID, bucket string) (Version, error)
+	IncrementBucketTags(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination) (int, error)
+	UpdateBucketTagsIfGreater(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination, version int) error
 }
 
 func NewVersionService(client redis.UniversalClient) VersionService {
@@ -140,33 +104,251 @@ type versionSvc struct {
 	client redis.UniversalClient
 }
 
-func (s *versionSvc) GetObj(ctx context.Context, obj dom.Object) (map[Destination]int64, error) {
-	return s.get(ctx, obj.Key())
+func (s *versionSvc) GetObj(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) (Version, error) {
+	return s.getObjVersion(ctx, replID, obj, payload)
 }
 
-func (s *versionSvc) get(ctx context.Context, key string) (map[Destination]int64, error) {
-	resMap, err := s.client.HGetAll(ctx, key).Result()
+func (s *versionSvc) IncrementObj(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination) (int, error) {
+	keys, err := toRedisObjKeys(replID, obj, payload)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	res := map[Destination]int64{}
-	for stor, verStr := range resMap {
-		ver, err := strconv.Atoi(verStr)
+	return s.incrementDest(ctx, replID, keys, dest)
+}
+
+func (s *versionSvc) UpdateIfGreater(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination, version int) error {
+	keys, err := toRedisObjKeys(replID, obj, payload)
+	if err != nil {
+		return err
+	}
+	return s.setDestIfGreater(ctx, replID, keys, dest, int(version))
+}
+
+func (s *versionSvc) DeleteObjAll(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) error {
+	key, fields, err := allRedisObjKeys(replID, obj)
+	if err != nil {
+		return err
+	}
+	return s.client.HDel(ctx, key, fields...).Err()
+}
+
+func (s *versionSvc) GetACL(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) (Version, error) {
+	return s.getObjVersion(ctx, replID, obj, acl)
+}
+
+func (s *versionSvc) IncrementACL(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination) (int, error) {
+	keys, err := toRedisObjKeys(replID, obj, acl)
+	if err != nil {
+		return 0, err
+	}
+	return s.incrementDest(ctx, replID, keys, dest)
+}
+
+func (s *versionSvc) UpdateACLIfGreater(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination, version int) error {
+	keys, err := toRedisObjKeys(replID, obj, acl)
+	if err != nil {
+		return err
+	}
+	return s.setDestIfGreater(ctx, replID, keys, dest, version)
+}
+
+func (s *versionSvc) GetTags(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object) (Version, error) {
+	return s.getObjVersion(ctx, replID, obj, tags)
+}
+
+func (s *versionSvc) IncrementTags(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination) (int, error) {
+	keys, err := toRedisObjKeys(replID, obj, tags)
+	if err != nil {
+		return 0, err
+	}
+	return s.incrementDest(ctx, replID, keys, dest)
+}
+
+func (s *versionSvc) UpdateTagsIfGreater(ctx context.Context, replID entity.UniversalReplicationID, obj dom.Object, dest Destination, version int) error {
+	keys, err := toRedisObjKeys(replID, obj, tags)
+	if err != nil {
+		return err
+	}
+	return s.setDestIfGreater(ctx, replID, keys, dest, version)
+}
+
+func (s *versionSvc) GetBucket(ctx context.Context, replID entity.UniversalReplicationID, bucket string) (Version, error) {
+	return s.getBucketVersion(ctx, replID, bucket, payload)
+}
+
+func (s *versionSvc) IncrementBucket(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination) (int, error) {
+	keys, err := toRedisBucketKeys(replID, bucket, payload)
+	if err != nil {
+		return 0, err
+	}
+	return s.incrementDest(ctx, replID, keys, dest)
+}
+
+func (s *versionSvc) UpdateBucketIfGreater(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination, version int) error {
+	keys, err := toRedisBucketKeys(replID, bucket, payload)
+	if err != nil {
+		return err
+	}
+	return s.setDestIfGreater(ctx, replID, keys, dest, version)
+}
+
+func (s *versionSvc) DeleteBucketAll(ctx context.Context, replID entity.UniversalReplicationID, bucket string) error {
+	key, fields, err := allRedisBucketKeys(replID, bucket)
+	if err != nil {
+		return err
+	}
+	return s.client.HDel(ctx, key, fields...).Err()
+}
+
+func (s *versionSvc) GetBucketACL(ctx context.Context, replID entity.UniversalReplicationID, bucket string) (Version, error) {
+	return s.getBucketVersion(ctx, replID, bucket, acl)
+}
+
+func (s *versionSvc) IncrementBucketACL(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination) (int, error) {
+	keys, err := toRedisBucketKeys(replID, bucket, acl)
+	if err != nil {
+		return 0, err
+	}
+	return s.incrementDest(ctx, replID, keys, dest)
+}
+
+func (s *versionSvc) UpdateBucketACLIfGreater(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination, version int) error {
+	keys, err := toRedisBucketKeys(replID, bucket, acl)
+	if err != nil {
+		return err
+	}
+	return s.setDestIfGreater(ctx, replID, keys, dest, version)
+}
+
+func (s *versionSvc) GetBucketTags(ctx context.Context, replID entity.UniversalReplicationID, bucket string) (Version, error) {
+	return s.getBucketVersion(ctx, replID, bucket, tags)
+}
+
+func (s *versionSvc) IncrementBucketTags(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination) (int, error) {
+	keys, err := toRedisBucketKeys(replID, bucket, tags)
+	if err != nil {
+		return 0, err
+	}
+	return s.incrementDest(ctx, replID, keys, dest)
+}
+
+func (s *versionSvc) UpdateBucketTagsIfGreater(ctx context.Context, replID entity.UniversalReplicationID, bucket string, dest Destination, version int) error {
+	keys, err := toRedisBucketKeys(replID, bucket, tags)
+	if err != nil {
+		return err
+	}
+	return s.setDestIfGreater(ctx, replID, keys, dest, version)
+}
+
+// luaDelKeysWithPrefix - server side scan and delete keys with given key prefix
+//
+// Input:
+// KEYS[1] -> Key prefix pattern (e.g. "v:user1:*")
+// --
+// ARGV[1] -> COUNT for SCAN (optional, default 1000)
+//
+// Output:
+// Returns 0 when done
+var luaDelKeysWithPrefix = redis.NewScript(`
+local pattern = KEYS[1]
+local cursor = 0
+local count = tonumber(ARGV[1]) or 1000
+repeat
+    local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', count)
+    cursor = tonumber(scan_result[1])
+    local keys = scan_result[2]
+    redis.call('UNLINK', unpack(keys))
+until cursor == 0
+return 0`)
+
+func (s *versionSvc) Cleanup(ctx context.Context, replID entity.UniversalReplicationID) error {
+	pattern := redisReplicationMATCH(replID)
+	if !strings.HasSuffix(pattern, "*") {
+		// exact match - single key deletion
+		return s.client.Del(ctx, pattern).Err()
+	}
+	// wildcard match - server-side scan and delete
+	_, err := luaDelKeysWithPrefix.Run(ctx, s.client, []string{pattern}, 1000).Result()
+	return err
+}
+
+func (s *versionSvc) getObjVersion(ctx context.Context, replID entity.UniversalReplicationID, object dom.Object, kind versionKind) (Version, error) {
+	keys, err := toRedisObjKeys(replID, object, kind)
+	if err != nil {
+		return Version{}, err
+	}
+	return s.getVersion(ctx, keys)
+}
+
+func (s *versionSvc) getBucketVersion(ctx context.Context, replID entity.UniversalReplicationID, bucket string, kind versionKind) (Version, error) {
+	keys, err := toRedisBucketKeys(replID, bucket, kind)
+	if err != nil {
+		return Version{}, err
+	}
+	return s.getVersion(ctx, keys)
+}
+
+func (s *versionSvc) getVersion(ctx context.Context, keys redisKeys) (Version, error) {
+	res, err := s.client.HMGet(ctx, keys.hashKey, keys.fromField, keys.toField).Result()
+	if err != nil {
+		return Version{}, err
+	}
+	if len(res) != 2 {
+		return Version{}, fmt.Errorf("%w: unexpected HMGet result length %d", dom.ErrInternal, len(res))
+	}
+	var version Version
+	if res[0] != nil {
+		version.From, err = strconv.Atoi(res[0].(string))
 		if err != nil {
-			zerolog.Ctx(ctx).Err(err).Interface("dom_object", key).Msgf("unable to parse %q version", stor)
-			continue
+			return Version{}, fmt.Errorf("%w: unable to parse from version %q", dom.ErrInternal, res[0])
 		}
-		res[Destination(stor)] = int64(ver)
 	}
-	return res, nil
+	if res[1] != nil {
+		version.To, err = strconv.Atoi(res[1].(string))
+		if err != nil {
+			return Version{}, fmt.Errorf("%w: unable to parse to version %q", dom.ErrInternal, res[1])
+		}
+	}
+	return version, nil
 }
 
-func (s *versionSvc) IncrementObj(ctx context.Context, obj dom.Object, dest Destination) (int64, error) {
-	return s.incVersion(ctx, obj.Key(), dest)
+func (s *versionSvc) incrementDest(ctx context.Context, replID entity.UniversalReplicationID, keys redisKeys, dest Destination) (int, error) {
+	if err := dest.Validate(); err != nil {
+		return 0, err
+	}
+	if dest.IsFrom(replID) {
+		return s.incVersion(ctx, keys.hashKey, keys.fromField, keys.toField)
+	}
+	// swap fields for 'to' destination
+	return s.incVersion(ctx, keys.hashKey, keys.toField, keys.fromField)
 }
 
-func (s *versionSvc) incVersion(ctx context.Context, key string, dest Destination) (int64, error) {
-	result, err := luaHIncVersion.Run(ctx, s.client, []string{key}, string(dest)).Result()
+// luaHIncVersion - takes max value out of 2 hash fields (A,B), increments it, and assigns result to A.
+//
+//	A = max(A,B) + 1
+//
+// Input:
+// KEYS[1] -> Redis hash Key
+// --
+// ARGV[1] -> First hash field (A)
+// ARGV[2] -> Second hash field (B)
+//
+// Output:
+// Returns incremented version
+var luaHIncVersion = redis.NewScript(`
+local max_ver = 0
+local vals = redis.call('HMGET', KEYS[1], ARGV[1], ARGV[2])
+for _, ver in ipairs(vals) do
+	if ver then
+		max_ver = math.max(max_ver, tonumber(ver))
+	end
+end
+max_ver = max_ver + 1
+redis.call('HSET',KEYS[1], ARGV[1], max_ver )
+return max_ver`)
+
+func (s *versionSvc) incVersion(ctx context.Context, key, a, b string) (int, error) {
+	result, err := luaHIncVersion.Run(ctx, s.client, []string{key}, a, b).Result()
 	if err != nil {
 		return 0, err
 	}
@@ -177,53 +359,56 @@ func (s *versionSvc) incVersion(ctx context.Context, key string, dest Destinatio
 	if inc == 0 {
 		return 0, dom.ErrNotFound
 	}
-	return inc, nil
+	return int(inc), nil
 }
 
-func (s *versionSvc) UpdateIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error {
-	return s.setIfGreater(ctx, obj.Key(), string(dest), int(version))
+func (s *versionSvc) setDestIfGreater(ctx context.Context, replID entity.UniversalReplicationID, keys redisKeys, dest Destination, version int) error {
+	if err := dest.Validate(); err != nil {
+		return err
+	}
+	if dest.IsFrom(replID) {
+		return s.setIfGreater(ctx, keys.hashKey, keys.fromField, keys.toField, version)
+	}
+	// swap fields for 'to' destination
+	return s.setIfGreater(ctx, keys.hashKey, keys.toField, keys.fromField, version)
 }
 
-func (s *versionSvc) DeleteBucketMeta(ctx context.Context, dest Destination, bucket string) error {
-	err := s3.ValidateBucketName(bucket)
-	if err != nil {
-		return err
-	}
-	key := fmt.Sprintf("b:%s", bucket)
-	if err = s.client.HDel(ctx, key, string(dest)).Err(); err != nil {
-		return err
-	}
-	keyAcl := fmt.Sprintf("b:%s:a", bucket)
-	if err = s.client.HDel(ctx, keyAcl, string(dest)).Err(); err != nil {
-		return err
-	}
-	keyTags := fmt.Sprintf("b:%s:t", bucket)
-	if err = s.client.HDel(ctx, keyTags, string(dest)).Err(); err != nil {
-		return err
-	}
-	var cursor int64
-	for {
-		cursor, err = luaDelKeysWithPrefix.Run(ctx, s.client, []string{string(dest)}, cursor, bucket+":*").Int64()
-		if err != nil {
-			return err
-		}
-		if cursor == 0 {
-			break
-		}
-	}
-	return nil
-}
+// luaHSetIfExAndGreater(hash_key, field_A, field_B, X) - sets X to hash field A only if:
+//  1. hash key exists
+//  2. field B exists - checks concurrent delete
+//  3. X <= B         - checks concurrent delete
+//  3. X > A          - checks concurrent updates
+//
+// Input:
+// KEYS[1] -> Redis hash Key
+// --
+// ARGV[1] -> First Hash field (A)
+// ARGV[2] -> Second Hash field (B)
+// ARGV[2] -> Integer value (X) to set to first hash field
+//
+// Output:
+// Returns -1 if hash key does not exist or second field does not exist or less than given integer
+// Returns 0 if given integer is not greater than current value
+// Returns 1 if value was set
+var luaHSetIfExAndGreater = redis.NewScript(`
+if redis.call('exists',KEYS[1]) ~= 1 then return -1 end
 
-func (s *versionSvc) DeleteObjAll(ctx context.Context, obj dom.Object) error {
-	return s.client.Del(ctx, obj.Key(), obj.ACLKey(), obj.TagKey()).Err()
-}
+local other = redis.call('hget', KEYS[1], ARGV[2])
+if not other or tonumber(other) < tonumber(ARGV[3]) then return -1 end
 
-func (s *versionSvc) setIfGreater(ctx context.Context, key, field string, setTo int) error {
-	if setTo <= 0 {
-		zerolog.Ctx(ctx).Warn().Str("key", key).Str("field", field).Msgf("discarded attempt to set invalid version %d", setTo)
+local prev = redis.call('hget', KEYS[1], ARGV[1]);
+if prev and (tonumber(prev) >= tonumber(ARGV[3])) then return 0
+else 
+	redis.call("hset", KEYS[1], ARGV[1], ARGV[3]);
+	return 1
+end`)
+
+func (s *versionSvc) setIfGreater(ctx context.Context, key, a, b string, version int) error {
+	if version <= 0 {
+		zerolog.Ctx(ctx).Warn().Str("key", key).Str("field", a).Msgf("discarded attempt to set invalid version %d", version)
 		return fmt.Errorf("%w: version value must be positive", dom.ErrInvalidArg)
 	}
-	result, err := luaHSetIfExAndGreater.Run(ctx, s.client, []string{key}, field, setTo).Result()
+	result, err := luaHSetIfExAndGreater.Run(ctx, s.client, []string{key}, a, b, version).Result()
 	if err != nil {
 		return err
 	}
@@ -238,80 +423,4 @@ func (s *versionSvc) setIfGreater(ctx context.Context, key, field string, setTo 
 		return fmt.Errorf("%w: unable to update replicated version for key %s", dom.ErrAlreadyExists, key)
 	}
 	return nil
-}
-
-func (s *versionSvc) GetACL(ctx context.Context, obj dom.Object) (map[Destination]int64, error) {
-	return s.get(ctx, obj.ACLKey())
-}
-
-func (s *versionSvc) IncrementACL(ctx context.Context, obj dom.Object, dest Destination) (int64, error) {
-	return s.incVersion(ctx, obj.ACLKey(), dest)
-}
-
-func (s *versionSvc) UpdateACLIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error {
-	return s.setIfGreater(ctx, obj.ACLKey(), string(dest), int(version))
-}
-
-func (s *versionSvc) GetTags(ctx context.Context, obj dom.Object) (map[Destination]int64, error) {
-	return s.get(ctx, obj.TagKey())
-}
-
-func (s *versionSvc) IncrementTags(ctx context.Context, obj dom.Object, dest Destination) (int64, error) {
-	return s.incVersion(ctx, obj.TagKey(), dest)
-}
-
-func (s *versionSvc) UpdateTagsIfGreater(ctx context.Context, obj dom.Object, dest Destination, version int64) error {
-	return s.setIfGreater(ctx, obj.TagKey(), string(dest), int(version))
-}
-
-func (s *versionSvc) GetBucket(ctx context.Context, bucket string) (map[Destination]int64, error) {
-	key := fmt.Sprintf("b:%s", bucket)
-	return s.get(ctx, key)
-}
-
-func (s *versionSvc) IncrementBucket(ctx context.Context, bucket string, dest Destination) (int64, error) {
-	key := fmt.Sprintf("b:%s", bucket)
-	return s.incVersion(ctx, key, dest)
-}
-
-func (s *versionSvc) UpdateBucketIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error {
-	key := fmt.Sprintf("b:%s", bucket)
-	return s.setIfGreater(ctx, key, string(dest), int(version))
-}
-
-func (s *versionSvc) DeleteBucketAll(ctx context.Context, bucket string) error {
-	key := fmt.Sprintf("b:%s", bucket)
-	keyAcl := fmt.Sprintf("b:%s:a", bucket)
-	keyTags := fmt.Sprintf("b:%s:t", bucket)
-	return s.client.Del(ctx, key, keyAcl, keyTags).Err()
-}
-
-func (s *versionSvc) GetBucketACL(ctx context.Context, bucket string) (map[Destination]int64, error) {
-	key := fmt.Sprintf("b:%s:a", bucket)
-	return s.get(ctx, key)
-}
-
-func (s *versionSvc) IncrementBucketACL(ctx context.Context, bucket string, dest Destination) (int64, error) {
-	key := fmt.Sprintf("b:%s:a", bucket)
-	return s.incVersion(ctx, key, dest)
-}
-
-func (s *versionSvc) UpdateBucketACLIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error {
-	key := fmt.Sprintf("b:%s:a", bucket)
-	return s.setIfGreater(ctx, key, string(dest), int(version))
-}
-
-func (s *versionSvc) GetBucketTags(ctx context.Context, bucket string) (map[Destination]int64, error) {
-	key := fmt.Sprintf("b:%s:t", bucket)
-	return s.get(ctx, key)
-}
-
-func (s *versionSvc) IncrementBucketTags(ctx context.Context, bucket string, dest Destination) (int64, error) {
-	key := fmt.Sprintf("b:%s:t", bucket)
-	return s.incVersion(ctx, key, dest)
-}
-
-func (s *versionSvc) UpdateBucketTagsIfGreater(ctx context.Context, bucket string, dest Destination, version int64) error {
-	key := fmt.Sprintf("b:%s:t", bucket)
-	return s.setIfGreater(ctx, key, string(dest), int(version))
 }

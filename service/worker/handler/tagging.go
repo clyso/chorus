@@ -95,13 +95,11 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	fromBucket, toBucket := replID.FromToBuckets(bucket)
-	versions, err := s.versionSvc.GetBucketTags(ctx, fromBucket)
+	versions, err := s.versionSvc.GetBucketTags(ctx, replID, fromBucket)
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(replID.FromStorage(), "")]
-	destVersionKey := meta.ToDest(replID.ToStorage(), toBucket)
-	toVer := versions[destVersionKey]
+	fromVer, toVer := versions.From, versions.To
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip bucket tagging sync: already synced")
 		return nil
@@ -146,7 +144,8 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	if fromVer != 0 {
-		return s.versionSvc.UpdateBucketTagsIfGreater(ctx, fromBucket, destVersionKey, fromVer)
+		destination := meta.Destination{Storage: replID.ToStorage(), Bucket: toBucketName}
+		return s.versionSvc.UpdateBucketTagsIfGreater(ctx, replID, fromBucket, destination, fromVer)
 	}
 	return nil
 }
@@ -157,13 +156,11 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	fromBucket, toBucket := replID.FromToBuckets(object.Bucket)
-	versions, err := s.versionSvc.GetTags(ctx, dom.Object{Bucket: fromBucket, Name: object.Name})
+	versions, err := s.versionSvc.GetTags(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name})
 	if err != nil {
 		return err
 	}
-	fromVer := versions[meta.ToDest(replID.FromStorage(), "")]
-	destVersionKey := meta.ToDest(replID.ToStorage(), toBucket)
-	toVer := versions[destVersionKey]
+	fromVer, toVer := versions.From, versions.To
 	if fromVer == toVer && fromVer != 0 {
 		zerolog.Ctx(ctx).Info().Msg("skip object Tagging sync: already synced")
 		return nil
@@ -208,7 +205,8 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	if fromVer != 0 {
-		return s.versionSvc.UpdateTagsIfGreater(ctx, dom.Object{Bucket: fromBucket, Name: object.Name}, destVersionKey, fromVer)
+		destination := meta.Destination{Storage: replID.ToStorage(), Bucket: toBucketName}
+		return s.versionSvc.UpdateTagsIfGreater(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name}, destination, fromVer)
 	}
 	return nil
 }
