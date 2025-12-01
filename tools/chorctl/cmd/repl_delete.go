@@ -18,87 +18,69 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
-
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/tools/chorctl/internal/api"
-
 	"github.com/spf13/cobra"
+
+	"github.com/clyso/chorus/tools/chorctl/internal/api"
 )
 
 var (
-	rdFrom     string
-	rdTo       string
-	rdUser     string
-	rdBucket   string
-	rdToBucket string
+	rdFrom       string
+	rdTo         string
+	rdUser       string
+	rdFromBucket string
+	rdToBucket   string
 )
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "deletes bucket replication rule",
-	Long: `Example:
-chorctl repl delete -f main -t follower -u admin -b bucket1`,
+	Short: "delete a replication policy",
+	Long: `Delete a replication policy.
+
+User-level policy:
+  chorctl repl delete --from main --to follower --user admin
+
+Bucket-level policy:
+  chorctl repl delete --from main --to follower --user admin --from-bucket bucket1`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if rdFromBucket != "" && rdToBucket == "" {
+			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
-		}
-		defer conn.Close()
-		client := pb.NewPolicyClient(conn)
 
-		req := &pb.ReplicationID{
-			User:        rdUser,
-			FromBucket:  &rdBucket,
-			FromStorage: rdFrom,
-			ToStorage:   rdTo,
-			ToBucket:    &rdToBucket,
-		}
-		if rdToBucket == "" {
-			req.ToBucket = &rdBucket
-		}
-		_, err = client.DeleteReplication(ctx, req)
+		conn, client := newPolicyClient(ctx)
+		defer conn.Close()
+
+		id := buildReplicationID(rdUser, rdFrom, rdTo, rdFromBucket, rdToBucket)
+		_, err := client.DeleteReplication(ctx, id)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to add replication")
+			api.PrintGrpcError(err)
 		}
 	},
 }
 
 func init() {
 	replCmd.AddCommand(deleteCmd)
-	deleteCmd.Flags().StringVarP(&rdFrom, "from", "f", "", "from storage")
-	deleteCmd.Flags().StringVarP(&rdTo, "to", "t", "", "to storage")
-	deleteCmd.Flags().StringVarP(&rdUser, "user", "u", "", "storage user")
-	deleteCmd.Flags().StringVarP(&rdBucket, "bucket", "b", "", "bucket name")
-	deleteCmd.Flags().StringVar(&rdToBucket, "to-bucket", "", "custom destinatin bucket name. Set if destination bucket should have different name from source bucket")
-	err := deleteCmd.MarkFlagRequired("from")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = deleteCmd.MarkFlagRequired("to")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = deleteCmd.MarkFlagRequired("user")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = deleteCmd.MarkFlagRequired("bucket")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
+	deleteCmd.Flags().StringVarP(&rdFrom, "from", "f", "", "source storage name")
+	deleteCmd.Flags().StringVarP(&rdTo, "to", "t", "", "destination storage name")
+	deleteCmd.Flags().StringVarP(&rdUser, "user", "u", "", "replication user")
+	deleteCmd.Flags().StringVarP(&rdFromBucket, "from-bucket", "b", "", "source bucket name; omit for user-level policies")
+	deleteCmd.Flags().StringVar(&rdToBucket, "to-bucket", "", "destination bucket name; defaults to from-bucket for bucket-level policies")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// addCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// addCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	if err := deleteCmd.MarkFlagRequired("from"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err := deleteCmd.MarkFlagRequired("to"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err := deleteCmd.MarkFlagRequired("user"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
 }
