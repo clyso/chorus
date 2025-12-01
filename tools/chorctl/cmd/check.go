@@ -37,8 +37,7 @@ var (
 // checkCmd represents the check command
 var checkCmd = &cobra.Command{
 	Use:   "check <from_storage> <to_storage> --bucket=<bucket_name>",
-	Short: "Checks the files in the source and destination match.",
-	Long:  ``,
+	Short: "[DEPRECATED] use 'chorctl consistency check' and related commands instead.",
 	Args:  cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		ctx, cancel := context.WithCancel(context.Background())

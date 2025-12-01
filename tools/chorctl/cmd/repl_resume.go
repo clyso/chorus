@@ -18,87 +18,69 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
-
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/tools/chorctl/internal/api"
-
 	"github.com/spf13/cobra"
+
+	"github.com/clyso/chorus/tools/chorctl/internal/api"
 )
 
 var (
-	rrFrom     string
-	rrTo       string
-	rrUser     string
-	rrBucket   string
-	rrToBucket string
+	rrFrom       string
+	rrTo         string
+	rrUser       string
+	rrFromBucket string
+	rrToBucket   string
 )
 
-// resumeCmd represents the pause command
+// resumeCmd represents the resume command
 var resumeCmd = &cobra.Command{
 	Use:   "resume",
-	Short: "resumes bucket replication rule",
-	Long: `Example:
-chorctl repl resume -f main -t follower -u admin -b bucket1`,
+	Short: "resume a replication policy",
+	Long: `Resume a replication policy.
+
+User-level policy:
+  chorctl repl resume --from main --to follower --user admin
+
+Bucket-level policy:
+  chorctl repl resume --from main --to follower --user admin --from-bucket bucket1`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if rrFromBucket != "" && rrToBucket == "" {
+			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
-		}
-		defer conn.Close()
-		client := pb.NewPolicyClient(conn)
 
-		req := &pb.ReplicationID{
-			User:        rrUser,
-			FromBucket:  &rrBucket,
-			FromStorage: rrFrom,
-			ToStorage:   rrTo,
-			ToBucket:    &rrToBucket,
-		}
-		if rrToBucket == "" {
-			req.ToBucket = &rrBucket
-		}
-		_, err = client.ResumeReplication(ctx, req)
+		conn, client := newPolicyClient(ctx)
+		defer conn.Close()
+
+		id := buildReplicationID(rrUser, rrFrom, rrTo, rrFromBucket, rrToBucket)
+		_, err := client.ResumeReplication(ctx, id)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to add replication")
+			api.PrintGrpcError(err)
 		}
 	},
 }
 
 func init() {
 	replCmd.AddCommand(resumeCmd)
-	resumeCmd.Flags().StringVarP(&rrFrom, "from", "f", "", "from storage")
-	resumeCmd.Flags().StringVarP(&rrTo, "to", "t", "", "to storage")
-	resumeCmd.Flags().StringVarP(&rrUser, "user", "u", "", "storage user")
-	resumeCmd.Flags().StringVarP(&rrBucket, "bucket", "b", "", "bucket name")
-	resumeCmd.Flags().StringVar(&rrToBucket, "to-bucket", "", "custom destinatin bucket name. Set if destination bucket should have different name from source bucket")
-	err := resumeCmd.MarkFlagRequired("from")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = resumeCmd.MarkFlagRequired("to")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = resumeCmd.MarkFlagRequired("user")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = resumeCmd.MarkFlagRequired("bucket")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
+	resumeCmd.Flags().StringVarP(&rrFrom, "from", "f", "", "source storage name")
+	resumeCmd.Flags().StringVarP(&rrTo, "to", "t", "", "destination storage name")
+	resumeCmd.Flags().StringVarP(&rrUser, "user", "u", "", "replication user")
+	resumeCmd.Flags().StringVarP(&rrFromBucket, "from-bucket", "b", "", "source bucket name; omit for user-level policies")
+	resumeCmd.Flags().StringVar(&rrToBucket, "to-bucket", "", "destination bucket name; defaults to from-bucket for bucket-level policies")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// addCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// addCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	if err := resumeCmd.MarkFlagRequired("from"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err := resumeCmd.MarkFlagRequired("to"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err := resumeCmd.MarkFlagRequired("user"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
 }

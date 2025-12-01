@@ -40,26 +40,26 @@ var (
 // bucketsCmd represents the buckets command
 var bucketsCmd = &cobra.Command{
 	Use:   "buckets",
-	Short: "Lists buckets without replication",
-	Long: `Example:
-chorctl repl buckets -f main -t follower -u admin`,
+	Short: "list buckets available for replication",
+	Long: `List buckets available for replication for a given user and from/to storages.
+
+Example:
+  chorctl repl buckets --from main --to follower --user admin
+  chorctl repl buckets --from main --to follower --user admin --show-replicated`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
-		}
+
+		conn, client := newPolicyClient(ctx)
 		defer conn.Close()
-		client := pb.NewPolicyClient(conn)
+
 		res, err := client.AvailableBuckets(ctx, &pb.AvailableBucketsRequest{
-			User:           rbUser,
-			FromStorage:    rbFrom,
-			ToStorage:      rbTo,
-			ShowReplicated: false,
+			User:        rbUser,
+			FromStorage: rbFrom,
+			ToStorage:   rbTo,
 		})
 		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get buckets for replication")
+			api.PrintGrpcError(err)
 		}
 		sort.Strings(res.Buckets)
 
@@ -74,9 +74,9 @@ chorctl repl buckets -f main -t follower -u admin`,
 
 func init() {
 	replCmd.AddCommand(bucketsCmd)
-	bucketsCmd.Flags().StringVarP(&rbFrom, "from", "f", "", "from storage")
-	bucketsCmd.Flags().StringVarP(&rbTo, "to", "t", "", "to storage")
-	bucketsCmd.Flags().StringVarP(&rbUser, "user", "u", "", "storage user")
+	bucketsCmd.Flags().StringVarP(&rbFrom, "from", "f", "", "source storage name")
+	bucketsCmd.Flags().StringVarP(&rbTo, "to", "t", "", "destination storage name")
+	bucketsCmd.Flags().StringVarP(&rbUser, "user", "u", "", "replication user")
 	err := bucketsCmd.MarkFlagRequired("from")
 	if err != nil {
 		logrus.WithError(err).Fatal()

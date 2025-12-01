@@ -49,6 +49,10 @@ var agentsCmd = &cobra.Command{
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get storages")
 		}
+		if len(agents.Agents) == 0 {
+			fmt.Println("No agents registered.")
+			return
+		}
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
