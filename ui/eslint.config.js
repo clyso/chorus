@@ -41,7 +41,6 @@ export default [
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
   },
-  oxlint.configs['flat/recommended'],
   skipFormatting,
   {
     plugins: {
@@ -115,4 +114,5 @@ export default [
       'no-console': ['error'],
     },
   },
+  ...oxlint.configs['flat/recommended'],
 ];
