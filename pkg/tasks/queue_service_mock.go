@@ -35,41 +35,33 @@ func (q *QueueServiceMock) EnqueueTask(ctx context.Context, task any) error {
 
 // InitReplicationInProgress test helper to initialize queues for replication in progress
 func (q *QueueServiceMock) InitReplicationInProgress(id entity.UniversalReplicationID) {
-	queues := InitMigrationQueues(id)
-	for _, queue := range queues {
-		q.Queues[queue] = 1 // not empty
-	}
+	queue := InitMigrationListQueue(id)
+	q.Queues[queue] = 1 // not empty
 }
 
 // InitReplicationDone test helper to make init replication queues empty
 func (q *QueueServiceMock) InitReplicationDone(id entity.UniversalReplicationID) {
-	queues := InitMigrationQueues(id)
-	for _, queue := range queues {
-		q.Queues[queue] = 0 // empty
-	}
+	queue := InitMigrationListQueue(id)
+	q.Queues[queue] = 0 // empty
+	queue = InitMigrationCopyQueue(id)
+	q.Queues[queue] = 0 // empty
 }
 
 // EventReplicationInProgress test helper to make event replication queue non-empty
 func (q *QueueServiceMock) EventReplicationInProgress(id entity.UniversalReplicationID) {
-	queues := EventMigrationQueues(id)
-	for _, queue := range queues {
-		q.Queues[queue] = 1 // not empty
-	}
+	queue := EventMigrationQueue(id)
+	q.Queues[queue] = 1 // not empty
 }
 
 func (q *QueueServiceMock) EventReplicationLag(id entity.UniversalReplicationID, lag int) {
-	queues := EventMigrationQueues(id)
-	for _, queue := range queues {
-		q.Queues[queue] = lag
-	}
+	queue := EventMigrationQueue(id)
+	q.Queues[queue] = lag
 }
 
 // EventReplicationDone test helper to make event replication queue empty
 func (q *QueueServiceMock) EventReplicationDone(id entity.UniversalReplicationID) {
-	queues := EventMigrationQueues(id)
-	for _, queue := range queues {
-		q.Queues[queue] = 0 // empty
-	}
+	queue := EventMigrationQueue(id)
+	q.Queues[queue] = 0 // empty
 }
 
 func Reset(q *QueueServiceMock) {

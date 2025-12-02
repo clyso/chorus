@@ -46,7 +46,7 @@ User-level policy:
 Bucket-level policy:
   chorctl repl pause --from main --to follower --user admin --from-bucket bucket1`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if rpFromBucket != "" && rpToBucket == "" {
+		if rpToBucket != "" && rpFromBucket == "" {
 			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
 		}
 		return nil

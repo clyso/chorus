@@ -65,21 +65,24 @@ func replicationQueueName(queuePrefix Queue, id entity.UniversalReplicationID) s
 	}
 }
 
-func InitMigrationQueues(id entity.UniversalReplicationID) []string {
-	return []string{
-		replicationQueueName(QueueMigrateListObjectsPrefix, id),
-		replicationQueueName(QueueMigrateCopyObjectPrefix, id),
-	}
+func InitMigrationListQueue(id entity.UniversalReplicationID) string {
+	return replicationQueueName(QueueMigrateListObjectsPrefix, id)
 }
 
-func EventMigrationQueues(id entity.UniversalReplicationID) []string {
-	return []string{
-		replicationQueueName(QueueEventsPrefix, id),
-	}
+func InitMigrationCopyQueue(id entity.UniversalReplicationID) string {
+	return replicationQueueName(QueueMigrateCopyObjectPrefix, id)
+}
+
+func EventMigrationQueue(id entity.UniversalReplicationID) string {
+	return replicationQueueName(QueueEventsPrefix, id)
 }
 
 func AllReplicationQueues(id entity.UniversalReplicationID) []string {
-	return append(InitMigrationQueues(id), EventMigrationQueues(id)...)
+	return []string{
+		InitMigrationListQueue(id),
+		InitMigrationCopyQueue(id),
+		EventMigrationQueue(id),
+	}
 }
 
 func ConsistencyCheckQueue(id entity.ConsistencyCheckID) string {

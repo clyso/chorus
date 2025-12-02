@@ -243,10 +243,7 @@ func (u *UI) updateTable(changeSelection bool) {
 		rows = make([]table.Row, len(u.data))
 		for i := range u.data {
 			d := u.data[i]
-			p := 0.0
-			if d.InitObjListed != 0 {
-				p = float64(d.InitObjDone) / float64(d.InitObjListed)
-			}
+			p := api.ToProgress(d)
 			objects := fmt.Sprintf("%d/%d", d.InitObjDone, d.InitObjListed)
 			events := fmt.Sprintf("%d/%d", d.EventsDone, d.Events)
 			lag := api.DurationToStr(d.EventLag.AsDuration())

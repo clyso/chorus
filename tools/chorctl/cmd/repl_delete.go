@@ -46,7 +46,7 @@ User-level policy:
 Bucket-level policy:
   chorctl repl delete --from main --to follower --user admin --from-bucket bucket1`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if rdFromBucket != "" && rdToBucket == "" {
+		if rdToBucket != "" && rdFromBucket == "" {
 			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
 		}
 		return nil

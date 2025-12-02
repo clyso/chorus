@@ -54,7 +54,7 @@ Bucket-level replication (different destination bucket name):
 Agent-based bucket replication. (--agent-url and --from should be from "chorctl agent" output)
   chorctl repl add --from main --to follower --user admin --from-bucket bucket1 --agent-url https://agent.chorus.com/webhook`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if raFromBucket != "" && raToBucket == "" {
+		if raToBucket != "" && raFromBucket == "" {
 			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
 		}
 		return nil

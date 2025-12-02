@@ -1146,7 +1146,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 					queuesMock.InitReplicationInProgress(entity.UniversalFromUserReplication(*tt.before.userRepl))
 				}
 				if tt.before.replPaused {
-					queuesMock.Pause(ctx, tasks.InitMigrationQueues(entity.UniversalFromUserReplication(*tt.before.userRepl))[0])
+					queuesMock.Pause(ctx, tasks.InitMigrationListQueue(entity.UniversalFromUserReplication(*tt.before.userRepl)))
 				}
 			}
 			if tt.before.bucketRepl != nil {
@@ -1163,7 +1163,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 					queuesMock.InitReplicationInProgress(entity.UniversalFromBucketReplication(*tt.before.bucketRepl))
 				}
 				if tt.before.replPaused {
-					queuesMock.Pause(ctx, tasks.InitMigrationQueues(entity.UniversalFromBucketReplication(*tt.before.bucketRepl))[0])
+					queuesMock.Pause(ctx, tasks.InitMigrationListQueue(entity.UniversalFromBucketReplication(*tt.before.bucketRepl)))
 				}
 			}
 			// setup done
