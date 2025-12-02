@@ -3,7 +3,7 @@ module github.com/clyso/chorus
 go 1.25.2
 
 replace (
-	github.com/hibiken/asynq => github.com/clyso/asynq v0.0.0-20250821155534-5a1f8d7cbff6
+	github.com/hibiken/asynq => github.com/clyso/asynq v0.0.0-20251202163730-20cb0d89aa76
 	github.com/minio/minio-go/v7 => github.com/aiivashchenko/minio-go/v7 v7.0.0-20251107134057-755723242df6
 )
 

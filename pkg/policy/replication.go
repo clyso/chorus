@@ -122,68 +122,55 @@ func (r *policySvc) getReplicationStatusInTx(ctx context.Context, tx store.Execu
 
 func (r *policySvc) fillExtendedReplicationStatus(ctx context.Context, id entity.UniversalReplicationID, status *entity.ReplicationStatus, switchInfo *entity.ReplicationSwitchInfo) (entity.ReplicationStatusExtended, error) {
 	result := entity.ReplicationStatusExtended{
-		ReplicationStatus: status,
-		IsPaused:          false,
-		Switch:            switchInfo,
-		InitMigration:     entity.QueueStats{},
-		EventMigration:    entity.QueueStats{},
+		ReplicationStatus:    status,
+		IsPaused:             false,
+		Switch:               switchInfo,
+		InitMigration:        entity.QueueStats{},
+		EventMigration:       entity.QueueStats{},
+		InitMigrationListing: entity.QueueStats{},
 	}
-	// get initial migration queues stats
-	initQueues := tasks.InitMigrationQueues(id)
-	paused, initStats, err := r.buildQueueStats(ctx, initQueues)
+	// replication is paused if at least one of the queues is paused
+	paused := false
+	// get initial migration listing queues stats
+	var err error
+	paused, result.InitMigrationListing, err = r.buildQueueStats(ctx, tasks.InitMigrationListQueue(id))
 	if err != nil {
 		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get init migration queue stats: %w", err)
 	}
-	if paused {
-		result.IsPaused = true
+	result.IsPaused = result.IsPaused || paused
+
+	// get initial migration queues stats
+	paused, result.InitMigration, err = r.buildQueueStats(ctx, tasks.InitMigrationCopyQueue(id))
+	if err != nil {
+		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get init migration queue stats: %w", err)
 	}
-	result.InitMigration = initStats
+	result.IsPaused = result.IsPaused || paused
 
 	// get event migration queues stats
-	eventQueues := tasks.EventMigrationQueues(id)
-	paused, eventStats, err := r.buildQueueStats(ctx, eventQueues)
+	paused, result.EventMigration, err = r.buildQueueStats(ctx, tasks.EventMigrationQueue(id))
 	if err != nil {
 		return entity.ReplicationStatusExtended{}, fmt.Errorf("unable to get event migration queue stats: %w", err)
 	}
-	if paused {
-		result.IsPaused = true
-	}
-	result.EventMigration = eventStats
+	result.IsPaused = result.IsPaused || paused
 
 	return result, nil
 }
 
-func (r *policySvc) buildQueueStats(ctx context.Context, queues []string) (bool, entity.QueueStats, error) {
-	isPaused := false
-	result := entity.QueueStats{
-		Unprocessed: 0,
-		Done:        0,
-		Latency:     0,
-		MemoryUsage: 0,
+func (r *policySvc) buildQueueStats(ctx context.Context, queue string) (bool, entity.QueueStats, error) {
+	stats, err := r.queueSvc.Stats(ctx, queue)
+	if errors.Is(err, dom.ErrNotFound) {
+		// queue does not exist, so no stats available
+		return false, entity.QueueStats{}, nil
 	}
-	for _, queue := range queues {
-		stats, err := r.queueSvc.Stats(ctx, queue)
-		if errors.Is(err, dom.ErrNotFound) {
-			// queue does not exist, so no stats available
-			continue
-		}
-		if err != nil {
-			return false, entity.QueueStats{}, fmt.Errorf("unable to get queue stats for %s: %w", queue, err)
-		}
-		if stats.Paused {
-			// if at least one queue is paused, we consider the whole replication as paused
-			isPaused = true
-		}
-		// sum up counters for all queues
-		result.Unprocessed += stats.Unprocessed
-		result.Done += stats.ProcessedTotal
-		result.MemoryUsage += stats.MemoryUsage
-		if result.Latency < stats.Latency {
-			// return the maximum latency across all queues
-			result.Latency = stats.Latency
-		}
+	if err != nil {
+		return false, entity.QueueStats{}, fmt.Errorf("unable to get queue stats for %s: %w", queue, err)
 	}
-	return isPaused, result, nil
+	return stats.Paused, entity.QueueStats{
+		Unprocessed: stats.Unprocessed,
+		Done:        stats.ProcessedTotal,
+		Latency:     stats.Latency,
+		MemoryUsage: stats.MemoryUsage,
+	}, nil
 }
 
 func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) error {

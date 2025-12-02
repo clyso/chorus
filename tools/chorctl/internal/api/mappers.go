@@ -50,10 +50,7 @@ func ReplHeader() string {
 }
 
 func ReplRow(in *pb.Replication) string {
-	p := 0.0
-	if in.InitObjListed != 0 {
-		p = float64(in.InitObjDone) / float64(in.InitObjListed)
-	}
+	p := ToProgress(in)
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
 	from := in.Id.FromStorage
@@ -76,6 +73,18 @@ func ReplRow(in *pb.Replication) string {
 		DateToAge(in.CreatedAt),
 		in.HasSwitch,
 	)
+}
+
+func ToProgress(in *pb.Replication) float64 {
+	p := 0.0
+	todo := in.InitObjListed + in.Events
+	done := in.InitObjDone + in.EventsDone
+	if todo != 0 {
+		p = float64(done) / float64(todo)
+	} else if in.IsInitDone {
+		p = 1.0
+	}
+	return p
 }
 
 func ToPercentage(in float64) string {

@@ -120,6 +120,8 @@ type ReplicationStatusExtended struct {
 
 	// True if at least one of the queues is paused.
 	IsPaused bool
+	// Aggregated stats for initial migration list buckets/object tasks.
+	InitMigrationListing QueueStats
 	// Aggregated stats for initial migration queues.
 	InitMigration QueueStats
 	// Aggregated stats for event migration queues.
@@ -127,7 +129,8 @@ type ReplicationStatusExtended struct {
 }
 
 func (r *ReplicationStatusExtended) InitDone() bool {
-	return r.InitMigration.Unprocessed == 0
+	// all listing tasks done and all listed objects processed
+	return r.InitMigrationListing.Unprocessed == 0 && r.InitMigration.Unprocessed == 0
 }
 
 func (r *ReplicationStatusExtended) Latency() time.Duration {
