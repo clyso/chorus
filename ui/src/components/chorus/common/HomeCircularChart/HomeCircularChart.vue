@@ -141,9 +141,14 @@
           { intersect: true },
           false,
         );
-        const { index } = elements[0];
 
-        emit('clickElement', index);
+        const element = elements[0];
+
+        if (!element) {
+          return;
+        }
+
+        emit('clickElement', element.index);
       },
       plugins: {
         tooltip: {

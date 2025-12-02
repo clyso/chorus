@@ -65,7 +65,7 @@ interface ChorusReplicationsState {
   filterCreatedAtRange: [number, number] | null;
 }
 
-const PAGE_SIZES = [10, 20, 30, 50, 100];
+const PAGE_SIZES = [10, 20, 30, 50, 100] as const;
 
 function getChorusReplicationId(replication: ChorusReplication) {
   return `${replication.user}${replication.bucket}${replication.from}${replication.to}`;
@@ -280,8 +280,14 @@ export const useChorusReplicationsStore = defineStore(
         return;
       }
 
+      const matchedReplication = state.replications[index];
+
+      if (!matchedReplication) {
+        return;
+      }
+
       state.replications.splice(index, 1, {
-        ...state.replications[index],
+        ...matchedReplication,
         ...partialReplication,
       });
     }
