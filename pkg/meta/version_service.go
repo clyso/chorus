@@ -257,7 +257,9 @@ repeat
     local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', count)
     cursor = tonumber(scan_result[1])
     local keys = scan_result[2]
-    redis.call('UNLINK', unpack(keys))
+    if #keys > 0 then
+        redis.call('UNLINK', unpack(keys))
+    end
 until cursor == 0
 return 0`)
 

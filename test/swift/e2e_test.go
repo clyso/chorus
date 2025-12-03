@@ -324,7 +324,7 @@ func Test_e2e(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchStatus.LastStatus >= pb.ReplicationSwitch_InProgress
+		return switchStatus.LastStatus >= pb.ReplicationSwitch_IN_PROGRESS
 	}, e.WaitShort, e.RetryShort)
 	// create container in proxy should return error
 	cont3 := "chorus-container-3"
@@ -339,7 +339,7 @@ func Test_e2e(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchStatus.LastStatus == pb.ReplicationSwitch_Done
+		return switchStatus.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*3, e.RetryLong)
 	// ------------------------------------------------ switch done -----------------------------------------------
 
