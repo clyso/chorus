@@ -353,27 +353,27 @@ message SwitchDowntimeOpts {
 message ReplicationSwitch {
   enum Status {
     // Switch is not started yet
-    NotStarted = 0;
+    NOT_STARTED = 0;
     // Switch is in progress. Draining replication events queue.
     // For switch with downtime, requests to target are blocked at this point.
-    InProgress = 1;
+    IN_PROGRESS = 1;
     // Switch is in progress. Queue is drained. Checking if source and
     // destination targets are the same. Requests are still blocked. Used only
     // for switch with downtime with enabled bucket check.
-    CheckInProgress = 2;
+    CHECK_IN_PROGRESS = 2;
     // Switch failed to complete in downtime window and was aborted.
     // Requests to target are unblocked. Used only for switch with downtime.
     // If cron downtime_window is used, switch will be retried on next cron
     // execution.
-    Error = 3;
+    ERROR = 3;
     // Switch was not able to start in given downtime window because conditions
     // were not met. Used only for switch with downtime. If cron downtime_window
     // is used, switch will be retried on next cron execution.
-    Skipped = 4;
+    SKIPPED = 4;
     // Switch was successfully completed.
     // All data was replicated to replication destination target and all read
     // and all requests are now routed to it.
-    Done = 5;
+    DONE = 5;
   }
 
   // Current switch status

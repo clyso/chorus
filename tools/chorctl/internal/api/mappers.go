@@ -46,33 +46,41 @@ func StorageRow(in *pb.Storage) string {
 }
 
 func ReplHeader() string {
-	return "NAME\tPROGRESS\tOBJECTS\tEVENTS\tLAG\tPAUSED\tAGE\tHAS_SWITCH"
+	return "NAME\tPROGRESS\tOBJECTS\tEVENTS\tLAG\tPAUSED\tAGE\tARCHIEVED\tHAS_SWITCH"
 }
 
 func ReplRow(in *pb.Replication) string {
+	id := replIDToString(in.Id)
 	p := ToProgress(in)
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
-	from := in.Id.FromStorage
-	if in.Id.FromBucket != nil && *in.Id.FromBucket != "" {
-		from += ":" + *in.Id.FromBucket
+	switchStatus := "-"
+	if in.HasSwitch {
+		switchStatus = in.SwitchInfo.LastStatus.String()
 	}
-	to := in.Id.ToStorage
-	if in.Id.ToBucket != nil && *in.Id.ToBucket != "" {
-		to += ":" + *in.Id.ToBucket
-	}
-	return fmt.Sprintf("%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v",
-		in.Id.User,
-		from,
-		to,
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v\t%s",
+		id,
 		ToPercentage(p),
 		objects,
 		events,
 		DurationToStr(in.EventLag.AsDuration()),
 		in.IsPaused,
 		DateToAge(in.CreatedAt),
-		in.HasSwitch,
+		in.IsArchived,
+		switchStatus,
 	)
+}
+
+func replIDToString(in *pb.ReplicationID) string {
+	from := in.FromStorage
+	if in.FromBucket != nil && *in.FromBucket != "" {
+		from += ":" + *in.FromBucket
+	}
+	to := in.ToStorage
+	if in.ToBucket != nil && *in.ToBucket != "" {
+		to += ":" + *in.ToBucket
+	}
+	return fmt.Sprintf("%s:%s->%s", in.User, from, to)
 }
 
 func ToProgress(in *pb.Replication) float64 {
@@ -228,25 +236,38 @@ func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckRepo
 }
 
 func SwitchHeader() string {
-	return "USER\tBUCKET\tFROM\tTO\tSTATUS\tLAST_STARTED\tDONE"
+	return "REPLICATION_ID\tTYPE\tSTATUS\tLAST_STARTED\tDONE"
 }
 
 func PrintSwitchRow(w io.Writer, in *pb.ReplicationSwitch, wide bool) {
-	fromBucket := ""
-	if in.ReplicationId.FromBucket != nil {
-		fromBucket = *in.ReplicationId.FromBucket
-	}
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		in.ReplicationId.User,
-		fromBucket,
-		in.ReplicationId.FromStorage,
-		in.ReplicationId.ToStorage,
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		replIDToString(in.ReplicationId),
+		switchType(in),
 		in.LastStatus.String(),
 		DateToAge(in.LastStartedAt),
 		DateToAge(in.DoneAt))
 	if wide {
 		for _, hist := range in.History {
-			fmt.Fprintf(w, "\t\t%s\n", hist)
+			fmt.Fprintf(w, "\t%s\n", hist)
 		}
 	}
+}
+
+func switchType(in *pb.ReplicationSwitch) string {
+	if in.ZeroDowntime {
+		return "ZERO_DOWNTIME"
+	}
+	if in.DowntimeOpts == nil {
+		return "DOWNTIME: IMMEDIATE"
+	}
+	if in.DowntimeOpts.StartOnInitDone {
+		return "DOWNTIME: ON_INIT_DONE"
+	}
+	if in.DowntimeOpts.StartAt != nil {
+		return fmt.Sprintf("DOWNTIME: AT %s", DateToStr(in.DowntimeOpts.StartAt))
+	}
+	if in.DowntimeOpts.Cron != nil && *in.DowntimeOpts.Cron != "" {
+		return fmt.Sprintf("DOWNTIME: CRON [%s]", *in.DowntimeOpts.Cron)
+	}
+	return "DOWNTIME: IMMEDIATE"
 }

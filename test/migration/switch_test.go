@@ -273,7 +273,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 
 	switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 	r.NoError(err)
-	r.EqualValues(pb.ReplicationSwitch_InProgress, switchInfo.LastStatus)
+	r.EqualValues(pb.ReplicationSwitch_IN_PROGRESS, switchInfo.LastStatus)
 	r.Nil(switchInfo.DowntimeOpts)
 	r.NotNil(switchInfo.LastStartedAt)
 	r.EqualValues(time.Minute, switchInfo.MultipartTtl.AsDuration())
@@ -286,7 +286,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 
 	r.Eventually(func() bool {
@@ -326,7 +326,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 
 	switchInfo, err = e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 	r.NoError(err)
-	r.EqualValues(pb.ReplicationSwitch_Done, switchInfo.LastStatus)
+	r.EqualValues(pb.ReplicationSwitch_DONE, switchInfo.LastStatus)
 	r.Nil(switchInfo.DowntimeOpts)
 	r.NotNil(switchInfo.LastStartedAt)
 	r.NotNil(switchInfo.DoneAt)
@@ -511,7 +511,7 @@ func TestApi_switch_multipart(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 
 	r.Eventually(func() bool {
@@ -650,7 +650,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus > pb.ReplicationSwitch_NotStarted
+		return switchInfo.LastStatus > pb.ReplicationSwitch_NOT_STARTED
 	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket is blocked
@@ -663,7 +663,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
 	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
@@ -856,7 +856,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus > pb.ReplicationSwitch_NotStarted
+		return switchInfo.LastStatus > pb.ReplicationSwitch_NOT_STARTED
 	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket is blocked
@@ -869,7 +869,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
 	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
@@ -972,7 +972,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
 	r.NoError(err)
 	r.True(proto.Equal(replID, switchInfo.ReplicationId))
-	r.EqualValues(pb.ReplicationSwitch_Done, switchInfo.LastStatus)
+	r.EqualValues(pb.ReplicationSwitch_DONE, switchInfo.LastStatus)
 }
 
 func Test_User_switch(t *testing.T) {
@@ -1141,7 +1141,7 @@ func Test_User_switch(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus > pb.ReplicationSwitch_NotStarted
+		return switchInfo.LastStatus > pb.ReplicationSwitch_NOT_STARTED
 	}, e.WaitLong, e.RetryLong)
 
 	//check that bucket1 is blocked
@@ -1157,7 +1157,7 @@ func Test_User_switch(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		return switchInfo.LastStatus == pb.ReplicationSwitch_Done
+		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 
 	// check that all events are processed

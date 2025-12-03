@@ -134,17 +134,17 @@ func toPbSwitchStatus(in *entity.ReplicationSwitchInfo) *pb.ReplicationSwitch {
 func toPbSwitchWithDowntimeStatus(in entity.ReplicationSwitchStatus) pb.ReplicationSwitch_Status {
 	switch in {
 	case entity.StatusInProgress:
-		return pb.ReplicationSwitch_InProgress
+		return pb.ReplicationSwitch_IN_PROGRESS
 	case entity.StatusCheckInProgress:
-		return pb.ReplicationSwitch_CheckInProgress
+		return pb.ReplicationSwitch_CHECK_IN_PROGRESS
 	case entity.StatusSkipped:
-		return pb.ReplicationSwitch_Skipped
+		return pb.ReplicationSwitch_SKIPPED
 	case entity.StatusError:
-		return pb.ReplicationSwitch_Error
+		return pb.ReplicationSwitch_ERROR
 	case entity.StatusDone:
-		return pb.ReplicationSwitch_Done
+		return pb.ReplicationSwitch_DONE
 	default:
-		return pb.ReplicationSwitch_NotStarted
+		return pb.ReplicationSwitch_NOT_STARTED
 	}
 }
 

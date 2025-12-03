@@ -28,46 +28,46 @@ type ReplicationSwitch_Status int32
 
 const (
 	// Switch is not started yet
-	ReplicationSwitch_NotStarted ReplicationSwitch_Status = 0
+	ReplicationSwitch_NOT_STARTED ReplicationSwitch_Status = 0
 	// Switch is in progress. Draining replication events queue.
 	// For switch with downtime, requests to target are blocked at this point.
-	ReplicationSwitch_InProgress ReplicationSwitch_Status = 1
+	ReplicationSwitch_IN_PROGRESS ReplicationSwitch_Status = 1
 	// Switch is in progress. Queue is drained. Checking if source and
 	// destination targets are the same. Requests are still blocked. Used only
 	// for switch with downtime with enabled bucket check.
-	ReplicationSwitch_CheckInProgress ReplicationSwitch_Status = 2
+	ReplicationSwitch_CHECK_IN_PROGRESS ReplicationSwitch_Status = 2
 	// Switch failed to complete in downtime window and was aborted.
 	// Requests to target are unblocked. Used only for switch with downtime.
 	// If cron downtime_window is used, switch will be retried on next cron
 	// execution.
-	ReplicationSwitch_Error ReplicationSwitch_Status = 3
+	ReplicationSwitch_ERROR ReplicationSwitch_Status = 3
 	// Switch was not able to start in given downtime window because conditions
 	// were not met. Used only for switch with downtime. If cron downtime_window
 	// is used, switch will be retried on next cron execution.
-	ReplicationSwitch_Skipped ReplicationSwitch_Status = 4
+	ReplicationSwitch_SKIPPED ReplicationSwitch_Status = 4
 	// Switch was successfully completed.
 	// All data was replicated to replication destination target and all read
 	// and all requests are now routed to it.
-	ReplicationSwitch_Done ReplicationSwitch_Status = 5
+	ReplicationSwitch_DONE ReplicationSwitch_Status = 5
 )
 
 // Enum value maps for ReplicationSwitch_Status.
 var (
 	ReplicationSwitch_Status_name = map[int32]string{
-		0: "NotStarted",
-		1: "InProgress",
-		2: "CheckInProgress",
-		3: "Error",
-		4: "Skipped",
-		5: "Done",
+		0: "NOT_STARTED",
+		1: "IN_PROGRESS",
+		2: "CHECK_IN_PROGRESS",
+		3: "ERROR",
+		4: "SKIPPED",
+		5: "DONE",
 	}
 	ReplicationSwitch_Status_value = map[string]int32{
-		"NotStarted":      0,
-		"InProgress":      1,
-		"CheckInProgress": 2,
-		"Error":           3,
-		"Skipped":         4,
-		"Done":            5,
+		"NOT_STARTED":       0,
+		"IN_PROGRESS":       1,
+		"CHECK_IN_PROGRESS": 2,
+		"ERROR":             3,
+		"SKIPPED":           4,
+		"DONE":              5,
 	}
 )
 
@@ -1144,7 +1144,7 @@ func (x *ReplicationSwitch) GetLastStatus() ReplicationSwitch_Status {
 	if x != nil {
 		return x.LastStatus
 	}
-	return ReplicationSwitch_NotStarted
+	return ReplicationSwitch_NOT_STARTED
 }
 
 func (x *ReplicationSwitch) GetZeroDowntime() bool {
@@ -1444,7 +1444,7 @@ const file_chorus_policy_proto_rawDesc = "" +
 	"\x05_cronB\v\n" +
 	"\t_start_atB\x0f\n" +
 	"\r_max_durationB\x10\n" +
-	"\x0e_max_event_lag\"\x86\x05\n" +
+	"\x0e_max_event_lag\"\x8a\x05\n" +
 	"\x11ReplicationSwitch\x12A\n" +
 	"\vlast_status\x18\x01 \x01(\x0e2 .chorus.ReplicationSwitch.StatusR\n" +
 	"lastStatus\x12#\n" +
@@ -1454,16 +1454,14 @@ const file_chorus_policy_proto_rawDesc = "" +
 	"\x0flast_started_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x02R\rlastStartedAt\x88\x01\x01\x128\n" +
 	"\adone_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x03R\x06doneAt\x88\x01\x01\x12\x18\n" +
 	"\ahistory\x18\a \x03(\tR\ahistory\x12<\n" +
-	"\x0ereplication_id\x18\b \x01(\v2\x15.chorus.ReplicationIDR\rreplicationId\"_\n" +
-	"\x06Status\x12\x0e\n" +
-	"\n" +
-	"NotStarted\x10\x00\x12\x0e\n" +
-	"\n" +
-	"InProgress\x10\x01\x12\x13\n" +
-	"\x0fCheckInProgress\x10\x02\x12\t\n" +
-	"\x05Error\x10\x03\x12\v\n" +
-	"\aSkipped\x10\x04\x12\b\n" +
-	"\x04Done\x10\x05B\x10\n" +
+	"\x0ereplication_id\x18\b \x01(\v2\x15.chorus.ReplicationIDR\rreplicationId\"c\n" +
+	"\x06Status\x12\x0f\n" +
+	"\vNOT_STARTED\x10\x00\x12\x0f\n" +
+	"\vIN_PROGRESS\x10\x01\x12\x15\n" +
+	"\x11CHECK_IN_PROGRESS\x10\x02\x12\t\n" +
+	"\x05ERROR\x10\x03\x12\v\n" +
+	"\aSKIPPED\x10\x04\x12\b\n" +
+	"\x04DONE\x10\x05B\x10\n" +
 	"\x0e_multipart_ttlB\x10\n" +
 	"\x0e_downtime_optsB\x12\n" +
 	"\x10_last_started_atB\n" +

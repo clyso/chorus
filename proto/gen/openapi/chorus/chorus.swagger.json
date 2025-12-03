@@ -1290,15 +1290,15 @@
     "chorusReplicationSwitchStatus": {
       "type": "string",
       "enum": [
-        "NotStarted",
-        "InProgress",
-        "CheckInProgress",
-        "Error",
-        "Skipped",
-        "Done"
+        "NOT_STARTED",
+        "IN_PROGRESS",
+        "CHECK_IN_PROGRESS",
+        "ERROR",
+        "SKIPPED",
+        "DONE"
       ],
-      "default": "NotStarted",
-      "description": " - NotStarted: Switch is not started yet\n - InProgress: Switch is in progress. Draining replication events queue.\nFor switch with downtime, requests to target are blocked at this point.\n - CheckInProgress: Switch is in progress. Queue is drained. Checking if source and\ndestination targets are the same. Requests are still blocked. Used only\nfor switch with downtime with enabled bucket check.\n - Error: Switch failed to complete in downtime window and was aborted.\nRequests to target are unblocked. Used only for switch with downtime.\nIf cron downtime_window is used, switch will be retried on next cron\nexecution.\n - Skipped: Switch was not able to start in given downtime window because conditions\nwere not met. Used only for switch with downtime. If cron downtime_window\nis used, switch will be retried on next cron execution.\n - Done: Switch was successfully completed.\nAll data was replicated to replication destination target and all read\nand all requests are now routed to it."
+      "default": "NOT_STARTED",
+      "description": " - NOT_STARTED: Switch is not started yet\n - IN_PROGRESS: Switch is in progress. Draining replication events queue.\nFor switch with downtime, requests to target are blocked at this point.\n - CHECK_IN_PROGRESS: Switch is in progress. Queue is drained. Checking if source and\ndestination targets are the same. Requests are still blocked. Used only\nfor switch with downtime with enabled bucket check.\n - ERROR: Switch failed to complete in downtime window and was aborted.\nRequests to target are unblocked. Used only for switch with downtime.\nIf cron downtime_window is used, switch will be retried on next cron\nexecution.\n - SKIPPED: Switch was not able to start in given downtime window because conditions\nwere not met. Used only for switch with downtime. If cron downtime_window\nis used, switch will be retried on next cron execution.\n - DONE: Switch was successfully completed.\nAll data was replicated to replication destination target and all read\nand all requests are now routed to it."
     },
     "chorusStartConsistencyCheckRequest": {
       "type": "object",

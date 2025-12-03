@@ -295,6 +295,11 @@ func (h *policyHandlers) DeleteReplication(ctx context.Context, req *pb.Replicat
 	if err != nil {
 		return nil, err
 	}
+	existing, err := h.policySvc.GetReplicationPolicyInfoExtended(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	isAgent := existing.AgentURL != ""
 	err = h.inReplicationLock(ctx, uid, func() error {
 		if userRepl, ok := uid.AsUserID(); ok {
 			// delete user replication
@@ -308,9 +313,11 @@ func (h *policyHandlers) DeleteReplication(ctx context.Context, req *pb.Replicat
 			if err != nil {
 				return fmt.Errorf("%w: unable to delete replication policy", err)
 			}
-			err = h.notificationSvc.DeleteBucketNotification(ctx, bucketRepl.FromStorage, bucketRepl.User, bucketRepl.FromBucket)
-			if err != nil {
-				zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
+			if isAgent {
+				err = h.notificationSvc.DeleteBucketNotification(ctx, bucketRepl.FromStorage, bucketRepl.User, bucketRepl.FromBucket)
+				if err != nil {
+					zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
+				}
 			}
 		} else {
 			return fmt.Errorf("%w: invalid replication ID", dom.ErrInvalidArg)
@@ -483,13 +490,13 @@ func (h *policyHandlers) skipBucketReplication(k entity.BucketReplicationPolicy,
 	if filter.IsPaused != nil && v.IsPaused != *filter.IsPaused {
 		return true
 	}
-	if filter.IsAgent != nil && v.AgentURL != "" && *filter.IsAgent {
+	if filter.IsAgent != nil && v.AgentURL != "" != *filter.IsAgent {
 		return true
 	}
 	if filter.IsArchived != nil && v.IsArchived != *filter.IsArchived {
 		return true
 	}
-	if filter.HasSwitch != nil && v.Switch != nil && *filter.HasSwitch {
+	if filter.HasSwitch != nil && v.Switch != nil != *filter.HasSwitch {
 		return true
 	}
 	return false
@@ -511,13 +518,13 @@ func (h *policyHandlers) skipUserReplication(k entity.UserReplicationPolicy, v e
 	if filter.IsPaused != nil && v.IsPaused != *filter.IsPaused {
 		return true
 	}
-	if filter.IsAgent != nil && v.AgentURL != "" && *filter.IsAgent {
+	if filter.IsAgent != nil && v.AgentURL != "" != *filter.IsAgent {
 		return true
 	}
 	if filter.IsArchived != nil && v.IsArchived != *filter.IsArchived {
 		return true
 	}
-	if filter.HasSwitch != nil && v.Switch != nil && *filter.HasSwitch {
+	if filter.HasSwitch != nil && v.Switch != nil != *filter.HasSwitch {
 		return true
 	}
 	return false
