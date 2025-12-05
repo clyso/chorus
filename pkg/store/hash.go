@@ -95,6 +95,16 @@ func (r *RedisIDKeyHash[ID, V]) GetOp(ctx context.Context, id ID) OperationResul
 			var noVal V
 			return noVal, fmt.Errorf("%w: hash map not found", dom.ErrNotFound)
 		}
+		// check if V is map[string]string - cmd.Scan works only for structs
+		reflectType := reflect.TypeOf((*V)(nil)).Elem()
+		if reflectType.Kind() == reflect.Map &&
+			reflectType.Key().Kind() == reflect.String &&
+			reflectType.Elem().Kind() == reflect.String {
+			var mapValue any = cmd.Val()
+			return mapValue.(V), nil
+		}
+
+		// otherwise, try to scan into struct
 		var value V
 		if err := cmd.Scan(&value); err != nil {
 			var noVal V

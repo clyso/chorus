@@ -94,6 +94,25 @@ service Policy {
   rpc CompareBucket(CompareBucketRequest) returns (CompareBucketResponse) {
     option deprecated = true; // Diff service to compare buckets
   };
+
+  // Returns configured routing policies for chorus proxy.
+  rpc ListRoutings(RoutingsRequest) returns (RoutingsResponse);
+
+  // Overrides routing destination for given user or user's bucket.
+  rpc AddRouting(AddRoutingRequest) returns (google.protobuf.Empty);
+
+  // Removes user or bucket routing override.
+  rpc DeleteRouting(RoutingID) returns (google.protobuf.Empty);
+
+  // Blocks requests on proxy for given user or user's bucket.
+  rpc BlockRouting(RoutingID) returns (google.protobuf.Empty);
+
+  // Removes block on requests on proxy for given user or user's bucket.
+  rpc UnblockRouting(RoutingID) returns (google.protobuf.Empty);
+
+  // Returns configured routing and replication for given storage request to
+  // proxy. Emulates proxy behaviour for given user and bucket.
+  rpc TestProxy(TestProxyRequest) returns (TestProxyResponse);
 }
 
 // Represents user-level and bucket-level replication source and destination
@@ -393,4 +412,88 @@ message ReplicationSwitch {
   repeated string history = 7;
 
   ReplicationID replication_id = 8;
+}
+
+message RoutingsRequest {
+  message Filter {
+    // filter routing policy by user (exact match)
+    optional string user = 1;
+    // filter routing policy by bucket (exact match)
+    optional string bucket = 2;
+    // filter routing policy by destination storage (exact match)
+    optional string to_storage = 3;
+    // filter routing policy by blocked status
+    optional bool is_blocked = 4;
+  }
+  // set true to hide user-level routings from response
+  bool hide_user_routings = 1;
+  // set true to hide bucket-level routings from response
+  bool hide_bucket_routings = 2;
+  // optional filter to apply to routings list
+  optional Filter filter = 3;
+}
+
+message RoutingsResponse {
+  // name of the main storage - default destination if not overridden by user or
+  // bucket routing.
+  string main = 1;
+  // list of user-level routing overrides.
+  repeated UserRouting user_routings = 2;
+  // list of bucket-level routing overrides.
+  repeated BucketRouting bucket_routings = 3;
+}
+
+message UserRouting {
+  // overrides routing destination for all requests of given user.
+  string user = 1;
+  // destination storage name
+  // can be empty if routing is blocked
+  string to_storage = 2;
+  // true if routing is blocked for given user
+  bool is_blocked = 3;
+}
+
+message BucketRouting {
+  // overrides routing destination for given user and bucket.
+  string user = 1;
+  // overrides routing destination for given user and bucket.
+  string bucket = 2;
+  // destination storage name
+  // can be empty if routing is blocked
+  string to_storage = 3;
+  // true if routing is blocked for given user and bucket
+  bool is_blocked = 4;
+}
+
+message AddRoutingRequest {
+  // user for whom to override routing destination.
+  string user = 1;
+  // bucket for which to override routing destination.
+  optional string bucket = 2;
+  // destination storage name
+  string to_storage = 3;
+}
+
+message RoutingID {
+  // routing policy user
+  string user = 1;
+
+  // routing policy bucket
+  optional string bucket = 2;
+}
+
+message TestProxyRequest {
+  // user making requests
+  string user = 1;
+  // bucket being accessed
+  string bucket = 2;
+}
+
+message TestProxyResponse {
+  // destination storage name according to current routing configuration.
+  string route_to_storage = 1;
+  // true if requests are blocked for given user and bucket.
+  bool is_blocked = 2;
+  // list of applicable replications for given user and bucket.
+  repeated ReplicationID replications = 3;
 }

@@ -217,7 +217,7 @@
       }
     },
     "/replication": {
-      "get": {
+      "post": {
         "summary": "Lists configured replications info.",
         "operationId": "Policy_ListReplications",
         "responses": {
@@ -236,95 +236,13 @@
         },
         "parameters": [
           {
-            "name": "hideUserReplications",
-            "description": "if true, user-level replications will be excluded from response.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "hideBucketReplications",
-            "description": "if true, bucket-level replications will be excluded from response.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "hideSwitchInfo",
-            "description": "if true, replications will be listed without switch info.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "filter.user",
-            "description": "If set, filters replications by exact user.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "filter.fromStorage",
-            "description": "If set, filters replications by exact source storage.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "filter.toStorage",
-            "description": "If set, filters replications by exact destination storage.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "filter.fromBucket",
-            "description": "If set, filters bucket-level replications by exact source bucket.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "filter.toBucket",
-            "description": "If set, filters bucket-level replications by exact destination bucket.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "filter.isArchived",
-            "description": "If set, filters replications by archived status.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "filter.isPaused",
-            "description": "If set, filters replications by paused status.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "filter.isInitDone",
-            "description": "If set, filters replications by completion of initial replication phase.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "filter.hasSwitch",
-            "description": "If set, filters replications that have or not have associated switch.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          },
-          {
-            "name": "filter.isAgent",
-            "description": "If set, filters replications by agent-based or proxy-based replication.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
+            "name": "body",
+            "description": "Filters replications list.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusListReplicationsRequest"
+            }
           }
         ],
         "tags": [
@@ -714,6 +632,175 @@
         ]
       }
     },
+    "/routing": {
+      "post": {
+        "summary": "Returns configured routing policies for chorus proxy.",
+        "operationId": "Policy_ListRoutings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/routing/add": {
+      "post": {
+        "summary": "Overrides routing destination for given user or user's bucket.",
+        "operationId": "Policy_AddRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusAddRoutingRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/routing/block": {
+      "put": {
+        "summary": "Blocks requests on proxy for given user or user's bucket.",
+        "operationId": "Policy_BlockRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingID"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/routing/delete": {
+      "put": {
+        "summary": "Removes user or bucket routing override.",
+        "operationId": "Policy_DeleteRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingID"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/routing/unblock": {
+      "put": {
+        "summary": "Removes block on requests on proxy for given user or user's bucket.",
+        "operationId": "Policy_UnblockRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingID"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
     "/storage": {
       "get": {
         "summary": "Lists configured storages with users",
@@ -734,6 +821,39 @@
         },
         "tags": [
           "Chorus"
+        ]
+      }
+    },
+    "/test-proxy": {
+      "post": {
+        "summary": "Returns configured routing and replication for given storage request to\nproxy. Emulates proxy behaviour for given user and bucket.",
+        "operationId": "Policy_TestProxy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusTestProxyResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusTestProxyRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
         ]
       }
     },
@@ -762,51 +882,6 @@
     }
   },
   "definitions": {
-    "ListReplicationsRequestFilter": {
-      "type": "object",
-      "properties": {
-        "user": {
-          "type": "string",
-          "description": "If set, filters replications by exact user."
-        },
-        "fromStorage": {
-          "type": "string",
-          "description": "If set, filters replications by exact source storage."
-        },
-        "toStorage": {
-          "type": "string",
-          "description": "If set, filters replications by exact destination storage."
-        },
-        "fromBucket": {
-          "type": "string",
-          "description": "If set, filters bucket-level replications by exact source bucket."
-        },
-        "toBucket": {
-          "type": "string",
-          "description": "If set, filters bucket-level replications by exact destination bucket."
-        },
-        "isArchived": {
-          "type": "boolean",
-          "description": "If set, filters replications by archived status."
-        },
-        "isPaused": {
-          "type": "boolean",
-          "description": "If set, filters replications by paused status."
-        },
-        "isInitDone": {
-          "type": "boolean",
-          "description": "If set, filters replications by completion of initial replication phase."
-        },
-        "hasSwitch": {
-          "type": "boolean",
-          "description": "If set, filters replications that have or not have associated switch."
-        },
-        "isAgent": {
-          "type": "boolean",
-          "description": "If set, filters replications by agent-based or proxy-based replication."
-        }
-      }
-    },
     "StorageType": {
       "type": "string",
       "enum": [
@@ -828,6 +903,23 @@
         }
       },
       "description": "Configures new user-level or bucket-level replication."
+    },
+    "chorusAddRoutingRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "user for whom to override routing destination."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "bucket for which to override routing destination."
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "destination storage name"
+        }
+      }
     },
     "chorusAgent": {
       "type": "object",
@@ -874,6 +966,27 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "chorusBucketRouting": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "overrides routing destination for given user and bucket."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "overrides routing destination for given user and bucket."
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "destination storage name\ncan be empty if routing is blocked"
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "title": "true if routing is blocked for given user and bucket"
         }
       }
     },
@@ -1122,6 +1235,73 @@
         }
       }
     },
+    "chorusListReplicationsRequest": {
+      "type": "object",
+      "properties": {
+        "hideUserReplications": {
+          "type": "boolean",
+          "description": "if true, user-level replications will be excluded from response."
+        },
+        "hideBucketReplications": {
+          "type": "boolean",
+          "description": "if true, bucket-level replications will be excluded from response."
+        },
+        "hideSwitchInfo": {
+          "type": "boolean",
+          "description": "if true, replications will be listed without switch info."
+        },
+        "filter": {
+          "$ref": "#/definitions/chorusListReplicationsRequestFilter",
+          "description": "OPTIONAL: filter to apply to replications list."
+        }
+      },
+      "description": "Filters replications list."
+    },
+    "chorusListReplicationsRequestFilter": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "If set, filters replications by exact user."
+        },
+        "fromStorage": {
+          "type": "string",
+          "description": "If set, filters replications by exact source storage."
+        },
+        "toStorage": {
+          "type": "string",
+          "description": "If set, filters replications by exact destination storage."
+        },
+        "fromBucket": {
+          "type": "string",
+          "description": "If set, filters bucket-level replications by exact source bucket."
+        },
+        "toBucket": {
+          "type": "string",
+          "description": "If set, filters bucket-level replications by exact destination bucket."
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "If set, filters replications by archived status."
+        },
+        "isPaused": {
+          "type": "boolean",
+          "description": "If set, filters replications by paused status."
+        },
+        "isInitDone": {
+          "type": "boolean",
+          "description": "If set, filters replications by completion of initial replication phase."
+        },
+        "hasSwitch": {
+          "type": "boolean",
+          "description": "If set, filters replications that have or not have associated switch."
+        },
+        "isAgent": {
+          "type": "boolean",
+          "description": "If set, filters replications by agent-based or proxy-based replication."
+        }
+      }
+    },
     "chorusListReplicationsResponse": {
       "type": "object",
       "properties": {
@@ -1300,6 +1480,82 @@
       "default": "NOT_STARTED",
       "description": " - NOT_STARTED: Switch is not started yet\n - IN_PROGRESS: Switch is in progress. Draining replication events queue.\nFor switch with downtime, requests to target are blocked at this point.\n - CHECK_IN_PROGRESS: Switch is in progress. Queue is drained. Checking if source and\ndestination targets are the same. Requests are still blocked. Used only\nfor switch with downtime with enabled bucket check.\n - ERROR: Switch failed to complete in downtime window and was aborted.\nRequests to target are unblocked. Used only for switch with downtime.\nIf cron downtime_window is used, switch will be retried on next cron\nexecution.\n - SKIPPED: Switch was not able to start in given downtime window because conditions\nwere not met. Used only for switch with downtime. If cron downtime_window\nis used, switch will be retried on next cron execution.\n - DONE: Switch was successfully completed.\nAll data was replicated to replication destination target and all read\nand all requests are now routed to it."
     },
+    "chorusRoutingID": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "title": "routing policy user"
+        },
+        "bucket": {
+          "type": "string",
+          "title": "routing policy bucket"
+        }
+      }
+    },
+    "chorusRoutingsRequest": {
+      "type": "object",
+      "properties": {
+        "hideUserRoutings": {
+          "type": "boolean",
+          "title": "set true to hide user-level routings from response"
+        },
+        "hideBucketRoutings": {
+          "type": "boolean",
+          "title": "set true to hide bucket-level routings from response"
+        },
+        "filter": {
+          "$ref": "#/definitions/chorusRoutingsRequestFilter",
+          "title": "optional filter to apply to routings list"
+        }
+      }
+    },
+    "chorusRoutingsRequestFilter": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "title": "filter routing policy by user (exact match)"
+        },
+        "bucket": {
+          "type": "string",
+          "title": "filter routing policy by bucket (exact match)"
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "filter routing policy by destination storage (exact match)"
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "title": "filter routing policy by blocked status"
+        }
+      }
+    },
+    "chorusRoutingsResponse": {
+      "type": "object",
+      "properties": {
+        "main": {
+          "type": "string",
+          "description": "name of the main storage - default destination if not overridden by user or\nbucket routing."
+        },
+        "userRoutings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusUserRouting"
+          },
+          "description": "list of user-level routing overrides."
+        },
+        "bucketRoutings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusBucketRouting"
+          },
+          "description": "list of bucket-level routing overrides."
+        }
+      }
+    },
     "chorusStartConsistencyCheckRequest": {
       "type": "object",
       "properties": {
@@ -1411,6 +1667,57 @@
         "multipartTtl": {
           "type": "string",
           "description": "Max Amount of time to wait for uncompleted multipart uploads to finish\nbefore switching targets. Default is 1 hour."
+        }
+      }
+    },
+    "chorusTestProxyRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "title": "user making requests"
+        },
+        "bucket": {
+          "type": "string",
+          "title": "bucket being accessed"
+        }
+      }
+    },
+    "chorusTestProxyResponse": {
+      "type": "object",
+      "properties": {
+        "routeToStorage": {
+          "type": "string",
+          "description": "destination storage name according to current routing configuration."
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "description": "true if requests are blocked for given user and bucket."
+        },
+        "replications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusReplicationID"
+          },
+          "description": "list of applicable replications for given user and bucket."
+        }
+      }
+    },
+    "chorusUserRouting": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "overrides routing destination for all requests of given user."
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "destination storage name\ncan be empty if routing is blocked"
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "title": "true if routing is blocked for given user"
         }
       }
     },

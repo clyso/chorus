@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/meta"
@@ -711,4 +712,138 @@ func (h *policyHandlers) inReplicationLock(ctx context.Context, id entity.Univer
 	}
 	defer lock.Release(ctx)
 	return lock.Do(ctx, time.Second, fn)
+}
+
+func (h *policyHandlers) AddRouting(ctx context.Context, req *pb.AddRoutingRequest) (*emptypb.Empty, error) {
+	if err := h.clients.Config().Exists(req.ToStorage, req.User); err != nil {
+		return nil, err
+	}
+	err := h.inUserLock(ctx, req.User, func() error {
+		if req.Bucket != nil && *req.Bucket != "" {
+			return h.policySvc.SetBucketRouting(ctx, entity.BucketRoutingPolicyID{
+				User:   req.User,
+				Bucket: *req.Bucket,
+			}, req.ToStorage)
+		}
+		return h.policySvc.SetUserRouting(ctx, req.User, req.ToStorage)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *policyHandlers) DeleteRouting(ctx context.Context, req *pb.RoutingID) (*emptypb.Empty, error) {
+	if req.User == "" {
+		return nil, fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	err := h.inUserLock(ctx, req.User, func() error {
+		if req.Bucket != nil && *req.Bucket != "" {
+			return h.policySvc.DeleteBucketRouting(ctx, entity.BucketRoutingPolicyID{
+				User:   req.User,
+				Bucket: *req.Bucket,
+			})
+		}
+		return h.policySvc.DeleteUserRouting(ctx, req.User)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *policyHandlers) BlockRouting(ctx context.Context, req *pb.RoutingID) (*emptypb.Empty, error) {
+	if req.User == "" {
+		return nil, fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	err := h.inUserLock(ctx, req.User, func() error {
+		if req.Bucket != nil && *req.Bucket != "" {
+			return h.policySvc.BlockBucketRouting(ctx, entity.BucketRoutingPolicyID{
+				User:   req.User,
+				Bucket: *req.Bucket,
+			})
+		}
+		return h.policySvc.BlockUserRouting(ctx, req.User)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *policyHandlers) UnblockRouting(ctx context.Context, req *pb.RoutingID) (*emptypb.Empty, error) {
+	if req.User == "" {
+		return nil, fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	err := h.inUserLock(ctx, req.User, func() error {
+		if req.Bucket != nil && *req.Bucket != "" {
+			return h.policySvc.UnblockBucketRouting(ctx, entity.BucketRoutingPolicyID{
+				User:   req.User,
+				Bucket: *req.Bucket,
+			})
+		}
+		return h.policySvc.UnblockUserRouting(ctx, req.User)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *policyHandlers) ListRoutings(ctx context.Context, req *pb.RoutingsRequest) (*pb.RoutingsResponse, error) {
+	res := &pb.RoutingsResponse{
+		Main: h.clients.Config().Main,
+	}
+
+	users := h.clients.Config().GetMain().UserList()
+	if req.Filter != nil && req.Filter.User != nil && *req.Filter.User != "" {
+		// filter by user if set
+		users = []string{*req.Filter.User}
+	}
+	if !req.HideBucketRoutings {
+		for _, user := range users {
+			br, err := h.policySvc.GetBucketRoutings(ctx, user)
+			if err != nil {
+				return nil, err
+			}
+			bb, err := h.policySvc.GetBucketRoutingBlocks(ctx, user)
+			if err != nil {
+				return nil, err
+			}
+			res.BucketRoutings = append(res.BucketRoutings, toBucketRoutingsPb(req.Filter, user, br, bb)...)
+		}
+	}
+	if !req.HideUserRoutings {
+		ur, err := h.policySvc.GetUserRoutings(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ub, err := h.policySvc.GetUserRoutingBlocks(ctx)
+		if err != nil {
+			return nil, err
+		}
+		res.UserRoutings = toUserRoutingsPb(req.Filter, ur, ub)
+	}
+	return res, nil
+}
+
+func (h *policyHandlers) TestProxy(ctx context.Context, req *pb.TestProxyRequest) (*pb.TestProxyResponse, error) {
+	var err error
+	ctx, err = h.policySvc.BuildProxyContext(ctx, req.User, req.Bucket)
+	if err != nil {
+		if errors.Is(err, dom.ErrRoutingBlock) {
+			return &pb.TestProxyResponse{
+				IsBlocked: true,
+			}, nil
+		}
+		return nil, err
+	}
+	result := &pb.TestProxyResponse{
+		RouteToStorage: xctx.GetRoutingPolicy(ctx),
+	}
+	replications := xctx.GetReplications(ctx)
+	for _, repl := range replications {
+		result.Replications = append(result.Replications, replicationIDToPb(repl))
+	}
+	return result, nil
 }

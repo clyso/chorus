@@ -104,42 +104,61 @@ func (r *UserRoutingStore) GetOp(ctx context.Context, user string) OperationResu
 	})
 }
 
-func (r *UserRoutingStore) SetOp(ctx context.Context, user, toStorage string) OperationStatus {
-	result := r.route.SetFieldOp(ctx, "", user, toStorage)
-	return NewRedisOperationStatus(func() error {
-		_, err := result.Get()
-		return err
+func (r *UserRoutingStore) ListRoutesOp(ctx context.Context) OperationResult[map[string]string] {
+	res := r.route.GetOp(ctx, "")
+	// ignore not found err
+	return NewRedisOperationResult(func() (map[string]string, error) {
+		routes, err := res.Get()
+		if errors.Is(err, dom.ErrNotFound) {
+			return map[string]string{}, nil
+		}
+		return routes, err
 	})
+}
+
+func (r *UserRoutingStore) ListBlocksOp(ctx context.Context) OperationResult[map[string]bool] {
+	res := r.block.GetOp(ctx, "")
+	return NewRedisOperationResult(func() (map[string]bool, error) {
+		blockedUsers, err := res.Get()
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[string]bool, len(blockedUsers))
+		for _, user := range blockedUsers {
+			result[user] = true
+		}
+		return result, nil
+	})
+}
+
+func (r *UserRoutingStore) SetOp(ctx context.Context, user, toStorage string) OperationStatus {
+	return r.route.SetFieldOp(ctx, "", user, toStorage).Status()
 }
 
 func (r *UserRoutingStore) BlockOp(ctx context.Context, user string) OperationStatus {
-	result := r.block.AddOp(ctx, "", user)
-	return NewRedisOperationStatus(func() error {
-		_, err := result.Get()
-		return err
-	})
+	return r.block.AddOp(ctx, "", user).Status()
 }
 
 func (r *UserRoutingStore) UnblockOp(ctx context.Context, user string) OperationStatus {
-	result := r.block.RemoveOp(ctx, "", user)
-	return NewRedisOperationStatus(func() error {
-		_, err := result.Get()
-		return err
-	})
+	return r.block.RemoveOp(ctx, "", user).Status()
 }
 
-func (r *UserRoutingStore) DeleteOp(ctx context.Context, user string) OperationStatus {
-	blockRes := r.block.RemoveOp(ctx, "", user)
-	routeRes := r.route.DelFieldOp(ctx, "", user)
+func (r *UserRoutingStore) DeleteAllOp(ctx context.Context, user string) OperationStatus {
+	blockRes := r.UnblockOp(ctx, user)
+	routeRes := r.DeleteRouteOp(ctx, user)
 	return NewRedisOperationStatus(func() error {
-		if _, err := blockRes.Get(); err != nil {
+		if err := blockRes.Get(); err != nil {
 			return err
 		}
-		if _, err := routeRes.Get(); err != nil {
+		if err := routeRes.Get(); err != nil {
 			return err
 		}
 		return nil
 	})
+}
+
+func (r *UserRoutingStore) DeleteRouteOp(ctx context.Context, user string) OperationStatus {
+	return r.route.DelFieldOp(ctx, "", user).Status()
 }
 
 type BucketRoutingStore struct {
@@ -187,43 +206,61 @@ func (r *BucketRoutingStore) GetOp(ctx context.Context, id entity.BucketRoutingP
 	})
 }
 
+func (r *BucketRoutingStore) ListRoutesOp(ctx context.Context, user string) OperationResult[map[string]string] {
+	res := r.route.GetOp(ctx, user)
+	// ignore not found err
+	return NewRedisOperationResult(func() (map[string]string, error) {
+		routes, err := res.Get()
+		if errors.Is(err, dom.ErrNotFound) {
+			return map[string]string{}, nil
+		}
+		return routes, err
+	})
+}
+
+func (r *BucketRoutingStore) ListBlocksOp(ctx context.Context, user string) OperationResult[map[string]bool] {
+	res := r.block.GetOp(ctx, user)
+	return NewRedisOperationResult(func() (map[string]bool, error) {
+		blockedBuckets, err := res.Get()
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[string]bool, len(blockedBuckets))
+		for _, bucket := range blockedBuckets {
+			result[bucket] = true
+		}
+		return result, nil
+	})
+}
+
 // Can be part of a transaction.
 func (r *BucketRoutingStore) SetOp(ctx context.Context, id entity.BucketRoutingPolicyID, toStorage string) OperationStatus {
-	result := r.route.SetFieldOp(ctx, id.User, id.Bucket, toStorage)
-	return NewRedisOperationStatus(func() error {
-		_, err := result.Get()
-		return err
-	})
+	return r.route.SetFieldOp(ctx, id.User, id.Bucket, toStorage).Status()
 }
 
 func (r *BucketRoutingStore) BlockOp(ctx context.Context, id entity.BucketRoutingPolicyID) OperationStatus {
-	result := r.block.AddOp(ctx, id.User, id.Bucket)
-	return NewRedisOperationStatus(func() error {
-		_, err := result.Get()
-		return err
-	})
+	return r.block.AddOp(ctx, id.User, id.Bucket).Status()
 }
 
 func (r *BucketRoutingStore) UnblockOp(ctx context.Context, id entity.BucketRoutingPolicyID) OperationStatus {
-	result := r.block.RemoveOp(ctx, id.User, id.Bucket)
-	return NewRedisOperationStatus(func() error {
-		_, err := result.Get()
-		return err
-	})
+	return r.block.RemoveOp(ctx, id.User, id.Bucket).Status()
 }
 
-func (r *BucketRoutingStore) DeleteOp(ctx context.Context, id entity.BucketRoutingPolicyID) OperationStatus {
-	blockRes := r.block.RemoveOp(ctx, id.User, id.Bucket)
-	routeRes := r.route.DelFieldOp(ctx, id.User, id.Bucket)
+func (r *BucketRoutingStore) DeleteAllOp(ctx context.Context, id entity.BucketRoutingPolicyID) OperationStatus {
+	blockRes := r.UnblockOp(ctx, id)
+	routeRes := r.DeleteRouteOp(ctx, id)
 	return NewRedisOperationStatus(func() error {
-		if _, err := blockRes.Get(); err != nil {
+		if err := blockRes.Get(); err != nil {
 			return err
 		}
-		if _, err := routeRes.Get(); err != nil {
+		if err := routeRes.Get(); err != nil {
 			return err
 		}
 		return nil
 	})
+}
+func (r *BucketRoutingStore) DeleteRouteOp(ctx context.Context, id entity.BucketRoutingPolicyID) OperationStatus {
+	return r.route.DelFieldOp(ctx, id.User, id.Bucket).Status()
 }
 
 // ---------------- Converters ----------------

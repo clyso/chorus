@@ -266,3 +266,86 @@ func replicationOptsToPb(in *entity.ReplicationStatus) *pb.ReplicationOpts {
 		AgentUrl: strPtr(in.AgentURL),
 	}
 }
+
+func toUserRoutingsPb(filter *pb.RoutingsRequest_Filter, routings map[string]string, blocks map[string]bool) []*pb.UserRouting {
+	//nolint:prealloc // cannot preallocate because of the filtering
+	var res []*pb.UserRouting
+	for user, toStorage := range routings {
+		if filter != nil && filter.User != nil && *filter.User != "" && user != *filter.User {
+			continue
+		}
+		if filter != nil && filter.ToStorage != nil && *filter.ToStorage != "" && toStorage != *filter.ToStorage {
+			continue
+		}
+		blocked := blocks[user]
+		if filter != nil && filter.IsBlocked != nil && *filter.IsBlocked != blocked {
+			continue
+		}
+
+		res = append(res, &pb.UserRouting{
+			User:      user,
+			ToStorage: toStorage,
+			IsBlocked: blocked,
+		})
+	}
+	for user, isBlocked := range blocks {
+		if filter != nil && filter.User != nil && *filter.User != "" && user != *filter.User {
+			continue
+		}
+		if filter != nil && filter.IsBlocked != nil && *filter.IsBlocked != isBlocked {
+			continue
+		}
+		_, exists := routings[user]
+		if !exists && isBlocked {
+			// add blocked routing without target
+			res = append(res, &pb.UserRouting{
+				User:      user,
+				ToStorage: "",
+				IsBlocked: isBlocked,
+			})
+		}
+	}
+	return res
+}
+
+func toBucketRoutingsPb(filter *pb.RoutingsRequest_Filter, user string, routings map[string]string, blocks map[string]bool) []*pb.BucketRouting {
+	//nolint:prealloc // cannot preallocate because of the filtering
+	var res []*pb.BucketRouting
+	for bucket, toStorage := range routings {
+		if filter != nil && filter.Bucket != nil && *filter.Bucket != "" && bucket != *filter.Bucket {
+			continue
+		}
+		if filter != nil && filter.ToStorage != nil && *filter.ToStorage != "" && toStorage != *filter.ToStorage {
+			continue
+		}
+		blocked := blocks[bucket]
+		if filter != nil && filter.IsBlocked != nil && *filter.IsBlocked != blocked {
+			continue
+		}
+		res = append(res, &pb.BucketRouting{
+			User:      user,
+			Bucket:    bucket,
+			ToStorage: toStorage,
+			IsBlocked: blocked,
+		})
+	}
+	for bucket, isBlocked := range blocks {
+		if filter != nil && filter.Bucket != nil && *filter.Bucket != "" && bucket != *filter.Bucket {
+			continue
+		}
+		if filter != nil && filter.IsBlocked != nil && *filter.IsBlocked != isBlocked {
+			continue
+		}
+		_, exists := routings[bucket]
+		if !exists && isBlocked {
+			// add blocked routing without target
+			res = append(res, &pb.BucketRouting{
+				User:      user,
+				Bucket:    bucket,
+				ToStorage: "",
+				IsBlocked: isBlocked,
+			})
+		}
+	}
+	return res
+}

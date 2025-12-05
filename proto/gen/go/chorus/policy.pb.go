@@ -1196,6 +1196,504 @@ func (x *ReplicationSwitch) GetReplicationId() *ReplicationID {
 	return nil
 }
 
+type RoutingsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// set true to hide user-level routings from response
+	HideUserRoutings bool `protobuf:"varint,1,opt,name=hide_user_routings,json=hideUserRoutings,proto3" json:"hide_user_routings,omitempty"`
+	// set true to hide bucket-level routings from response
+	HideBucketRoutings bool `protobuf:"varint,2,opt,name=hide_bucket_routings,json=hideBucketRoutings,proto3" json:"hide_bucket_routings,omitempty"`
+	// optional filter to apply to routings list
+	Filter        *RoutingsRequest_Filter `protobuf:"bytes,3,opt,name=filter,proto3,oneof" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoutingsRequest) Reset() {
+	*x = RoutingsRequest{}
+	mi := &file_chorus_policy_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoutingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoutingsRequest) ProtoMessage() {}
+
+func (x *RoutingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoutingsRequest.ProtoReflect.Descriptor instead.
+func (*RoutingsRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RoutingsRequest) GetHideUserRoutings() bool {
+	if x != nil {
+		return x.HideUserRoutings
+	}
+	return false
+}
+
+func (x *RoutingsRequest) GetHideBucketRoutings() bool {
+	if x != nil {
+		return x.HideBucketRoutings
+	}
+	return false
+}
+
+func (x *RoutingsRequest) GetFilter() *RoutingsRequest_Filter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type RoutingsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// name of the main storage - default destination if not overridden by user or
+	// bucket routing.
+	Main string `protobuf:"bytes,1,opt,name=main,proto3" json:"main,omitempty"`
+	// list of user-level routing overrides.
+	UserRoutings []*UserRouting `protobuf:"bytes,2,rep,name=user_routings,json=userRoutings,proto3" json:"user_routings,omitempty"`
+	// list of bucket-level routing overrides.
+	BucketRoutings []*BucketRouting `protobuf:"bytes,3,rep,name=bucket_routings,json=bucketRoutings,proto3" json:"bucket_routings,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RoutingsResponse) Reset() {
+	*x = RoutingsResponse{}
+	mi := &file_chorus_policy_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoutingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoutingsResponse) ProtoMessage() {}
+
+func (x *RoutingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoutingsResponse.ProtoReflect.Descriptor instead.
+func (*RoutingsResponse) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RoutingsResponse) GetMain() string {
+	if x != nil {
+		return x.Main
+	}
+	return ""
+}
+
+func (x *RoutingsResponse) GetUserRoutings() []*UserRouting {
+	if x != nil {
+		return x.UserRoutings
+	}
+	return nil
+}
+
+func (x *RoutingsResponse) GetBucketRoutings() []*BucketRouting {
+	if x != nil {
+		return x.BucketRoutings
+	}
+	return nil
+}
+
+type UserRouting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// overrides routing destination for all requests of given user.
+	User string `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// destination storage name
+	// can be empty if routing is blocked
+	ToStorage string `protobuf:"bytes,2,opt,name=to_storage,json=toStorage,proto3" json:"to_storage,omitempty"`
+	// true if routing is blocked for given user
+	IsBlocked     bool `protobuf:"varint,3,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserRouting) Reset() {
+	*x = UserRouting{}
+	mi := &file_chorus_policy_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserRouting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserRouting) ProtoMessage() {}
+
+func (x *UserRouting) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserRouting.ProtoReflect.Descriptor instead.
+func (*UserRouting) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UserRouting) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *UserRouting) GetToStorage() string {
+	if x != nil {
+		return x.ToStorage
+	}
+	return ""
+}
+
+func (x *UserRouting) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
+}
+
+type BucketRouting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// overrides routing destination for given user and bucket.
+	User string `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// overrides routing destination for given user and bucket.
+	Bucket string `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
+	// destination storage name
+	// can be empty if routing is blocked
+	ToStorage string `protobuf:"bytes,3,opt,name=to_storage,json=toStorage,proto3" json:"to_storage,omitempty"`
+	// true if routing is blocked for given user and bucket
+	IsBlocked     bool `protobuf:"varint,4,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BucketRouting) Reset() {
+	*x = BucketRouting{}
+	mi := &file_chorus_policy_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BucketRouting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BucketRouting) ProtoMessage() {}
+
+func (x *BucketRouting) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BucketRouting.ProtoReflect.Descriptor instead.
+func (*BucketRouting) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *BucketRouting) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *BucketRouting) GetBucket() string {
+	if x != nil {
+		return x.Bucket
+	}
+	return ""
+}
+
+func (x *BucketRouting) GetToStorage() string {
+	if x != nil {
+		return x.ToStorage
+	}
+	return ""
+}
+
+func (x *BucketRouting) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
+}
+
+type AddRoutingRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user for whom to override routing destination.
+	User string `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// bucket for which to override routing destination.
+	Bucket *string `protobuf:"bytes,2,opt,name=bucket,proto3,oneof" json:"bucket,omitempty"`
+	// destination storage name
+	ToStorage     string `protobuf:"bytes,3,opt,name=to_storage,json=toStorage,proto3" json:"to_storage,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddRoutingRequest) Reset() {
+	*x = AddRoutingRequest{}
+	mi := &file_chorus_policy_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddRoutingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddRoutingRequest) ProtoMessage() {}
+
+func (x *AddRoutingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddRoutingRequest.ProtoReflect.Descriptor instead.
+func (*AddRoutingRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *AddRoutingRequest) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *AddRoutingRequest) GetBucket() string {
+	if x != nil && x.Bucket != nil {
+		return *x.Bucket
+	}
+	return ""
+}
+
+func (x *AddRoutingRequest) GetToStorage() string {
+	if x != nil {
+		return x.ToStorage
+	}
+	return ""
+}
+
+type RoutingID struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// routing policy user
+	User string `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// routing policy bucket
+	Bucket        *string `protobuf:"bytes,2,opt,name=bucket,proto3,oneof" json:"bucket,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoutingID) Reset() {
+	*x = RoutingID{}
+	mi := &file_chorus_policy_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoutingID) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoutingID) ProtoMessage() {}
+
+func (x *RoutingID) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoutingID.ProtoReflect.Descriptor instead.
+func (*RoutingID) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *RoutingID) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *RoutingID) GetBucket() string {
+	if x != nil && x.Bucket != nil {
+		return *x.Bucket
+	}
+	return ""
+}
+
+type TestProxyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user making requests
+	User string `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// bucket being accessed
+	Bucket        string `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestProxyRequest) Reset() {
+	*x = TestProxyRequest{}
+	mi := &file_chorus_policy_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestProxyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestProxyRequest) ProtoMessage() {}
+
+func (x *TestProxyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestProxyRequest.ProtoReflect.Descriptor instead.
+func (*TestProxyRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *TestProxyRequest) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *TestProxyRequest) GetBucket() string {
+	if x != nil {
+		return x.Bucket
+	}
+	return ""
+}
+
+type TestProxyResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// destination storage name according to current routing configuration.
+	RouteToStorage string `protobuf:"bytes,1,opt,name=route_to_storage,json=routeToStorage,proto3" json:"route_to_storage,omitempty"`
+	// true if requests are blocked for given user and bucket.
+	IsBlocked bool `protobuf:"varint,2,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
+	// list of applicable replications for given user and bucket.
+	Replications  []*ReplicationID `protobuf:"bytes,3,rep,name=replications,proto3" json:"replications,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestProxyResponse) Reset() {
+	*x = TestProxyResponse{}
+	mi := &file_chorus_policy_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestProxyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestProxyResponse) ProtoMessage() {}
+
+func (x *TestProxyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestProxyResponse.ProtoReflect.Descriptor instead.
+func (*TestProxyResponse) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *TestProxyResponse) GetRouteToStorage() string {
+	if x != nil {
+		return x.RouteToStorage
+	}
+	return ""
+}
+
+func (x *TestProxyResponse) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
+}
+
+func (x *TestProxyResponse) GetReplications() []*ReplicationID {
+	if x != nil {
+		return x.Replications
+	}
+	return nil
+}
+
 type ListReplicationsRequest_Filter struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// If set, filters replications by exact user.
@@ -1224,7 +1722,7 @@ type ListReplicationsRequest_Filter struct {
 
 func (x *ListReplicationsRequest_Filter) Reset() {
 	*x = ListReplicationsRequest_Filter{}
-	mi := &file_chorus_policy_proto_msgTypes[14]
+	mi := &file_chorus_policy_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1236,7 +1734,7 @@ func (x *ListReplicationsRequest_Filter) String() string {
 func (*ListReplicationsRequest_Filter) ProtoMessage() {}
 
 func (x *ListReplicationsRequest_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_policy_proto_msgTypes[14]
+	mi := &file_chorus_policy_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1318,6 +1816,78 @@ func (x *ListReplicationsRequest_Filter) GetHasSwitch() bool {
 func (x *ListReplicationsRequest_Filter) GetIsAgent() bool {
 	if x != nil && x.IsAgent != nil {
 		return *x.IsAgent
+	}
+	return false
+}
+
+type RoutingsRequest_Filter struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// filter routing policy by user (exact match)
+	User *string `protobuf:"bytes,1,opt,name=user,proto3,oneof" json:"user,omitempty"`
+	// filter routing policy by bucket (exact match)
+	Bucket *string `protobuf:"bytes,2,opt,name=bucket,proto3,oneof" json:"bucket,omitempty"`
+	// filter routing policy by destination storage (exact match)
+	ToStorage *string `protobuf:"bytes,3,opt,name=to_storage,json=toStorage,proto3,oneof" json:"to_storage,omitempty"`
+	// filter routing policy by blocked status
+	IsBlocked     *bool `protobuf:"varint,4,opt,name=is_blocked,json=isBlocked,proto3,oneof" json:"is_blocked,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoutingsRequest_Filter) Reset() {
+	*x = RoutingsRequest_Filter{}
+	mi := &file_chorus_policy_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoutingsRequest_Filter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoutingsRequest_Filter) ProtoMessage() {}
+
+func (x *RoutingsRequest_Filter) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_policy_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoutingsRequest_Filter.ProtoReflect.Descriptor instead.
+func (*RoutingsRequest_Filter) Descriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{14, 0}
+}
+
+func (x *RoutingsRequest_Filter) GetUser() string {
+	if x != nil && x.User != nil {
+		return *x.User
+	}
+	return ""
+}
+
+func (x *RoutingsRequest_Filter) GetBucket() string {
+	if x != nil && x.Bucket != nil {
+		return *x.Bucket
+	}
+	return ""
+}
+
+func (x *RoutingsRequest_Filter) GetToStorage() string {
+	if x != nil && x.ToStorage != nil {
+		return *x.ToStorage
+	}
+	return ""
+}
+
+func (x *RoutingsRequest_Filter) GetIsBlocked() bool {
+	if x != nil && x.IsBlocked != nil {
+		return *x.IsBlocked
 	}
 	return false
 }
@@ -1466,7 +2036,59 @@ const file_chorus_policy_proto_rawDesc = "" +
 	"\x0e_downtime_optsB\x12\n" +
 	"\x10_last_started_atB\n" +
 	"\n" +
-	"\b_done_at2\xc4\a\n" +
+	"\b_done_at\"\xf4\x02\n" +
+	"\x0fRoutingsRequest\x12,\n" +
+	"\x12hide_user_routings\x18\x01 \x01(\bR\x10hideUserRoutings\x120\n" +
+	"\x14hide_bucket_routings\x18\x02 \x01(\bR\x12hideBucketRoutings\x12;\n" +
+	"\x06filter\x18\x03 \x01(\v2\x1e.chorus.RoutingsRequest.FilterH\x00R\x06filter\x88\x01\x01\x1a\xb8\x01\n" +
+	"\x06Filter\x12\x17\n" +
+	"\x04user\x18\x01 \x01(\tH\x00R\x04user\x88\x01\x01\x12\x1b\n" +
+	"\x06bucket\x18\x02 \x01(\tH\x01R\x06bucket\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"to_storage\x18\x03 \x01(\tH\x02R\ttoStorage\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"is_blocked\x18\x04 \x01(\bH\x03R\tisBlocked\x88\x01\x01B\a\n" +
+	"\x05_userB\t\n" +
+	"\a_bucketB\r\n" +
+	"\v_to_storageB\r\n" +
+	"\v_is_blockedB\t\n" +
+	"\a_filter\"\xa0\x01\n" +
+	"\x10RoutingsResponse\x12\x12\n" +
+	"\x04main\x18\x01 \x01(\tR\x04main\x128\n" +
+	"\ruser_routings\x18\x02 \x03(\v2\x13.chorus.UserRoutingR\fuserRoutings\x12>\n" +
+	"\x0fbucket_routings\x18\x03 \x03(\v2\x15.chorus.BucketRoutingR\x0ebucketRoutings\"_\n" +
+	"\vUserRouting\x12\x12\n" +
+	"\x04user\x18\x01 \x01(\tR\x04user\x12\x1d\n" +
+	"\n" +
+	"to_storage\x18\x02 \x01(\tR\ttoStorage\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\x03 \x01(\bR\tisBlocked\"y\n" +
+	"\rBucketRouting\x12\x12\n" +
+	"\x04user\x18\x01 \x01(\tR\x04user\x12\x16\n" +
+	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x1d\n" +
+	"\n" +
+	"to_storage\x18\x03 \x01(\tR\ttoStorage\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\x04 \x01(\bR\tisBlocked\"n\n" +
+	"\x11AddRoutingRequest\x12\x12\n" +
+	"\x04user\x18\x01 \x01(\tR\x04user\x12\x1b\n" +
+	"\x06bucket\x18\x02 \x01(\tH\x00R\x06bucket\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"to_storage\x18\x03 \x01(\tR\ttoStorageB\t\n" +
+	"\a_bucket\"G\n" +
+	"\tRoutingID\x12\x12\n" +
+	"\x04user\x18\x01 \x01(\tR\x04user\x12\x1b\n" +
+	"\x06bucket\x18\x02 \x01(\tH\x00R\x06bucket\x88\x01\x01B\t\n" +
+	"\a_bucket\">\n" +
+	"\x10TestProxyRequest\x12\x12\n" +
+	"\x04user\x18\x01 \x01(\tR\x04user\x12\x16\n" +
+	"\x06bucket\x18\x02 \x01(\tR\x06bucket\"\x97\x01\n" +
+	"\x11TestProxyResponse\x12(\n" +
+	"\x10route_to_storage\x18\x01 \x01(\tR\x0erouteToStorage\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\x02 \x01(\bR\tisBlocked\x129\n" +
+	"\freplications\x18\x03 \x03(\v2\x15.chorus.ReplicationIDR\freplications2\xbe\n" +
+	"\n" +
 	"\x06Policy\x12U\n" +
 	"\x10AvailableBuckets\x12\x1f.chorus.AvailableBucketsRequest\x1a .chorus.AvailableBucketsResponse\x12G\n" +
 	"\x0eAddReplication\x12\x1d.chorus.AddReplicationRequest\x1a\x16.google.protobuf.Empty\x12<\n" +
@@ -1480,7 +2102,14 @@ const file_chorus_policy_proto_rawDesc = "" +
 	"\x12SwitchWithDowntime\x12\x1d.chorus.SwitchDowntimeRequest\x1a\x16.google.protobuf.Empty\x12=\n" +
 	"\fDeleteSwitch\x12\x15.chorus.ReplicationID\x1a\x16.google.protobuf.Empty\x12C\n" +
 	"\x0fGetSwitchStatus\x12\x15.chorus.ReplicationID\x1a\x19.chorus.ReplicationSwitch\x12Q\n" +
-	"\rCompareBucket\x12\x1c.chorus.CompareBucketRequest\x1a\x1d.chorus.CompareBucketResponse\"\x03\x88\x02\x01B)Z'github.com/clyso/chorus/proto/chorus;pbb\x06proto3"
+	"\rCompareBucket\x12\x1c.chorus.CompareBucketRequest\x1a\x1d.chorus.CompareBucketResponse\"\x03\x88\x02\x01\x12A\n" +
+	"\fListRoutings\x12\x17.chorus.RoutingsRequest\x1a\x18.chorus.RoutingsResponse\x12?\n" +
+	"\n" +
+	"AddRouting\x12\x19.chorus.AddRoutingRequest\x1a\x16.google.protobuf.Empty\x12:\n" +
+	"\rDeleteRouting\x12\x11.chorus.RoutingID\x1a\x16.google.protobuf.Empty\x129\n" +
+	"\fBlockRouting\x12\x11.chorus.RoutingID\x1a\x16.google.protobuf.Empty\x12;\n" +
+	"\x0eUnblockRouting\x12\x11.chorus.RoutingID\x1a\x16.google.protobuf.Empty\x12@\n" +
+	"\tTestProxy\x12\x18.chorus.TestProxyRequest\x1a\x19.chorus.TestProxyResponseB)Z'github.com/clyso/chorus/proto/chorus;pbb\x06proto3"
 
 var (
 	file_chorus_policy_proto_rawDescOnce sync.Once
@@ -1495,7 +2124,7 @@ func file_chorus_policy_proto_rawDescGZIP() []byte {
 }
 
 var file_chorus_policy_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_chorus_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_chorus_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_chorus_policy_proto_goTypes = []any{
 	(ReplicationSwitch_Status)(0),          // 0: chorus.ReplicationSwitch.Status
 	(*ReplicationID)(nil),                  // 1: chorus.ReplicationID
@@ -1512,66 +2141,91 @@ var file_chorus_policy_proto_goTypes = []any{
 	(*SwitchDowntimeRequest)(nil),          // 12: chorus.SwitchDowntimeRequest
 	(*SwitchDowntimeOpts)(nil),             // 13: chorus.SwitchDowntimeOpts
 	(*ReplicationSwitch)(nil),              // 14: chorus.ReplicationSwitch
-	(*ListReplicationsRequest_Filter)(nil), // 15: chorus.ListReplicationsRequest.Filter
-	(*timestamppb.Timestamp)(nil),          // 16: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),            // 17: google.protobuf.Duration
-	(*emptypb.Empty)(nil),                  // 18: google.protobuf.Empty
+	(*RoutingsRequest)(nil),                // 15: chorus.RoutingsRequest
+	(*RoutingsResponse)(nil),               // 16: chorus.RoutingsResponse
+	(*UserRouting)(nil),                    // 17: chorus.UserRouting
+	(*BucketRouting)(nil),                  // 18: chorus.BucketRouting
+	(*AddRoutingRequest)(nil),              // 19: chorus.AddRoutingRequest
+	(*RoutingID)(nil),                      // 20: chorus.RoutingID
+	(*TestProxyRequest)(nil),               // 21: chorus.TestProxyRequest
+	(*TestProxyResponse)(nil),              // 22: chorus.TestProxyResponse
+	(*ListReplicationsRequest_Filter)(nil), // 23: chorus.ListReplicationsRequest.Filter
+	(*RoutingsRequest_Filter)(nil),         // 24: chorus.RoutingsRequest.Filter
+	(*timestamppb.Timestamp)(nil),          // 25: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),            // 26: google.protobuf.Duration
+	(*emptypb.Empty)(nil),                  // 27: google.protobuf.Empty
 }
 var file_chorus_policy_proto_depIdxs = []int32{
 	1,  // 0: chorus.AddReplicationRequest.id:type_name -> chorus.ReplicationID
 	3,  // 1: chorus.AddReplicationRequest.opts:type_name -> chorus.ReplicationOpts
-	15, // 2: chorus.ListReplicationsRequest.filter:type_name -> chorus.ListReplicationsRequest.Filter
+	23, // 2: chorus.ListReplicationsRequest.filter:type_name -> chorus.ListReplicationsRequest.Filter
 	6,  // 3: chorus.ListReplicationsResponse.replications:type_name -> chorus.Replication
 	1,  // 4: chorus.Replication.id:type_name -> chorus.ReplicationID
 	3,  // 5: chorus.Replication.opts:type_name -> chorus.ReplicationOpts
-	16, // 6: chorus.Replication.created_at:type_name -> google.protobuf.Timestamp
-	17, // 7: chorus.Replication.event_lag:type_name -> google.protobuf.Duration
-	16, // 8: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
+	25, // 6: chorus.Replication.created_at:type_name -> google.protobuf.Timestamp
+	26, // 7: chorus.Replication.event_lag:type_name -> google.protobuf.Duration
+	25, // 8: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
 	14, // 9: chorus.Replication.switch_info:type_name -> chorus.ReplicationSwitch
 	1,  // 10: chorus.CompareBucketRequest.target:type_name -> chorus.ReplicationID
 	1,  // 11: chorus.SwitchZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationID
-	17, // 12: chorus.SwitchZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
+	26, // 12: chorus.SwitchZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
 	1,  // 13: chorus.SwitchDowntimeRequest.replication_id:type_name -> chorus.ReplicationID
 	13, // 14: chorus.SwitchDowntimeRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	16, // 15: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
-	17, // 16: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
+	25, // 15: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
+	26, // 16: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
 	0,  // 17: chorus.ReplicationSwitch.last_status:type_name -> chorus.ReplicationSwitch.Status
-	17, // 18: chorus.ReplicationSwitch.multipart_ttl:type_name -> google.protobuf.Duration
+	26, // 18: chorus.ReplicationSwitch.multipart_ttl:type_name -> google.protobuf.Duration
 	13, // 19: chorus.ReplicationSwitch.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	16, // 20: chorus.ReplicationSwitch.last_started_at:type_name -> google.protobuf.Timestamp
-	16, // 21: chorus.ReplicationSwitch.done_at:type_name -> google.protobuf.Timestamp
+	25, // 20: chorus.ReplicationSwitch.last_started_at:type_name -> google.protobuf.Timestamp
+	25, // 21: chorus.ReplicationSwitch.done_at:type_name -> google.protobuf.Timestamp
 	1,  // 22: chorus.ReplicationSwitch.replication_id:type_name -> chorus.ReplicationID
-	7,  // 23: chorus.Policy.AvailableBuckets:input_type -> chorus.AvailableBucketsRequest
-	2,  // 24: chorus.Policy.AddReplication:input_type -> chorus.AddReplicationRequest
-	1,  // 25: chorus.Policy.GetReplication:input_type -> chorus.ReplicationID
-	4,  // 26: chorus.Policy.ListReplications:input_type -> chorus.ListReplicationsRequest
-	1,  // 27: chorus.Policy.StreamReplication:input_type -> chorus.ReplicationID
-	1,  // 28: chorus.Policy.PauseReplication:input_type -> chorus.ReplicationID
-	1,  // 29: chorus.Policy.ResumeReplication:input_type -> chorus.ReplicationID
-	1,  // 30: chorus.Policy.DeleteReplication:input_type -> chorus.ReplicationID
-	11, // 31: chorus.Policy.SwitchWithZeroDowntime:input_type -> chorus.SwitchZeroDowntimeRequest
-	12, // 32: chorus.Policy.SwitchWithDowntime:input_type -> chorus.SwitchDowntimeRequest
-	1,  // 33: chorus.Policy.DeleteSwitch:input_type -> chorus.ReplicationID
-	1,  // 34: chorus.Policy.GetSwitchStatus:input_type -> chorus.ReplicationID
-	9,  // 35: chorus.Policy.CompareBucket:input_type -> chorus.CompareBucketRequest
-	8,  // 36: chorus.Policy.AvailableBuckets:output_type -> chorus.AvailableBucketsResponse
-	18, // 37: chorus.Policy.AddReplication:output_type -> google.protobuf.Empty
-	6,  // 38: chorus.Policy.GetReplication:output_type -> chorus.Replication
-	5,  // 39: chorus.Policy.ListReplications:output_type -> chorus.ListReplicationsResponse
-	6,  // 40: chorus.Policy.StreamReplication:output_type -> chorus.Replication
-	18, // 41: chorus.Policy.PauseReplication:output_type -> google.protobuf.Empty
-	18, // 42: chorus.Policy.ResumeReplication:output_type -> google.protobuf.Empty
-	18, // 43: chorus.Policy.DeleteReplication:output_type -> google.protobuf.Empty
-	18, // 44: chorus.Policy.SwitchWithZeroDowntime:output_type -> google.protobuf.Empty
-	18, // 45: chorus.Policy.SwitchWithDowntime:output_type -> google.protobuf.Empty
-	18, // 46: chorus.Policy.DeleteSwitch:output_type -> google.protobuf.Empty
-	14, // 47: chorus.Policy.GetSwitchStatus:output_type -> chorus.ReplicationSwitch
-	10, // 48: chorus.Policy.CompareBucket:output_type -> chorus.CompareBucketResponse
-	36, // [36:49] is the sub-list for method output_type
-	23, // [23:36] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	24, // 23: chorus.RoutingsRequest.filter:type_name -> chorus.RoutingsRequest.Filter
+	17, // 24: chorus.RoutingsResponse.user_routings:type_name -> chorus.UserRouting
+	18, // 25: chorus.RoutingsResponse.bucket_routings:type_name -> chorus.BucketRouting
+	1,  // 26: chorus.TestProxyResponse.replications:type_name -> chorus.ReplicationID
+	7,  // 27: chorus.Policy.AvailableBuckets:input_type -> chorus.AvailableBucketsRequest
+	2,  // 28: chorus.Policy.AddReplication:input_type -> chorus.AddReplicationRequest
+	1,  // 29: chorus.Policy.GetReplication:input_type -> chorus.ReplicationID
+	4,  // 30: chorus.Policy.ListReplications:input_type -> chorus.ListReplicationsRequest
+	1,  // 31: chorus.Policy.StreamReplication:input_type -> chorus.ReplicationID
+	1,  // 32: chorus.Policy.PauseReplication:input_type -> chorus.ReplicationID
+	1,  // 33: chorus.Policy.ResumeReplication:input_type -> chorus.ReplicationID
+	1,  // 34: chorus.Policy.DeleteReplication:input_type -> chorus.ReplicationID
+	11, // 35: chorus.Policy.SwitchWithZeroDowntime:input_type -> chorus.SwitchZeroDowntimeRequest
+	12, // 36: chorus.Policy.SwitchWithDowntime:input_type -> chorus.SwitchDowntimeRequest
+	1,  // 37: chorus.Policy.DeleteSwitch:input_type -> chorus.ReplicationID
+	1,  // 38: chorus.Policy.GetSwitchStatus:input_type -> chorus.ReplicationID
+	9,  // 39: chorus.Policy.CompareBucket:input_type -> chorus.CompareBucketRequest
+	15, // 40: chorus.Policy.ListRoutings:input_type -> chorus.RoutingsRequest
+	19, // 41: chorus.Policy.AddRouting:input_type -> chorus.AddRoutingRequest
+	20, // 42: chorus.Policy.DeleteRouting:input_type -> chorus.RoutingID
+	20, // 43: chorus.Policy.BlockRouting:input_type -> chorus.RoutingID
+	20, // 44: chorus.Policy.UnblockRouting:input_type -> chorus.RoutingID
+	21, // 45: chorus.Policy.TestProxy:input_type -> chorus.TestProxyRequest
+	8,  // 46: chorus.Policy.AvailableBuckets:output_type -> chorus.AvailableBucketsResponse
+	27, // 47: chorus.Policy.AddReplication:output_type -> google.protobuf.Empty
+	6,  // 48: chorus.Policy.GetReplication:output_type -> chorus.Replication
+	5,  // 49: chorus.Policy.ListReplications:output_type -> chorus.ListReplicationsResponse
+	6,  // 50: chorus.Policy.StreamReplication:output_type -> chorus.Replication
+	27, // 51: chorus.Policy.PauseReplication:output_type -> google.protobuf.Empty
+	27, // 52: chorus.Policy.ResumeReplication:output_type -> google.protobuf.Empty
+	27, // 53: chorus.Policy.DeleteReplication:output_type -> google.protobuf.Empty
+	27, // 54: chorus.Policy.SwitchWithZeroDowntime:output_type -> google.protobuf.Empty
+	27, // 55: chorus.Policy.SwitchWithDowntime:output_type -> google.protobuf.Empty
+	27, // 56: chorus.Policy.DeleteSwitch:output_type -> google.protobuf.Empty
+	14, // 57: chorus.Policy.GetSwitchStatus:output_type -> chorus.ReplicationSwitch
+	10, // 58: chorus.Policy.CompareBucket:output_type -> chorus.CompareBucketResponse
+	16, // 59: chorus.Policy.ListRoutings:output_type -> chorus.RoutingsResponse
+	27, // 60: chorus.Policy.AddRouting:output_type -> google.protobuf.Empty
+	27, // 61: chorus.Policy.DeleteRouting:output_type -> google.protobuf.Empty
+	27, // 62: chorus.Policy.BlockRouting:output_type -> google.protobuf.Empty
+	27, // 63: chorus.Policy.UnblockRouting:output_type -> google.protobuf.Empty
+	22, // 64: chorus.Policy.TestProxy:output_type -> chorus.TestProxyResponse
+	46, // [46:65] is the sub-list for method output_type
+	27, // [27:46] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_chorus_policy_proto_init() }
@@ -1587,13 +2241,17 @@ func file_chorus_policy_proto_init() {
 	file_chorus_policy_proto_msgTypes[12].OneofWrappers = []any{}
 	file_chorus_policy_proto_msgTypes[13].OneofWrappers = []any{}
 	file_chorus_policy_proto_msgTypes[14].OneofWrappers = []any{}
+	file_chorus_policy_proto_msgTypes[18].OneofWrappers = []any{}
+	file_chorus_policy_proto_msgTypes[19].OneofWrappers = []any{}
+	file_chorus_policy_proto_msgTypes[22].OneofWrappers = []any{}
+	file_chorus_policy_proto_msgTypes[23].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chorus_policy_proto_rawDesc), len(file_chorus_policy_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

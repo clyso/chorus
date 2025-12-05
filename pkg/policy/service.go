@@ -25,6 +25,7 @@ import (
 
 type Service interface {
 	ContextSvc
+	RoutingSvc
 	ReplicationSvc
 	ReplicationSwitchSvc
 }

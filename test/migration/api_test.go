@@ -49,7 +49,16 @@ func Test_api_list_replications(t *testing.T) {
 	tstCtx := t.Context()
 	r := require.New(t)
 	bucket := "replications"
-	err := e.ProxyClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{})
+
+	testRes, err := e.PolicyClient.TestProxy(tstCtx, &pb.TestProxyRequest{
+		User:   user,
+		Bucket: bucket,
+	})
+	r.NoError(err)
+	r.EqualValues("main", testRes.RouteToStorage)
+	r.Empty(testRes.Replications)
+
+	err = e.ProxyClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{})
 	r.NoError(err)
 	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{
 		Id: &pb.ReplicationID{
@@ -69,6 +78,23 @@ func Test_api_list_replications(t *testing.T) {
 	r.EqualValues(user, res.Replications[0].Id.User)
 	r.EqualValues("main", res.Replications[0].Id.FromStorage)
 	r.EqualValues("f1", res.Replications[0].Id.ToStorage)
+
+	testRes, err = e.PolicyClient.TestProxy(tstCtx, &pb.TestProxyRequest{
+		User:   user,
+		Bucket: bucket,
+	})
+	r.NoError(err)
+	r.EqualValues("main", testRes.RouteToStorage)
+	r.Len(testRes.Replications, 1)
+	r.EqualValues("f1", testRes.Replications[0].ToStorage)
+
+	testRes, err = e.PolicyClient.TestProxy(tstCtx, &pb.TestProxyRequest{
+		User:   user,
+		Bucket: "asdfas",
+	})
+	r.NoError(err)
+	r.EqualValues("main", testRes.RouteToStorage)
+	r.Empty(testRes.Replications)
 }
 
 func Test_api_get_replication(t *testing.T) {

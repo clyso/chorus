@@ -50,7 +50,7 @@ func ReplHeader() string {
 }
 
 func ReplRow(in *pb.Replication) string {
-	id := replIDToString(in.Id)
+	id := ReplIDToString(in.Id)
 	p := ToProgress(in)
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
@@ -71,7 +71,7 @@ func ReplRow(in *pb.Replication) string {
 	)
 }
 
-func replIDToString(in *pb.ReplicationID) string {
+func ReplIDToString(in *pb.ReplicationID) string {
 	from := in.FromStorage
 	if in.FromBucket != nil && *in.FromBucket != "" {
 		from += ":" + *in.FromBucket
@@ -241,7 +241,7 @@ func SwitchHeader() string {
 
 func PrintSwitchRow(w io.Writer, in *pb.ReplicationSwitch, wide bool) {
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-		replIDToString(in.ReplicationId),
+		ReplIDToString(in.ReplicationId),
 		switchType(in),
 		in.LastStatus.String(),
 		DateToAge(in.LastStartedAt),
