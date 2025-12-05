@@ -27,25 +27,117 @@ import (
 )
 
 type RoutingSvc interface {
-	// TODO: discuss routing management API before implementing. Should we allow to set it explicitly???
-	/*
-		// SetUserLevelRouting - allows chorus user to configure custom routing per user on chorus proxy.
-		SetUserLevelRouting(ctx context.Context, user string, toStorage string) error
-		// SetBucketLevelRouting - allows chorus user to configure custom routing per bucket on chorus proxy.
-		SetBucketLevelRouting(ctx context.Context, id entity.BucketRoutingPolicyID, toStorage string) error
-		// routing visualisation API. Return as graph?
-		GetRoutings(ctx context.Context) (Routings, error)
+	SetUserRouting(ctx context.Context, user string, toStorage string) error
+	GetUserRoutings(ctx context.Context) (map[string]string, error)
+	GetUserRoutingBlocks(ctx context.Context) (map[string]bool, error)
+	DeleteUserRouting(ctx context.Context, user string) error
+	BlockUserRouting(ctx context.Context, user string) error
+	UnblockUserRouting(ctx context.Context, user string) error
 
-		type Routings struct {
-			Main  string                  // main storage - default routing
-			Users map[string]UserRoutings // user -> storage
-		}
+	SetBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID, toStorage string) error
+	GetBucketRoutings(ctx context.Context, user string) (map[string]string, error)
+	GetBucketRoutingBlocks(ctx context.Context, user string) (map[string]bool, error)
+	DeleteBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error
+	BlockBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error
+	UnblockBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error
+}
 
-		type UserRoutings struct {
-			Storage string            // route to storage if User level routing is set
-			Buckets map[string]string // bucket level routings if set
-		}
-	*/
+var _ RoutingSvc = (*policySvc)(nil)
+
+func (r *policySvc) SetBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID, toStorage string) error {
+	//check if there are no active user-level replications for the user
+	userRepls, err := r.userReplicationPolicyStore.Get(ctx, id.User)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("unable to get user-level replications for user %s: %w", id.User, err)
+	}
+	if len(userRepls) > 0 {
+		return fmt.Errorf("%w: cannot set bucket-level routing for user %s and bucket %s because user-level replications exist", dom.ErrInvalidArg, id.User, id.Bucket)
+	}
+	// check if there are no active bucket-level replications
+	bucketRepls, err := r.bucketReplicationPolicyStore.Get(ctx, entity.BucketReplicationPolicyID{
+		User:       id.User,
+		FromBucket: id.Bucket,
+	})
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("unable to get bucket-level replications for user %s and bucket %s: %w", id.User, id.Bucket, err)
+	}
+	if len(bucketRepls) > 0 {
+		return fmt.Errorf("%w: cannot set bucket-level routing for user %s and bucket %s because active bucket-level replications exist", dom.ErrInvalidArg, id.User, id.Bucket)
+	}
+	// add the routing
+	return r.bucketRoutingStore.SetOp(ctx, id, toStorage).Get()
+}
+
+func (r *policySvc) SetUserRouting(ctx context.Context, user string, toStorage string) error {
+	//check if there are no active user-level replications
+	userRepls, err := r.userReplicationPolicyStore.Get(ctx, user)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("unable to get user-level replications for user %s: %w", user, err)
+	}
+	if len(userRepls) > 0 {
+		return fmt.Errorf("%w: cannot set user-level routing for user %s because active user-level replications exist", dom.ErrInvalidArg, user)
+	}
+	// add the routing
+	return r.userRoutingStore.SetOp(ctx, user, toStorage).Get()
+}
+
+func (r *policySvc) DeleteBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error {
+	// check if there are no dependent bucket-level replications and it is safe to delete
+	bucketRepl, err := r.bucketReplicationPolicyStore.Get(ctx, entity.BucketReplicationPolicyID{
+		User:       id.User,
+		FromBucket: id.Bucket,
+	})
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("unable to get bucket-level replications for user %s and bucket %s: %w", id.User, id.Bucket, err)
+	}
+	if len(bucketRepl) > 0 {
+		return fmt.Errorf("%w: cannot delete bucket-level routing for user %s and bucket %s because dependent bucket-level replications exist", dom.ErrInvalidArg, id.User, id.Bucket)
+	}
+	return r.bucketRoutingStore.DeleteRouteOp(ctx, id).Get()
+}
+
+func (r *policySvc) DeleteUserRouting(ctx context.Context, user string) error {
+	// check if there are no active user-level replications and it is safe to delete
+	userRepls, err := r.userReplicationPolicyStore.Get(ctx, user)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return fmt.Errorf("unable to get user-level replications for user %s: %w", user, err)
+	}
+	if len(userRepls) > 0 {
+		return fmt.Errorf("%w: cannot delete user-level routing for user %s because dependent user-level replications exist", dom.ErrInvalidArg, user)
+	}
+	return r.userRoutingStore.DeleteRouteOp(ctx, user).Get()
+}
+
+func (r *policySvc) GetBucketRoutings(ctx context.Context, user string) (map[string]string, error) {
+	return r.bucketRoutingStore.ListRoutesOp(ctx, user).Get()
+}
+
+func (r *policySvc) GetUserRoutings(ctx context.Context) (map[string]string, error) {
+	return r.userRoutingStore.ListRoutesOp(ctx).Get()
+}
+
+func (r *policySvc) BlockBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error {
+	return r.bucketRoutingStore.BlockOp(ctx, id).Get()
+}
+
+func (r *policySvc) BlockUserRouting(ctx context.Context, user string) error {
+	return r.userRoutingStore.BlockOp(ctx, user).Get()
+}
+
+func (r *policySvc) UnblockBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error {
+	return r.bucketRoutingStore.UnblockOp(ctx, id).Get()
+}
+
+func (r *policySvc) UnblockUserRouting(ctx context.Context, user string) error {
+	return r.userRoutingStore.UnblockOp(ctx, user).Get()
+}
+
+func (r *policySvc) GetBucketRoutingBlocks(ctx context.Context, user string) (map[string]bool, error) {
+	return r.bucketRoutingStore.ListBlocksOp(ctx, user).Get()
+}
+
+func (r *policySvc) GetUserRoutingBlocks(ctx context.Context) (map[string]bool, error) {
+	return r.userRoutingStore.ListBlocksOp(ctx).Get()
 }
 
 func (r *policySvc) unblockRouteInTx(ctx context.Context, tx store.Executor[redis.Pipeliner], policy entity.UniversalReplicationID) {

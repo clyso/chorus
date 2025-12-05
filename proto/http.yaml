@@ -25,7 +25,7 @@ http:
       get: /proxy
     - selector: chorus.Chorus.GetAgents
       get: /agents
-      # Policy service
+      # Policy service - replication:
     - selector: chorus.Policy.AvailableBuckets
       post: /replication/list-buckets
       body: "*"
@@ -36,7 +36,8 @@ http:
       post: /replication/get
       body: "*"
     - selector: chorus.Policy.ListReplications
-      get: /replication
+      post: /replication
+      body: "*"
     - selector: chorus.Policy.PauseReplication
       put: /replication/pause
       body: "*"
@@ -60,4 +61,23 @@ http:
       body: "*"
     - selector: chorus.Policy.CompareBucket
       post: /replication/compare-bucket
+      body: "*"
+      # Policy service - routing:
+    - selector: chorus.Policy.ListRoutings
+      post: /routing
+      body: "*"
+    - selector: chorus.Policy.AddRouting
+      post: /routing/add
+      body: "*"
+    - selector: chorus.Policy.DeleteRouting
+      put: /routing/delete
+      body: "*"
+    - selector: chorus.Policy.BlockRouting
+      put: /routing/block
+      body: "*"
+    - selector: chorus.Policy.UnblockRouting
+      put: /routing/unblock
+      body: "*"
+    - selector: chorus.Policy.TestProxy
+      post: /test-proxy
       body: "*"

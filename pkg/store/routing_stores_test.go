@@ -19,15 +19,34 @@ func TestNewUserRoutingStore(t *testing.T) {
 	toStorage := "storage_1"
 	store := NewUserRoutingStore(c)
 
+	// empty
 	_, err := store.GetOp(ctx, user).Get()
 	r.ErrorIs(err, dom.ErrNotFound)
 
+	rList, err := store.ListRoutesOp(ctx).Get()
+	r.NoError(err)
+	r.Empty(rList)
+
+	bList, err := store.ListBlocksOp(ctx).Get()
+	r.NoError(err)
+	r.Empty(bList)
+
+	// set route
 	err = store.SetOp(ctx, user, toStorage).Get()
 	r.NoError(err)
 
 	got, err := store.GetOp(ctx, user).Get()
 	r.NoError(err)
 	r.Equal(toStorage, got)
+
+	rList, err = store.ListRoutesOp(ctx).Get()
+	r.NoError(err)
+	r.Len(rList, 1)
+	r.Equal(toStorage, rList[user])
+
+	bList, err = store.ListBlocksOp(ctx).Get()
+	r.NoError(err)
+	r.Empty(bList)
 
 	// set idempotent
 	err = store.SetOp(ctx, user, toStorage).Get()
@@ -45,12 +64,22 @@ func TestNewUserRoutingStore(t *testing.T) {
 	r.NoError(err)
 	r.Equal(newStorage, got)
 
+	rList, err = store.ListRoutesOp(ctx).Get()
+	r.NoError(err)
+	r.Len(rList, 1)
+	r.Equal(newStorage, rList[user])
+
 	// block user
 	err = store.BlockOp(ctx, user).Get()
 	r.NoError(err)
 
 	_, err = store.GetOp(ctx, user).Get()
 	r.ErrorIs(err, dom.ErrRoutingBlock)
+
+	bList, err = store.ListBlocksOp(ctx).Get()
+	r.NoError(err)
+	r.Len(bList, 1)
+	r.True(bList[user])
 
 	// block idempotent
 	err = store.BlockOp(ctx, user).Get()
@@ -64,6 +93,10 @@ func TestNewUserRoutingStore(t *testing.T) {
 	got, err = store.GetOp(ctx, user).Get()
 	r.NoError(err)
 	r.Equal(newStorage, got)
+
+	bList, err = store.ListBlocksOp(ctx).Get()
+	r.NoError(err)
+	r.Empty(bList)
 
 	// unblock idempotent
 	err = store.UnblockOp(ctx, user).Get()
@@ -84,6 +117,12 @@ func TestNewUserRoutingStore(t *testing.T) {
 	r.NoError(err)
 	r.Equal("storage_asdf", got)
 
+	rList, err = store.ListRoutesOp(ctx).Get()
+	r.NoError(err)
+	r.Len(rList, 2)
+	r.Equal(newStorage, rList[user])
+	r.Equal("storage_asdf", rList["asdf"])
+
 	// original user still the same
 	got, err = store.GetOp(ctx, user).Get()
 	r.NoError(err)
@@ -94,6 +133,11 @@ func TestNewUserRoutingStore(t *testing.T) {
 	r.NoError(err)
 	_, err = store.GetOp(ctx, "asdf").Get()
 	r.ErrorIs(err, dom.ErrRoutingBlock)
+
+	bList, err = store.ListBlocksOp(ctx).Get()
+	r.NoError(err)
+	r.Len(bList, 1)
+	r.True(bList["asdf"])
 
 	// original user still the same
 	got, err = store.GetOp(ctx, user).Get()
@@ -170,11 +214,29 @@ func TestNewBucketRoutingStore(t *testing.T) {
 	_, err := store.GetOp(ctx, id).Get()
 	r.ErrorIs(err, dom.ErrNotFound)
 
+	rList, err := store.ListRoutesOp(ctx, user).Get()
+	r.NoError(err)
+	r.Empty(rList)
+
+	bList, err := store.ListBlocksOp(ctx, user).Get()
+	r.NoError(err)
+	r.Empty(bList)
+
+	// set route
 	err = store.SetOp(ctx, id, toStorage).Get()
 	r.NoError(err)
 	got, err := store.GetOp(ctx, id).Get()
 	r.NoError(err)
 	r.Equal(toStorage, got)
+
+	rList, err = store.ListRoutesOp(ctx, user).Get()
+	r.NoError(err)
+	r.Len(rList, 1)
+	r.Equal(toStorage, rList[bucket])
+
+	bList, err = store.ListBlocksOp(ctx, user).Get()
+	r.NoError(err)
+	r.Empty(bList)
 
 	// set idempotent
 	err = store.SetOp(ctx, id, toStorage).Get()
@@ -191,11 +253,22 @@ func TestNewBucketRoutingStore(t *testing.T) {
 	r.NoError(err)
 	r.Equal(updatedToStorage, got)
 
+	rList, err = store.ListRoutesOp(ctx, user).Get()
+	r.NoError(err)
+	r.Len(rList, 1)
+	r.Equal(updatedToStorage, rList[bucket])
+
 	// block bucket
 	err = store.BlockOp(ctx, id).Get()
 	r.NoError(err)
 	_, err = store.GetOp(ctx, id).Get()
 	r.ErrorIs(err, dom.ErrRoutingBlock)
+
+	bList, err = store.ListBlocksOp(ctx, user).Get()
+	r.NoError(err)
+	r.Len(bList, 1)
+	r.True(bList[bucket])
+
 	// block idempotent
 	err = store.BlockOp(ctx, id).Get()
 	r.NoError(err)
@@ -208,6 +281,11 @@ func TestNewBucketRoutingStore(t *testing.T) {
 	got, err = store.GetOp(ctx, id).Get()
 	r.NoError(err)
 	r.Equal(updatedToStorage, got)
+
+	bList, err = store.ListBlocksOp(ctx, user).Get()
+	r.NoError(err)
+	r.Empty(bList)
+
 	// unblock idempotent
 	err = store.UnblockOp(ctx, id).Get()
 	r.NoError(err)
@@ -228,6 +306,12 @@ func TestNewBucketRoutingStore(t *testing.T) {
 	r.NoError(err)
 	r.Equal(otherStorage, got)
 
+	rList, err = store.ListRoutesOp(ctx, user).Get()
+	r.NoError(err)
+	r.Len(rList, 2)
+	r.Equal(updatedToStorage, rList[bucket])
+	r.Equal(otherStorage, rList["asdf"])
+
 	// original bucket still the same
 	got, err = store.GetOp(ctx, id).Get()
 	r.NoError(err)
@@ -242,6 +326,11 @@ func TestNewBucketRoutingStore(t *testing.T) {
 	got, err = store.GetOp(ctx, id).Get()
 	r.NoError(err)
 	r.Equal(updatedToStorage, got)
+
+	bList, err = store.ListBlocksOp(ctx, user).Get()
+	r.NoError(err)
+	r.Len(bList, 1)
+	r.True(bList["asdf"])
 
 }
 

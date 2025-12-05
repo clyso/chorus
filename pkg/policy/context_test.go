@@ -69,14 +69,14 @@ func Test_determineActiveRouting(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "error if both policies set",
+			name: "bucket policy returned if both policies set",
 			args: args{
 				mainStorage:   "main",
 				userRouting:   stringResult("user", nil),
 				bucketRouting: stringResult("bucket", nil),
 			},
-			want:    "",
-			wantErr: dom.ErrInternal,
+			want:    "bucket",
+			wantErr: nil,
 		},
 		{
 			name: "error if bucket policy errors",

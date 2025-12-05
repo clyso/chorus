@@ -95,12 +95,6 @@ func determineActiveRouting(mainStorage string, userRouting, bucketRouting store
 	userRoute, userErr := userRouting.Get()
 	bucketRoute, bucketErr := bucketRouting.Get()
 
-	// both user and bucket routings cannot be set
-	if userRoute != "" && bucketRoute != "" {
-		// should never happen
-		return "", fmt.Errorf("%w: both user and bucket routing policies are set: user=%q, bucket=%q", dom.ErrInternal, userRoute, bucketRoute)
-	}
-
 	// check for routing blocks
 	if errors.Is(userErr, dom.ErrRoutingBlock) || errors.Is(bucketErr, dom.ErrRoutingBlock) {
 		return "", dom.ErrRoutingBlock

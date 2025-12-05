@@ -33,6 +33,12 @@ const (
 	Policy_DeleteSwitch_FullMethodName           = "/chorus.Policy/DeleteSwitch"
 	Policy_GetSwitchStatus_FullMethodName        = "/chorus.Policy/GetSwitchStatus"
 	Policy_CompareBucket_FullMethodName          = "/chorus.Policy/CompareBucket"
+	Policy_ListRoutings_FullMethodName           = "/chorus.Policy/ListRoutings"
+	Policy_AddRouting_FullMethodName             = "/chorus.Policy/AddRouting"
+	Policy_DeleteRouting_FullMethodName          = "/chorus.Policy/DeleteRouting"
+	Policy_BlockRouting_FullMethodName           = "/chorus.Policy/BlockRouting"
+	Policy_UnblockRouting_FullMethodName         = "/chorus.Policy/UnblockRouting"
+	Policy_TestProxy_FullMethodName              = "/chorus.Policy/TestProxy"
 )
 
 // PolicyClient is the client API for Policy service.
@@ -111,6 +117,19 @@ type PolicyClient interface {
 	// Deprecated: Do not use.
 	// Compares contents of given bucket in given storages
 	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
+	// Returns configured routing policies for chorus proxy.
+	ListRoutings(ctx context.Context, in *RoutingsRequest, opts ...grpc.CallOption) (*RoutingsResponse, error)
+	// Overrides routing destination for given user or user's bucket.
+	AddRouting(ctx context.Context, in *AddRoutingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Removes user or bucket routing override.
+	DeleteRouting(ctx context.Context, in *RoutingID, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Blocks requests on proxy for given user or user's bucket.
+	BlockRouting(ctx context.Context, in *RoutingID, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Removes block on requests on proxy for given user or user's bucket.
+	UnblockRouting(ctx context.Context, in *RoutingID, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Returns configured routing and replication for given storage request to
+	// proxy. Emulates proxy behaviour for given user and bucket.
+	TestProxy(ctx context.Context, in *TestProxyRequest, opts ...grpc.CallOption) (*TestProxyResponse, error)
 }
 
 type policyClient struct {
@@ -261,6 +280,66 @@ func (c *policyClient) CompareBucket(ctx context.Context, in *CompareBucketReque
 	return out, nil
 }
 
+func (c *policyClient) ListRoutings(ctx context.Context, in *RoutingsRequest, opts ...grpc.CallOption) (*RoutingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RoutingsResponse)
+	err := c.cc.Invoke(ctx, Policy_ListRoutings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyClient) AddRouting(ctx context.Context, in *AddRoutingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Policy_AddRouting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyClient) DeleteRouting(ctx context.Context, in *RoutingID, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Policy_DeleteRouting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyClient) BlockRouting(ctx context.Context, in *RoutingID, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Policy_BlockRouting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyClient) UnblockRouting(ctx context.Context, in *RoutingID, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Policy_UnblockRouting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyClient) TestProxy(ctx context.Context, in *TestProxyRequest, opts ...grpc.CallOption) (*TestProxyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TestProxyResponse)
+	err := c.cc.Invoke(ctx, Policy_TestProxy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PolicyServer is the server API for Policy service.
 // All implementations should embed UnimplementedPolicyServer
 // for forward compatibility.
@@ -337,6 +416,19 @@ type PolicyServer interface {
 	// Deprecated: Do not use.
 	// Compares contents of given bucket in given storages
 	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)
+	// Returns configured routing policies for chorus proxy.
+	ListRoutings(context.Context, *RoutingsRequest) (*RoutingsResponse, error)
+	// Overrides routing destination for given user or user's bucket.
+	AddRouting(context.Context, *AddRoutingRequest) (*emptypb.Empty, error)
+	// Removes user or bucket routing override.
+	DeleteRouting(context.Context, *RoutingID) (*emptypb.Empty, error)
+	// Blocks requests on proxy for given user or user's bucket.
+	BlockRouting(context.Context, *RoutingID) (*emptypb.Empty, error)
+	// Removes block on requests on proxy for given user or user's bucket.
+	UnblockRouting(context.Context, *RoutingID) (*emptypb.Empty, error)
+	// Returns configured routing and replication for given storage request to
+	// proxy. Emulates proxy behaviour for given user and bucket.
+	TestProxy(context.Context, *TestProxyRequest) (*TestProxyResponse, error)
 }
 
 // UnimplementedPolicyServer should be embedded to have
@@ -384,6 +476,24 @@ func (UnimplementedPolicyServer) GetSwitchStatus(context.Context, *ReplicationID
 }
 func (UnimplementedPolicyServer) CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CompareBucket not implemented")
+}
+func (UnimplementedPolicyServer) ListRoutings(context.Context, *RoutingsRequest) (*RoutingsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListRoutings not implemented")
+}
+func (UnimplementedPolicyServer) AddRouting(context.Context, *AddRoutingRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddRouting not implemented")
+}
+func (UnimplementedPolicyServer) DeleteRouting(context.Context, *RoutingID) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteRouting not implemented")
+}
+func (UnimplementedPolicyServer) BlockRouting(context.Context, *RoutingID) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockRouting not implemented")
+}
+func (UnimplementedPolicyServer) UnblockRouting(context.Context, *RoutingID) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnblockRouting not implemented")
+}
+func (UnimplementedPolicyServer) TestProxy(context.Context, *TestProxyRequest) (*TestProxyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TestProxy not implemented")
 }
 func (UnimplementedPolicyServer) testEmbeddedByValue() {}
 
@@ -632,6 +742,114 @@ func _Policy_CompareBucket_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Policy_ListRoutings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RoutingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).ListRoutings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_ListRoutings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).ListRoutings(ctx, req.(*RoutingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Policy_AddRouting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddRoutingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).AddRouting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_AddRouting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).AddRouting(ctx, req.(*AddRoutingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Policy_DeleteRouting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RoutingID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).DeleteRouting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_DeleteRouting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).DeleteRouting(ctx, req.(*RoutingID))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Policy_BlockRouting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RoutingID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).BlockRouting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_BlockRouting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).BlockRouting(ctx, req.(*RoutingID))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Policy_UnblockRouting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RoutingID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).UnblockRouting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_UnblockRouting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).UnblockRouting(ctx, req.(*RoutingID))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Policy_TestProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestProxyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).TestProxy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_TestProxy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).TestProxy(ctx, req.(*TestProxyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Policy_ServiceDesc is the grpc.ServiceDesc for Policy service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -686,6 +904,30 @@ var Policy_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CompareBucket",
 			Handler:    _Policy_CompareBucket_Handler,
+		},
+		{
+			MethodName: "ListRoutings",
+			Handler:    _Policy_ListRoutings_Handler,
+		},
+		{
+			MethodName: "AddRouting",
+			Handler:    _Policy_AddRouting_Handler,
+		},
+		{
+			MethodName: "DeleteRouting",
+			Handler:    _Policy_DeleteRouting_Handler,
+		},
+		{
+			MethodName: "BlockRouting",
+			Handler:    _Policy_BlockRouting_Handler,
+		},
+		{
+			MethodName: "UnblockRouting",
+			Handler:    _Policy_UnblockRouting_Handler,
+		},
+		{
+			MethodName: "TestProxy",
+			Handler:    _Policy_TestProxy_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
