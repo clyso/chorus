@@ -51,10 +51,8 @@ func NewS3Router(
 type s3Router struct {
 	clients    s3client.Service
 	versionSvc meta.VersionService
-	// userUploadStore *store.UserUploadStore
-	uploadSvc *storage.UploadSvc
-	// storageSvc      storage.Service
-	limit ratelimit.RPM
+	uploadSvc  *storage.UploadSvc
+	limit      ratelimit.RPM
 }
 
 func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
@@ -63,6 +61,7 @@ func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tas
 		method = xctx.GetMethod(req.Context())
 		bucket = xctx.GetBucket(ctx)
 		object = xctx.GetObject(ctx)
+		objVer = xctx.GetObjectVer(ctx)
 		task   tasks.ReplicationTask
 	)
 
@@ -105,18 +104,21 @@ func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tas
 	case s3.PutBucketTagging, s3.DeleteBucketTagging:
 		resp, storage, isApiErr, err = r.commonWrite(req)
 		task = &tasks.BucketSyncTagsPayload{Bucket: bucket}
-	case s3.PutBucketAcl, s3.PutObjectAcl:
+	case s3.PutBucketAcl:
 		resp, storage, isApiErr, err = r.commonWrite(req)
-		task = &tasks.ObjSyncACLPayload{Object: dom.Object{Bucket: bucket, Name: object}}
+		task = &tasks.BucketSyncACLPayload{Bucket: bucket}
+	case s3.PutObjectAcl:
+		resp, storage, isApiErr, err = r.commonWrite(req)
+		task = &tasks.ObjSyncACLPayload{Object: dom.Object{Bucket: bucket, Name: object, Version: objVer}}
 	case s3.PutObjectTagging, s3.DeleteObjectTagging:
 		resp, storage, isApiErr, err = r.commonWrite(req)
-		task = &tasks.ObjSyncTagsPayload{Object: dom.Object{Bucket: bucket, Name: object}}
+		task = &tasks.ObjSyncTagsPayload{Object: dom.Object{Bucket: bucket, Name: object, Version: objVer}}
 	case s3.PutObject, s3.CopyObject:
 		resp, taskList, storage, isApiErr, err = r.putObject(req)
 	case s3.DeleteObject:
 		resp, storage, isApiErr, err = r.commonWrite(req)
 		task = &tasks.ObjectSyncPayload{
-			Object:  dom.Object{Bucket: bucket, Name: object},
+			Object:  dom.Object{Bucket: bucket, Name: object, Version: objVer},
 			Deleted: true,
 		}
 	case s3.DeleteObjects:

@@ -26,10 +26,12 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/policy"
-	"github.com/clyso/chorus/pkg/rclone"
+	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/copy"
 )
 
 const (
@@ -39,12 +41,14 @@ const (
 type VersionedMigrationCtrl struct {
 	svc      *VersionedMigrationSvc
 	queueSvc tasks.QueueService
+	limit    ratelimit.RPM
 }
 
-func NewVersionedMigrationCtrl(svc *VersionedMigrationSvc, queueSvc tasks.QueueService) *VersionedMigrationCtrl {
+func NewVersionedMigrationCtrl(svc *VersionedMigrationSvc, queueSvc tasks.QueueService, limit ratelimit.RPM) *VersionedMigrationCtrl {
 	return &VersionedMigrationCtrl{
 		svc:      svc,
 		queueSvc: queueSvc,
+		limit:    limit,
 	}
 }
 
@@ -79,6 +83,16 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 	if err := json.Unmarshal(t.Payload(), &migratePayload); err != nil {
 		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
+	logger := zerolog.Ctx(ctx)
+	// check rate limit before proceeding the task to avoid rollback in the middle of the operation
+	if err := r.limit.StorReq(ctx, migratePayload.ID.FromStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, migratePayload.ID.FromStorage()).Msg("rate limit error")
+		return err
+	}
+	if err := r.limit.StorReq(ctx, migratePayload.ID.ToStorage()); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, migratePayload.ID.ToStorage()).Msg("rate limit error")
+		return err
+	}
 
 	user := migratePayload.ID.User()
 	fromBucket, toBucket := migratePayload.ID.FromToBuckets(migratePayload.Bucket)
@@ -93,7 +107,7 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 
 type VersionedMigrationSvc struct {
 	policySvc policy.Service
-	copySvc   rclone.CopySvc
+	copySvc   copy.CopySvc
 
 	objectVersionInfoStore *store.ObjectVersionInfoStore
 
@@ -102,7 +116,7 @@ type VersionedMigrationSvc struct {
 	pauseRetryInterval time.Duration
 }
 
-func NewVersionedMigrationSvc(policySvc policy.Service, copySvc rclone.CopySvc,
+func NewVersionedMigrationSvc(policySvc policy.Service, copySvc copy.CopySvc,
 	objectVersionInfoStore *store.ObjectVersionInfoStore, objectLocker *store.ObjectLocker,
 	pauseRetryInterval time.Duration) *VersionedMigrationSvc {
 	return &VersionedMigrationSvc{
@@ -120,7 +134,7 @@ func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entit
 		return fmt.Errorf("unable to get last listed version for object: %w", err)
 	}
 
-	toFile := rclone.NewFile(objectID.Storage, objectID.Bucket, objectID.Name)
+	toFile := copy.NewFile(objectID.Storage, objectID.Bucket, objectID.Name)
 
 	var shouldSkipFirstListings bool
 	if lastListedVersionInfo.Version != "" {
@@ -149,7 +163,7 @@ func (r *VersionedMigrationSvc) ListVersions(ctx context.Context, objectID entit
 }
 
 func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replicationID entity.BucketReplicationPolicy, prefix string) error {
-	toFile := rclone.File{
+	toFile := copy.File{
 		Storage: replicationID.ToStorage,
 		Bucket:  replicationID.ToBucket,
 		Name:    prefix,
@@ -206,8 +220,8 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 		}
 
 		for _, info := range objectVersionInfoList {
-			fromFile := rclone.NewVersionedFile(replicationID.FromStorage, replicationID.FromBucket, prefix, info.Version)
-			toFile := rclone.NewVersionedFile(replicationID.ToStorage, replicationID.ToBucket, prefix, info.Version)
+			fromFile := copy.NewVersionedFile(replicationID.FromStorage, replicationID.FromBucket, prefix, info.Version)
+			toFile := copy.NewVersionedFile(replicationID.ToStorage, replicationID.ToBucket, prefix, info.Version)
 
 			if err = lock.Do(ctx, time.Second*2, func() error {
 				return r.copySvc.CopyObject(ctx, replicationID.User, fromFile, toFile)

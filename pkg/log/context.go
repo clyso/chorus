@@ -58,6 +58,16 @@ func WithObjName(ctx context.Context, objName string) context.Context {
 	return xctx.SetObject(ctx, objName)
 }
 
+func WithObjVer(ctx context.Context, objVer string) context.Context {
+	if objVer == "" {
+		return ctx
+	}
+	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str(ObjectVer, objVer)
+	})
+	return xctx.SetObjectVer(ctx, objVer)
+}
+
 func WithBucket(ctx context.Context, bucket string) context.Context {
 	if bucket == "" {
 		return ctx

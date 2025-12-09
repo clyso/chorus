@@ -168,14 +168,9 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 
 	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object.Name, mclient.GetObjectTaggingOptions{VersionID: ""}) //todo: versioning
 
-	// destination bucket name is equal to source bucke name unless toBucket param is set
-	toBucketName := fromBucket
-	if toBucket != "" {
-		toBucketName = toBucket
-	}
 	var mcErr mclient.ErrorResponse
 	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
-		err = toClient.S3().RemoveObjectTagging(ctx, toBucketName, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
 		if err != nil {
 			if mclient.IsNetworkOrHostDown(err, true) {
 				return fmt.Errorf("sync object tags: remove tags err: %w", err)
@@ -193,9 +188,9 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 
 	if fromTags != nil && len(fromTags.ToMap()) != 0 {
-		err = toClient.S3().PutObjectTagging(ctx, toBucketName, object.Name, fromTags, mclient.PutObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().PutObjectTagging(ctx, toBucket, object.Name, fromTags, mclient.PutObjectTaggingOptions{VersionID: ""}) //todo: versioning
 	} else {
-		err = toClient.S3().RemoveObjectTagging(ctx, toBucketName, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
 	}
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
@@ -205,7 +200,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	if fromVer != 0 {
-		destination := meta.Destination{Storage: replID.ToStorage(), Bucket: toBucketName}
+		destination := meta.Destination{Storage: replID.ToStorage(), Bucket: toBucket}
 		return s.versionSvc.UpdateTagsIfGreater(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name}, destination, fromVer)
 	}
 	return nil

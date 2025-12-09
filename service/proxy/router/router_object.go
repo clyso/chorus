@@ -46,7 +46,10 @@ func (r *s3Router) putObject(req *http.Request) (resp *http.Response, taskList [
 	}
 	zerolog.Ctx(ctx).Debug().Str("etag", resp.Header.Get("ETag")).Msg("uploaded object with etag")
 
-	obj := dom.Object{Bucket: bucket, Name: object}
+	obj := dom.Object{Bucket: bucket,
+		Name:    object,
+		Version: "", // versionID not supported for obj PUT
+	}
 	var objSize int64
 	objInfo, err := client.S3().StatObject(ctx, bucket, object, mclient.StatObjectOptions{})
 	if err != nil {

@@ -74,25 +74,6 @@ worker:
     trace:
       enabled: false
       endpoint: # url to Jaeger or other open trace provider
-    rclone:
-      memoryLimit:
-        enabled: false
-        limit: 300M # Max RAM memory for file copy. Possible values: 50M <= mem <= (total app RAM - 50M). More memory -> faster s3 replication. # For example: if worker container resources.memory.limit = 500M, then mem = 450M
-        retryMin: 2s
-        retryMax: 20s
-      memoryCalc:
-        mul: 1.5
-        const: 0M
-      localFileLimit:
-        enabled: false
-        limit: 3
-        retryMin: 2s
-        retryMax: 20s
-      globalFileLimit:
-        enabled: false
-        limit: 3
-        retryMin: 2s
-        retryMax: 20s
     concurrency: 10
     api:
       enabled: true

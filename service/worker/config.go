@@ -25,7 +25,6 @@ import (
 	"github.com/clyso/chorus/pkg/api"
 	"github.com/clyso/chorus/pkg/config"
 	"github.com/clyso/chorus/pkg/objstore"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/service/worker/handler"
 )
 
@@ -48,7 +47,6 @@ type Config struct {
 	ShutdownTimeout time.Duration `yaml:"shutdownTimeout"`
 
 	Api    *api.Config     `yaml:"api,omitempty"`
-	RClone *rclone.Config  `yaml:"rclone,omitempty"`
 	Lock   *Lock           `yaml:"lock,omitempty"`
 	Worker *handler.Config `yaml:"worker,omitempty"`
 }
@@ -69,9 +67,6 @@ func (c *Config) Validate() error {
 	}
 	if c.Api == nil {
 		return fmt.Errorf("worker config: empty Api config")
-	}
-	if c.RClone == nil {
-		return fmt.Errorf("app config: empty RClone config")
 	}
 	if c.Lock == nil {
 		return fmt.Errorf("app config: empty Lock config")

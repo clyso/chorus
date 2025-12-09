@@ -26,6 +26,7 @@ import (
 const (
 	Storage    = "stor_name"
 	Object     = "obj_name"
+	ObjectVer  = "obj_ver"
 	Bucket     = "bucket"
 	Method     = "method"
 	storType   = "stor_type"

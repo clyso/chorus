@@ -19,7 +19,7 @@ Listed features can be configured per S3 user and per bucket with [management CL
 ## Components
 [Chorus S3 Proxy](./service/proxy) service responsible for routing S3 requests and capturing data change events. 
 [Chorus Agent](./service/agent) can be used as an alternative solution for capturing events instead of Proxy.
-[Chorus Worker](./service/worker) service does actual data replication with the help of [RClone](https://github.com/rclone/rclone). Worker also hosts management API so it is a central and the only required component to start with Chorus.
+[Chorus Worker](./service/worker) service does actual data replication. Worker also hosts management API so it is a central and the only required component to start with Chorus.
 Communication between Proxy/Agent and Worker is done over work queue. 
 [Asynq](https://github.com/hibiken/asynq) with [Redis](https://github.com/redis/redis) is used as a work queue.
 

@@ -23,7 +23,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/clyso/chorus/pkg/entity"
-	"github.com/clyso/chorus/pkg/rclone"
 )
 
 func TokensToBucketReplicationPolicyIDConverter(tokens []string) (entity.BucketReplicationPolicyID, error) {
@@ -157,7 +156,7 @@ func NewBucketLocker(client redis.Cmdable, overlap time.Duration) *BucketLocker 
 }
 
 type ObjectVersionInfoStore struct {
-	RedisIDKeyList[entity.VersionedObjectID, rclone.ObjectVersionInfo]
+	RedisIDKeyList[entity.VersionedObjectID, entity.ObjectVersionInfo]
 }
 
 func TokensToObjectVersionIDConverter(tokens []string) (entity.VersionedObjectID, error) {
@@ -172,7 +171,7 @@ func ObjectVersionIDToTokensConverter(id entity.VersionedObjectID) ([]string, er
 	return []string{id.Storage, id.Bucket, id.Name}, nil
 }
 
-func ObjectVersionInfoToStringConverter(value rclone.ObjectVersionInfo) (string, error) {
+func ObjectVersionInfoToStringConverter(value entity.ObjectVersionInfo) (string, error) {
 	bytes, err := json.Marshal(value)
 	if err != nil {
 		return "", fmt.Errorf("unable to marshal value: %w", err)
@@ -180,17 +179,17 @@ func ObjectVersionInfoToStringConverter(value rclone.ObjectVersionInfo) (string,
 	return string(bytes), nil
 }
 
-func StringToObjectVersionInfoConverter(value string) (rclone.ObjectVersionInfo, error) {
-	result := rclone.ObjectVersionInfo{}
+func StringToObjectVersionInfoConverter(value string) (entity.ObjectVersionInfo, error) {
+	result := entity.ObjectVersionInfo{}
 	if err := json.Unmarshal([]byte(value), &result); err != nil {
-		return rclone.ObjectVersionInfo{}, fmt.Errorf("unable to unmarshal value: %w", err)
+		return entity.ObjectVersionInfo{}, fmt.Errorf("unable to unmarshal value: %w", err)
 	}
 	return result, nil
 }
 
 func NewObjectVersionInfoStore(client redis.Cmdable) *ObjectVersionInfoStore {
 	return &ObjectVersionInfoStore{
-		*NewRedisIDKeyList[entity.VersionedObjectID, rclone.ObjectVersionInfo](
+		*NewRedisIDKeyList[entity.VersionedObjectID, entity.ObjectVersionInfo](
 			client, "p:repl:objectversion",
 			ObjectVersionIDToTokensConverter, TokensToObjectVersionIDConverter,
 			ObjectVersionInfoToStringConverter, StringToObjectVersionInfoConverter),

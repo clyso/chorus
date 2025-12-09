@@ -36,7 +36,6 @@ import (
 	"github.com/clyso/chorus/pkg/notifications"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
