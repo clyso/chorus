@@ -18,6 +18,7 @@ package s3client
 
 import (
 	"context"
+	"io"
 
 	mclient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/lifecycle"
@@ -30,13 +31,13 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func newMinioClient(name, user string, c *mclient.Client, metricsSvc metrics.S3Service) *S3 {
+func newMinioClient(name, user string, c *mclient.Client, metricsSvc metrics.Service) *S3 {
 	return &S3{c, metricsSvc, name, user}
 }
 
 type S3 struct {
 	*mclient.Client
-	metricsSvc metrics.S3Service
+	metricsSvc metrics.Service
 	name       string
 	user       string
 }
@@ -45,7 +46,7 @@ func (s *S3) MakeBucket(ctx context.Context, bucketName string, opts mclient.Mak
 	ctx, span := otel.Tracer("").Start(ctx, s3.CreateBucket.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.CreateBucket)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.CreateBucket.String())
 	return s.Client.MakeBucket(ctx, bucketName, opts)
 }
 
@@ -53,7 +54,7 @@ func (s *S3) RemoveBucket(ctx context.Context, bucketName string) error {
 	ctx, span := otel.Tracer("").Start(ctx, s3.DeleteBucket.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteBucket)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteBucket.String())
 	return s.Client.RemoveBucket(ctx, bucketName)
 }
 
@@ -61,7 +62,7 @@ func (s *S3) RemoveObjects(ctx context.Context, bucketName string, objectsCh <-c
 	ctx, span := otel.Tracer("").Start(ctx, s3.DeleteObjects.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteObjects)
+	s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteObjects.String())
 	return s.Client.RemoveObjects(ctx, bucketName, objectsCh, opts)
 }
 
@@ -69,7 +70,7 @@ func (s *S3) BucketExists(ctx context.Context, bucketName string) (bool, error) 
 	ctx, span := otel.Tracer("").Start(ctx, s3.HeadBucket.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.HeadBucket)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.HeadBucket.String())
 	return s.Client.BucketExists(ctx, bucketName)
 }
 
@@ -77,7 +78,7 @@ func (s *S3) ListObjects(ctx context.Context, bucketName string, opts mclient.Li
 	ctx, span := otel.Tracer("").Start(ctx, s3.ListObjects.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.ListObjects)
+	s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.ListObjects.String())
 	return s.Client.ListObjects(ctx, bucketName, opts)
 }
 
@@ -85,7 +86,7 @@ func (s *S3) ListBuckets(ctx context.Context) ([]mclient.BucketInfo, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.ListBuckets.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.ListBuckets)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.ListBuckets.String())
 	return s.Client.ListBuckets(ctx)
 }
 
@@ -93,7 +94,7 @@ func (s *S3) GetBucketLifecycle(ctx context.Context, bucketName string) (*lifecy
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetBucketLifecycle.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketLifecycle)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketLifecycle.String())
 	return s.Client.GetBucketLifecycle(ctx, bucketName)
 }
 
@@ -101,21 +102,21 @@ func (s *S3) SetBucketLifecycle(ctx context.Context, bucketName string, config *
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutBucketLifecycle.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketLifecycle)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketLifecycle.String())
 	return s.Client.SetBucketLifecycle(ctx, bucketName, config)
 }
 func (s *S3) GetBucketPolicy(ctx context.Context, bucketName string) (string, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetBucketPolicy.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketPolicy)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketPolicy.String())
 	return s.Client.GetBucketPolicy(ctx, bucketName)
 }
 func (s *S3) SetBucketPolicy(ctx context.Context, bucketName, policy string) error {
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutBucketPolicy.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketPolicy)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketPolicy.String())
 	return s.Client.SetBucketPolicy(ctx, bucketName, policy)
 }
 
@@ -123,7 +124,7 @@ func (s *S3) GetBucketTagging(ctx context.Context, bucketName string) (*tags.Tag
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetBucketTagging.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketTagging)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketTagging.String())
 	return s.Client.GetBucketTagging(ctx, bucketName)
 }
 
@@ -131,7 +132,7 @@ func (s *S3) SetBucketTagging(ctx context.Context, bucketName string, tags *tags
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutBucketTagging.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketTagging)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketTagging.String())
 	return s.Client.SetBucketTagging(ctx, bucketName, tags)
 }
 
@@ -139,7 +140,7 @@ func (s *S3) GetBucketVersioning(ctx context.Context, bucketName string) (mclien
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetBucketVersioning.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketVersioning)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketVersioning.String())
 	return s.Client.GetBucketVersioning(ctx, bucketName)
 }
 
@@ -147,7 +148,7 @@ func (s *S3) SetBucketVersioning(ctx context.Context, bucketName string, config 
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutBucketVersioning.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketVersioning)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketVersioning.String())
 	return s.Client.SetBucketVersioning(ctx, bucketName, config)
 }
 
@@ -155,7 +156,7 @@ func (s *S3) GetObjectTagging(ctx context.Context, bucketName, objectName string
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetObjectTagging.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetObjectTagging)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetObjectTagging.String())
 	return s.Client.GetObjectTagging(ctx, bucketName, objectName, opts)
 }
 
@@ -163,7 +164,7 @@ func (s *S3) PutObjectTagging(ctx context.Context, bucketName, objectName string
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutObjectTagging.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutObjectTagging)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutObjectTagging.String())
 	return s.Client.PutObjectTagging(ctx, bucketName, objectName, otags, opts)
 }
 
@@ -171,7 +172,7 @@ func (s *S3) RemoveObject(ctx context.Context, bucketName, objectName string, op
 	ctx, span := otel.Tracer("").Start(ctx, s3.DeleteObject.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteObject)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteObject.String())
 	return s.Client.RemoveObject(ctx, bucketName, objectName, opts)
 }
 
@@ -179,7 +180,7 @@ func (s *S3) RemoveBucketTagging(ctx context.Context, bucketName string) error {
 	ctx, span := otel.Tracer("").Start(ctx, s3.DeleteBucketTagging.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteBucketTagging)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteBucketTagging.String())
 	return s.Client.RemoveBucketTagging(ctx, bucketName)
 }
 
@@ -187,6 +188,38 @@ func (s *S3) RemoveObjectTagging(ctx context.Context, bucketName, objectName str
 	ctx, span := otel.Tracer("").Start(ctx, s3.DeleteObjectTagging.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteObjectTagging)
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.DeleteObjectTagging.String())
 	return s.Client.RemoveObjectTagging(ctx, bucketName, objectName, opts)
+}
+
+func (s *S3) StatObject(ctx context.Context, bucketName, objectName string, opts mclient.StatObjectOptions) (mclient.ObjectInfo, error) {
+	ctx, span := otel.Tracer("").Start(ctx, s3.HeadObject.String())
+	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	defer span.End()
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.HeadObject.String())
+	return s.Client.StatObject(ctx, bucketName, objectName, opts)
+}
+
+func (s *S3) GetObject(ctx context.Context, bucketName, objectName string, opts mclient.GetObjectOptions) (*mclient.Object, error) {
+	ctx, span := otel.Tracer("").Start(ctx, s3.GetObject.String())
+	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	defer span.End()
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetObject.String())
+	res, err := s.Client.GetObject(ctx, bucketName, objectName, opts)
+	if err == nil {
+		stat, statErr := res.Stat()
+		if statErr == nil {
+			s.metricsSvc.Download(xctx.GetFlow(ctx), s.name, bucketName, int(stat.Size))
+		}
+	}
+	return res, err
+}
+
+func (s *S3) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, size int64, opts mclient.PutObjectOptions) (info mclient.UploadInfo, err error) {
+	ctx, span := otel.Tracer("").Start(ctx, s3.PutObject.String())
+	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	defer span.End()
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutObject.String())
+	defer s.metricsSvc.Upload(xctx.GetFlow(ctx), s.name, bucketName, int(size))
+	return s.Client.PutObject(ctx, bucketName, objectName, reader, size, opts)
 }

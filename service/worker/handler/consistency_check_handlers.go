@@ -27,9 +27,9 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/copy"
 )
 
 const (
@@ -157,11 +157,11 @@ type ConsistencyCheckSvc struct {
 	settingsStore  *store.ConsistencyCheckSettingsStore
 	listStateStore *store.ConsistencyCheckListStateStore
 	setStore       *store.ConsistencyCheckSetStore
-	copySvc        rclone.CopySvc
+	copySvc        copy.CopySvc
 	queueSvc       tasks.QueueService
 }
 
-func NewConsistencyCheckSvc(idStore *store.ConsistencyCheckIDStore, settingsStore *store.ConsistencyCheckSettingsStore, listStateStore *store.ConsistencyCheckListStateStore, setStore *store.ConsistencyCheckSetStore, copySvc rclone.CopySvc, queueSvc tasks.QueueService) *ConsistencyCheckSvc {
+func NewConsistencyCheckSvc(idStore *store.ConsistencyCheckIDStore, settingsStore *store.ConsistencyCheckSettingsStore, listStateStore *store.ConsistencyCheckListStateStore, setStore *store.ConsistencyCheckSetStore, copySvc copy.CopySvc, queueSvc tasks.QueueService) *ConsistencyCheckSvc {
 	return &ConsistencyCheckSvc{
 		idStore:        idStore,
 		settingsStore:  settingsStore,
@@ -176,7 +176,7 @@ func (r *ConsistencyCheckSvc) ShouldCheckVersions(ctx context.Context, user stri
 	versionedLocations := 0
 
 	for _, location := range locations {
-		versioned, err := r.copySvc.IsBucketVersioned(ctx, user, rclone.NewBucket(location.Storage, location.Bucket))
+		versioned, err := r.copySvc.IsBucketVersioned(ctx, user, copy.NewBucket(location.Storage, location.Bucket))
 		if err != nil {
 			return false, fmt.Errorf("unable to check if bucket is versioned: %w", err)
 		}
@@ -206,12 +206,12 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 	}
 
 	objectCount := uint64(0)
-	listBucket := rclone.Bucket{
+	listBucket := copy.Bucket{
 		Storage: location.Storage,
 		Bucket:  location.Bucket,
 	}
 
-	objects := r.copySvc.BucketObjects(ctx, user, listBucket, rclone.WithAfter(lastObject), rclone.WithPrefix(prefix))
+	objects := r.copySvc.BucketObjects(ctx, user, listBucket, copy.WithAfter(lastObject), copy.WithPrefix(prefix))
 	return func(yield func(ObjectTask, error) bool) {
 		for object, err := range objects {
 			if err != nil {
@@ -273,13 +273,13 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID entity.ConsistencyCheckID,
 	user string, location entity.ConsistencyCheckLocation, prefix string, ignoreEtags bool, ignoreSizes bool) error {
 	locationCount := len(checkID.Locations)
-	listBucket := rclone.Bucket{
+	listBucket := copy.Bucket{
 		Storage: location.Storage,
 		Bucket:  location.Bucket,
 	}
 
 	versionIdx := uint64(0)
-	objects := r.copySvc.BucketObjects(ctx, user, listBucket, rclone.WithPrefix(prefix), rclone.WithVersions())
+	objects := r.copySvc.BucketObjects(ctx, user, listBucket, copy.WithPrefix(prefix), copy.WithVersions())
 	for object, err := range objects {
 		if err != nil {
 			return fmt.Errorf("unable to list object versions: %w", err)

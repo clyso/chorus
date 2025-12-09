@@ -97,7 +97,11 @@ func (r *s3Router) completeMultipartUpload(req *http.Request) (resp *http.Respon
 	} else {
 		objSize = objInfo.Size
 	}
-	obj := dom.Object{Bucket: bucket, Name: object}
+	obj := dom.Object{
+		Bucket:  bucket,
+		Name:    object,
+		Version: "", // versionID not supported for obj PUT (including multipart)
+	}
 	taskList = []tasks.ReplicationTask{
 		&tasks.ObjectSyncPayload{
 			Object:  obj,

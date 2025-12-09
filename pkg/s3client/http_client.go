@@ -40,7 +40,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.S3Service, _ trace.TracerProvider) (Client, error) {
+func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.Service, _ trace.TracerProvider) (Client, error) {
 	c := &client{
 		c: &http.Client{
 			Timeout: conf.HttpTimeout,
@@ -128,7 +128,7 @@ func isOnline(ctx context.Context, c *client) error {
 }
 
 type client struct {
-	metricsSvc metrics.S3Service
+	metricsSvc metrics.Service
 	c          *http.Client
 	s3         *S3
 	aws        *AWS
@@ -178,7 +178,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		}
 		method := xctx.GetMethod(req.Context())
 		flow := xctx.GetFlow(req.Context())
-		c.metricsSvc.Count(flow, c.name, method)
+		c.metricsSvc.Count(flow, c.name, method.String())
 		switch method {
 		case s3.GetObject:
 			if resp.ContentLength != 0 {

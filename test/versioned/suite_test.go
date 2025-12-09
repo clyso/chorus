@@ -46,12 +46,11 @@ import (
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/objstore"
-	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/trace"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker"
+	"github.com/clyso/chorus/service/worker/copy"
 	"github.com/clyso/chorus/service/worker/handler"
 	"github.com/clyso/chorus/test/app"
 	"github.com/clyso/chorus/test/env"
@@ -255,17 +254,6 @@ var _ = Describe("Minio versioned migration", func() {
 			Lock: &worker.Lock{
 				Overlap: time.Second,
 			},
-			RClone: &rclone.Config{
-				MemoryLimit: rclone.MemoryLimit{
-					Enabled: false,
-				},
-				LocalFileLimit: ratelimit.SemaphoreConfig{
-					Enabled: false,
-				},
-				GlobalFileLimit: ratelimit.SemaphoreConfig{
-					Enabled: false,
-				},
-			},
 			Worker: &handler.Config{
 				SwitchRetryInterval: time.Millisecond * 500,
 				PauseRetryInterval:  time.Millisecond * 500,
@@ -366,7 +354,7 @@ var _ = Describe("Minio versioned migration", func() {
 				Expect(srcObject.ETag).To(Equal(destObject.ETag))
 				Expect(srcObject.VersionID).To(Equal(destObject.VersionID))
 				Expect(srcObject.Size).To(Equal(destObject.Size))
-				Expect(srcObject.VersionID).To(Equal(destObject.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)]))
+				Expect(srcObject.VersionID).To(Equal(destObject.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)]))
 			}
 		}
 	})
@@ -567,17 +555,6 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 			Lock: &worker.Lock{
 				Overlap: time.Second,
 			},
-			RClone: &rclone.Config{
-				MemoryLimit: rclone.MemoryLimit{
-					Enabled: false,
-				},
-				LocalFileLimit: ratelimit.SemaphoreConfig{
-					Enabled: false,
-				},
-				GlobalFileLimit: ratelimit.SemaphoreConfig{
-					Enabled: false,
-				},
-			},
 			Worker: &handler.Config{
 				SwitchRetryInterval: time.Millisecond * 500,
 				PauseRetryInterval:  time.Millisecond * 500,
@@ -686,8 +663,8 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 
 				Expect(srcObject.ETag).To(Equal(destObject.ETag))
 				Expect(srcObject.Size).To(Equal(destObject.Size))
-				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
-				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)][0]))
+				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
+				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)][0]))
 			}
 		}
 	})
@@ -806,17 +783,6 @@ var _ = Describe("Ceph system user versioned migration", func() {
 			Concurrency: 10,
 			Lock: &worker.Lock{
 				Overlap: time.Second,
-			},
-			RClone: &rclone.Config{
-				MemoryLimit: rclone.MemoryLimit{
-					Enabled: false,
-				},
-				LocalFileLimit: ratelimit.SemaphoreConfig{
-					Enabled: false,
-				},
-				GlobalFileLimit: ratelimit.SemaphoreConfig{
-					Enabled: false,
-				},
 			},
 			Worker: &handler.Config{
 				SwitchRetryInterval: time.Millisecond * 500,
@@ -964,8 +930,8 @@ var _ = Describe("Ceph system user versioned migration", func() {
 				Expect(srcObject.ETag).To(Equal(destObject.ETag))
 				Expect(srcObject.Size).To(Equal(destObject.Size))
 				Expect(srcObject.VersionID).To(Equal(destObject.VersionID))
-				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
-				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(rclone.CChorusSourceVersionIDMetaHeader)][0]))
+				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
+				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)][0]))
 			}
 		}
 	})

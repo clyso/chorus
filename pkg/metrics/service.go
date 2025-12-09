@@ -17,17 +17,18 @@
 package metrics
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/s3"
 )
 
 var countRequests = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "storage_requests_total",
-		Help: "Number of api calls to s3 storage.",
+		Help: "Number of api calls to storage.",
 	},
 	[]string{"flow", "storage", "method"},
 )
@@ -35,7 +36,7 @@ var countRequests = promauto.NewCounterVec(
 var bytesUpload = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "storage_bucket_bytes_upload",
-		Help: "Number of bytes uploaded to s3 storage.",
+		Help: "Number of bytes uploaded to storage.",
 	},
 	[]string{"flow", "storage", "bucket"},
 )
@@ -43,106 +44,86 @@ var bytesUpload = promauto.NewCounterVec(
 var bytesDownload = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "storage_bucket_bytes_download",
-		Help: "Number of bytes downloaded from s3 storage.",
+		Help: "Number of bytes downloaded from storage.",
 	},
 	[]string{"flow", "storage", "bucket"},
 )
 
-var rcloneCalcUsage = promauto.NewGauge(
+var copyInProgressBytes = promauto.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "rclone_calc_mem_usage",
-		Help: "Calculated rclone_memory_usage.",
+		Name: "copy_in_progress_obj_bytes",
+		Help: "Size of files currently copied by worker.",
 	},
+	[]string{"flow", "user", "bucket"},
 )
 
-var rcloneFilesSize = promauto.NewGauge(
-	prometheus.GaugeOpts{
-		Name: "rclone_file_size_processing",
-		Help: "Size of files currently processed with rclone.",
-	},
-)
-
-var rcloneFilesNum = promauto.NewGauge(
-	prometheus.GaugeOpts{
-		Name: "rclone_file_num_processing",
-		Help: "Amount of files currently processed with rclone.",
-	},
-)
-
-type S3Service interface {
-	Count(flow xctx.Flow, storage string, method s3.Method)
+type Service interface {
+	Count(flow xctx.Flow, storage string, method string)
 	Upload(flow xctx.Flow, storage, bucket string, bytes int)
 	Download(flow xctx.Flow, storage, bucket string, bytes int)
-
-	RcloneCalcMemUsageInc(bytes int64)
-	RcloneCalcMemUsageDec(bytes int64)
-	RcloneCalcFileSizeInc(bytes int64)
-	RcloneCalcFileSizeDec(bytes int64)
-	RcloneCalcFileNumInc()
-	RcloneCalcFileNumDec()
 }
 
-func NewS3Service(enabled bool) S3Service {
-	return &svcS3{enabled: enabled}
+type WorkerService interface {
+	WorkerInProgressBytesInc(ctx context.Context, bytes int64)
+	WorkerInProgressBytesDec(ctx context.Context, bytes int64)
 }
 
-type svcS3 struct {
+func NewS3Service(enabled bool) *svc {
+	return &svc{enabled: enabled}
+}
+
+var _ Service = &svc{}
+var _ WorkerService = &svc{}
+
+type svc struct {
 	enabled bool
 }
 
-func (s svcS3) RcloneCalcMemUsageInc(bytes int64) {
+func (s svc) WorkerInProgressBytesInc(ctx context.Context, bytes int64) {
 	if !s.enabled {
 		return
 	}
-	rcloneCalcUsage.Add(float64(bytes))
+	labels := prometheus.Labels{}
+	if flow := xctx.GetFlow(ctx); flow != "" {
+		labels["flow"] = string(flow)
+	}
+	if user := xctx.GetUser(ctx); user != "" {
+		labels["user"] = user
+	}
+	if bucket := xctx.GetBucket(ctx); bucket != "" {
+		labels["bucket"] = bucket
+	}
+	copyInProgressBytes.With(labels).Add(float64(bytes))
 }
 
-func (s svcS3) RcloneCalcMemUsageDec(bytes int64) {
+func (s svc) WorkerInProgressBytesDec(ctx context.Context, bytes int64) {
 	if !s.enabled {
 		return
 	}
-	rcloneCalcUsage.Sub(float64(bytes))
-}
-
-func (s svcS3) RcloneCalcFileSizeInc(bytes int64) {
-	if !s.enabled {
-		return
+	labels := prometheus.Labels{}
+	if flow := xctx.GetFlow(ctx); flow != "" {
+		labels["flow"] = string(flow)
 	}
-	rcloneFilesSize.Add(float64(bytes))
-}
-
-func (s svcS3) RcloneCalcFileSizeDec(bytes int64) {
-	if !s.enabled {
-		return
+	if user := xctx.GetUser(ctx); user != "" {
+		labels["user"] = user
 	}
-	rcloneFilesSize.Sub(float64(bytes))
-}
-
-func (s svcS3) RcloneCalcFileNumInc() {
-	if !s.enabled {
-		return
+	if bucket := xctx.GetBucket(ctx); bucket != "" {
+		labels["bucket"] = bucket
 	}
-	rcloneFilesNum.Add(float64(1))
+	copyInProgressBytes.With(labels).Sub(float64(bytes))
 }
 
-func (s svcS3) RcloneCalcFileNumDec() {
-	if !s.enabled {
-		return
-	}
-	rcloneFilesNum.Sub(float64(1))
-}
-
-func (s svcS3) Count(flow xctx.Flow, storage string, method s3.Method) {
+func (s svc) Count(flow xctx.Flow, storage string, method string) {
 	if !s.enabled {
 		return
 	}
 	countRequests.With(prometheus.Labels{
 		"flow":    string(flow),
 		"storage": storage,
-		"method":  method.String()}).Inc()
+		"method":  method}).Inc()
 }
 
-func (s svcS3) Upload(flow xctx.Flow, storage, bucket string, bytes int) {
+func (s svc) Upload(flow xctx.Flow, storage, bucket string, bytes int) {
 	if !s.enabled {
 		return
 	}
@@ -152,7 +133,7 @@ func (s svcS3) Upload(flow xctx.Flow, storage, bucket string, bytes int) {
 		"bucket":  bucket}).Add(float64(bytes))
 }
 
-func (s svcS3) Download(flow xctx.Flow, storage, bucket string, bytes int) {
+func (s svc) Download(flow xctx.Flow, storage, bucket string, bytes int) {
 	if !s.enabled {
 		return
 	}

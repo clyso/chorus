@@ -48,9 +48,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	workerConf.RClone.MemoryLimit.Enabled = false
-	workerConf.RClone.LocalFileLimit.Enabled = false
-	workerConf.RClone.GlobalFileLimit.Enabled = false
 	workerConf.Features.ACL = false
 	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
 

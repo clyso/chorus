@@ -34,9 +34,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	workerConf.RClone.MemoryLimit.Enabled = false
-	workerConf.RClone.LocalFileLimit.Enabled = false
-	workerConf.RClone.GlobalFileLimit.Enabled = false
 	workerConf.Features.ACL = false
 	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"

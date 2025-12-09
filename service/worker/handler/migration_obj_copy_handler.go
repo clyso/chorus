@@ -77,7 +77,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 	// 1. sync obj meta and content
 	err = lock.Do(ctx, time.Second*2, func() error {
-		return s.rc.CopyTo(ctx, p.ID.User(), rclone.File{
+		return s.copySvc.CopyObject(ctx, p.ID.User(), rclone.File{
 			Storage: p.ID.FromStorage(),
 			Bucket:  fromBucket,
 			Name:    p.Obj.Name,
@@ -85,7 +85,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 			Storage: p.ID.ToStorage(),
 			Bucket:  toBucket,
 			Name:    p.Obj.Name,
-		}, p.Obj.Size)
+		})
 	})
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {

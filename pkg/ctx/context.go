@@ -30,6 +30,7 @@ import (
 type methodKey struct{}
 type storTypeKey struct{}
 type objectKey struct{}
+type objectVerKey struct{}
 type bucketKey struct{}
 type storageKey struct{}
 type flowKey struct{}
@@ -88,6 +89,22 @@ func SetObject(ctx context.Context, in string) context.Context {
 
 func GetObject(ctx context.Context) string {
 	res, _ := ctx.Value(objectKey{}).(string)
+	return res
+}
+
+func SetObjectVer(ctx context.Context, in string) context.Context {
+	if in == "" {
+		return ctx
+	}
+	if prev := GetObjectVer(ctx); prev != "" {
+		zerolog.Ctx(ctx).Warn().Msgf("cannot set object version %s, ctx already contains version %s", in, prev)
+		return ctx
+	}
+	return context.WithValue(ctx, objectVerKey{}, in)
+}
+
+func GetObjectVer(ctx context.Context) string {
+	res, _ := ctx.Value(objectVerKey{}).(string)
 	return res
 }
 

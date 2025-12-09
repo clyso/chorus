@@ -32,6 +32,7 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/copy"
 )
 
 func (s *svc) HandleBucketACL(ctx context.Context, t *asynq.Task) error {
@@ -128,7 +129,7 @@ func (s *svc) syncBucketACL(ctx context.Context, fromClient, toClient s3client.C
 	}
 
 	_, err = toClient.AWS().PutBucketAclWithContext(ctx, &aws_s3.PutBucketAclInput{
-		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
+		AccessControlPolicy: copy.MapOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
 		Bucket:              &toBucket,
 	})
 	if err != nil {
@@ -151,7 +152,7 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 		return nil
 	}
 	fromBucket, toBucket := replID.FromToBuckets(object.Bucket)
-	versions, err := s.versionSvc.GetACL(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name})
+	versions, err := s.versionSvc.GetACL(ctx, replID, object)
 	if err != nil {
 		return err
 	}
@@ -161,93 +162,14 @@ func (s *svc) syncObjectACL(ctx context.Context, fromClient, toClient s3client.C
 		return nil
 	}
 
-	fromACL, err := fromClient.AWS().GetObjectAclWithContext(ctx, &aws_s3.GetObjectAclInput{
-		Bucket:    &fromBucket,
-		Key:       &object.Name,
-		VersionId: nil, //todo: versioning
-	})
+	err = s.copySvc.CopyACLs(ctx, replID.User(), copy.NewVersionedFile(replID.FromStorage(), fromBucket, object.Name, object.Version), copy.NewVersionedFile(replID.ToStorage(), toBucket, object.Name, object.Version))
 	if err != nil {
-		if s3client.AwsErrRetry(err) {
-			return err
-		}
-		zerolog.Ctx(ctx).Err(err).Msg("skip object ACL sync due to get ACL err")
-		return nil
+		return fmt.Errorf("unable to copy object ACLs: %w", err)
 	}
 
-	// destination bucket name is equal to source bucke name unless toBucket param is set
-	toACL, err := toClient.AWS().GetObjectAclWithContext(ctx, &aws_s3.GetObjectAclInput{
-		Bucket:    &toBucket,
-		Key:       &object.Name,
-		VersionId: nil, //todo: versioning
-	})
-	if err != nil {
-		if s3client.AwsErrRetry(err) {
-			return err
-		}
-		zerolog.Ctx(ctx).Err(err).Msg("skip object ACL sync due to get dest ACL err")
-		return nil
-	}
-	var toOwnerID *string
-	if toACL != nil && toACL.Owner != nil {
-		toOwnerID = toACL.Owner.ID
-	}
-
-	_, err = toClient.AWS().PutObjectAclWithContext(ctx, &aws_s3.PutObjectAclInput{
-		AccessControlPolicy: mappedOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
-		Bucket:              &toBucket,
-		Key:                 &object.Name,
-		VersionId:           nil, //todo: versioning
-	})
-	if err != nil {
-		if s3client.AwsErrRetry(err) {
-			return err
-		}
-		zerolog.Ctx(ctx).Err(err).Msg("skip object ACL sync due to put ACL err")
-		return nil
-	}
 	if fromVer != 0 {
 		destination := meta.Destination{Storage: replID.ToStorage(), Bucket: toBucket}
-		return s.versionSvc.UpdateACLIfGreater(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name}, destination, fromVer)
+		return s.versionSvc.UpdateACLIfGreater(ctx, replID, object, destination, fromVer)
 	}
 	return nil
-}
-
-func srcOwnerToDstOwner(owner, srcBucketOwner, dstBucketOwner *string) *string {
-	if owner == nil || *owner != *srcBucketOwner {
-		return owner
-	}
-	return dstBucketOwner
-}
-
-func mappedOwnersACL(srcOwner *aws_s3.Owner, srcGrants []*aws_s3.Grant, dstOwner *string, preserveACLGrants bool) *aws_s3.AccessControlPolicy {
-	grants := make([]*aws_s3.Grant, len(srcGrants))
-	for i, grant := range srcGrants {
-		var dstID *string
-		if preserveACLGrants {
-			dstID = grant.Grantee.ID
-		} else {
-			dstID = srcOwnerToDstOwner(grant.Grantee.ID, srcOwner.ID, dstOwner)
-		}
-		grants[i] = &aws_s3.Grant{
-			Grantee: &aws_s3.Grantee{
-				ID:           dstID,
-				EmailAddress: grant.Grantee.EmailAddress,
-				Type:         grant.Grantee.Type,
-				URI:          grant.Grantee.URI,
-				DisplayName:  grant.Grantee.DisplayName,
-			},
-			Permission: grant.Permission,
-		}
-	}
-	res := &aws_s3.AccessControlPolicy{
-		Grants: grants,
-	}
-	if srcOwner != nil {
-		res.Owner = &aws_s3.Owner{
-			ID:          srcOwnerToDstOwner(srcOwner.ID, srcOwner.ID, dstOwner),
-			DisplayName: srcOwner.DisplayName,
-		}
-	}
-
-	return res
 }

@@ -30,10 +30,28 @@ const (
 	defaultHttpTimeout         = time.Minute * 10
 )
 
+// Provider defines the S3 storage provider type
+type Provider string
+
+const (
+	ProviderOther Provider = "Other"
+	ProviderMinIO Provider = "Minio"
+	ProviderCeph  Provider = "Ceph"
+)
+
+func (p Provider) SupportsRetainVersionID() bool {
+	switch p {
+	case ProviderMinIO, ProviderCeph:
+		return true
+	default:
+		return false
+	}
+}
+
 type Storage struct {
 	Credentials   map[string]CredentialsV4 `yaml:"credentials"`
 	Address       string                   `yaml:"address"`
-	Provider      string                   `yaml:"provider"`
+	Provider      Provider                 `yaml:"provider"`
 	DefaultRegion string                   `yaml:"defaultRegion"`
 
 	HealthCheckInterval time.Duration `yaml:"healthCheckInterval"`

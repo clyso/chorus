@@ -39,7 +39,6 @@ import (
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
@@ -49,6 +48,7 @@ import (
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/service/worker/copy"
 	"github.com/clyso/chorus/service/worker/handler"
 	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 )
@@ -120,29 +120,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return err
 	}
 
-	memLimitBytes, err := util.ParseBytes(conf.RClone.MemoryLimit.Limit)
-	if err != nil && conf.RClone.MemoryLimit.Enabled {
-		return err
-	}
-	memLimiter := ratelimit.LocalSemaphore(ratelimit.SemaphoreConfig{
-		Enabled:  conf.RClone.MemoryLimit.Enabled,
-		Limit:    memLimitBytes,
-		RetryMin: conf.RClone.MemoryLimit.RetryMin,
-		RetryMax: conf.RClone.MemoryLimit.RetryMax,
-	}, "rclone_mem")
-	var filesLimiter ratelimit.Semaphore
-	if conf.RClone.GlobalFileLimit.Enabled {
-		filesLimiter = ratelimit.GlobalSemaphore(appRedis, conf.RClone.GlobalFileLimit, "rclone_files")
-	} else {
-		filesLimiter = ratelimit.LocalSemaphore(conf.RClone.LocalFileLimit, "rclone_files")
-	}
-	memCalc := rclone.NewMemoryCalculator(conf.RClone.MemoryCalc)
-	rc, err := rclone.New(conf.Storage, conf.Log.Json, metricsSvc, memCalc, memLimiter, filesLimiter)
-	if err != nil {
-		return err
-	}
-	logger.Info().Msg("rclone connected")
-
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
@@ -163,11 +140,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	objectLocker := store.NewObjectLocker(lockRedis, conf.Lock.Overlap)
 	bucketLocker := store.NewBucketLocker(lockRedis, conf.Lock.Overlap)
 
-	memoryLimiterSvc := rclone.NewMemoryLimiterSvc(memCalc, memLimiter, filesLimiter, metricsSvc)
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
-	copySvc := rclone.NewS3CopySvc(clientRegistry, memoryLimiterSvc, limiter, metricsSvc)
+	copySvc := copy.NewS3CopySvc(clientRegistry, metricsSvc)
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
-	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc)
+	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc, limiter)
 
 	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
 	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
@@ -176,7 +152,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, rc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)

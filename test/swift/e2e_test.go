@@ -42,9 +42,6 @@ func Test_e2e(t *testing.T) {
 
 	workerConf, err := worker.GetConfig()
 	r.NoError(err, "failed to get worker config")
-	workerConf.RClone.MemoryLimit.Enabled = false
-	workerConf.RClone.LocalFileLimit.Enabled = false
-	workerConf.RClone.GlobalFileLimit.Enabled = false
 	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
 	workerConf.Worker.SwitchRetryInterval = time.Millisecond * 500
 	workerConf.Worker.PauseRetryInterval = time.Millisecond * 500

@@ -15,8 +15,6 @@ import (
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/metrics"
-	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/trace"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -194,17 +192,6 @@ var _ = BeforeSuite(func() {
 		Concurrency: 10,
 		Lock: &worker.Lock{
 			Overlap: time.Second,
-		},
-		RClone: &rclone.Config{
-			MemoryLimit: rclone.MemoryLimit{
-				Enabled: false,
-			},
-			LocalFileLimit: ratelimit.SemaphoreConfig{
-				Enabled: false,
-			},
-			GlobalFileLimit: ratelimit.SemaphoreConfig{
-				Enabled: false,
-			},
 		},
 		Worker: &handler.Config{
 			SwitchRetryInterval: time.Millisecond * 500,

@@ -192,3 +192,8 @@ type ConsistencyCheckStatus struct {
 	Consistent bool
 	ConsistencyCheckSettings
 }
+
+type ObjectVersionInfo struct {
+	Version string
+	Size    uint64
+}

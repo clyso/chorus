@@ -38,9 +38,17 @@ func ParseBucketAndObject(r *http.Request) (bucket string, object string) {
 	return
 }
 
-func ParseReq(r *http.Request) (bucket string, object string, method Method) {
+type ParseResult struct {
+	Bucket       string
+	Object       string
+	Method       Method
+	ObjVersionID string
+}
+
+func ParseReq(r *http.Request) ParseResult {
 	query := r.URL.Query()
-	bucket, object = ParseBucketAndObject(r)
+	bucket, object := ParseBucketAndObject(r)
+	var method Method
 
 	switch {
 	case query.Has("lifecycle") && bucket != "":
@@ -111,7 +119,12 @@ func ParseReq(r *http.Request) (bucket string, object string, method Method) {
 	default:
 		method = UndefinedMethod
 	}
-	return
+	return ParseResult{
+		Bucket:       bucket,
+		Object:       object,
+		Method:       method,
+		ObjVersionID: query.Get("versionId"),
+	}
 }
 
 func routeObject(r *http.Request) Method {

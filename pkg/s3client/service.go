@@ -44,7 +44,7 @@ type Client interface {
 	IsOnline() bool
 }
 
-func New(ctx context.Context, conf map[string]*s3.Storage, metricsSvc metrics.S3Service, tp trace.TracerProvider) (*svc, error) {
+func New(ctx context.Context, conf map[string]*s3.Storage, metricsSvc metrics.Service, tp trace.TracerProvider) (*svc, error) {
 	s := &svc{
 		_clients: make(map[string]Client, len(conf)),
 	}

@@ -26,11 +26,11 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/rclone"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/copy"
 )
 
 type Config struct {
@@ -45,18 +45,17 @@ type svc struct {
 	versionSvc              meta.VersionService
 	listStateStore          *store.MigrationObjectListStateStore
 	uploadSvc               *storage.UploadSvc
-	rc                      rclone.Service
+	copySvc                 copy.CopySvc
 	queueSvc                tasks.QueueService
 	limit                   ratelimit.RPM
 	objectLocker            *store.ObjectLocker
 	bucketLocker            *store.BucketLocker
 	replicationstatusLocker *store.ReplicationStatusLocker
 	conf                    *Config
-	rclone.CopySvc
 }
 
 func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
-	rc rclone.Service, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
+	copySvc copy.CopySvc, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
 	limit ratelimit.RPM, listStateStore *store.MigrationObjectListStateStore,
 	objectLocker *store.ObjectLocker, bucketLocker *store.BucketLocker,
 	replicationstatusLocker *store.ReplicationStatusLocker) *svc {
@@ -66,7 +65,7 @@ func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
 		versionSvc:              versionSvc,
 		listStateStore:          listStateStore,
 		uploadSvc:               uploadSvc,
-		rc:                      rc,
+		copySvc:                 copySvc,
 		queueSvc:                queueSvc,
 		limit:                   limit,
 		objectLocker:            objectLocker,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rclone
+package copy
 
 import (
 	"context"
@@ -21,7 +21,6 @@ import (
 	"iter"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
@@ -31,26 +30,62 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 
-	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/objstore"
-	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/util"
 )
 
+// TODO:
+// - revisit s3 workers for delete obj, put obj tags,acls for VERSIONED objects
+// meta.VersionSvc - OK supports versioned objects
+// worker.ACL - OK supports versioned objects
+// worker.Taggig- todo
+// worker copy/migrate obj  TODO
 const (
 	CChorusSourceVersionIDMetaHeader = "x-amz-meta-chorus-source-version-id"
 
 	CRGWVersionMigrationQueryParam = "rgwx-version-id"
 )
 
-type ObjectVersionInfo struct {
+type Bucket struct {
+	Storage string
+	Bucket  string
+}
+
+func NewBucket(storage string, bucket string) Bucket {
+	return Bucket{
+		Storage: storage,
+		Bucket:  bucket,
+	}
+}
+
+type File struct {
+	Storage string
+	Bucket  string
+	Name    string
 	Version string
-	Size    uint64
+}
+
+func NewVersionedFile(storage string, bucket string, name string, version string) File {
+	return File{
+		Storage: storage,
+		Bucket:  bucket,
+		Name:    name,
+		Version: version,
+	}
+}
+
+func NewFile(storage string, bucket string, name string) File {
+	return File{
+		Storage: storage,
+		Bucket:  bucket,
+		Name:    name,
+	}
 }
 
 type ObjectInfo struct {
@@ -65,25 +100,24 @@ type ObjectInfo struct {
 type CopySvc interface {
 	BucketObjects(ctx context.Context, user string, bucket Bucket, opts ...func(o *minio.ListObjectsOptions)) iter.Seq2[ObjectInfo, error]
 	IsBucketVersioned(ctx context.Context, user string, bucket Bucket) (bool, error)
-	GetVersionInfo(ctx context.Context, user string, to File) ([]ObjectVersionInfo, error)
+	GetVersionInfo(ctx context.Context, user string, to File) ([]entity.ObjectVersionInfo, error)
 	DeleteDestinationObject(ctx context.Context, user string, to File) error
-	GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (ObjectVersionInfo, error)
+	GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (entity.ObjectVersionInfo, error)
 	CopyObject(ctx context.Context, user string, from File, to File) error
+	CopyACLs(ctx context.Context, user string, from File, to File) error
 }
+
+var _ CopySvc = (*S3CopySvc)(nil)
 
 type S3CopySvc struct {
-	clientRegistry    objstore.Clients
-	memoryLimiterSvc  LimiterSvc
-	requestLimiterSvc ratelimit.RPM
-	metricsSvc        metrics.S3Service
+	clientRegistry objstore.Clients
+	metricsSvc     metrics.WorkerService
 }
 
-func NewS3CopySvc(clientRegistry objstore.Clients, memoryLimiterSvc LimiterSvc, requestLimiterSvc ratelimit.RPM, metricsSvc metrics.S3Service) *S3CopySvc {
+func NewS3CopySvc(clientRegistry objstore.Clients, metricsSvc metrics.WorkerService) *S3CopySvc {
 	return &S3CopySvc{
-		clientRegistry:    clientRegistry,
-		memoryLimiterSvc:  memoryLimiterSvc,
-		requestLimiterSvc: requestLimiterSvc,
-		metricsSvc:        metricsSvc,
+		clientRegistry: clientRegistry,
+		metricsSvc:     metricsSvc,
 	}
 }
 
@@ -118,12 +152,6 @@ func (r *S3CopySvc) BucketObjects(ctx context.Context, user string, bucket Bucke
 		opt(&listOpts)
 	}
 
-	if err := r.requestLimiterSvc.StorReq(ctx, bucket.Storage); err != nil {
-		return func(yield func(ObjectInfo, error) bool) {
-			yield(ObjectInfo{}, fmt.Errorf("unable to get storage rate limit: %w", err))
-		}
-	}
-
 	objects := storageClient.S3().ListObjects(ctx, bucket.Bucket, listOpts)
 	return func(yield func(ObjectInfo, error) bool) {
 		for object := range objects {
@@ -152,10 +180,6 @@ func (r *S3CopySvc) IsBucketVersioned(ctx context.Context, user string, bucket B
 		return false, fmt.Errorf("unable to get %s storage client: %w", bucket.Storage, err)
 	}
 
-	if err := r.requestLimiterSvc.StorReq(ctx, bucket.Storage); err != nil {
-		return false, fmt.Errorf("unable to get storage rate limit: %w", err)
-	}
-
 	versioningConfig, err := storageClient.S3().GetBucketVersioning(ctx, bucket.Bucket)
 	if err != nil {
 		return false, fmt.Errorf("unable to get storage rversioning config: %w", err)
@@ -164,14 +188,10 @@ func (r *S3CopySvc) IsBucketVersioned(ctx context.Context, user string, bucket B
 	return versioningConfig.Enabled(), nil
 }
 
-func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([]ObjectVersionInfo, error) {
+func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([]entity.ObjectVersionInfo, error) {
 	storageClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get %s storage client: %w", to.Storage, err)
-	}
-
-	if err := r.requestLimiterSvc.StorReq(ctx, to.Storage); err != nil {
-		return nil, fmt.Errorf("unable to get storage rate limit: %w", err)
 	}
 
 	objects := storageClient.S3().ListObjects(ctx, to.Bucket, minio.ListObjectsOptions{
@@ -179,13 +199,13 @@ func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([
 		Prefix:       to.Name,
 	})
 
-	result := []ObjectVersionInfo{}
+	result := []entity.ObjectVersionInfo{}
 	for object := range objects {
 		if object.Err != nil {
 			return nil, fmt.Errorf("unable to list versions: %w", object.Err)
 		}
 
-		info := ObjectVersionInfo{
+		info := entity.ObjectVersionInfo{
 			Version: object.VersionID,
 			Size:    uint64(object.Size),
 		}
@@ -196,14 +216,10 @@ func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([
 	return result, nil
 }
 
-func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (ObjectVersionInfo, error) {
+func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (entity.ObjectVersionInfo, error) {
 	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
-		return ObjectVersionInfo{}, fmt.Errorf("unable to get to client: %w", err)
-	}
-
-	if err := r.requestLimiterSvc.StorReq(ctx, to.Storage); err != nil {
-		return ObjectVersionInfo{}, fmt.Errorf("unable to get storage rate limit: %w", err)
+		return entity.ObjectVersionInfo{}, fmt.Errorf("unable to get to client: %w", err)
 	}
 
 	objectStat, err := toClient.S3().StatObject(ctx, to.Bucket, to.Name, minio.StatObjectOptions{})
@@ -211,20 +227,20 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string,
 		var errorResp minio.ErrorResponse
 		ok := errors.As(err, &errorResp)
 		if !ok {
-			return ObjectVersionInfo{}, fmt.Errorf("unable to cast error to s3 error %w", err)
+			return entity.ObjectVersionInfo{}, fmt.Errorf("unable to cast error to s3 error %w", err)
 		}
 		if errorResp.StatusCode == http.StatusNotFound {
-			return ObjectVersionInfo{}, dom.ErrNotFound
+			return entity.ObjectVersionInfo{}, dom.ErrNotFound
 		}
 	}
 
 	sourceVersionID := objectStat.Metadata.Get(CChorusSourceVersionIDMetaHeader)
 
 	if sourceVersionID == "" {
-		return ObjectVersionInfo{}, dom.ErrInvalidArg
+		return entity.ObjectVersionInfo{}, dom.ErrInvalidArg
 	}
 
-	return ObjectVersionInfo{
+	return entity.ObjectVersionInfo{
 		Version: sourceVersionID,
 		Size:    uint64(objectStat.Size),
 	}, nil
@@ -234,10 +250,6 @@ func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, user string, to
 	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
-	}
-
-	if err := r.requestLimiterSvc.StorReq(ctx, to.Storage); err != nil {
-		return fmt.Errorf("unable to get storage rate limit: %w", err)
 	}
 
 	if err := toClient.S3().RemoveObject(ctx, to.Bucket, to.Name, minio.RemoveObjectOptions{}); err != nil {
@@ -254,14 +266,6 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
-	}
-
-	if err := r.requestLimiterSvc.StorReqN(ctx, from.Storage, 2); err != nil {
-		return fmt.Errorf("unable to get storage rate limit: %w", err)
-	}
-
-	if err := r.requestLimiterSvc.StorReqN(ctx, to.Storage, 3); err != nil {
-		return fmt.Errorf("unable to get storage rate limit: %w", err)
 	}
 
 	fromObjectStat, err := fromClient.S3().StatObject(ctx, from.Bucket, from.Name, minio.GetObjectOptions{
@@ -299,19 +303,13 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 
 	fromObjectSize := fromObjectStat.Size
 
-	release, err := r.memoryLimiterSvc.Reserve(ctx, fromObjectSize)
-	if err != nil {
-		return fmt.Errorf("unable to check limit: %w", err)
-	}
-	defer release()
-
-	ctx, span := otel.Tracer("").Start(ctx, "rclone.CopyToWithVersion")
+	ctx, span := otel.Tracer("").Start(ctx, "copy.CopyToWithVersion")
 	span.SetAttributes(attribute.String("bucket", from.Bucket), attribute.String("object", from.Name),
 		attribute.String("version", from.Version),
 		attribute.String("from", from.Storage), attribute.String("to", to.Storage), attribute.Int64("size", fromObjectSize))
 	defer span.End()
 
-	provider := strings.ToLower(toClient.Config().Provider)
+	provider := toClient.Config().Provider
 
 	putObjectOpts := minio.PutObjectOptions{
 		UserMetadata: fromObjectStat.UserMetadata,
@@ -325,11 +323,11 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		putObjectOpts.UserMetadata[CChorusSourceVersionIDMetaHeader] = to.Version
 
 		switch provider {
-		case "ceph":
+		case s3.ProviderCeph:
 			putObjectOpts.Internal.CustomQueryParams = url.Values{
 				CRGWVersionMigrationQueryParam: []string{to.Version},
 			}
-		case "minio":
+		case s3.ProviderMinIO:
 			// minio will accept only uuid as a version id
 			if _, err := uuid.Parse(to.Version); err == nil {
 				putObjectOpts.Internal.SourceVersionID = to.Version
@@ -343,6 +341,8 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		Str("file_size", util.ByteCountSI(fromObjectSize)).
 		Msg("starting obj copy")
 
+	r.metricsSvc.WorkerInProgressBytesInc(ctx, fromObjectSize)
+	defer r.metricsSvc.WorkerInProgressBytesDec(ctx, fromObjectSize)
 	fromObject, err := fromClient.S3().GetObject(ctx, from.Bucket, from.Name, minio.GetObjectOptions{
 		VersionID: from.Version,
 	})
@@ -351,9 +351,12 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 	defer fromObject.Close()
 
-	_, err = toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, fromObjectStat.Size, putObjectOpts)
+	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, fromObjectStat.Size, putObjectOpts)
 	if err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
+	}
+	if info.VersionID != "" {
+		to.Version = info.VersionID
 	}
 
 	if features.ACL(ctx) {
@@ -370,8 +373,6 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		}
 	}
 
-	r.AddMetrics(ctx, from, to, fromObjectSize)
-
 	return nil
 }
 
@@ -383,6 +384,15 @@ func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to Fil
 	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to get to client: %w", err)
+	}
+	// check if copy ACL supported for versioned objects with the same version ID
+	toProvider := toClient.Config().Provider
+	isVersioned := from.Version != ""
+	sameVersion := from.Version == to.Version
+	if isVersioned && sameVersion && !toProvider.SupportsRetainVersionID() {
+		// TODO: iterate over from/to versions and find "to" version with the same index(or eTag?) as "from" version???
+		zerolog.Ctx(ctx).Warn().Msgf("skip object ACL sync: same version IDs on different storages not supported for provider %q", toProvider)
+		return nil
 	}
 
 	fromACL, err := fromClient.AWS().GetObjectAclWithContext(ctx, &awss3.GetObjectAclInput{
@@ -417,7 +427,7 @@ func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to Fil
 	}
 
 	_, err = toClient.AWS().PutObjectAclWithContext(ctx, &awss3.PutObjectAclInput{
-		AccessControlPolicy: r.mapOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
+		AccessControlPolicy: MapOwnersACL(fromACL.Owner, fromACL.Grants, toOwnerID, features.PreserveACLGrants(ctx)),
 		Bucket:              &to.Bucket,
 		Key:                 &to.Name,
 		VersionId:           &to.Version,
@@ -433,21 +443,14 @@ func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to Fil
 	return nil
 }
 
-func (r *S3CopySvc) srcOwnerToDestOwner(owner, srcBucketOwner, dstBucketOwner *string) *string {
-	if owner == nil || *owner != *srcBucketOwner {
-		return owner
-	}
-	return dstBucketOwner
-}
-
-func (r *S3CopySvc) mapOwnersACL(srcOwner *awss3.Owner, srcGrants []*awss3.Grant, dstOwner *string, preserveACLGrants bool) *awss3.AccessControlPolicy {
+func MapOwnersACL(srcOwner *awss3.Owner, srcGrants []*awss3.Grant, dstOwner *string, preserveACLGrants bool) *awss3.AccessControlPolicy {
 	destGrants := make([]*awss3.Grant, 0, len(srcGrants))
 	for _, grant := range srcGrants {
 		var destID *string
 		if preserveACLGrants {
 			destID = grant.Grantee.ID
 		} else {
-			destID = r.srcOwnerToDestOwner(grant.Grantee.ID, srcOwner.ID, dstOwner)
+			destID = srcOwnerToDestOwner(grant.Grantee.ID, srcOwner.ID, dstOwner)
 		}
 
 		destGrant := &awss3.Grant{
@@ -468,7 +471,7 @@ func (r *S3CopySvc) mapOwnersACL(srcOwner *awss3.Owner, srcGrants []*awss3.Grant
 	}
 	if srcOwner != nil {
 		res.Owner = &awss3.Owner{
-			ID:          r.srcOwnerToDestOwner(srcOwner.ID, srcOwner.ID, dstOwner),
+			ID:          srcOwnerToDestOwner(srcOwner.ID, srcOwner.ID, dstOwner),
 			DisplayName: srcOwner.DisplayName,
 		}
 	}
@@ -476,64 +479,9 @@ func (r *S3CopySvc) mapOwnersACL(srcOwner *awss3.Owner, srcGrants []*awss3.Grant
 	return res
 }
 
-func (r *S3CopySvc) AddMetrics(ctx context.Context, from File, to File, size int64) {
-	flow := xctx.GetFlow(ctx)
-	r.metricsSvc.Count(flow, from.Storage, s3.HeadObject)
-	r.metricsSvc.Count(flow, from.Storage, s3.GetObject)
-	r.metricsSvc.Count(flow, from.Storage, s3.GetObjectAcl)
-	r.metricsSvc.Count(flow, to.Storage, s3.HeadObject)
-	r.metricsSvc.Count(flow, to.Storage, s3.PutObject)
-	r.metricsSvc.Count(flow, to.Storage, s3.PutObjectAcl)
-	if size != 0 {
-		r.metricsSvc.Download(flow, from.Storage, from.Bucket, int(size))
-		r.metricsSvc.Upload(flow, to.Storage, to.Bucket, int(size))
+func srcOwnerToDestOwner(owner, srcBucketOwner, dstBucketOwner *string) *string {
+	if owner == nil || *owner != *srcBucketOwner {
+		return owner
 	}
-}
-
-type LimiterSvc interface {
-	Reserve(ctx context.Context, size int64) (func(), error)
-}
-
-type MemoryLimiterSvc struct {
-	memCalc     *MemCalculator
-	memLimiter  ratelimit.Semaphore
-	fileLimiter ratelimit.Semaphore
-
-	metricsSvc metrics.S3Service
-}
-
-func NewMemoryLimiterSvc(memCalc *MemCalculator, memLimiter ratelimit.Semaphore, fileLimiter ratelimit.Semaphore, metricsSvc metrics.S3Service) *MemoryLimiterSvc {
-	return &MemoryLimiterSvc{
-		memCalc:     memCalc,
-		memLimiter:  memLimiter,
-		fileLimiter: fileLimiter,
-		metricsSvc:  metricsSvc,
-	}
-}
-
-func (r *MemoryLimiterSvc) Reserve(ctx context.Context, fileSize int64) (func(), error) {
-	fileLimitRelease, err := r.fileLimiter.TryAcquire(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to allocate memory with file limiter: %w", err)
-	}
-
-	reserve := r.memCalc.calcMemFromFileSize(fileSize)
-	var memLimitRelease func()
-	memLimitRelease, err = r.memLimiter.TryAcquireN(ctx, reserve)
-	if err != nil {
-		fileLimitRelease()
-		return nil, fmt.Errorf("unable to allocate memory with memory limiter: %w", err)
-	}
-
-	r.metricsSvc.RcloneCalcMemUsageInc(reserve)
-	r.metricsSvc.RcloneCalcFileNumInc()
-	r.metricsSvc.RcloneCalcFileSizeInc(fileSize)
-	release := func() {
-		fileLimitRelease()
-		memLimitRelease()
-		r.metricsSvc.RcloneCalcMemUsageDec(reserve)
-		r.metricsSvc.RcloneCalcFileNumDec()
-		r.metricsSvc.RcloneCalcFileSizeDec(fileSize)
-	}
-	return release, nil
+	return dstBucketOwner
 }
