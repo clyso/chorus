@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -35,7 +36,8 @@ func (s *svc) HandleMigrationS3User(ctx context.Context, t *asynq.Task) error {
 	}
 	logger := zerolog.Ctx(ctx)
 
-	if err := s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), s3.ListBuckets); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}

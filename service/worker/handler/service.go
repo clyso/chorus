@@ -26,6 +26,7 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
@@ -51,6 +52,7 @@ type svc struct {
 	objectLocker            *store.ObjectLocker
 	bucketLocker            *store.BucketLocker
 	replicationstatusLocker *store.ReplicationStatusLocker
+	versionedSvc            *VersionedMigrationSvc
 	conf                    *Config
 }
 
@@ -58,7 +60,7 @@ func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
 	copySvc copy.CopySvc, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
 	limit ratelimit.RPM, listStateStore *store.MigrationObjectListStateStore,
 	objectLocker *store.ObjectLocker, bucketLocker *store.BucketLocker,
-	replicationstatusLocker *store.ReplicationStatusLocker) *svc {
+	replicationstatusLocker *store.ReplicationStatusLocker, versionedSvc *VersionedMigrationSvc) *svc {
 	return &svc{
 		conf:                    conf,
 		clients:                 clients,
@@ -85,4 +87,15 @@ func (s *svc) getClients(ctx context.Context, user, fromStorage, toStorage strin
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", toStorage, err, asynq.SkipRetry)
 	}
 	return
+}
+
+func (s *svc) rateLimit(ctx context.Context, storage string, methods ...s3.Method) error {
+	if len(methods) == 0 {
+		return nil
+	}
+	opts := make([]ratelimit.Opt, 0, len(methods))
+	for _, m := range methods {
+		opts = append(opts, ratelimit.S3Method(m))
+	}
+	return s.limit.StorReqN(ctx, storage, len(methods), opts...)
 }

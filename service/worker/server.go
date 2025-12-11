@@ -143,7 +143,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
 	copySvc := copy.NewS3CopySvc(clientRegistry, metricsSvc)
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
-	versionedMigrationCtrl := handler.NewVersionedMigrationCtrl(versionedMigrationSvc, queueSvc, limiter)
 
 	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
 	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
@@ -152,7 +151,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker)
+	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -221,8 +220,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		logger.Info().Msg("registered S3 workers")
 
 		// versioned object migration workers
-		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, versionedMigrationCtrl.HandleObjectVersionList)
-		mux.HandleFunc(tasks.TypeMigrateVersionedObject, versionedMigrationCtrl.HandleVersionedObjectMigration)
+		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, workerSvc.HandleObjectVersionList)
+		mux.HandleFunc(tasks.TypeMigrateVersionedObject, workerSvc.HandleVersionedObjectMigration)
 		logger.Info().Msg("registered S3 versioned workers")
 
 		mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)

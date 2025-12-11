@@ -28,7 +28,6 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/policy"
-	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/service/worker/copy"
@@ -38,21 +37,7 @@ const (
 	CMaxBufferedMoveObjectVersions = 100
 )
 
-type VersionedMigrationCtrl struct {
-	svc      *VersionedMigrationSvc
-	queueSvc tasks.QueueService
-	limit    ratelimit.RPM
-}
-
-func NewVersionedMigrationCtrl(svc *VersionedMigrationSvc, queueSvc tasks.QueueService, limit ratelimit.RPM) *VersionedMigrationCtrl {
-	return &VersionedMigrationCtrl{
-		svc:      svc,
-		queueSvc: queueSvc,
-		limit:    limit,
-	}
-}
-
-func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t *asynq.Task) error {
+func (s *svc) HandleObjectVersionList(ctx context.Context, t *asynq.Task) error {
 	var listVersionsPayload tasks.ListObjectVersionsPayload
 	if err := json.Unmarshal(t.Payload(), &listVersionsPayload); err != nil {
 		return fmt.Errorf("unable to unmarshal payload: %w", err)
@@ -64,13 +49,13 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 	objectVersionID := entity.NewVersionedObjectID(listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.Prefix)
 	replicationID := entity.NewBucketRepliationPolicy(user, listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.ID.ToStorage(), toBucket)
 
-	if err := r.svc.ListVersions(ctx, objectVersionID, replicationID); err != nil {
+	if err := s.versionedSvc.ListVersions(ctx, objectVersionID, replicationID); err != nil {
 		return fmt.Errorf("unable to list obejct versions: %w", err)
 	}
 
 	migratePayload := tasks.MigrateVersionedObjectPayload(listVersionsPayload)
 
-	err := r.queueSvc.EnqueueTask(ctx, migratePayload)
+	err := s.queueSvc.EnqueueTask(ctx, migratePayload)
 	if err != nil {
 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 	}
@@ -78,18 +63,18 @@ func (r *VersionedMigrationCtrl) HandleObjectVersionList(ctx context.Context, t 
 	return nil
 }
 
-func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Context, t *asynq.Task) error {
+func (s *svc) HandleVersionedObjectMigration(ctx context.Context, t *asynq.Task) error {
 	var migratePayload tasks.MigrateVersionedObjectPayload
 	if err := json.Unmarshal(t.Payload(), &migratePayload); err != nil {
 		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 	logger := zerolog.Ctx(ctx)
 	// check rate limit before proceeding the task to avoid rollback in the middle of the operation
-	if err := r.limit.StorReq(ctx, migratePayload.ID.FromStorage()); err != nil {
+	if err := s.limit.StorReq(ctx, migratePayload.ID.FromStorage()); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, migratePayload.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err := r.limit.StorReq(ctx, migratePayload.ID.ToStorage()); err != nil {
+	if err := s.limit.StorReq(ctx, migratePayload.ID.ToStorage()); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, migratePayload.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
@@ -98,7 +83,7 @@ func (r *VersionedMigrationCtrl) HandleVersionedObjectMigration(ctx context.Cont
 	fromBucket, toBucket := migratePayload.ID.FromToBuckets(migratePayload.Bucket)
 	replicationID := entity.NewBucketRepliationPolicy(user, migratePayload.ID.FromStorage(), fromBucket, migratePayload.ID.ToStorage(), toBucket)
 
-	if err := r.svc.MigrateVersions(ctx, replicationID, migratePayload.Prefix); err != nil {
+	if err := s.versionedSvc.MigrateVersions(ctx, replicationID, migratePayload.Prefix); err != nil {
 		return fmt.Errorf("unable to migrate object version: %w", err)
 	}
 

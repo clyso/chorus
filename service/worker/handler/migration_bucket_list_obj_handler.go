@@ -30,6 +30,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -41,6 +42,11 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	logger := zerolog.Ctx(ctx)
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), s3.ListObjects); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
+		return err
+	}
 
 	replicationID := p.GetReplicationID()
 

@@ -42,12 +42,12 @@ func (s *svc) HandleObjectUpdate(ctx context.Context, t *asynq.Task) (err error)
 	}
 	logger := zerolog.Ctx(ctx)
 
-	// check rate limits:
-	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), swift.GetObject); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), swift.PutObject); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
