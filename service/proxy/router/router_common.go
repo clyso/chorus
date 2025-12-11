@@ -45,10 +45,6 @@ func (r *s3Router) commonRead(req *http.Request) (resp *http.Response, storage s
 	if err != nil {
 		return nil, "", false, err
 	}
-
-	if xctx.GetMethod(ctx) == s3.GetObject {
-		_ = r.limit.StorReq(ctx, storage) //todo: refactor rate-limiting
-	}
 	resp, isApiErr, err = client.Do(req)
 	return
 }
@@ -113,9 +109,9 @@ func (r *s3Router) getVersion(ctx context.Context, replID entity.UniversalReplic
 	method := xctx.GetMethod(ctx)
 	switch {
 	case method == s3.GetObjectAcl || method == s3.PutObjectAcl:
-		return r.versionSvc.GetACL(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
+		return r.versionSvc.GetACL(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx), Version: xctx.GetObjectVer(ctx)})
 	case method == s3.GetObjectTagging || method == s3.PutObjectTagging || method == s3.DeleteObjectTagging:
-		return r.versionSvc.GetTags(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx)})
+		return r.versionSvc.GetTags(ctx, replID, dom.Object{Bucket: xctx.GetBucket(ctx), Name: xctx.GetObject(ctx), Version: xctx.GetObjectVer(ctx)})
 	case method == s3.GetBucketAcl || method == s3.PutBucketAcl:
 		return r.versionSvc.GetBucketACL(ctx, replID, xctx.GetBucket(ctx))
 	case method == s3.GetBucketTagging || method == s3.PutBucketTagging || method == s3.DeleteBucketTagging:

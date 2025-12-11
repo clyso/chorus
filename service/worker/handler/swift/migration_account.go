@@ -23,9 +23,12 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/pagination"
 	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -37,6 +40,16 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 	var p tasks.SwiftAccountMigrationPayload
 	if err = json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwiftAccountMigrationPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
+	}
+	logger := zerolog.Ctx(ctx)
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), swift.GetAccount); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
+		return err
+	}
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), swift.PostAccount); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
+		return err
 	}
 
 	fromClient, err := s.clients.AsSwift(ctx, p.ID.FromStorage(), p.ID.User())

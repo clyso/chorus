@@ -29,6 +29,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -42,15 +43,20 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("SwiftContainerMigrationPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
+	logger := zerolog.Ctx(ctx)
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), swift.GetContainer); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
+		return err
+	}
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), swift.PutContainer); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
+		return err
+	}
+
 	fromClient, err := s.clients.AsSwift(ctx, p.ID.FromStorage(), p.ID.User())
 	if err != nil {
 		return fmt.Errorf("get swift client: %w", err)
-	}
-
-	// check rate limits:
-	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
-		zerolog.Ctx(ctx).Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
-		return err
 	}
 
 	// migrate container metadata:

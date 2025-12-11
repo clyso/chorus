@@ -27,6 +27,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -36,12 +37,12 @@ func (s *svc) HandleAccountUpdate(ctx context.Context, t *asynq.Task) (err error
 		return fmt.Errorf("AccountUpdatePayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	logger := zerolog.Ctx(ctx)
-
-	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), swift.GetAccount); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), swift.PostAccount); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}

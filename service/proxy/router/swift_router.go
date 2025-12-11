@@ -87,6 +87,9 @@ func (r *swiftRouter) Route(req *http.Request) (resp *http.Response, taskList []
 		// no data replication needed
 		return
 	}
+	if rlErr := r.limit.StorReq(ctx, storage, ratelimit.SwiftMethod(method)); rlErr != nil && !dom.IsErrRateLimitExceeded(rlErr) {
+		zerolog.Ctx(ctx).Err(rlErr).Str("storage", storage).Msg("rate limit error")
+	}
 	switch method {
 	case swift.GetInfo, swift.GetEndpoints, swift.GetAccount, swift.GetContainer, swift.GetObject, swift.HeadAccount, swift.HeadContainer, swift.HeadObject:
 	// read requests, no replication task needed
@@ -177,14 +180,6 @@ func (r *swiftRouter) forwardToStorage(ctx context.Context, req *http.Request, t
 
 	// forward request:
 	resp, err = r.client.Do(newReq)
-	defer func() {
-		if err != nil {
-			return
-		}
-		// update rate limit & metrics:
-		_ = r.limit.StorReq(ctx, toStorage)
-		// TODO: implement metrics for swift
-	}()
 	if err != nil {
 		return nil, false, err
 	}

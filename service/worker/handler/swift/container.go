@@ -32,6 +32,7 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
@@ -43,11 +44,12 @@ func (s *svc) HandleContainerUpdate(ctx context.Context, t *asynq.Task) (err err
 	logger := zerolog.Ctx(ctx)
 	_, toBucket := p.ID.FromToBuckets(p.Bucket)
 
-	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), swift.GetContainer); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), swift.PutContainer); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}

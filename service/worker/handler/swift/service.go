@@ -15,9 +15,12 @@
 package swift
 
 import (
+	"context"
+
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/store"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/service/worker/handler"
 )
@@ -49,4 +52,15 @@ func New(conf *handler.Config, clients objstore.Clients, bucketListStateStore *s
 		objectLocker:         objectLocker,
 		bucketLocker:         bucketLocker,
 	}
+}
+
+func (s *svc) rateLimit(ctx context.Context, storage string, methods ...swift.Method) error {
+	if len(methods) == 0 {
+		return nil
+	}
+	opts := make([]ratelimit.Opt, 0, len(methods))
+	for _, m := range methods {
+		opts = append(opts, ratelimit.SwiftMethod(m))
+	}
+	return s.limit.StorReqN(ctx, storage, len(methods), opts...)
 }

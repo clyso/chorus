@@ -31,8 +31,9 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/rclone"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/copy"
 )
 
 func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
@@ -45,11 +46,12 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
-	if err = s.limit.StorReq(ctx, p.ID.FromStorage()); err != nil {
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), s3.HeadObject, s3.GetObject, s3.GetObjectAcl); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
 		return err
 	}
-	if err = s.limit.StorReq(ctx, p.ID.ToStorage()); err != nil {
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), s3.HeadObject, s3.PutObject, s3.PutObjectAcl); err != nil {
 		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
 		return err
 	}
@@ -76,15 +78,15 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	}
 
 	err = lock.Do(ctx, time.Second*2, func() error {
-		return s.rc.CopyTo(ctx, p.ID.User(), rclone.File{
+		return s.copySvc.CopyObject(ctx, p.ID.User(), copy.File{
 			Storage: p.ID.FromStorage(),
 			Bucket:  fromBucket,
 			Name:    p.Object.Name,
-		}, rclone.File{
+		}, copy.File{
 			Storage: p.ID.ToStorage(),
 			Bucket:  toBucket,
 			Name:    p.Object.Name,
-		}, p.ObjSize)
+		})
 	})
 	if err != nil {
 		if errors.Is(err, dom.ErrNotFound) {

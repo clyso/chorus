@@ -32,6 +32,7 @@ import (
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -42,6 +43,17 @@ func (s *svc) HandleBucketTags(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("BucketSyncTagsPayload Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
+	logger := zerolog.Ctx(ctx)
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), s3.GetBucketTagging); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
+		return err
+	}
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), s3.GetBucketTagging, s3.PutBucketTagging); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
+		return err
+	}
+
 	_, toBucket := p.ID.FromToBuckets(p.Bucket)
 
 	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
@@ -68,6 +80,16 @@ func (s *svc) HandleObjectTags(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
+	logger := zerolog.Ctx(ctx)
+	// acquire rate limits for source and destination storage before proceeding
+	if err := s.rateLimit(ctx, p.ID.FromStorage(), s3.GetObjectTagging); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.FromStorage()).Msg("rate limit error")
+		return err
+	}
+	if err := s.rateLimit(ctx, p.ID.ToStorage(), s3.GetObjectTagging, s3.PutObjectTagging); err != nil {
+		logger.Debug().Err(err).Str(log.Storage, p.ID.ToStorage()).Msg("rate limit error")
+		return err
+	}
 	_, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 
 	fromClient, toClient, err := s.getClients(ctx, p.ID.User(), p.ID.FromStorage(), p.ID.ToStorage())
@@ -156,7 +178,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 	fromBucket, toBucket := replID.FromToBuckets(object.Bucket)
-	versions, err := s.versionSvc.GetTags(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name})
+	versions, err := s.versionSvc.GetTags(ctx, replID, object)
 	if err != nil {
 		return err
 	}
@@ -166,11 +188,11 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 		return nil
 	}
 
-	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object.Name, mclient.GetObjectTaggingOptions{VersionID: ""}) //todo: versioning
+	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object.Name, mclient.GetObjectTaggingOptions{VersionID: object.Version})
 
 	var mcErr mclient.ErrorResponse
 	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
-		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: object.Version})
 		if err != nil {
 			if mclient.IsNetworkOrHostDown(err, true) {
 				return fmt.Errorf("sync object tags: remove tags err: %w", err)
@@ -188,9 +210,9 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 
 	if fromTags != nil && len(fromTags.ToMap()) != 0 {
-		err = toClient.S3().PutObjectTagging(ctx, toBucket, object.Name, fromTags, mclient.PutObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().PutObjectTagging(ctx, toBucket, object.Name, fromTags, mclient.PutObjectTaggingOptions{VersionID: object.Version})
 	} else {
-		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: ""}) //todo: versioning
+		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: object.Version})
 	}
 	if err != nil {
 		if mclient.IsNetworkOrHostDown(err, true) {
@@ -201,7 +223,8 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	}
 	if fromVer != 0 {
 		destination := meta.Destination{Storage: replID.ToStorage(), Bucket: toBucket}
-		return s.versionSvc.UpdateTagsIfGreater(ctx, replID, dom.Object{Bucket: fromBucket, Name: object.Name}, destination, fromVer)
+		return s.versionSvc.UpdateTagsIfGreater(ctx, replID, object, destination, fromVer)
+
 	}
 	return nil
 }

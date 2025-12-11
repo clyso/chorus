@@ -29,6 +29,7 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/rs/zerolog"
 )
 
 type Router interface {
@@ -141,6 +142,13 @@ func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tas
 		if taskList == nil {
 			taskList = []tasks.ReplicationTask{task}
 		}
+	}
+
+	if err != nil || isApiErr {
+		return
+	}
+	if rlErr := r.limit.StorReq(ctx, storage, ratelimit.S3Method(method)); rlErr != nil && !dom.IsErrRateLimitExceeded(rlErr) {
+		zerolog.Ctx(ctx).Err(rlErr).Str("storage", storage).Msg("rate limit error")
 	}
 
 	return

@@ -41,11 +41,7 @@ import (
 )
 
 // TODO:
-// - revisit s3 workers for delete obj, put obj tags,acls for VERSIONED objects
-// meta.VersionSvc - OK supports versioned objects
-// worker.ACL - OK supports versioned objects
-// worker.Taggig- todo
-// worker copy/migrate obj  TODO
+// swift client metrics
 const (
 	CChorusSourceVersionIDMetaHeader = "x-amz-meta-chorus-source-version-id"
 
