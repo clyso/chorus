@@ -41,11 +41,11 @@
           type="success"
           size="small"
         >
-          {{ replication.from }}
+          {{ replication.id.fromStorage }}
         </CTag>
       </template>
       <span class="replication-direction-cell__from-tooltip">
-        <strong>{{ replication.from }}</strong
+        <strong>{{ replication.id.fromStorage }}</strong
         >: {{ t('replicationFrom') }}
       </span>
     </CTooltip>
@@ -64,11 +64,11 @@
           type="warning"
           size="small"
         >
-          {{ replication.to }}
+          {{ replication.id.toStorage }}
         </CTag>
       </template>
       <span class="replication-direction-cell__to-tooltip">
-        <strong>{{ replication.to }}</strong
+        <strong>{{ replication.id.toStorage }}</strong
         >: {{ t('replicationTo') }}
       </span>
     </CTooltip>

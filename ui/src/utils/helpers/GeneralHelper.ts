@@ -22,7 +22,11 @@ import {
   throttle,
   uniqueId,
 } from 'lodash-es';
-import { formatDistanceStrict } from 'date-fns';
+import {
+  formatDistanceStrict,
+  formatDuration,
+  intervalToDuration,
+} from 'date-fns';
 import { de, enGB } from 'date-fns/locale';
 import { storeToRefs } from 'pinia';
 import { useI18nStore } from '@/stores/i18nStore';
@@ -100,5 +104,20 @@ export abstract class GeneralHelper {
     return formatDistanceStrict(dateComputed, baseDateComputed, {
       locale: locale.value === 'en' ? enGB : de,
     });
+  }
+
+  static formatDurationSeconds(duration: string): string {
+    const { locale } = storeToRefs(useI18nStore());
+    const totalSeconds = Number(duration.replace('s', ''));
+
+    if (isNaN(totalSeconds)) return '-';
+
+    return formatDuration(
+      intervalToDuration({ start: 0, end: totalSeconds * 1000 }),
+      {
+        format: ['days', 'hours', 'minutes', 'seconds'],
+        locale: locale.value === 'en' ? enGB : de,
+      },
+    );
   }
 }

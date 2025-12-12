@@ -26,9 +26,9 @@
   import { computed, h, type Ref, ref } from 'vue';
   import { storeToRefs } from 'pinia';
   import { useI18n } from 'vue-i18n';
-  import type {
-    ChorusReplication,
-    ChorusUserReplication,
+  import {
+    ReplicationType,
+    type ChorusReplication,
   } from '@/utils/types/chorus';
   import type { AddId } from '@/utils/types/helper';
   import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
@@ -47,23 +47,45 @@
   const isPauseResumeLoading = ref(false);
   const isDeleteLoading = ref(false);
 
-  const {
-    setReplicationPaused,
-    deleteReplication: callDeleteReplication,
-    setUserReplicationToDelete,
-  } = useChorusReplicationsStore();
+  const { setReplicationPaused, deleteReplication: callDeleteReplication } =
+    useChorusReplicationsStore();
 
-  const {
-    page,
-    pagination,
-    userReplications,
-    userReplicationToDelete,
-    selectedReplicationIds,
-  } = storeToRefs(useChorusReplicationsStore());
+  const { page, pagination, selectedReplicationIds } = storeToRefs(
+    useChorusReplicationsStore(),
+  );
 
   const { createNotification, removeNotification } = useNotification();
 
   const replicationNotificationId: Ref<string | null> = ref(null);
+
+  const replicationMetadata = computed(() => ({
+    [ReplicationType.BUCKET]: {
+      iconName: 'base-trash',
+      title: t('bucketDeletionConfirmTitle'),
+      content: t('bucketDeletionConfirmContent'),
+      confirm: t('bucketDeletionConfirmQuestion'),
+      action: t('bucketDeletionConfirmAction'),
+      cancel: t('bucketDeletionConfirmCancel'),
+      successTitle: t('deleteSuccessTitle'),
+      successContent: t('deleteSuccessContent'),
+      errorTitle: t('deleteErrorTitle'),
+      errorContent: t('deleteErrorContent'),
+      errorAction: t('deleteErrorAction'),
+    },
+    [ReplicationType.USER]: {
+      iconName: 'base-person-remove',
+      title: t('userDeletionConfirmTitle'),
+      content: t('userDeletionConfirmContent'),
+      confirm: t('userDeletionConfirmQuestion'),
+      action: t('userDeletionConfirmAction'),
+      cancel: t('userDeletionConfirmCancel'),
+      successTitle: t('deleteUserSuccessTitle'),
+      successContent: t('deleteUserSuccessContent'),
+      errorTitle: t('deleteUserErrorTitle'),
+      errorContent: t('deleteUserErrorContent'),
+      errorAction: t('deleteUserErrorAction'),
+    },
+  }));
 
   function clearReplicationNotification() {
     if (!replicationNotificationId.value) {
@@ -165,6 +187,16 @@
   async function deleteReplication() {
     isDeleteLoading.value = true;
 
+    const replicationType = props.replication.replicationType;
+
+    const {
+      successTitle,
+      successContent,
+      errorTitle,
+      errorContent,
+      errorAction,
+    } = replicationMetadata.value[replicationType];
+
     try {
       await callDeleteReplication(props.replication);
 
@@ -175,16 +207,16 @@
       }
 
       selectedReplicationIds.value = selectedReplicationIds.value.filter(
-        (selectedId) => selectedId !== props.replication.id,
+        (selectedId) => selectedId !== props.replication.idStr,
       );
 
       createReplicationNotification({
         type: 'success',
-        title: t('deleteSuccessTitle'),
+        title: successTitle,
         duration: 4000,
         content: () =>
           h('div', [
-            t('deleteSuccessContent'),
+            successContent,
             h(ReplicationsShortList, {
               replications: [props.replication],
             }),
@@ -193,15 +225,15 @@
     } catch {
       createReplicationNotification({
         type: 'error',
-        title: t('deleteErrorTitle'),
-        positiveText: t('deleteErrorAction'),
+        title: errorTitle,
+        positiveText: errorAction,
         positiveHandler: () => {
           clearReplicationNotification();
           deleteReplication();
         },
         content: () =>
           h('div', [
-            t('deleteErrorContent'),
+            errorContent,
             h(ReplicationsShortList, {
               replications: [props.replication],
             }),
@@ -214,42 +246,29 @@
 
   const { createDialog } = useDialog();
 
-  function handleBucketReplicationDelete() {
+  function handleReplicationDelete() {
+    const replicationType = props.replication.replicationType;
+
+    const { iconName, title, content, confirm, action, cancel } =
+      replicationMetadata.value[replicationType];
+
     createDialog({
       type: 'error',
-      iconName: 'base-trash',
-      title: t('bucketDeletionConfirmTitle'),
+      iconName: iconName,
+      title: title,
       content: () => [
-        h(
-          'div',
-          { style: 'margin-bottom: 8px' },
-          t('bucketDeletionConfirmContent'),
-        ),
+        h('div', { style: 'margin-bottom: 8px' }, content),
         h(ReplicationsShortList, {
           replications: [props.replication],
           size: 'medium',
           style: 'margin-bottom: 8px',
         }),
-        t('bucketDeletionConfirmQuestion'),
+        confirm,
       ],
-      positiveText: t('bucketDeletionConfirmAction'),
-      negativeText: t('bucketDeletionConfirmCancel'),
+      positiveText: action,
+      negativeText: cancel,
       positiveHandler: () => deleteReplication(),
     });
-  }
-
-  const userReplication = computed<ChorusUserReplication | null>(
-    () =>
-      userReplications.value.find(
-        (userReplicationItem) =>
-          props.replication.user === userReplicationItem.user &&
-          props.replication.to === userReplicationItem.to &&
-          props.replication.from === userReplicationItem.from,
-      ) ?? null,
-  );
-
-  function handleUserReplicationDelete() {
-    setUserReplicationToDelete(userReplication.value);
   }
 </script>
 
@@ -339,42 +358,20 @@
             size="tiny"
             type="error"
             :loading="isDeleteLoading"
-            @click="handleBucketReplicationDelete"
+            @click="handleReplicationDelete"
           >
             <template #icon>
               <CIcon
                 :is-inline="true"
-                :name="IconName.BASE_TRASH"
+                :name="
+                  replicationMetadata[replication.replicationType].iconName
+                "
               />
             </template>
           </CButton>
         </template>
 
         {{ t('actionDelete') }}
-      </CTooltip>
-
-      <CTooltip
-        v-if="userReplication"
-        :delay="1000"
-      >
-        <template #trigger>
-          <CButton
-            secondary
-            size="tiny"
-            type="error"
-            :loading="userReplicationToDelete?.isProcessing || false"
-            @click="handleUserReplicationDelete"
-          >
-            <template #icon>
-              <CIcon
-                :is-inline="true"
-                :name="IconName.BASE_PERSON_REMOVE"
-              />
-            </template>
-          </CButton>
-        </template>
-
-        {{ t('actionDeleteUserReplication') }}
       </CTooltip>
     </div>
   </div>

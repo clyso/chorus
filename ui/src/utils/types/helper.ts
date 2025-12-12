@@ -14,4 +14,4 @@
  *  limitations under the License.
  */
 
-export type AddId<T> = T & { id: string | number };
+export type AddId<T> = T & { idStr: string | number };

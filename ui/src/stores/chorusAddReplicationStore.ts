@@ -24,11 +24,13 @@ import { useRouter } from 'vue-router';
 import {
   AddReplicationStepName,
   type ChorusBucketListRequest,
+  type ChorusReplicationId,
   type ChorusStorage,
 } from '@/utils/types/chorus';
 import { ChorusService } from '@/services/ChorusService';
 import i18nAddReplication from '@/components/chorus/add-replication/i18nAddReplication';
 import { RouteName } from '@/utils/types/router';
+import { ErrorHelper } from '@/utils/helpers/ErrorHelper';
 
 interface ChorusAddReplicationState {
   isLoading: boolean;
@@ -143,8 +145,8 @@ export const useChorusAddReplicationStore = defineStore(
 
       state.bucketsRequestOptions = {
         user: state.selectedUser,
-        from: state.selectedFromStorage.name,
-        to: state.selectedToStorage.name,
+        fromStorage: state.selectedFromStorage.name,
+        toStorage: state.selectedToStorage.name,
         showReplicated: true,
       };
 
@@ -176,8 +178,10 @@ export const useChorusAddReplicationStore = defineStore(
     const isBucketsAlreadyRequested = computed(
       () =>
         state.bucketsRequestOptions?.user === state.selectedUser &&
-        state.bucketsRequestOptions?.from === state.selectedFromStorage?.name &&
-        state.bucketsRequestOptions?.to === state.selectedToStorage?.name,
+        state.bucketsRequestOptions?.fromStorage ===
+          state.selectedFromStorage?.name &&
+        state.bucketsRequestOptions?.toStorage ===
+          state.selectedToStorage?.name,
     );
 
     const validator = useVuelidate(
@@ -219,21 +223,53 @@ export const useChorusAddReplicationStore = defineStore(
 
       state.isSubmitting = true;
 
-      try {
-        await ChorusService.addReplication({
-          user: selectedUser,
-          from: selectedFromStorage.name,
-          to: selectedToStorage.name,
-          buckets: isForAllBuckets ? [] : selectedBuckets,
-          isForAllBuckets,
-        });
-        showCreateSuccess();
+      const successList: ChorusReplicationId[] = [];
+      const errorList: [ChorusReplicationId, string][] = [];
 
-        router.push({ name: RouteName.CHORUS_REPLICATION });
-      } catch {
-        showCreateError();
-      } finally {
-        state.isSubmitting = false;
+      const baseReplicationId: ChorusReplicationId = {
+        user: selectedUser,
+        fromStorage: selectedFromStorage.name,
+        toStorage: selectedToStorage.name,
+      };
+
+      const replicationIds: ChorusReplicationId[] = isForAllBuckets
+        ? [{ ...baseReplicationId }]
+        : selectedBuckets.map((bucket) => ({
+            ...baseReplicationId,
+            fromBucket: bucket,
+            toBucket: bucket,
+          }));
+
+      await Promise.all(
+        replicationIds.map(async (replicationId) => {
+          try {
+            await ChorusService.addReplication({
+              id: replicationId,
+            });
+            successList.push(replicationId);
+          } catch (error: unknown) {
+            const reason =
+              ErrorHelper.getReason(error) ||
+              t('createReplicationErrorUnknown');
+
+            errorList.push([replicationId, reason]);
+          }
+        }),
+      );
+
+      router.push({ name: RouteName.CHORUS_REPLICATION });
+      state.isSubmitting = false;
+
+      if (errorList.length !== 0) {
+        const content = errorList.map(([id, reason]) => {
+          return `${id.user}/${id.fromStorage}->${id.toStorage}: ${reason}`;
+        });
+
+        showCreateError(content ? content.join(', ') : undefined);
+      }
+
+      if (successList.length !== 0) {
+        showCreateSuccess();
       }
     }
 
@@ -248,11 +284,13 @@ export const useChorusAddReplicationStore = defineStore(
       });
     }
 
-    function showCreateError() {
+    function showCreateError(reason?: string) {
+      const content = reason ? reason : t('createReplicationError');
+
       createNotification({
         type: 'error',
         title: `${t('errorTitle')}`,
-        content: t('createReplicationError'),
+        content: content,
         isClosable: true,
       });
     }
