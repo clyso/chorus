@@ -362,8 +362,10 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		// workaround for e2e test test/object_test.go TestApi_Object_Folder
 		putObjectOpts.DisableContentSha256 = true
 	}
-	// workaround for big objects in e2e tests TODO: investigate
-	putObjectOpts.DisableContentSha256 = true
+	if !toClient.Config().IsSecure {
+		// workaround for big objects in e2e tests TODO: investigate
+		putObjectOpts.DisableContentSha256 = true
+	}
 	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, stat.Size, putObjectOpts)
 	if err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
