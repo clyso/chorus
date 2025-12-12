@@ -19,6 +19,7 @@ package migration
 import (
 	"context"
 	"math/rand"
+	"strings"
 	"testing"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -74,22 +75,86 @@ func rmBucket(client *mclient.Client, bucket string) error {
 	return client.RemoveBucket(context.Background(), bucket)
 }
 
-func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) *pb.ReplicationDiffResponse {
+type ReplicationDiffResponse struct {
+	IsMatch  bool
+	MissFrom []string
+	MissTo   []string
+	Differ   []string
+}
+
+func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) ReplicationDiffResponse {
 	t.Helper()
 	r := require.New(t)
+	r.NotNil(id.FromBucket)
+	r.NotNil(id.ToBucket)
+	loc := []*pb.MigrateLocation{
+		{Bucket: *id.FromBucket, Storage: id.FromStorage},
+		{Bucket: *id.ToBucket, Storage: id.ToStorage},
+	}
 	// delete any existing diff
-	_, err := e.PolicyClient.DeleteReplicationDiff(t.Context(), id)
+	_, err := e.DiffClient.DeleteReport(t.Context(), &pb.ConsistencyCheckRequest{
+		Locations: loc,
+	})
 	r.NoError(err)
 
 	// create diff
-	res, err := e.PolicyClient.ReplicationDiff(t.Context(), &pb.ReplicationDiffRequest{ReplicationId: id, CheckOnlyLastVersions: true})
+	_, err = e.DiffClient.Start(t.Context(), &pb.StartConsistencyCheckRequest{
+		Locations:             loc,
+		User:                  id.User,
+		CheckOnlyLastVersions: true,
+	})
 	r.NoError(err)
+
+	var res *pb.GetConsistencyCheckReportResponse
 	r.Eventually(func() bool {
 		//poll until ready
-		res, err = e.PolicyClient.ReplicationDiff(t.Context(), &pb.ReplicationDiffRequest{ReplicationId: id})
+		res, err = e.DiffClient.GetReport(t.Context(), &pb.ConsistencyCheckRequest{
+			Locations: loc,
+		})
 		r.NoError(err)
-		return res.IsReady
+		return res.Check.Ready
 	}, e.WaitLong, e.RetryShort)
-	r.True(res.IsReady)
-	return res
+	r.True(res.Check.Ready)
+
+	if res.Check.Consistent {
+		// match
+		return ReplicationDiffResponse{IsMatch: true}
+	}
+	// not match, request diff entries
+	diff := ReplicationDiffResponse{IsMatch: false}
+	cursor := uint64(0)
+	for {
+		batch, err := e.DiffClient.GetReportEntries(t.Context(), &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: loc,
+			Cursor:    0,
+			PageSize:  100,
+		})
+		r.NoError(err)
+		cursor = batch.Cursor
+		for _, entry := range batch.Entries {
+			if len(entry.StorageEntries) == 1 {
+				stor := entry.StorageEntries[0]
+				if strings.HasSuffix(entry.Object, "/") {
+					//TODO: fix consistency check to
+					// skip folder placehoders
+					continue
+				}
+				if stor.Storage == id.FromStorage && stor.Storage == *id.FromBucket {
+					diff.MissTo = append(diff.MissTo, entry.Object)
+				} else if stor.Storage == id.ToStorage && stor.Bucket == *id.ToBucket {
+					diff.MissFrom = append(diff.MissFrom, entry.Object)
+				} else {
+					r.Fail("entry with unexpected location found")
+				}
+			} else if len(entry.StorageEntries) == 2 {
+				diff.Differ = append(diff.Differ, entry.Object)
+			} else {
+				r.Fail("entry with unexpected number of locations found")
+			}
+		}
+		if cursor == 0 {
+			break
+		}
+	}
+	return diff
 }

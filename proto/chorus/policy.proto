@@ -90,12 +90,6 @@ service Policy {
   // Returns Switch status
   rpc GetSwitchStatus(ReplicationID) returns (ReplicationSwitch);
 
-  // Get or Create diff for bucket replication
-  rpc ReplicationDiff(ReplicationDiffRequest)
-      returns (ReplicationDiffResponse) {};
-  // Deletes stored diff for bucket-level replication if exists
-  rpc DeleteReplicationDiff(ReplicationID) returns (google.protobuf.Empty) {};
-
   // Returns configured routing policies for chorus proxy.
   rpc ListRoutings(RoutingsRequest) returns (RoutingsResponse);
 
@@ -497,36 +491,4 @@ message TestProxyResponse {
   bool is_blocked = 2;
   // list of applicable replications for given user and bucket.
   repeated ReplicationID replications = 3;
-}
-
-message ReplicationDiffRequest {
-  // Id of bucket-level replication to get diff for.
-  ReplicationID replication_id = 1;
-  // if true, only last versions of versioned objects will be compared
-  // ignored if diff already exists
-  bool check_only_last_versions = 2;
-  // if true, etags will be ignored during comparison
-  // ignored if diff already exists
-  bool ignore_etags = 3;
-  // if true, sizes will be ignored during comparison
-  // ignored if diff already exists
-  bool ignore_sizes = 4;
-}
-
-// Response for replication diff request.
-message ReplicationDiffResponse {
-  // true if diff calculation is completed and report is ready
-  // if false, diff is still being calculated, try again later
-  bool is_ready = 1;
-  // true if storage's buckets have the same content
-  bool is_match = 2;
-  // list of missing objects in 'from storage' bucket
-  // shows first 1000 of miss_from + miss_to + differ objects
-  repeated string miss_from = 3;
-  // list of missing objects in 'to storage' bucket
-  // shows first 1000 of miss_from + miss_to + differ objects
-  repeated string miss_to = 4;
-  // list of objects with different content based on size/etag
-  // shows first 1000 of miss_from + miss_to + differ objects
-  repeated string differ = 5;
 }

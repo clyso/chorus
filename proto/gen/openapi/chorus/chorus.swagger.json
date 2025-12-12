@@ -320,74 +320,6 @@
         ]
       }
     },
-    "/replication/diff": {
-      "post": {
-        "summary": "Get or Create diff for bucket replication",
-        "operationId": "Policy_ReplicationDiff",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/chorusReplicationDiffResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/chorusReplicationDiffRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Policy"
-        ]
-      }
-    },
-    "/replication/diff/delete": {
-      "post": {
-        "summary": "Deletes stored diff for bucket-level replication if exists",
-        "operationId": "Policy_DeleteReplicationDiff",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "type": "object",
-              "properties": {}
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/chorusReplicationID"
-            }
-          }
-        ],
-        "tags": [
-          "Policy"
-        ]
-      }
-    },
     "/replication/get": {
       "post": {
         "summary": "Returns replication info by ID.",
@@ -1106,6 +1038,9 @@
         },
         "versionId": {
           "type": "string"
+        },
+        "bucket": {
+          "type": "string"
         }
       }
     },
@@ -1368,62 +1303,6 @@
         }
       },
       "description": "Represents specification and status of user-level or bucket-level\nreplication."
-    },
-    "chorusReplicationDiffRequest": {
-      "type": "object",
-      "properties": {
-        "replicationId": {
-          "$ref": "#/definitions/chorusReplicationID",
-          "description": "Id of bucket-level replication to get diff for."
-        },
-        "checkOnlyLastVersions": {
-          "type": "boolean",
-          "title": "if true, only last versions of versioned objects will be compared\nignored if diff already exists"
-        },
-        "ignoreEtags": {
-          "type": "boolean",
-          "title": "if true, etags will be ignored during comparison\nignored if diff already exists"
-        },
-        "ignoreSizes": {
-          "type": "boolean",
-          "title": "if true, sizes will be ignored during comparison\nignored if diff already exists"
-        }
-      }
-    },
-    "chorusReplicationDiffResponse": {
-      "type": "object",
-      "properties": {
-        "isReady": {
-          "type": "boolean",
-          "title": "true if diff calculation is completed and report is ready\nif false, diff is still being calculated, try again later"
-        },
-        "isMatch": {
-          "type": "boolean",
-          "title": "true if storage's buckets have the same content"
-        },
-        "missFrom": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of missing objects in 'from storage' bucket\nshows first 1000 of miss_from + miss_to + differ objects"
-        },
-        "missTo": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of missing objects in 'to storage' bucket\nshows first 1000 of miss_from + miss_to + differ objects"
-        },
-        "differ": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of objects with different content based on size/etag\nshows first 1000 of miss_from + miss_to + differ objects"
-        }
-      },
-      "description": "Response for replication diff request."
     },
     "chorusReplicationID": {
       "type": "object",

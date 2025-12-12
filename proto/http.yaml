@@ -59,12 +59,6 @@ http:
     - selector: chorus.Policy.GetSwitchStatus
       post: /replication/switch/get
       body: "*"
-    - selector: chorus.Policy.ReplicationDiff
-      post: /replication/diff
-      body: "*"
-    - selector: chorus.Policy.DeleteReplicationDiff
-      post: /replication/diff/delete
-      body: "*"
       # Policy service - routing:
     - selector: chorus.Policy.ListRoutings
       post: /routing
