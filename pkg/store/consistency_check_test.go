@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/clyso/chorus/pkg/entity"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/entity"
 )
 
 var _ = Describe("Consistency checker stores", func() {

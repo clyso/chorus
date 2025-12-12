@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/rs/zerolog"
+
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
@@ -29,7 +31,6 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/rs/zerolog"
 )
 
 type Router interface {
