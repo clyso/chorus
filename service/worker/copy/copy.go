@@ -152,6 +152,10 @@ func (r *S3CopySvc) BucketObjects(ctx context.Context, user string, bucket Bucke
 	return func(yield func(ObjectInfo, error) bool) {
 		for object := range objects {
 			err := object.Err
+			// skip if bucket not found
+			if err != nil && minio.ToErrorResponse(err).Code == minio.NoSuchBucket {
+				return
+			}
 			info := ObjectInfo{
 				Key:          object.Key,
 				VersionID:    object.VersionID,

@@ -84,14 +84,9 @@ func Test_Restart_Bucket_Replication(t *testing.T) {
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
 	}, e.WaitShort, e.RetryShort)
 
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff := replicationDiff(t, e, id)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Len(diff.Match, 3)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
@@ -102,11 +97,7 @@ func Test_Restart_Bucket_Replication(t *testing.T) {
 	// delete dest bucket
 	r.NoError(rmBucket(e.F1Client, bucket))
 
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id)
 	r.False(diff.IsMatch)
 
 	reps, err = e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
@@ -137,14 +128,9 @@ func Test_Restart_Bucket_Replication(t *testing.T) {
 	}, e.WaitShort, e.RetryShort)
 
 	// check that sync was correct
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Len(diff.Match, 3)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 }
@@ -228,14 +214,9 @@ func Test_Restart_User_Replication(t *testing.T) {
 		buckID := proto.Clone(id).(*pb.ReplicationID)
 		buckID.FromBucket = &bucket
 		buckID.ToBucket = &bucket
-		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Target:    buckID,
-			ShowMatch: true,
-		})
-		r.NoError(err)
+		diff := replicationDiff(t, e, buckID)
 		r.True(diff.IsMatch)
-		r.Empty(diff.Error)
-		r.Len(diff.Match, 3)
+		r.Empty(diff.Differ)
 		r.Empty(diff.MissFrom)
 		r.Empty(diff.MissTo)
 	}
@@ -253,11 +234,7 @@ func Test_Restart_User_Replication(t *testing.T) {
 		buckID := proto.Clone(id).(*pb.ReplicationID)
 		buckID.FromBucket = &bucket
 		buckID.ToBucket = &bucket
-		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Target:    buckID,
-			ShowMatch: true,
-		})
-		r.NoError(err)
+		diff := replicationDiff(t, e, buckID)
 		r.False(diff.IsMatch)
 	}
 
@@ -293,14 +270,9 @@ func Test_Restart_User_Replication(t *testing.T) {
 		buckID := proto.Clone(id).(*pb.ReplicationID)
 		buckID.FromBucket = &bucket
 		buckID.ToBucket = &bucket
-		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Target:    buckID,
-			ShowMatch: true,
-		})
-		r.NoError(err)
+		diff := replicationDiff(t, e, buckID)
 		r.True(diff.IsMatch)
-		r.Empty(diff.Error)
-		r.Len(diff.Match, 3)
+		r.Empty(diff.Differ)
 		r.Empty(diff.MissFrom)
 		r.Empty(diff.MissTo)
 	}

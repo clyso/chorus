@@ -269,7 +269,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Api.Enabled {
 		chorusHandler := api.ChorusHandlers(clientRegistry.Config(), rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
 		diffHandler := api.DiffHandlers(clientRegistry.Config(), queueSvc, checkSvc)
-		policyHandler := api.PolicyHandlers(clientRegistry, queueSvc, rc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
+		policyHandler := api.PolicyHandlers(clientRegistry, queueSvc, checkSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
 		registerServices := func(srv *grpc.Server) {
 			pb.RegisterChorusServer(srv, chorusHandler)
 			pb.RegisterDiffServer(srv, diffHandler)

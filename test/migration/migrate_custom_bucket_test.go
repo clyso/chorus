@@ -110,14 +110,10 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
 	}, e.WaitLong, e.RetryLong)
 
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id,
-		ShowMatch: true,
-	})
+	diff := replicationDiff(t, e, id)
 	r.NoError(err)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Len(diff.Match, 5)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
@@ -182,25 +178,17 @@ func TestApi_Migrate_CustomBucket(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	//check that all 3 buckets are the same
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id,
-		ShowMatch: true,
-	})
+	diff = replicationDiff(t, e, id)
 	r.NoError(err)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Len(diff.Match, 5)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    idDiffStor,
-		ShowMatch: true,
-	})
+	diff = replicationDiff(t, e, idDiffStor)
 	r.NoError(err)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Len(diff.Match, 5)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 }
