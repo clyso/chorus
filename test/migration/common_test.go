@@ -139,7 +139,7 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 					// skip folder placehoders
 					continue
 				}
-				if stor.Storage == id.FromStorage && stor.Storage == *id.FromBucket {
+				if stor.Storage == id.FromStorage && stor.Bucket == *id.FromBucket {
 					diff.MissTo = append(diff.MissTo, entry.Object)
 				} else if stor.Storage == id.ToStorage && stor.Bucket == *id.ToBucket {
 					diff.MissFrom = append(diff.MissFrom, entry.Object)
