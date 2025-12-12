@@ -277,3 +277,102 @@ func TestApi_Object_Folder(t *testing.T) {
 		return true
 	}, e.WaitShort, e.RetryShort)
 }
+
+func TestApi_Object_Big(t *testing.T) {
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
+	e.CreateMainFollowerUserReplications(t)
+	tstCtx := t.Context()
+	bucket := "object-big"
+	r := require.New(t)
+
+	err := e.ProxyClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{Region: "us-east"})
+	r.NoError(err)
+	ok, err := e.ProxyClient.BucketExists(tstCtx, bucket)
+	r.NoError(err)
+	r.True(ok)
+
+	r.Eventually(func() bool {
+		ok, err = e.MainClient.BucketExists(tstCtx, bucket)
+		if err != nil || !ok {
+			return false
+		}
+		ok, err = e.F1Client.BucketExists(tstCtx, bucket)
+		if err != nil || !ok {
+			return false
+		}
+		ok, err = e.F2Client.BucketExists(tstCtx, bucket)
+		if err != nil || !ok {
+			return false
+		}
+		return true
+	}, e.WaitShort, e.RetryShort)
+
+	objName := "obj-big"
+	_, err = e.MainClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+	r.Error(err)
+	_, err = e.F1Client.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+	r.Error(err)
+	_, err = e.F2Client.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+	r.Error(err)
+	_, err = e.ProxyClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+	r.Error(err)
+
+	buf := bytes.Repeat([]byte("a"), 32*1024*1024) // 32 MiB
+	br := bytes.NewReader(buf)
+	putInfo, err := e.ProxyClient.PutObject(tstCtx, bucket, objName, br, int64(len(buf)), mclient.PutObjectOptions{
+		ContentType: "binary/octet-stream", DisableContentSha256: true,
+	})
+	r.NoError(err)
+	r.EqualValues(objName, putInfo.Key)
+	r.EqualValues(bucket, putInfo.Bucket)
+	r.EqualValues(bucket, putInfo.Bucket)
+
+	obj, err := e.ProxyClient.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
+	r.NoError(err)
+
+	proxyBytes, err := io.ReadAll(obj)
+	r.NoError(err)
+
+	_, err = e.ProxyClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+	r.NoError(err)
+
+	r.Eventually(func() bool {
+		_, err = e.MainClient.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+		if err != nil {
+			return false
+		}
+		_, err = e.F1Client.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+		if err != nil {
+			return false
+		}
+		_, err = e.F2Client.StatObject(tstCtx, bucket, objName, mclient.StatObjectOptions{})
+		if err != nil {
+			return false
+		}
+		return true
+	}, e.WaitShort, e.RetryShort)
+
+	obj, err = e.MainClient.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
+	r.NoError(err)
+	objBytes, err := io.ReadAll(obj)
+	r.NoError(err)
+	r.True(bytes.Equal(proxyBytes, objBytes))
+
+	obj, err = e.F1Client.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
+	r.NoError(err)
+	objBytes, err = io.ReadAll(obj)
+	r.NoError(err)
+	r.NotEmpty(proxyBytes)
+	r.NotEmpty(objBytes)
+	r.EqualValues(len(proxyBytes), len(objBytes))
+	r.True(bytes.Equal(proxyBytes, objBytes))
+
+	obj, err = e.F2Client.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
+	r.NoError(err)
+	objBytes, err = io.ReadAll(obj)
+	r.NoError(err)
+	r.NotEmpty(proxyBytes)
+	r.NotEmpty(objBytes)
+	r.EqualValues(len(proxyBytes), len(objBytes))
+	r.True(bytes.Equal(proxyBytes, objBytes))
+}

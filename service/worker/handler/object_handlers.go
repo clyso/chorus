@@ -77,6 +77,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 		return nil
 	}
 
+	fmt.Println("IN EVENT", p.ObjSize)
 	err = lock.Do(ctx, time.Second*2, func() error {
 		return s.copySvc.CopyObject(ctx, p.ID.User(), copy.File{
 			Storage: p.ID.FromStorage(),

@@ -305,6 +305,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 
 	fromObjectSize := fromObjectStat.Size
+	fmt.Println("COPY SIZE:", fromObjectSize)
 
 	ctx, span := otel.Tracer("").Start(ctx, "copy.CopyToWithVersion")
 	span.SetAttributes(attribute.String("bucket", from.Bucket), attribute.String("object", from.Name),
@@ -362,6 +363,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		// workaround for e2e test test/object_test.go TestApi_Object_Folder
 		putObjectOpts.DisableContentSha256 = true
 	}
+	fmt.Println("COPY SIZE2:", stat.Size)
 	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, stat.Size, putObjectOpts)
 	if err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
