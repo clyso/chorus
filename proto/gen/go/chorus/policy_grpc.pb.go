@@ -32,7 +32,8 @@ const (
 	Policy_SwitchWithDowntime_FullMethodName     = "/chorus.Policy/SwitchWithDowntime"
 	Policy_DeleteSwitch_FullMethodName           = "/chorus.Policy/DeleteSwitch"
 	Policy_GetSwitchStatus_FullMethodName        = "/chorus.Policy/GetSwitchStatus"
-	Policy_CompareBucket_FullMethodName          = "/chorus.Policy/CompareBucket"
+	Policy_ReplicationDiff_FullMethodName        = "/chorus.Policy/ReplicationDiff"
+	Policy_DeleteReplicationDiff_FullMethodName  = "/chorus.Policy/DeleteReplicationDiff"
 	Policy_ListRoutings_FullMethodName           = "/chorus.Policy/ListRoutings"
 	Policy_AddRouting_FullMethodName             = "/chorus.Policy/AddRouting"
 	Policy_DeleteRouting_FullMethodName          = "/chorus.Policy/DeleteRouting"
@@ -114,9 +115,10 @@ type PolicyClient interface {
 	DeleteSwitch(ctx context.Context, in *ReplicationID, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Returns Switch status
 	GetSwitchStatus(ctx context.Context, in *ReplicationID, opts ...grpc.CallOption) (*ReplicationSwitch, error)
-	// Deprecated: Do not use.
-	// Compares contents of given bucket in given storages
-	CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error)
+	// Get or Create diff for bucket replication
+	ReplicationDiff(ctx context.Context, in *ReplicationDiffRequest, opts ...grpc.CallOption) (*ReplicationDiffResponse, error)
+	// Deletes stored diff for bucket-level replication if exists
+	DeleteReplicationDiff(ctx context.Context, in *ReplicationID, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Returns configured routing policies for chorus proxy.
 	ListRoutings(ctx context.Context, in *RoutingsRequest, opts ...grpc.CallOption) (*RoutingsResponse, error)
 	// Overrides routing destination for given user or user's bucket.
@@ -269,11 +271,20 @@ func (c *policyClient) GetSwitchStatus(ctx context.Context, in *ReplicationID, o
 	return out, nil
 }
 
-// Deprecated: Do not use.
-func (c *policyClient) CompareBucket(ctx context.Context, in *CompareBucketRequest, opts ...grpc.CallOption) (*CompareBucketResponse, error) {
+func (c *policyClient) ReplicationDiff(ctx context.Context, in *ReplicationDiffRequest, opts ...grpc.CallOption) (*ReplicationDiffResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CompareBucketResponse)
-	err := c.cc.Invoke(ctx, Policy_CompareBucket_FullMethodName, in, out, cOpts...)
+	out := new(ReplicationDiffResponse)
+	err := c.cc.Invoke(ctx, Policy_ReplicationDiff_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyClient) DeleteReplicationDiff(ctx context.Context, in *ReplicationID, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Policy_DeleteReplicationDiff_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -413,9 +424,10 @@ type PolicyServer interface {
 	DeleteSwitch(context.Context, *ReplicationID) (*emptypb.Empty, error)
 	// Returns Switch status
 	GetSwitchStatus(context.Context, *ReplicationID) (*ReplicationSwitch, error)
-	// Deprecated: Do not use.
-	// Compares contents of given bucket in given storages
-	CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error)
+	// Get or Create diff for bucket replication
+	ReplicationDiff(context.Context, *ReplicationDiffRequest) (*ReplicationDiffResponse, error)
+	// Deletes stored diff for bucket-level replication if exists
+	DeleteReplicationDiff(context.Context, *ReplicationID) (*emptypb.Empty, error)
 	// Returns configured routing policies for chorus proxy.
 	ListRoutings(context.Context, *RoutingsRequest) (*RoutingsResponse, error)
 	// Overrides routing destination for given user or user's bucket.
@@ -474,8 +486,11 @@ func (UnimplementedPolicyServer) DeleteSwitch(context.Context, *ReplicationID) (
 func (UnimplementedPolicyServer) GetSwitchStatus(context.Context, *ReplicationID) (*ReplicationSwitch, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSwitchStatus not implemented")
 }
-func (UnimplementedPolicyServer) CompareBucket(context.Context, *CompareBucketRequest) (*CompareBucketResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CompareBucket not implemented")
+func (UnimplementedPolicyServer) ReplicationDiff(context.Context, *ReplicationDiffRequest) (*ReplicationDiffResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReplicationDiff not implemented")
+}
+func (UnimplementedPolicyServer) DeleteReplicationDiff(context.Context, *ReplicationID) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteReplicationDiff not implemented")
 }
 func (UnimplementedPolicyServer) ListRoutings(context.Context, *RoutingsRequest) (*RoutingsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListRoutings not implemented")
@@ -724,20 +739,38 @@ func _Policy_GetSwitchStatus_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Policy_CompareBucket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CompareBucketRequest)
+func _Policy_ReplicationDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplicationDiffRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PolicyServer).CompareBucket(ctx, in)
+		return srv.(PolicyServer).ReplicationDiff(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Policy_CompareBucket_FullMethodName,
+		FullMethod: Policy_ReplicationDiff_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PolicyServer).CompareBucket(ctx, req.(*CompareBucketRequest))
+		return srv.(PolicyServer).ReplicationDiff(ctx, req.(*ReplicationDiffRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Policy_DeleteReplicationDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplicationID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).DeleteReplicationDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_DeleteReplicationDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).DeleteReplicationDiff(ctx, req.(*ReplicationID))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -902,8 +935,12 @@ var Policy_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Policy_GetSwitchStatus_Handler,
 		},
 		{
-			MethodName: "CompareBucket",
-			Handler:    _Policy_CompareBucket_Handler,
+			MethodName: "ReplicationDiff",
+			Handler:    _Policy_ReplicationDiff_Handler,
+		},
+		{
+			MethodName: "DeleteReplicationDiff",
+			Handler:    _Policy_DeleteReplicationDiff_Handler,
 		},
 		{
 			MethodName: "ListRoutings",

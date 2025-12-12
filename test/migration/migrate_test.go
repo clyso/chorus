@@ -41,14 +41,9 @@ func TestApi_Migrate_test(t *testing.T) {
 		ToStorage:   "f1",
 		User:        user,
 	}
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id1,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff := replicationDiff(t, e, id1)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Empty(diff.Match)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
@@ -59,14 +54,9 @@ func TestApi_Migrate_test(t *testing.T) {
 		ToStorage:   "f1",
 		User:        user,
 	}
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id2,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id2)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Empty(diff.Match)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
@@ -97,26 +87,16 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.NoError(err)
 	r.Empty(buckets)
 
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id1,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id1)
 	r.False(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Empty(diff.Match)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Len(diff.MissTo, 3)
 	r.ElementsMatch([]string{"obj1", "photo/sept/obj2", "photo/obj3"}, diff.MissTo)
 
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id2,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id2)
 	r.False(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Empty(diff.Match)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Len(diff.MissTo, 3)
 	r.ElementsMatch([]string{"obj4", "obj5", "obj6"}, diff.MissTo)
@@ -279,26 +259,15 @@ func TestApi_Migrate_test(t *testing.T) {
 		return bytes.Equal(obj1upd.data, f1Obj1UpdBytes)
 	}, e.WaitLong, e.RetryLong)
 
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id1,
-		ShowMatch: true,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id1)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Len(diff.Match, 4)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
-	r.ElementsMatch([]string{"obj1", "photo/sept/obj2", "photo/obj3", "photo/sept/obj7"}, diff.Match)
 
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target:    id2,
-		ShowMatch: false,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, id2)
 	r.True(diff.IsMatch)
-	r.Empty(diff.Error)
-	r.Empty(diff.Match)
+	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Empty(diff.MissTo)
 
@@ -699,41 +668,29 @@ func Test_User_migration(t *testing.T) {
 	}, e.WaitLong*2, e.RetryLong)
 
 	// check that data is in sync
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: &pb.ReplicationID{
-			User:        user,
-			FromStorage: "main",
-			ToStorage:   "f1",
-			FromBucket:  &bucket1,
-			ToBucket:    &bucket1,
-		},
-		ShowMatch: false,
+	diff := replicationDiff(t, e, &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		FromBucket:  &bucket1,
+		ToBucket:    &bucket1,
 	})
-	r.NoError(err)
 	r.True(diff.IsMatch)
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: &pb.ReplicationID{
-			User:        user,
-			FromStorage: "main",
-			ToStorage:   "f1",
-			FromBucket:  &bucket2,
-			ToBucket:    &bucket2,
-		},
-		ShowMatch: false,
+	diff = replicationDiff(t, e, &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		FromBucket:  &bucket2,
+		ToBucket:    &bucket2,
 	})
-	r.NoError(err)
 	r.True(diff.IsMatch)
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: &pb.ReplicationID{
-			User:        user,
-			FromStorage: "main",
-			ToStorage:   "f1",
-			FromBucket:  &bucket3,
-			ToBucket:    &bucket3,
-		},
-		ShowMatch: false,
+	diff = replicationDiff(t, e, &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		FromBucket:  &bucket3,
+		ToBucket:    &bucket3,
 	})
-	r.NoError(err)
 	r.True(diff.IsMatch)
 
 	// bucket1: obj1,  obj3  obj5

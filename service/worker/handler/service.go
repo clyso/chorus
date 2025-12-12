@@ -72,6 +72,7 @@ func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
 		limit:                   limit,
 		objectLocker:            objectLocker,
 		bucketLocker:            bucketLocker,
+		versionedSvc:            versionedSvc,
 		replicationstatusLocker: replicationstatusLocker,
 	}
 }

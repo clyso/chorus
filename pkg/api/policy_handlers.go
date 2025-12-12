@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -40,6 +41,7 @@ import (
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/service/worker/handler"
 )
 
 const (
@@ -50,7 +52,7 @@ const (
 func PolicyHandlers(
 	clients objstore.Clients,
 	queueSvc tasks.QueueService,
-	rclone rclone.Service,
+	checkSvc *handler.ConsistencyCheckSvc,
 	policySvc policy.Service,
 	versionSvc meta.VersionService,
 	objectListStateStore *store.MigrationObjectListStateStore,
@@ -61,7 +63,7 @@ func PolicyHandlers(
 	userLocker *store.UserLocker,
 ) pb.PolicyServer {
 	return &policyHandlers{
-		rclone:                  rclone,
+		checkSvc:                checkSvc,
 		clients:                 clients,
 		queueSvc:                queueSvc,
 		policySvc:               policySvc,
@@ -80,7 +82,7 @@ var _ pb.PolicyServer = &policyHandlers{}
 type policyHandlers struct {
 	clients                 objstore.Clients
 	queueSvc                tasks.QueueService
-	rclone                  rclone.Service
+	checkSvc                *handler.ConsistencyCheckSvc
 	policySvc               policy.Service
 	versionSvc              meta.VersionService
 	objectListStateStore    *store.MigrationObjectListStateStore
@@ -261,33 +263,6 @@ func (h *policyHandlers) AvailableBuckets(ctx context.Context, req *pb.Available
 		}
 	}
 	return res, nil
-}
-
-func (h *policyHandlers) CompareBucket(ctx context.Context, req *pb.CompareBucketRequest) (*pb.CompareBucketResponse, error) {
-	uid, err := pbToReplicationID(req.Target)
-	if err != nil {
-		return nil, err
-	}
-	if err := h.clients.Config().ValidateReplicationID(uid); err != nil {
-		return nil, err
-	}
-	bucketRepl, ok := uid.AsBucketID()
-	if !ok {
-		return nil, fmt.Errorf("%w: only bucket replication supported", dom.ErrInvalidArg)
-	}
-
-	res, err := h.rclone.Compare(ctx, req.ShowMatch, bucketRepl.User, bucketRepl.FromStorage, bucketRepl.ToStorage, bucketRepl.FromBucket, bucketRepl.ToBucket)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.CompareBucketResponse{
-		IsMatch:  res.IsMatch,
-		MissFrom: res.MissFrom,
-		MissTo:   res.MissTo,
-		Differ:   res.Differ,
-		Error:    res.Error,
-		Match:    res.Match,
-	}, nil
 }
 
 func (h *policyHandlers) DeleteReplication(ctx context.Context, req *pb.ReplicationID) (*emptypb.Empty, error) {
@@ -845,4 +820,126 @@ func (h *policyHandlers) TestProxy(ctx context.Context, req *pb.TestProxyRequest
 		result.Replications = append(result.Replications, replicationIDToPb(repl))
 	}
 	return result, nil
+}
+
+func (h *policyHandlers) ReplicationDiff(ctx context.Context, req *pb.ReplicationDiffRequest) (*pb.ReplicationDiffResponse, error) {
+	uid, err := pbToReplicationID(req.ReplicationId)
+	if err != nil {
+		return nil, err
+	}
+	bucketID, ok := uid.AsBucketID()
+	if !ok {
+		return nil, fmt.Errorf("%w: replication diff is only supported for bucket replications", dom.ErrInvalidArg)
+	}
+
+	checkLocations := []entity.ConsistencyCheckLocation{
+		entity.NewConsistencyCheckLocation(bucketID.FromStorage, bucketID.FromBucket),
+		entity.NewConsistencyCheckLocation(bucketID.ToStorage, bucketID.ToBucket),
+	}
+
+	checkID := entity.NewConsistencyCheckID(checkLocations...)
+	checkStatus, err := h.checkSvc.GetConsistencyCheckStatus(ctx, checkID)
+	if err == nil {
+		//already exists
+		if !checkStatus.Ready {
+			return &pb.ReplicationDiffResponse{
+				IsReady: false,
+				IsMatch: false,
+			}, nil
+		}
+		if checkStatus.Consistent {
+			return &pb.ReplicationDiffResponse{
+				IsReady: true,
+				IsMatch: true,
+			}, nil
+		}
+		// not match - return diff
+		reportPage, err := h.checkSvc.GetConsistencyCheckReportEntries(ctx, checkID, 0, 1000)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get consistency check report: %w", err)
+		}
+		res := &pb.ReplicationDiffResponse{
+			IsReady: true,
+			IsMatch: false,
+		}
+		for _, entry := range reportPage.Entries {
+			if len(entry.StorageEntries) == 1 {
+				// only in one storage
+				stor := entry.StorageEntries[0]
+				if strings.HasSuffix(entry.Object, "/") {
+					//TODO: fix consistency check to
+					// skip folder placehoders
+					continue
+				}
+				if stor.Location.Storage == bucketID.FromStorage && stor.Location.Bucket == bucketID.FromBucket {
+					res.MissTo = append(res.MissTo, entry.Object)
+				} else {
+					res.MissFrom = append(res.MissFrom, entry.Object)
+				}
+			}
+			if len(entry.StorageEntries) == 2 {
+				// exists in both - check for size/etag mismatch
+				res.Differ = append(res.Differ, entry.Object)
+			}
+		}
+		return res, nil
+	}
+	if !errors.Is(err, dom.ErrNotFound) {
+		return nil, fmt.Errorf("unable to get consistency check status: %w", err)
+	}
+	// create new consistency check
+	shouldCheckVersions := !req.CheckOnlyLastVersions
+	if shouldCheckVersions {
+		var err error
+		shouldCheckVersions, err = h.checkSvc.ShouldCheckVersions(ctx, bucketID.User, checkLocations)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if should check version: %w", err)
+		}
+	}
+
+	withSizeCheck := !req.IgnoreSizes
+	withEtagCheck := !req.IgnoreEtags && !req.IgnoreSizes
+	settings := entity.NewConsistencyCheckSettings(shouldCheckVersions, withSizeCheck, withEtagCheck)
+	if err := h.checkSvc.RegisterConsistencyCheck(ctx, checkID, settings); err != nil {
+		return nil, fmt.Errorf("unable to start consistency check: %w", err)
+	}
+
+	consistencyCheckTask := tasks.ConsistencyCheckPayload{
+		Locations: []tasks.MigrateLocation{
+			{Storage: bucketID.FromStorage, Bucket: bucketID.FromBucket},
+			{Storage: bucketID.ToStorage, Bucket: bucketID.ToBucket},
+		},
+		User:        bucketID.User,
+		Versioned:   shouldCheckVersions,
+		IgnoreEtags: req.IgnoreEtags,
+		IgnoreSizes: req.IgnoreSizes,
+	}
+	if err := h.queueSvc.EnqueueTask(ctx, consistencyCheckTask); err != nil {
+		return nil, fmt.Errorf("unable to enqueue consistency check task: %w", err)
+	}
+
+	return &pb.ReplicationDiffResponse{
+		IsReady: false,
+		IsMatch: false,
+	}, nil
+}
+
+func (h *policyHandlers) DeleteReplicationDiff(ctx context.Context, id *pb.ReplicationID) (*emptypb.Empty, error) {
+	uid, err := pbToReplicationID(id)
+	if err != nil {
+		return nil, err
+	}
+	bucketID, ok := uid.AsBucketID()
+	if !ok {
+		return nil, fmt.Errorf("%w: replication diff is only supported for bucket replications", dom.ErrInvalidArg)
+	}
+	checkLocations := []entity.ConsistencyCheckLocation{
+		entity.NewConsistencyCheckLocation(bucketID.FromStorage, bucketID.FromBucket),
+		entity.NewConsistencyCheckLocation(bucketID.ToStorage, bucketID.ToBucket),
+	}
+	checkID := entity.NewConsistencyCheckID(checkLocations...)
+	if err := h.checkSvc.DeleteConsistencyCheck(ctx, checkID); err != nil {
+		return nil, fmt.Errorf("unable to delete consistency check: %w", err)
+	}
+	return &emptypb.Empty{}, nil
 }

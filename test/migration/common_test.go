@@ -19,8 +19,12 @@ package migration
 import (
 	"context"
 	"math/rand"
+	"testing"
 
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/test/app"
 	mclient "github.com/minio/minio-go/v7"
+	"github.com/stretchr/testify/require"
 )
 
 type testObj struct {
@@ -68,4 +72,24 @@ func rmBucket(client *mclient.Client, bucket string) error {
 		_ = client.RemoveObject(context.Background(), bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
 	}
 	return client.RemoveBucket(context.Background(), bucket)
+}
+
+func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) *pb.ReplicationDiffResponse {
+	t.Helper()
+	r := require.New(t)
+	// delete any existing diff
+	_, err := e.PolicyClient.DeleteReplicationDiff(t.Context(), id)
+	r.NoError(err)
+
+	// create diff
+	res, err := e.PolicyClient.ReplicationDiff(t.Context(), &pb.ReplicationDiffRequest{ReplicationId: id, CheckOnlyLastVersions: true})
+	r.NoError(err)
+	r.Eventually(func() bool {
+		//poll until ready
+		res, err = e.PolicyClient.ReplicationDiff(t.Context(), &pb.ReplicationDiffRequest{ReplicationId: id})
+		r.NoError(err)
+		return res.IsReady
+	}, e.WaitLong, e.RetryShort)
+	r.True(res.IsReady)
+	return res
 }

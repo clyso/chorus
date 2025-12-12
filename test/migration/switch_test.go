@@ -148,12 +148,7 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
-		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Target: replID,
-		})
-		if err != nil {
-			return false
-		}
+		diff := replicationDiff(t, e, replID)
 		return diff.IsMatch
 	}, e.WaitLong, e.RetryLong)
 
@@ -432,12 +427,7 @@ func TestApi_switch_multipart(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	r.Eventually(func() bool {
-		diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-			Target: replID,
-		})
-		if err != nil {
-			return false
-		}
+		diff := replicationDiff(t, e, replID)
 		return diff.IsMatch
 	}, e.WaitLong, e.RetryLong)
 
@@ -666,10 +656,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: replID,
-	})
-	r.NoError(err)
+	diff := replicationDiff(t, e, replID)
 	r.True(diff.IsMatch)
 
 	var objects = []testObj{obj1, obj2, obj3, obj4, obj7}
@@ -695,17 +682,13 @@ func TestApi_scheduled_switch(t *testing.T) {
 	objects[0] = obj1
 
 	// now updates only in f1:
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: replID,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, replID)
 	r.False(diff.IsMatch)
 	// obj1 is different
 	r.Len(diff.Differ, 1)
 	r.Equal(obj1.name, diff.Differ[0])
 	r.Empty(diff.MissTo)
 	r.Empty(diff.MissFrom)
-	r.Empty(diff.Error)
 
 	for _, object := range objects {
 		// check against source
@@ -872,10 +855,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
 	}, e.WaitLong*2, e.RetryLong)
 	// check that data is in sync
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: replID,
-	})
-	r.NoError(err)
+	diff := replicationDiff(t, e, replID)
 	r.True(diff.IsMatch)
 
 	var objects = []testObj{obj1, obj2, obj3, obj4, obj7}
@@ -944,10 +924,7 @@ func TestApi_scheduled_switch_continue_replication(t *testing.T) {
 	}, e.WaitLong, e.RetryLong)
 
 	// now f1 and main are in sync again
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: replID,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, replID)
 	r.True(diff.IsMatch)
 
 	for _, object := range objects {
@@ -1171,18 +1148,12 @@ func Test_User_switch(t *testing.T) {
 	b1ID := proto.Clone(replID).(*pb.ReplicationID)
 	b1ID.ToBucket = &bucket1
 	b1ID.FromBucket = &bucket1
-	diff, err := e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: b1ID,
-	})
-	r.NoError(err)
+	diff := replicationDiff(t, e, b1ID)
 	r.True(diff.IsMatch)
 	b2ID := proto.Clone(replID).(*pb.ReplicationID)
 	b2ID.ToBucket = &bucket2
 	b2ID.FromBucket = &bucket2
-	diff, err = e.PolicyClient.CompareBucket(tstCtx, &pb.CompareBucketRequest{
-		Target: b2ID,
-	})
-	r.NoError(err)
+	diff = replicationDiff(t, e, b2ID)
 	r.True(diff.IsMatch)
 
 	// bucket1: obj1,  obj3  obj5
