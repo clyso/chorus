@@ -41,8 +41,8 @@ func ParseBucketAndObject(r *http.Request) (bucket string, object string) {
 type ParseResult struct {
 	Bucket       string
 	Object       string
-	Method       Method
 	ObjVersionID string
+	Method       Method
 }
 
 func ParseReq(r *http.Request) ParseResult {
