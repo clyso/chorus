@@ -19,6 +19,7 @@ package s3
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -38,6 +39,12 @@ const (
 	ProviderMinIO Provider = "Minio"
 	ProviderCeph  Provider = "Ceph"
 )
+
+var providers = []Provider{
+	ProviderOther,
+	ProviderMinIO,
+	ProviderCeph,
+}
 
 func (p Provider) SupportsRetainVersionID() bool {
 	switch p {
@@ -95,6 +102,9 @@ func (s *Storage) Validate() error {
 	}
 	if s.HttpTimeout == 0 {
 		s.HttpTimeout = defaultHttpTimeout
+	}
+	if slices.Contains(providers, s.Provider) == false {
+		return fmt.Errorf("%w: invalid storage provider %q. Supported values: %#v", dom.ErrInvalidStorageConfig, s.Provider, providers)
 	}
 	if s.Provider == "" {
 		return fmt.Errorf("app config: storage provider required")
