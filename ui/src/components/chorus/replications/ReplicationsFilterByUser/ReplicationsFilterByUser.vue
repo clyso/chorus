@@ -37,7 +37,7 @@
     }[]
   >(() => {
     const sortedUniqueUsers = [
-      ...new Set(replications.value.map((replication) => replication.user)),
+      ...new Set(replications.value.map((replication) => replication.id.user)),
     ].sort();
 
     return sortedUniqueUsers.map((user) => ({ label: user, value: user }));

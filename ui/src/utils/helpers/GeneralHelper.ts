@@ -101,4 +101,24 @@ export abstract class GeneralHelper {
       locale: locale.value === 'en' ? enGB : de,
     });
   }
+
+  static formatDurationSeconds(duration: string): string {
+    const totalSeconds = parseFloat(duration.replace('s', ''));
+
+    if (isNaN(totalSeconds)) return '-';
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    const result = [];
+
+    if (hours > 0) result.push(`${hours}h`);
+
+    if (minutes > 0) result.push(`${minutes}m`);
+
+    if (seconds > 0 || result.length === 0) result.push(`${seconds}s`);
+
+    return result.join(' ');
+  }
 }

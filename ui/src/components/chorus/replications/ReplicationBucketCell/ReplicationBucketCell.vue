@@ -1,5 +1,5 @@
 <!--
-  - Copyright © 2026 Clyso GmbH
+  - Copyright © 2025 Clyso GmbH
   -
   -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
   -  you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@
   import { useI18n } from 'vue-i18n';
   import { CTooltip, CTag, CIcon } from '@clyso/clyso-ui-kit';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
-  import type { ChorusReplication } from '@/utils/types/chorus';
   import type { AddId } from '@/utils/types/helper';
+  import type { ChorusReplication } from '@/utils/types/chorus';
   import { IconName } from '@/utils/types/icon';
+  import { ReplicationType } from '@/utils/types/chorus';
 
   const { t } = useI18n({
     messages: i18nReplications,
@@ -32,26 +33,49 @@
 </script>
 
 <template>
-  <div class="replication-direction-cell">
+  <div
+    class="replication-bucket-user-cell"
+    v-if="replication.replicationType === ReplicationType.USER"
+  >
     <CTooltip :delay="500">
       <template #trigger>
         <CTag
-          class="replication-direction-cell__from"
+          class="replication-bucket-user-cell"
           round
           type="success"
           size="small"
         >
-          {{ replication.id.fromStorage }}
+          {{ t('userReplication') }}
         </CTag>
       </template>
-      <span class="replication-direction-cell__from-tooltip">
-        <strong>{{ replication.id.fromStorage }}</strong
+      <span class="replicatio-bucket-user-cell-tooltip">
+        {{ t('userReplicationDescription') }}
+      </span>
+    </CTooltip>
+  </div>
+  <div
+    class="replication-bucket-cell"
+    v-else
+  >
+    <CTooltip :delay="500">
+      <template #trigger>
+        <CTag
+          class="replication-bucket-cell__from"
+          round
+          type="success"
+          size="small"
+        >
+          {{ replication.id.fromBucket }}
+        </CTag>
+      </template>
+      <span class="replication-bucket-cell__from-tooltip">
+        <strong>{{ replication.id.fromBucket }}</strong
         >: {{ t('replicationFrom') }}
       </span>
     </CTooltip>
 
     <CIcon
-      class="replication-direction-cell__arrow"
+      class="replication-bucket-cell__arrow"
       :is-inline="true"
       :name="IconName.BASE_ARROW_FORWARD"
     />
@@ -60,15 +84,15 @@
       <template #trigger>
         <CTag
           round
-          class="replication-direction-cell__to"
+          class="replication-bucket-cell__to"
           type="warning"
           size="small"
         >
-          {{ replication.id.toStorage }}
+          {{ replication.id.toBucket }}
         </CTag>
       </template>
-      <span class="replication-direction-cell__to-tooltip">
-        <strong>{{ replication.id.toStorage }}</strong
+      <span class="replication-bucket-cell__to-tooltip">
+        <strong>{{ replication.id.toBucket }}</strong
         >: {{ t('replicationTo') }}
       </span>
     </CTooltip>
@@ -78,7 +102,7 @@
 <style lang="scss" scoped>
   @use '@/styles/utils' as utils;
 
-  .replication-direction-cell {
+  .replication-bucket-cell {
     display: flex;
     align-items: center;
     gap: utils.unit(2);

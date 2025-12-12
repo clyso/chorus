@@ -41,13 +41,13 @@
   }>();
 
   const initPercentage = computed<number>(() => {
-    const { isInitDone, initBytesListed, initBytesDone } = props.replication;
+    const { isInitDone, initObjListed, initObjDone } = props.replication;
 
-    if (+initBytesListed === 0) {
+    if (+initObjListed === 0) {
       return isInitDone ? 100 : 0;
     }
 
-    const percentage = Math.ceil((+initBytesDone / +initBytesListed) * 100);
+    const percentage = Math.ceil((+initObjDone / +initObjListed) * 100);
 
     if (percentage >= 100) {
       return 99;
@@ -56,16 +56,10 @@
     return percentage;
   });
 
-  const replicationBytesString = computed<string>(() => {
-    const { initBytesListed, initBytesDone } = props.replication;
-
-    return `${GeneralHelper.formatBytes(+initBytesDone)} / ${GeneralHelper.formatBytes(+initBytesListed)}`;
-  });
-
   const lastEmittedDateString = computed<string>(() => {
-    const { lastEmittedAt } = props.replication;
+    const { eventLag } = props.replication;
 
-    return lastEmittedAt ? GeneralHelper.formatDateTime(lastEmittedAt) : '—';
+    return eventLag ? GeneralHelper.formatDurationSeconds(eventLag) : '—';
   });
 
   const isLiveReplicationBehind = computed<boolean>(() =>
@@ -144,11 +138,6 @@
 
                 {{ replication.initObjDone }} / {{ replication.initObjListed }}
               </CDescriptionItem>
-              <CDescriptionItem class="details-popup__item">
-                <template #label> {{ t('labelBytes') }}: </template>
-
-                {{ replicationBytesString }}
-              </CDescriptionItem>
             </CDescriptionList>
           </div>
         </CTooltip>
@@ -211,7 +200,9 @@
                 {{ replication.eventsDone }} / {{ replication.events }}
               </CDescriptionItem>
               <CDescriptionItem class="details-popup__item">
-                <template #label> {{ t('labelLastEmitted') }}: </template>
+                <template #label>
+                  {{ t('labelReplicationLatency') }}:
+                </template>
 
                 {{ lastEmittedDateString }}
               </CDescriptionItem>

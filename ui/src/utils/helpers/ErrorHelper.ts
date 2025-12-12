@@ -14,4 +14,20 @@
  *  limitations under the License.
  */
 
-export type AddId<T> = T & { idStr: string | number };
+import axios from 'axios';
+
+export abstract class ErrorHelper {
+  static getReason(error: unknown): string | null {
+    if (!axios.isAxiosError(error)) return null;
+
+    const details = error.response?.data.details;
+
+    if (!Array.isArray(details)) return null;
+
+    const errorInfo = details.find(
+      (d) => d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo',
+    );
+
+    return errorInfo?.reason || null;
+  }
+}

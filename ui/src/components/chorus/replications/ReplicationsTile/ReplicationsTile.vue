@@ -19,7 +19,6 @@
   import { useI18n } from 'vue-i18n';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import ReplicationsList from '@/components/chorus/replications/ReplicationsList/ReplicationsList.vue';
-  import UserReplicationDeletionDialog from '@/components/chorus/replications/UserReplicationDeletionDialog/UserReplicationDeletionDialog.vue';
   import ReplicationsListActions from '@/components/chorus/replications/ReplicationsListActions/ReplicationsListActions.vue';
   import ReplicationsListTags from '@/components/chorus/replications/ReplicationsListTags/ReplicationsListTags.vue';
   import ReplicationsFilters from '@/components/chorus/replications/ReplicationsFilters/ReplicationsFilters.vue';
@@ -42,8 +41,6 @@
     <ReplicationsListActions class="replications-tile__actions" />
 
     <ReplicationsList class="replications-tile__replications" />
-
-    <UserReplicationDeletionDialog />
   </CTile>
 </template>
 

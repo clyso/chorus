@@ -24,9 +24,9 @@ import { useNotification } from '@clyso/clyso-ui-kit';
 import { useI18n } from 'vue-i18n';
 import type {
   ChorusReplication,
-  ChorusUserReplication,
+  ChorusReplicationId,
 } from '@/utils/types/chorus';
-import { ReplicationStatusFilter } from '@/utils/types/chorus';
+import { ReplicationStatusFilter, ReplicationType } from '@/utils/types/chorus';
 import { GeneralHelper } from '@/utils/helpers/GeneralHelper';
 import type { AddId } from '@/utils/types/helper';
 import { ChorusService } from '@/services/ChorusService';
@@ -38,15 +38,6 @@ interface ChorusReplicationsState {
   isLoading: boolean;
   hasError: boolean;
   replications: AddId<ChorusReplication>[];
-  userReplications: ChorusUserReplication[];
-  userReplicationToDelete: {
-    replication: ChorusUserReplication;
-    isProcessing: boolean;
-    isConfirmationShown: boolean;
-    isBucketsDeletion: boolean;
-    linkedBucketReplications: AddId<ChorusReplication>[];
-    hasError: boolean;
-  } | null;
   sorter: DataTableSortState | null;
   page: number;
   pageSize: number;
@@ -67,8 +58,20 @@ interface ChorusReplicationsState {
 
 const PAGE_SIZES = [10, 20, 30, 50, 100] as const;
 
-function getChorusReplicationId(replication: ChorusReplication) {
-  return `${replication.user}${replication.bucket}${replication.from}${replication.to}`;
+function getChorusReplicationId(replicationId: ChorusReplicationId): string {
+  return (
+    `${replicationId.user}${replicationId.fromBucket}` +
+    `${replicationId.toBucket}${replicationId.fromStorage}` +
+    `${replicationId.toStorage}`
+  );
+}
+
+function getReplicationType(
+  replicationId: ChorusReplicationId,
+): ReplicationType {
+  return !(replicationId.fromBucket && replicationId.toBucket)
+    ? ReplicationType.USER
+    : ReplicationType.BUCKET;
 }
 
 function getInitialState(): ChorusReplicationsState {
@@ -76,8 +79,6 @@ function getInitialState(): ChorusReplicationsState {
     isLoading: false,
     hasError: false,
     replications: [],
-    userReplications: [],
-    userReplicationToDelete: null,
     sorter: null,
     page: 1,
     pageSize: PAGE_SIZES[0],
@@ -113,16 +114,20 @@ export const useChorusReplicationsStore = defineStore(
       state.replications.filter((replication) => {
         const isUserMatched =
           !state.filterUsers.length ||
-          state.filterUsers.includes(replication.user);
+          state.filterUsers.includes(replication.id.user);
         const isBucketMatched =
           !state.filterBucket ||
-          replication.bucket
-            .toLowerCase()
+          replication.id.fromBucket
+            ?.toLowerCase()
+            .trim()
+            .includes(state.filterBucket.toLowerCase().trim()) ||
+          replication.id.toBucket
+            ?.toLowerCase()
             .trim()
             .includes(state.filterBucket.toLowerCase().trim());
         const isToStorageMatched =
           !state.filterToStorages.length ||
-          state.filterToStorages.includes(replication.to);
+          state.filterToStorages.includes(replication.id.toStorage);
         const isStatusMatched =
           !state.filterStatuses.length ||
           state.filterStatuses.every((status) =>
@@ -202,24 +207,16 @@ export const useChorusReplicationsStore = defineStore(
 
       state.replications = res.replications.map((replication) => ({
         ...replication,
-        id: getChorusReplicationId(replication),
+        idStr: getChorusReplicationId(replication.id),
+        replicationType: getReplicationType(replication.id),
       }));
-    }
-
-    async function getUserReplications() {
-      const res = await ChorusService.getUserReplications();
-
-      state.userReplications = res.replications;
     }
 
     async function startReplicationPolling() {
       try {
         await stopReplicationPolling();
 
-        state.pollingRequest = Promise.all([
-          getReplications(),
-          getUserReplications(),
-        ]);
+        state.pollingRequest = Promise.resolve(getReplications());
 
         await state.pollingRequest;
       } finally {
@@ -273,7 +270,7 @@ export const useChorusReplicationsStore = defineStore(
       partialReplication: Partial<AddId<ChorusReplication>>,
     ) {
       const index = state.replications.findIndex(
-        (replication) => replication.id === id,
+        (replication) => replication.idStr === id,
       );
 
       if (index === -1) {
@@ -304,7 +301,8 @@ export const useChorusReplicationsStore = defineStore(
         return;
       }
 
-      const { user, bucket, from, to } = replication;
+      const { user, fromBucket, toBucket, fromStorage, toStorage } =
+        replication.id;
 
       await stopReplicationPolling();
       await (
@@ -313,9 +311,10 @@ export const useChorusReplicationsStore = defineStore(
           : ChorusService.resumeBucketReplication
       )({
         user,
-        bucket,
-        from,
-        to,
+        fromBucket,
+        toBucket,
+        fromStorage,
+        toStorage,
       });
 
       state.replications.splice(replicationIndex, 1, {
@@ -334,15 +333,8 @@ export const useChorusReplicationsStore = defineStore(
         return;
       }
 
-      const { user, bucket, from, to } = replication;
-
       await stopReplicationPolling();
-      await ChorusService.deleteBucketReplication({
-        user,
-        bucket,
-        from,
-        to,
-      });
+      await ChorusService.deleteReplication(replication.id);
 
       replicationIndex = state.replications.findIndex(
         ({ id }) => replication.id === id,
@@ -350,139 +342,6 @@ export const useChorusReplicationsStore = defineStore(
 
       state.replications.splice(replicationIndex, 1);
       startReplicationPolling();
-    }
-
-    function setUserReplicationToDelete(
-      userReplication: ChorusUserReplication | null,
-    ) {
-      if (!userReplication) {
-        state.userReplicationToDelete = null;
-
-        return;
-      }
-
-      const linkedBucketReplications = state.replications.filter(
-        (replication) =>
-          replication.user === userReplication.user &&
-          replication.to === userReplication.to &&
-          replication.from === userReplication.from,
-      );
-
-      state.userReplicationToDelete = {
-        replication: userReplication,
-        isProcessing: false,
-        isConfirmationShown: true,
-        isBucketsDeletion: false,
-        hasError: false,
-        linkedBucketReplications,
-      };
-    }
-
-    function setUserReplicationToDeleteProcessing(isProcessing: boolean) {
-      if (!state.userReplicationToDelete) {
-        return;
-      }
-
-      state.userReplicationToDelete.isProcessing = isProcessing;
-    }
-
-    function setUserReplicationToDeleteConfirmation(isShown: boolean) {
-      if (!state.userReplicationToDelete) {
-        return;
-      }
-
-      state.userReplicationToDelete.isConfirmationShown = isShown;
-    }
-
-    async function deleteUserReplication() {
-      const userReplication = state.userReplicationToDelete?.replication;
-
-      if (!userReplication || !state.userReplicationToDelete) {
-        return;
-      }
-
-      setUserReplicationToDeleteProcessing(true);
-      state.userReplicationToDelete.hasError = false;
-
-      try {
-        await stopReplicationPolling();
-        await ChorusService.deleteUserReplication({
-          ...state.userReplicationToDelete.replication,
-          deleteBucketReplications:
-            state.userReplicationToDelete.isBucketsDeletion,
-        });
-
-        state.userReplications = state.userReplications.filter(
-          (replication) =>
-            replication.user !== userReplication.user ||
-            replication.to !== userReplication.to ||
-            replication.from !== userReplication.from,
-        );
-
-        const { isBucketsDeletion, linkedBucketReplications } =
-          state.userReplicationToDelete;
-
-        if (isBucketsDeletion) {
-          state.replications = state.replications.filter(
-            (replication) => !linkedBucketReplications.includes(replication),
-          );
-          state.page = 1;
-        }
-
-        createNotification({
-          type: 'success',
-          title: t('deleteUserSuccessTitle'),
-          duration: 4000,
-          content: () =>
-            h('div', [
-              t('deleteUserSuccessContent'),
-              h('strong', { style: 'font-weight: 600' }, [
-                userReplication.user,
-              ]),
-              isBucketsDeletion
-                ? h(
-                    'div',
-                    {
-                      style: 'margin-top: 8px;',
-                    },
-                    [
-                      t('deleteUserSuccessContentBuckets', {
-                        total: linkedBucketReplications.length,
-                      }),
-                      h(ReplicationsShortList, {
-                        replications: linkedBucketReplications,
-                      }),
-                    ],
-                  )
-                : '',
-            ]),
-        });
-
-        startReplicationPolling();
-      } catch (e) {
-        state.userReplicationToDelete.hasError = true;
-        const errorNotification = createNotification({
-          type: 'error',
-          title: t('deleteUserErrorTitle'),
-          positiveText: t('deleteUserErrorAction'),
-          positiveHandler: async () => {
-            removeNotification(errorNotification.value.id);
-            await deleteUserReplication();
-            setUserReplicationToDelete(null);
-          },
-          content: () =>
-            h('div', [
-              t('deleteUserErrorContent'),
-              h('strong', { style: 'font-weight: 600' }, [
-                userReplication.user,
-              ]),
-            ]),
-        });
-
-        throw e;
-      } finally {
-        setUserReplicationToDeleteProcessing(false);
-      }
     }
 
     const selectedReplicationsCount = computed(
@@ -493,7 +352,7 @@ export const useChorusReplicationsStore = defineStore(
     );
     const selectedReplications = computed<AddId<ChorusReplication>[]>(() =>
       state.replications.filter((replication) =>
-        state.selectedReplicationIds.includes(String(replication.id)),
+        state.selectedReplicationIds.includes(replication.idStr),
       ),
     );
 
@@ -514,14 +373,16 @@ export const useChorusReplicationsStore = defineStore(
 
       await Promise.all(
         replications.map(async (replication) => {
-          const { from, to, user, bucket } = replication;
+          const { fromStorage, toStorage, user, fromBucket, toBucket } =
+            replication.id;
 
           try {
             await ChorusService.resumeBucketReplication({
-              from,
-              to,
+              fromStorage,
+              toStorage,
               user,
-              bucket,
+              fromBucket,
+              toBucket,
             });
             successList.push(replication);
           } catch {
@@ -551,7 +412,7 @@ export const useChorusReplicationsStore = defineStore(
 
       if (successList.length !== 0) {
         successList.forEach((replication) => {
-          setReplicationById(replication.id, { isPaused: false });
+          setReplicationById(replication.idStr, { isPaused: false });
         });
         createNotification({
           type: 'success',
@@ -579,14 +440,16 @@ export const useChorusReplicationsStore = defineStore(
 
       await Promise.all(
         replications.map(async (replication) => {
-          const { from, to, user, bucket } = replication;
+          const { fromStorage, toStorage, user, fromBucket, toBucket } =
+            replication.id;
 
           try {
             await ChorusService.pauseBucketReplication({
-              from,
-              to,
+              fromStorage,
+              toStorage,
               user,
-              bucket,
+              fromBucket,
+              toBucket,
             });
             successList.push(replication);
           } catch {
@@ -616,7 +479,7 @@ export const useChorusReplicationsStore = defineStore(
 
       if (successList.length !== 0) {
         successList.forEach((replication) => {
-          setReplicationById(replication.id, { isPaused: true });
+          setReplicationById(replication.idStr, { isPaused: true });
         });
         createNotification({
           type: 'success',
@@ -646,15 +509,8 @@ export const useChorusReplicationsStore = defineStore(
 
       await Promise.all(
         replications.map(async (replication) => {
-          const { from, to, user, bucket } = replication;
-
           try {
-            await ChorusService.deleteBucketReplication({
-              from,
-              to,
-              user,
-              bucket,
-            });
+            await ChorusService.deleteReplication(replication.id);
             successList.push(replication);
           } catch {
             errorList.push(replication);
@@ -682,10 +538,10 @@ export const useChorusReplicationsStore = defineStore(
       }
 
       if (successList.length !== 0) {
-        const successListIds = successList.map((item) => item.id);
+        const successListIds = successList.map((item) => item.idStr);
 
         state.replications = state.replications.filter(
-          (item) => !successListIds.includes(item.id),
+          (item) => !successListIds.includes(item.idStr),
         );
         state.selectedReplicationIds = state.selectedReplicationIds.filter(
           (item) => !successListIds.includes(item),
@@ -731,10 +587,6 @@ export const useChorusReplicationsStore = defineStore(
       initReplicationsPage,
       setReplicationPaused,
       deleteReplication,
-      setUserReplicationToDelete,
-      setUserReplicationToDeleteProcessing,
-      setUserReplicationToDeleteConfirmation,
-      deleteUserReplication,
       selectedReplicationsCount,
       isAnyReplicationsSelected,
       selectedReplications,

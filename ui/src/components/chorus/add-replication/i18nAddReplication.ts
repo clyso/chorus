@@ -68,6 +68,7 @@ export default <I18nMessages>{
       'Replication(s) were successfully created. You should be able to see them at the top of the list.',
     createReplicationError:
       'An error occurred when creating the replication(s). Please try one more time.',
+    createReplicationErrorUnknown: 'Unknown Error',
   },
   [I18nLocale.DE]: {
     addReplicationTitle: 'Replikation hinzufügen',
@@ -123,5 +124,6 @@ export default <I18nMessages>{
       'Die Replikation(en) wurden erfolgreich erstellt. Sie sollten sie oben in der Liste sehen können.',
     createReplicationError:
       'Beim Erstellen der Replikation(en) ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.',
+    createReplicationErrorUnknown: 'Unbekannter Fehler',
   },
 };
