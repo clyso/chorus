@@ -539,7 +539,7 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 					Versioning: true,
 				},
 				Log: &log.Config{
-					Level: "debug",
+					Level: "warn",
 				},
 				Redis: &config.Redis{
 					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
@@ -768,7 +768,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 					Versioning: true,
 				},
 				Log: &log.Config{
-					Level: "debug",
+					Level: "warn",
 				},
 				Redis: &config.Redis{
 					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},

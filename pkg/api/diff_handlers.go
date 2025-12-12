@@ -183,6 +183,7 @@ func (h *diffHandlers) GetReportEntries(ctx context.Context, req *pb.GetConsiste
 			storageEntries = append(storageEntries, &pb.ConsistencyCheckStorageEntry{
 				Storage:   entry.Location.Storage,
 				VersionId: entry.VersionID,
+				Bucket:    entry.Location.Bucket,
 			})
 		}
 		entries = append(entries, &pb.ConsistencyCheckReportEntry{

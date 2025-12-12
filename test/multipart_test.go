@@ -121,18 +121,18 @@ func TestApi_Object_Multipart(t *testing.T) {
 	r.NoError(err)
 	objBytes, err := io.ReadAll(obj)
 	r.NoError(err)
-	r.EqualValues(proxyBytes, objBytes)
+	r.True(bytes.Equal(proxyBytes, objBytes))
 
 	obj, err = e.F1Client.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
 	r.NoError(err)
 	objBytes, err = io.ReadAll(obj)
 	r.NoError(err)
-	r.EqualValues(proxyBytes, objBytes)
+	r.True(bytes.Equal(proxyBytes, objBytes))
 
 	obj, err = e.F2Client.GetObject(tstCtx, bucket, objName, mclient.GetObjectOptions{})
 	r.NoError(err)
 	objBytes, err = io.ReadAll(obj)
 	r.NoError(err)
-	r.EqualValues(proxyBytes, objBytes)
+	r.True(bytes.Equal(proxyBytes, objBytes))
 
 }

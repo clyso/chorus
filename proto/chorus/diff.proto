@@ -57,6 +57,7 @@ message GetConsistencyCheckReportResponse { ConsistencyCheck check = 1; }
 message ConsistencyCheckStorageEntry {
   string storage = 1;
   string version_id = 2;
+  string bucket = 3;
 }
 
 message ConsistencyCheckReportEntry {

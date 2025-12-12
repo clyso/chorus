@@ -430,6 +430,7 @@ type ConsistencyCheckStorageEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
 	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Bucket        string                 `protobuf:"bytes,3,opt,name=bucket,proto3" json:"bucket,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -474,6 +475,13 @@ func (x *ConsistencyCheckStorageEntry) GetStorage() string {
 func (x *ConsistencyCheckStorageEntry) GetVersionId() string {
 	if x != nil {
 		return x.VersionId
+	}
+	return ""
+}
+
+func (x *ConsistencyCheckStorageEntry) GetBucket() string {
+	if x != nil {
+		return x.Bucket
 	}
 	return ""
 }
@@ -698,11 +706,12 @@ const file_chorus_diff_proto_rawDesc = "" +
 	" GetConsistencyCheckReportRequest\x125\n" +
 	"\tlocations\x18\x01 \x03(\v2\x17.chorus.MigrateLocationR\tlocations\"S\n" +
 	"!GetConsistencyCheckReportResponse\x12.\n" +
-	"\x05check\x18\x01 \x01(\v2\x18.chorus.ConsistencyCheckR\x05check\"W\n" +
+	"\x05check\x18\x01 \x01(\v2\x18.chorus.ConsistencyCheckR\x05check\"o\n" +
 	"\x1cConsistencyCheckStorageEntry\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x1d\n" +
 	"\n" +
-	"version_id\x18\x02 \x01(\tR\tversionId\"\xcd\x01\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x16\n" +
+	"\x06bucket\x18\x03 \x01(\tR\x06bucket\"\xcd\x01\n" +
 	"\x1bConsistencyCheckReportEntry\x12\x16\n" +
 	"\x06object\x18\x01 \x01(\tR\x06object\x12\x1f\n" +
 	"\vversion_idx\x18\x02 \x01(\x04R\n" +
