@@ -124,23 +124,56 @@ export interface ChorusMigrationStreamResponse {
 }
 
 // Replication
-export interface ChorusReplication {
+export interface ChorusReplicationId {
   user: string;
-  bucket: string;
-  from: string;
-  to: string;
-  createdAt: string; // when replication was started
+  fromStorage: string;
+  toStorage: string;
+  fromBucket?: string;
+  toBucket?: string;
+}
+
+export interface ChorusReplicationOpts {
+  agentUrl: string;
+}
+
+export interface ChorusReplicationDowntimeOpts {
+  startOnInitDone: boolean;
+  cron: string;
+  startAt: string;
+  maxDuration: string;
+  maxEventLag: number;
+  skipBucketCheck: boolean;
+  continueReplication: boolean;
+}
+
+export interface ChorusReplicationSwitchInfo {
+  lastStatus: string;
+  zeroDowntime: boolean;
+  multipartTtl: string;
+  downtimeOpts: ChorusReplicationDowntimeOpts;
+  lastStartedAt: string;
+  doneAt: string;
+  history: string[];
+  replicationId: ChorusReplicationId;
+}
+
+export interface ChorusReplication {
+  id: ChorusReplicationId;
+  idStr: string;
+  opts: ChorusReplicationOpts;
+  createdAt: string;
   isPaused: boolean;
   isInitDone: boolean;
-  initObjListed: string; // number of objected to replicate during the initial migration
-  initObjDone: string; // number of replicated objects during the initial migration
-  initBytesListed: string; // same but for bytes
-  initBytesDone: string; // same but for bytes
-  events: string; // events triggered after initial migration was initiated (live replication)
-  eventsDone: string; // number of processed events
-  lastEmittedAt?: string; // the date when the last event was emitted (live replication)
-  lastProcessedAt?: string; // the date when the last event was processed
-  // (lastProcessedAt > lastEmittedAt ? up to date : behind)
+  initObjListed: string;
+  initObjDone: string;
+  events: string;
+  eventsDone: string;
+  eventLag: string;
+  hasSwitch: boolean;
+  isArchived: boolean;
+  archivedAt: string;
+  switchInfo: ChorusReplicationSwitchInfo;
+  replicationType: ReplicationType;
 }
 
 export interface ChorusReplicationListResponse {
@@ -148,45 +181,20 @@ export interface ChorusReplicationListResponse {
 }
 
 export interface ChorusAddReplicationsRequest {
-  user: string;
-  from: string;
-  to: string;
-  buckets: string[];
-  isForAllBuckets: boolean;
+  id: ChorusReplicationId;
+  opts?: ChorusReplicationOpts;
 }
-
-export type ChorusReplicationBase = Pick<
-  ChorusReplication,
-  'user' | 'bucket' | 'from' | 'to'
->;
 
 export interface ChorusBucketListRequest {
   user: string;
-  from: string;
-  to: string;
+  fromStorage: string;
+  toStorage: string;
   showReplicated: boolean;
 }
 
 export interface ChorusBucketListResponse {
   buckets: string[];
   replicatedBuckets: string[];
-}
-
-export interface ChorusUserReplicationListResponse {
-  replications: ChorusUserReplication[];
-}
-
-export interface ChorusUserReplication {
-  to: string;
-  from: string;
-  user: string;
-}
-
-export interface ChorusDeleteUserReplicationRequest {
-  user: string;
-  from: string;
-  to: string;
-  deleteBucketReplications: boolean;
 }
 
 export enum ReplicationStatusFilter {
@@ -203,4 +211,9 @@ export enum AddReplicationStepName {
   'TO_STORAGE' = 2,
   'USER' = 3,
   'BUCKETS' = 4,
+}
+
+export enum ReplicationType {
+  'USER' = 'User Replication',
+  'BUCKET' = 'Bucket Replication',
 }

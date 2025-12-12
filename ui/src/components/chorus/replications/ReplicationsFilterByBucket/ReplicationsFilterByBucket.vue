@@ -36,7 +36,14 @@
 
   const bucketOptions = computed<string[]>(() => {
     const uniqueBucketOptions = [
-      ...new Set(replications.value.map((replication) => replication.bucket)),
+      ...new Set(
+        replications.value
+          .flatMap((replication) => [
+            replication.id.fromBucket,
+            replication.id.toBucket,
+          ])
+          .filter((bucket) => bucket !== undefined && bucket !== null),
+      ),
     ];
 
     return uniqueBucketOptions

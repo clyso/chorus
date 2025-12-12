@@ -25,6 +25,7 @@
   import { storeToRefs } from 'pinia';
   import { useI18n } from 'vue-i18n';
   import { GeneralHelper } from '../../../../utils/helpers/GeneralHelper';
+  import ReplicationBucketCell from '../ReplicationBucketCell/ReplicationBucketCell.vue';
   import type { ChorusReplication } from '@/utils/types/chorus';
   import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
@@ -60,15 +61,14 @@
     },
     {
       title: t('columnUser'),
-      key: 'user',
+      key: 'id.user',
       width: '15%',
       sorter: true,
     },
     {
       title: t('columnBucket'),
       key: 'bucket',
-      width: '15%',
-      sorter: true,
+      width: '20%',
     },
     {
       title: t('columnCreatedAt'),
@@ -108,7 +108,7 @@
     page.value = 1;
   };
 
-  const rowKey = (row: AddId<ChorusReplication>) => row.id;
+  const rowKey = (row: AddId<ChorusReplication>) => row.idStr;
 </script>
 
 <template>
@@ -134,6 +134,10 @@
         @update:page-size="handlePageSizeUpdate"
         @retry="initReplicationsPage"
       >
+        <template #bucket="{ rowData }: { rowData: AddId<ChorusReplication> }">
+          <ReplicationBucketCell :replication="rowData" />
+        </template>
+
         <template #createdAt="{ rowData }">
           {{ GeneralHelper.formatDateTime(rowData.createdAt) }}
         </template>
