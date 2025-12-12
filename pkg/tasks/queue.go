@@ -91,6 +91,9 @@ func ConsistencyCheckQueue(id entity.ConsistencyCheckID) string {
 	if err := json.NewEncoder(encoder).Encode(&id); err != nil {
 		panic(fmt.Errorf("unable to encode consistency check id: %w", err))
 	}
+	if err := encoder.Close(); err != nil {
+		panic(fmt.Errorf("unable to finalize encoding of consistency check id: %w", err))
+	}
 	// add prefix
 	return fmt.Sprintf("%s:%s", QueueConsistencyCheck, buf.String())
 }

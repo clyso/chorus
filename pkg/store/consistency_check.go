@@ -84,6 +84,9 @@ func ConsistencyCheckIDToTokensConverter(id entity.ConsistencyCheckID) ([]string
 	if err := json.NewEncoder(encoder).Encode(&id); err != nil {
 		return nil, fmt.Errorf("unable to encode consistency check id: %w", err)
 	}
+	if err := encoder.Close(); err != nil {
+		return nil, fmt.Errorf("unable to finalize encoding of consistency check id: %w", err)
+	}
 	return []string{buf.String()}, nil
 }
 

@@ -2,11 +2,12 @@ package store
 
 import (
 	"context"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"testing"
 
 	"github.com/clyso/chorus/pkg/entity"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
 var _ = Describe("Consistency checker stores", func() {
@@ -78,3 +79,38 @@ var _ = Describe("Consistency checker stores", func() {
 		}
 	})
 })
+
+func TestConsistencyCheckIDToTokensConverter(t *testing.T) {
+	type args struct {
+	}
+	tests := []struct {
+		name    string
+		id      entity.ConsistencyCheckID
+		wantErr bool
+	}{
+		{
+			name: "buffer error case",
+			id: entity.ConsistencyCheckID{
+				Locations: []entity.ConsistencyCheckLocation{
+					{Storage: "f1", Bucket: "restart1"},
+					{Storage: "main", Bucket: "restart1"},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			got, err := ConsistencyCheckIDToTokensConverter(tt.id)
+			if tt.wantErr {
+				r.Error(err)
+				return
+			}
+			r.NoError(err)
+			gotID, err := TokensToConsistencyCheckIDConverter(got)
+			r.NoError(err)
+			r.EqualValues(tt.id, gotID)
+		})
+	}
+}

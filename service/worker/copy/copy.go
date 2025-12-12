@@ -277,9 +277,10 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		if !ok {
 			return fmt.Errorf("unable to get from object stat: %w", err)
 		}
-		if errorResp.StatusCode == http.StatusNotFound {
+		if errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound {
 			return dom.ErrNotFound
 		}
+		return fmt.Errorf("unable to get from object stat: %w", err)
 	}
 
 	toObjectPresent := true
@@ -292,8 +293,10 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		if !ok {
 			return fmt.Errorf("unable to get from object stat: %w", err)
 		}
-		if errorResp.StatusCode == http.StatusNotFound {
+		if errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound {
 			toObjectPresent = false
+		} else {
+			return fmt.Errorf("unable to get to object stat: %w", err)
 		}
 	}
 
@@ -313,6 +316,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 
 	putObjectOpts := minio.PutObjectOptions{
 		UserMetadata: fromObjectStat.UserMetadata,
+		ContentType:  fromObjectStat.ContentType,
 	}
 
 	if features.Tagging(ctx) {
@@ -350,8 +354,15 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		return fmt.Errorf("unable to get from object: %w", err)
 	}
 	defer fromObject.Close()
-
-	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, fromObjectStat.Size, putObjectOpts)
+	stat, err := fromObject.Stat()
+	if err != nil {
+		return fmt.Errorf("unable to stat from object: %w", err)
+	}
+	if stat.Size == 0 {
+		// workaround for e2e test test/object_test.go TestApi_Object_Folder
+		putObjectOpts.DisableContentSha256 = true
+	}
+	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, stat.Size, putObjectOpts)
 	if err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
 	}
