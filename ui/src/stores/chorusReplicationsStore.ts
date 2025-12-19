@@ -54,6 +54,7 @@ interface ChorusReplicationsState {
   filterToStorages: string[];
   filterStatuses: ReplicationStatusFilter[];
   filterCreatedAtRange: [number, number] | null;
+  filterType: ReplicationType | null;
 }
 
 const PAGE_SIZES = [10, 20, 30, 50, 100] as const;
@@ -69,9 +70,9 @@ function getChorusReplicationId(replicationId: ChorusReplicationId): string {
 function getReplicationType(
   replicationId: ChorusReplicationId,
 ): ReplicationType {
-  return !(replicationId.fromBucket && replicationId.toBucket)
-    ? ReplicationType.USER
-    : ReplicationType.BUCKET;
+  return replicationId.fromBucket && replicationId.toBucket
+    ? ReplicationType.BUCKET
+    : ReplicationType.USER;
 }
 
 function getInitialState(): ChorusReplicationsState {
@@ -94,6 +95,7 @@ function getInitialState(): ChorusReplicationsState {
     filterToStorages: [],
     filterStatuses: [],
     filterCreatedAtRange: null,
+    filterType: null,
   };
 }
 
@@ -139,13 +141,16 @@ export const useChorusReplicationsStore = defineStore(
             replication,
             state.filterCreatedAtRange,
           );
+        const isTypeMatched =
+          !state.filterType || replication.replicationType === state.filterType;
 
         return (
           isUserMatched &&
           isBucketMatched &&
           isToStorageMatched &&
           isStatusMatched &&
-          isCreatedAtMatched
+          isCreatedAtMatched &&
+          isTypeMatched
         );
       }),
     );
@@ -156,7 +161,8 @@ export const useChorusReplicationsStore = defineStore(
         state.filterBucket !== '' ||
         state.filterToStorages.length !== 0 ||
         state.filterStatuses.length !== 0 ||
-        state.filterCreatedAtRange !== null,
+        state.filterCreatedAtRange !== null ||
+        state.filterType !== null,
     );
 
     function clearFilters() {
@@ -165,6 +171,7 @@ export const useChorusReplicationsStore = defineStore(
       state.filterToStorages = [];
       state.filterStatuses = [];
       state.filterCreatedAtRange = null;
+      state.filterType = null;
     }
 
     const computedReplications = computed<AddId<ChorusReplication>[]>(() => {
@@ -216,7 +223,7 @@ export const useChorusReplicationsStore = defineStore(
       try {
         await stopReplicationPolling();
 
-        state.pollingRequest = Promise.resolve(getReplications());
+        state.pollingRequest = getReplications();
 
         await state.pollingRequest;
       } finally {
