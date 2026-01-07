@@ -94,7 +94,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 			logger.Warn().Msg("migration obj copy: skip object sync: object missing in source")
 			return nil
 		}
-		return fmt.Errorf("migration obj copy: unable to copy with rclone: %w", err)
+		return fmt.Errorf("migration obj copy: unable to copy object: %w", err)
 	}
 
 	if fromVer != 0 {

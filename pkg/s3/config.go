@@ -103,7 +103,7 @@ func (s *Storage) Validate() error {
 	if s.HttpTimeout == 0 {
 		s.HttpTimeout = defaultHttpTimeout
 	}
-	if slices.Contains(providers, s.Provider) == false {
+	if !slices.Contains(providers, s.Provider) {
 		return fmt.Errorf("%w: invalid storage provider %q. Supported values: %#v", dom.ErrInvalidStorageConfig, s.Provider, providers)
 	}
 	if s.Provider == "" {
