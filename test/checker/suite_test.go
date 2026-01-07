@@ -39,7 +39,7 @@ const (
 	CMinioInstance = "minio"
 	CRedisInstance = "redis"
 
-	CMinioProvider = "minio"
+	CMinioProvider = "Minio"
 
 	CMinioUser = "user"
 	CMinioPass = "userpass"

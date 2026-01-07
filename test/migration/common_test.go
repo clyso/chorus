@@ -120,6 +120,8 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 		// match
 		return ReplicationDiffResponse{IsMatch: true}
 	}
+	fromMap := make(map[string]struct{})
+	toMap := make(map[string]struct{})
 	// not match, request diff entries
 	diff := ReplicationDiffResponse{IsMatch: false}
 	cursor := uint64(0)
@@ -140,14 +142,12 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 					continue
 				}
 				if stor.Storage == id.FromStorage && stor.Bucket == *id.FromBucket {
-					diff.MissTo = append(diff.MissTo, entry.Object)
+					fromMap[entry.Object] = struct{}{}
 				} else if stor.Storage == id.ToStorage && stor.Bucket == *id.ToBucket {
-					diff.MissFrom = append(diff.MissFrom, entry.Object)
+					toMap[entry.Object] = struct{}{}
 				} else {
 					r.Fail("entry with unexpected location found")
 				}
-			} else if len(entry.StorageEntries) == 2 {
-				diff.Differ = append(diff.Differ, entry.Object)
 			} else {
 				r.Fail("entry with unexpected number of locations found")
 			}
@@ -155,6 +155,19 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 		if cursor == 0 {
 			break
 		}
+	}
+
+	// find missing objects
+	for fromObj := range fromMap {
+		if _, found := toMap[fromObj]; !found {
+			diff.MissTo = append(diff.MissTo, fromObj)
+		} else {
+			delete(toMap, fromObj)
+			diff.Differ = append(diff.Differ, fromObj)
+		}
+	}
+	for toObj := range toMap {
+		diff.MissFrom = append(diff.MissFrom, toObj)
 	}
 	return diff
 }

@@ -109,7 +109,7 @@ var _ = Describe("Minio versioned migration", func() {
 		CMinioDestInstance = "minio2"
 		CRedisInstance     = "redis"
 
-		CMinioProvider = "minio"
+		CMinioProvider = "Minio"
 
 		CSyncUserKey = "test"
 
@@ -676,7 +676,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 		CCephDestInstance = "ceph2"
 		CRedisInstance    = "redis"
 
-		CCephProvider = "ceph"
+		CCephProvider = "Ceph"
 
 		CSyncUserKey = "test"
 
