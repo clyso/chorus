@@ -181,7 +181,7 @@ export const useChorusReplicationsStore = defineStore(
       page: state.page,
       pageSize: state.pageSize,
       showSizePicker: true,
-      pageSizes: PAGE_SIZES,
+      pageSizes: [...PAGE_SIZES],
       pageCount: Math.ceil(filteredReplications.value.length / state.pageSize),
       itemCount: filteredReplications.value.length,
       prefix({ itemCount }) {
