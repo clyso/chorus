@@ -59,7 +59,7 @@ export abstract class ChorusService {
   }
 
   static async getReplications(): Promise<ChorusReplicationListResponse> {
-    const { data } = await apiClient.get<ChorusReplicationListResponse>(
+    const { data } = await apiClient.post<ChorusReplicationListResponse>(
       ApiHelper.getChorusAPIUrl('/replication'),
     );
 

@@ -94,14 +94,8 @@ export interface ChorusStorage {
 }
 
 export enum StorageProvider {
-  Other = 'Other',
-  Ceph = 'Ceph',
-  Minio = 'Minio',
-  AWS = 'AWS',
-  GCS = 'GCS',
-  Alibaba = 'Alibaba',
-  Cloudflare = 'Cloudflare',
-  DigitalOcean = 'DigitalOcean',
+  S3 = 'S3',
+  SWIFT = 'SWIFT',
 }
 
 export interface ChorusCompareBucketRequest {
