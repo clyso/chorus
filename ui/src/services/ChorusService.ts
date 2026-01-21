@@ -22,12 +22,10 @@ import type {
   ChorusBucketListResponse,
   ChorusCompareBucketRequest,
   ChorusCompareBucketResponse,
-  ChorusDeleteUserReplicationRequest,
   ChorusProxyCredentials,
-  ChorusReplicationBase,
+  ChorusReplicationId,
   ChorusReplicationListResponse,
   ChorusStorageListResponse,
-  ChorusUserReplicationListResponse,
 } from '@/utils/types/chorus';
 
 export abstract class ChorusService {
@@ -75,9 +73,7 @@ export abstract class ChorusService {
     );
   }
 
-  static async deleteBucketReplication(
-    payload: ChorusReplicationBase,
-  ): Promise<void> {
+  static async deleteReplication(payload: ChorusReplicationId): Promise<void> {
     await apiClient.put(
       ApiHelper.getChorusAPIUrl('/replication/delete'),
       payload,
@@ -85,7 +81,7 @@ export abstract class ChorusService {
   }
 
   static async pauseBucketReplication(
-    payload: ChorusReplicationBase,
+    payload: ChorusReplicationId,
   ): Promise<void> {
     await apiClient.put(
       ApiHelper.getChorusAPIUrl('/replication/pause'),
@@ -94,7 +90,7 @@ export abstract class ChorusService {
   }
 
   static async resumeBucketReplication(
-    payload: ChorusReplicationBase,
+    payload: ChorusReplicationId,
   ): Promise<void> {
     await apiClient.put(
       ApiHelper.getChorusAPIUrl('/replication/resume'),
@@ -111,22 +107,5 @@ export abstract class ChorusService {
     );
 
     return data;
-  }
-
-  static async getUserReplications(): Promise<ChorusUserReplicationListResponse> {
-    const { data } = await apiClient.get<ChorusUserReplicationListResponse>(
-      ApiHelper.getChorusAPIUrl('/replication/user'),
-    );
-
-    return data;
-  }
-
-  static async deleteUserReplication(
-    payload: ChorusDeleteUserReplicationRequest,
-  ): Promise<void> {
-    await apiClient.put(
-      ApiHelper.getChorusAPIUrl('/replication/user/delete'),
-      payload,
-    );
   }
 }

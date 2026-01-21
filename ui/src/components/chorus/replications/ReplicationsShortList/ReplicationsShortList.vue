@@ -37,14 +37,20 @@
     :size="size"
     :max="max"
     :list="replications"
-    :item-key="(item) => item.id"
+    :item-key="(item) => item.idStr"
     class="replications-short-list"
   >
     <template #default="{ item }: { item: AddId<ChorusReplication> }">
-      <span class="replications-short-list__bucket">{{ item.bucket }}</span>
-      (<span class="replications-short-list__user">{{ item.user }}</span
-      >, <span>{{ item.from }} → {{ item.to }}</span
-      >)
+      <strong>
+        <span class="replications-short-list__user">{{ item.id.user }}: </span>
+      </strong>
+      {{ item.id.fromStorage }}/<span class="replications-short-list__bucket">
+        {{ item.id.fromBucket }}
+      </span>
+      →
+      {{ item.id.toStorage }}/<span class="replications-short-list__bucket">
+        {{ item.id.toBucket }}
+      </span>
     </template>
   </CShortList>
 </template>
