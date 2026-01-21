@@ -18,40 +18,41 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/clyso/chorus/pkg/validate"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker/handler"
 )
 
 func DiffHandlers(
-	storagesConfig objstore.Config,
+	credsSvc objstore.CredsService,
 	queueSvc tasks.QueueService,
 	checkSvc *handler.ConsistencyCheckSvc,
 ) pb.DiffServer {
 	return &diffHandlers{
-		storagesConfig: storagesConfig,
-		queueSvc:       queueSvc,
-		checkSvc:       checkSvc,
+		credsSvc: credsSvc,
+		queueSvc: queueSvc,
+		checkSvc: checkSvc,
 	}
 }
 
 var _ pb.DiffServer = &diffHandlers{}
 
 type diffHandlers struct {
-	queueSvc       tasks.QueueService
-	checkSvc       *handler.ConsistencyCheckSvc
-	storagesConfig objstore.Config
+	queueSvc tasks.QueueService
+	checkSvc *handler.ConsistencyCheckSvc
+	credsSvc objstore.CredsService
 }
 
 func (h *diffHandlers) Start(ctx context.Context, req *pb.StartConsistencyCheckRequest) (*emptypb.Empty, error) {
-	if err := validate.StorageLocationsWithUser(h.storagesConfig, req.Locations, req.User); err != nil {
+	if err := h.validateStorageLocationsWithUser(req.Locations, req.User); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -131,7 +132,7 @@ func (h *diffHandlers) List(ctx context.Context, _ *emptypb.Empty) (*pb.ListCons
 }
 
 func (h *diffHandlers) GetReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*pb.GetConsistencyCheckReportResponse, error) {
-	if err := validate.StorageLocations(h.storagesConfig, req.Locations); err != nil {
+	if err := h.validateStorageLocations(req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -161,7 +162,7 @@ func (h *diffHandlers) GetReport(ctx context.Context, req *pb.ConsistencyCheckRe
 }
 
 func (h *diffHandlers) GetReportEntries(ctx context.Context, req *pb.GetConsistencyCheckReportEntriesRequest) (*pb.GetConsistencyCheckReportEntriesResponse, error) {
-	if err := validate.StorageLocations(h.storagesConfig, req.Locations); err != nil {
+	if err := h.validateStorageLocations(req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -202,7 +203,7 @@ func (h *diffHandlers) GetReportEntries(ctx context.Context, req *pb.GetConsiste
 }
 
 func (h *diffHandlers) DeleteReport(ctx context.Context, req *pb.ConsistencyCheckRequest) (*emptypb.Empty, error) {
-	if err := validate.StorageLocations(h.storagesConfig, req.Locations); err != nil {
+	if err := h.validateStorageLocations(req.Locations); err != nil {
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
@@ -217,4 +218,59 @@ func (h *diffHandlers) DeleteReport(ctx context.Context, req *pb.ConsistencyChec
 	}
 
 	return nil, nil
+}
+
+var ccSupportedStorTypes = map[dom.StorageType]bool{
+	dom.S3: true,
+}
+
+func (h *diffHandlers) validateStorageLocations(locations []*pb.MigrateLocation) error {
+	if len(locations) < 2 {
+		return errors.New("at least 2 migration locations should be provided")
+	}
+
+	for idx, location := range locations {
+		if location.Bucket == "" {
+			return fmt.Errorf("location %d bucket is empty", idx)
+		}
+		if location.Storage == "" {
+			return fmt.Errorf("location %d storage is empty", idx)
+		}
+		storType, ok := h.credsSvc.Storages()[location.Storage]
+		if !ok {
+			return fmt.Errorf("unable to find storage %s in config", location.Storage)
+		}
+		if !ccSupportedStorTypes[storType] {
+			return fmt.Errorf("storage %s of type %s is not supported storage location", location.Storage, storType)
+		}
+	}
+
+	return nil
+}
+
+func (h *diffHandlers) validateStorageLocationsWithUser(locations []*pb.MigrateLocation, user string) error {
+	if len(locations) < 2 {
+		return errors.New("at least 2 migration locations should be provided")
+	}
+
+	for idx, location := range locations {
+		if location.Bucket == "" {
+			return fmt.Errorf("location %d bucket is empty", idx)
+		}
+		if location.Storage == "" {
+			return fmt.Errorf("location %d storage is empty", idx)
+		}
+		storType, ok := h.credsSvc.Storages()[location.Storage]
+		if !ok {
+			return fmt.Errorf("unable to find storage %s in config", location.Storage)
+		}
+		if !ccSupportedStorTypes[storType] {
+			return fmt.Errorf("storage %s of type %s is not supported storage location", location.Storage, storType)
+		}
+		if err := h.credsSvc.HasUser(location.Storage, user); err != nil {
+			return fmt.Errorf("%w: invalid storage location", err)
+		}
+	}
+
+	return nil
 }

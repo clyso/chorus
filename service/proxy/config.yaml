@@ -16,6 +16,11 @@ auth:
 #      secretAccessKey: <user2 v4 secretKey credential>
 storage:
   defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
+  dynamicCredentials:
+    enabled: false # set true to enable to manage storage credentials via API
+    disableEncryption: false
+    masterPassword: "" # master password to encrypt/decrypt storage credentials.
+    pollInterval: 3s # poll interval to check for updated credentials by chorus replicas
   storages:
 #    one: # yaml key with some handy storage name
 #      address: <s3.chorus.com>

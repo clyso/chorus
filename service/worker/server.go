@@ -40,10 +40,8 @@ import (
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/rpc"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
-	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
@@ -96,26 +94,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
 
+	credsSvc, err := objstore.NewCredsSvc(ctx, &conf.Storage, appRedis)
+	if err != nil {
+		return err
+	}
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
-
-	clients := map[dom.StorageType]any{}
-	if s3Conf := conf.Storage.S3Storages(); len(s3Conf) != 0 {
-		s3Clients, err := s3client.New(ctx, s3Conf, metricsSvc, tp)
-		if err != nil {
-			return err
-		}
-		clients[dom.S3] = s3Clients
-		logger.Info().Msg("s3 clients connected")
-	}
-	if swiftConf := conf.Storage.SwiftStorages(); len(swiftConf) != 0 {
-		swiftClients, err := swift.New(swiftConf)
-		if err != nil {
-			return err
-		}
-		clients[dom.Swift] = swiftClients
-		logger.Info().Msg("swift clients connected")
-	}
-	clientRegistry, err := objstore.New(conf.Storage, clients)
+	clientRegistry, err := objstore.NewRegistry(ctx, credsSvc, metricsSvc)
 	if err != nil {
 		return err
 	}
@@ -141,7 +125,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	bucketLocker := store.NewBucketLocker(lockRedis, conf.Lock.Overlap)
 
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
-	copySvc := copy.NewS3CopySvc(clientRegistry, metricsSvc)
+	copySvc := copy.NewS3CopySvc(credsSvc, clientRegistry, metricsSvc)
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
 
 	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
@@ -151,7 +135,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
+	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -267,9 +251,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		chorusHandler := api.ChorusHandlers(clientRegistry.Config(), rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
-		diffHandler := api.DiffHandlers(clientRegistry.Config(), queueSvc, checkSvc)
-		policyHandler := api.PolicyHandlers(clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
+		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
+		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
+		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
 		registerServices := func(srv *grpc.Server) {
 			pb.RegisterChorusServer(srv, chorusHandler)
 			pb.RegisterDiffServer(srv, diffHandler)

@@ -41,7 +41,7 @@ func (r *s3Router) commonRead(req *http.Request) (resp *http.Response, storage s
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -56,7 +56,7 @@ func (r *s3Router) commonWrite(req *http.Request) (resp *http.Response, storage 
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, "", false, err
 	}

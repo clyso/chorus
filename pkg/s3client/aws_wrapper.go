@@ -36,11 +36,10 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func newAWSClient(conf s3.Storage, name, user string, metricsSvc metrics.Service) (*AWS, error) {
-
-	cred := credentials.NewCredentials(&credentials.StaticProvider{Value: credentials.Value{
-		AccessKeyID:     conf.Credentials[user].AccessKeyID,
-		SecretAccessKey: conf.Credentials[user].SecretAccessKey,
+func newAWSClient(conf s3.StorageAddress, cred s3.CredentialsV4, storageName, userName string, metricsSvc metrics.Service) (*AWS, error) {
+	creds := credentials.NewCredentials(&credentials.StaticProvider{Value: credentials.Value{
+		AccessKeyID:     cred.AccessKeyID,
+		SecretAccessKey: cred.SecretAccessKey,
 	}})
 
 	endpoint := conf.Address
@@ -54,7 +53,7 @@ func newAWSClient(conf s3.Storage, name, user string, metricsSvc metrics.Service
 
 	awsConfig := aws.NewConfig().
 		WithMaxRetries(3).
-		WithCredentials(cred).
+		WithCredentials(creds).
 		WithHTTPClient(&http.Client{Timeout: conf.HttpTimeout}).
 		WithS3ForcePathStyle(true).
 		WithDisableSSL(!conf.IsSecure).
@@ -70,20 +69,20 @@ func newAWSClient(conf s3.Storage, name, user string, metricsSvc metrics.Service
 	}
 
 	return &AWS{
-		S3:         aws_s3.New(ses),
-		ses:        ses,
-		metricsSvc: metricsSvc,
-		name:       name,
-		user:       user,
+		S3:          aws_s3.New(ses),
+		ses:         ses,
+		metricsSvc:  metricsSvc,
+		storageName: storageName,
+		userName:    userName,
 	}, nil
 }
 
 type AWS struct {
 	*aws_s3.S3
-	ses        *session.Session
-	metricsSvc metrics.Service
-	name       string
-	user       string
+	ses         *session.Session
+	metricsSvc  metrics.Service
+	storageName string
+	userName    string
 }
 
 func AwsErrRetry(err error) bool {
@@ -99,48 +98,48 @@ func AwsErrRetry(err error) bool {
 
 func (s *AWS) PutObjectAclWithContext(ctx aws.Context, input *aws_s3.PutObjectAclInput, opts ...request.Option) (*aws_s3.PutObjectAclOutput, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutObjectAcl.String())
-	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	span.SetAttributes(attribute.String("storage", s.storageName), attribute.String("user", s.userName))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutObjectAcl.String())
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.storageName, s3.PutObjectAcl.String())
 	return s.S3.PutObjectAclWithContext(ctx, input, opts...)
 }
 
 func (s *AWS) GetObjectAclWithContext(ctx aws.Context, input *aws_s3.GetObjectAclInput, opts ...request.Option) (*aws_s3.GetObjectAclOutput, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetObjectAcl.String())
-	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	span.SetAttributes(attribute.String("storage", s.storageName), attribute.String("user", s.userName))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetObjectAcl.String())
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.storageName, s3.GetObjectAcl.String())
 	return s.S3.GetObjectAclWithContext(ctx, input, opts...)
 }
 
 func (s *AWS) GetBucketAclWithContext(ctx aws.Context, input *aws_s3.GetBucketAclInput, opts ...request.Option) (*aws_s3.GetBucketAclOutput, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.GetBucketAcl.String())
-	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	span.SetAttributes(attribute.String("storage", s.storageName), attribute.String("user", s.userName))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.GetBucketAcl.String())
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.storageName, s3.GetBucketAcl.String())
 	return s.S3.GetBucketAclWithContext(ctx, input, opts...)
 }
 
 func (s *AWS) PutBucketAclWithContext(ctx aws.Context, input *aws_s3.PutBucketAclInput, opts ...request.Option) (*aws_s3.PutBucketAclOutput, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.PutBucketAcl.String())
-	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	span.SetAttributes(attribute.String("storage", s.storageName), attribute.String("user", s.userName))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.PutBucketAcl.String())
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.storageName, s3.PutBucketAcl.String())
 	return s.S3.PutBucketAclWithContext(ctx, input, opts...)
 }
 
 func (s *AWS) HeadBucketWithContext(ctx aws.Context, input *aws_s3.HeadBucketInput, opts ...request.Option) (*aws_s3.HeadBucketOutput, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.HeadBucket.String())
-	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	span.SetAttributes(attribute.String("storage", s.storageName), attribute.String("user", s.userName))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.HeadBucket.String())
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.storageName, s3.HeadBucket.String())
 	return s.S3.HeadBucketWithContext(ctx, input, opts...)
 }
 
 func (s *AWS) CreateBucketWithContext(ctx aws.Context, input *aws_s3.CreateBucketInput, opts ...request.Option) (*aws_s3.CreateBucketOutput, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.CreateBucket.String())
-	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	span.SetAttributes(attribute.String("storage", s.storageName), attribute.String("user", s.userName))
 	defer span.End()
-	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.CreateBucket.String())
+	defer s.metricsSvc.Count(xctx.GetFlow(ctx), s.storageName, s3.CreateBucket.String())
 	return s.S3.CreateBucketWithContext(ctx, input, opts...)
 }

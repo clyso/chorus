@@ -22,8 +22,10 @@ import (
 	"io/fs"
 
 	"github.com/clyso/chorus/pkg/config"
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/proxy/router"
@@ -103,4 +105,28 @@ func GetConfig(src ...config.Opt) (*Config, error) {
 		return nil, err
 	}
 	return &conf, err
+}
+
+func ProxyToCredsConf(in Storages) (objstore.Config, error) {
+	res := objstore.Config{
+		Storages:           map[string]objstore.GenericStorage[*s3.Storage, *swift.Storage]{},
+		Main:               in.Main,
+		DynamicCredentials: in.DynamicCredentials,
+	}
+
+	for name, val := range in.Storages {
+		switch val.Type {
+		case dom.S3:
+			c := *val.S3
+			res.Storages[name] = objstore.Storage{
+				S3:           &c,
+				CommonConfig: val.CommonConfig,
+			}
+		case dom.Swift:
+		// ignore - swift proxy conf does not contains credentials
+		default:
+			return objstore.Config{}, fmt.Errorf("unsupported storage type %q for storage %q", val.Type, name)
+		}
+	}
+	return res, nil
 }

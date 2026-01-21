@@ -28,26 +28,26 @@ import (
 )
 
 func ChorusHandlers(
-	storagesConfig objstore.Config,
+	credsSvc objstore.CredsService,
 	proxyClient rpc.Proxy,
 	agentClient *rpc.AgentClient,
 	appInfo *dom.AppInfo,
 ) pb.ChorusServer {
 	return &chorusHandlers{
-		storagesConfig: storagesConfig,
-		proxyClient:    proxyClient,
-		agentClient:    agentClient,
-		appInfo:        appInfo,
+		credsSvc:    credsSvc,
+		proxyClient: proxyClient,
+		agentClient: agentClient,
+		appInfo:     appInfo,
 	}
 }
 
 var _ pb.ChorusServer = &chorusHandlers{}
 
 type chorusHandlers struct {
-	proxyClient    rpc.Proxy
-	agentClient    *rpc.AgentClient
-	appInfo        *dom.AppInfo
-	storagesConfig objstore.Config
+	proxyClient rpc.Proxy
+	agentClient *rpc.AgentClient
+	appInfo     *dom.AppInfo
+	credsSvc    objstore.CredsService
 }
 
 func (h *chorusHandlers) GetAppVersion(_ context.Context, _ *emptypb.Empty) (*pb.GetAppVersionResponse, error) {
@@ -59,7 +59,7 @@ func (h *chorusHandlers) GetAppVersion(_ context.Context, _ *emptypb.Empty) (*pb
 }
 
 func (h *chorusHandlers) GetStorages(_ context.Context, _ *emptypb.Empty) (*pb.GetStoragesResponse, error) {
-	res := toPbStorages(h.storagesConfig)
+	res := toPbStorages(h.credsSvc)
 	return &pb.GetStoragesResponse{Storages: res}, nil
 }
 

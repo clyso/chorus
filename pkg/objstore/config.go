@@ -23,7 +23,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/ratelimit"
 )
 
@@ -43,8 +42,9 @@ type StoragesConfig[
 	S3Config StorageConfig,
 	SwiftConfig StorageConfig,
 ] struct {
-	Storages map[string]GenericStorage[S3Config, SwiftConfig] `yaml:"storages"`
-	Main     string                                           `yaml:"main"`
+	Storages           map[string]GenericStorage[S3Config, SwiftConfig] `yaml:"storages"`
+	Main               string                                           `yaml:"main"`
+	DynamicCredentials DynamicCredentialsConfig                         `yaml:"dynamicCredentials"`
 }
 
 type GenericStorage[
@@ -70,6 +70,9 @@ func (s StoragesConfig[_, _]) Validate() error {
 		if err := storConf.Validate(); err != nil {
 			return fmt.Errorf("%w: for storage %q", err, name)
 		}
+	}
+	if err := s.DynamicCredentials.Validate(); err != nil {
+		return fmt.Errorf("%w: invalid dynamic credentials config: %w", dom.ErrInvalidStorageConfig, err)
 	}
 	return nil
 }
@@ -120,18 +123,26 @@ func (s StoragesConfig[S3Config, SwiftConfig]) Exists(stor, user string) error {
 	}
 }
 
-func (s StoragesConfig[S3Config, SwiftConfig]) ValidateReplicationID(id entity.UniversalReplicationID) error {
-	if err := s.Exists(id.FromStorage(), id.User()); err != nil {
-		return fmt.Errorf("%w: unknown replication source", err)
+func (s StoragesConfig[S3Config, SwiftConfig]) Types() map[string]dom.StorageType {
+	res := make(map[string]dom.StorageType, len(s.Storages))
+	for name, conf := range s.Storages {
+		res[name] = conf.Type
 	}
-	if err := s.Exists(id.ToStorage(), id.User()); err != nil {
-		return fmt.Errorf("%w: unknown replication destination", err)
+	return res
+}
+
+func (s StoragesConfig[S3Config, SwiftConfig]) sameStorType(fromStorName, toStorName string) error {
+	fs, ok := s.Storages[fromStorName]
+	if !ok {
+		return fmt.Errorf("%w: unknown replication source storage %q", dom.ErrInvalidArg, fromStorName)
 	}
-	fromType, toType := s.Storages[id.FromStorage()].Type, s.Storages[id.ToStorage()].Type
-	if fromType != toType {
-		// TODO: allow cross-type replication in the future?
+	ts, ok := s.Storages[toStorName]
+	if !ok {
+		return fmt.Errorf("%w: unknown replication destination storage %q", dom.ErrInvalidArg, toStorName)
+	}
+	if fs.Type != ts.Type {
 		return fmt.Errorf("%w: from_storage %q type %q is different from to_storage %q type %q",
-			dom.ErrInvalidArg, id.FromStorage(), fromType, id.ToStorage(), toType)
+			dom.ErrInvalidArg, fromStorName, fs.Type, toStorName, ts.Type)
 	}
 	return nil
 }

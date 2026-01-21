@@ -65,11 +65,7 @@ func Test_e2e(t *testing.T) {
 	// create proxy client
 	c := *swiftConf.Storages[swiftTestKey].Swift
 	c.StorageEndpointName = "chorus-swift"
-
-	proxyClientSvc, err := swift.New(map[string]*swift.Storage{
-		"chorus-swift": &c,
-	})
-	proxyClient, err := proxyClientSvc.For(ctx, "chorus-swift", testAcc)
+	proxyClient, err := swift.NewClient(ctx, c.StorageAddress, c.Credentials[testAcc])
 	r.NoError(err, "failed to create swift client")
 
 	// create container with metadata in proxy

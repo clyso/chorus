@@ -106,12 +106,14 @@ type CopySvc interface {
 var _ CopySvc = (*S3CopySvc)(nil)
 
 type S3CopySvc struct {
+	credsSvc       objstore.CredsService
 	clientRegistry objstore.Clients
 	metricsSvc     metrics.WorkerService
 }
 
-func NewS3CopySvc(clientRegistry objstore.Clients, metricsSvc metrics.WorkerService) *S3CopySvc {
+func NewS3CopySvc(credsSvc objstore.CredsService, clientRegistry objstore.Clients, metricsSvc metrics.WorkerService) *S3CopySvc {
 	return &S3CopySvc{
+		credsSvc:       credsSvc,
 		clientRegistry: clientRegistry,
 		metricsSvc:     metricsSvc,
 	}
@@ -312,7 +314,11 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		attribute.String("from", from.Storage), attribute.String("to", to.Storage), attribute.Int64("size", fromObjectSize))
 	defer span.End()
 
-	provider := toClient.Config().Provider
+	toStorage, err := r.credsSvc.GetS3Address(to.Storage)
+	if err != nil {
+		return fmt.Errorf("unable to get to storage address: %w", err)
+	}
+	provider := toStorage.Provider
 
 	putObjectOpts := minio.PutObjectOptions{
 		UserMetadata: fromObjectStat.UserMetadata,
@@ -362,7 +368,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		// workaround for e2e test test/object_test.go TestApi_Object_Folder
 		putObjectOpts.DisableContentSha256 = true
 	}
-	if !toClient.Config().IsSecure {
+	if !toStorage.IsSecure {
 		// workaround for big objects in e2e tests TODO: investigate
 		putObjectOpts.DisableContentSha256 = true
 	}
@@ -401,7 +407,11 @@ func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to Fil
 		return fmt.Errorf("unable to get to client: %w", err)
 	}
 	// check if copy ACL supported for versioned objects with the same version ID
-	toProvider := toClient.Config().Provider
+	toStorage, err := r.credsSvc.GetS3Address(to.Storage)
+	if err != nil {
+		return fmt.Errorf("unable to get to storage address: %w", err)
+	}
+	toProvider := toStorage.Provider
 	isVersioned := from.Version != ""
 	sameVersion := from.Version == to.Version
 	if isVersioned && sameVersion && !toProvider.SupportsRetainVersionID() {

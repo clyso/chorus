@@ -23,19 +23,23 @@ func TestStorage_Validate(t *testing.T) {
 						TenantName: "tenant",
 					},
 				},
-				StorageEndpointName: "endpoint",
-				AuthURL:             "http://auth.url",
+				StorageAddress: StorageAddress{
+					StorageEndpointName: "endpoint",
+					AuthURL:             "http://auth.url",
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "no credentials",
 			in: Storage{
-				Credentials:         map[string]Credentials{},
-				StorageEndpointName: "endpoint",
-				AuthURL:             "http://auth.url",
+				Credentials: map[string]Credentials{},
+				StorageAddress: StorageAddress{
+					StorageEndpointName: "endpoint",
+					AuthURL:             "http://auth.url",
+				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "no username",
@@ -48,8 +52,10 @@ func TestStorage_Validate(t *testing.T) {
 						TenantName: "tenant",
 					},
 				},
-				StorageEndpointName: "endpoint",
-				AuthURL:             "http://auth.url",
+				StorageAddress: StorageAddress{
+					StorageEndpointName: "endpoint",
+					AuthURL:             "http://auth.url",
+				},
 			},
 			wantErr: true,
 		},
@@ -64,8 +70,10 @@ func TestStorage_Validate(t *testing.T) {
 						TenantName: "tenant",
 					},
 				},
-				StorageEndpointName: "endpoint",
-				AuthURL:             "http://auth.url",
+				StorageAddress: StorageAddress{
+					StorageEndpointName: "endpoint",
+					AuthURL:             "http://auth.url",
+				},
 			},
 			wantErr: true,
 		},
@@ -80,8 +88,10 @@ func TestStorage_Validate(t *testing.T) {
 						TenantName: "tenant",
 					},
 				},
-				StorageEndpointName: "",
-				AuthURL:             "http://auth.url",
+				StorageAddress: StorageAddress{
+					StorageEndpointName: "",
+					AuthURL:             "http://auth.url",
+				},
 			},
 			wantErr: true,
 		},
@@ -96,8 +106,10 @@ func TestStorage_Validate(t *testing.T) {
 						TenantName: "tenant",
 					},
 				},
-				StorageEndpointName: "endpoint",
-				AuthURL:             "",
+				StorageAddress: StorageAddress{
+					StorageEndpointName: "endpoint",
+					AuthURL:             "",
+				},
 			},
 			wantErr: true,
 		},
@@ -122,8 +134,10 @@ func TestDefaultStorageEndpointType(t *testing.T) {
 				TenantName: "tenant",
 			},
 		},
-		StorageEndpointName: "endpoint",
-		AuthURL:             "http://auth.url",
+		StorageAddress: StorageAddress{
+			StorageEndpointName: "endpoint",
+			AuthURL:             "http://auth.url",
+		},
 	}
 	r.NoError(s.Validate())
 	r.Equal(defaultEndpointType, s.StorageEndpointType, "expected default StorageEndpointType to be set")

@@ -23,6 +23,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"golang.org/x/sync/errgroup"
@@ -108,15 +109,30 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		Str("commit", app.Commit).
 		Msg("app starting...")
 
-	// start embedded redis:
-	redisSvc, err := miniredis.Run()
-	if err != nil {
-		return fmt.Errorf("%w: unable to start redis", err)
+	embededRedis := false
+	if len(conf.Config.Redis.Addresses) == 0 {
+		embededRedis = true
+		// start embedded redis:
+		redisSvc, err := miniredis.Run()
+		if err != nil {
+			return fmt.Errorf("%w: unable to start redis", err)
+		}
+		go func() {
+			<-ctx.Done()
+			redisSvc.Close()
+		}()
+		conf.Config.Redis.Addresses = []string{redisSvc.Addr()}
 	}
-	go func() {
-		<-ctx.Done()
-		redisSvc.Close()
-	}()
+
+	if embededRedis && len(fake) > 0 {
+		// enable dynamic creds without encryption for fake redis + s3 setup
+		conf.Storage.DynamicCredentials.Enabled = true
+		conf.Storage.DynamicCredentials.DisableEncryption = true
+		conf.Storage.DynamicCredentials.PollInterval = time.Second * 3
+		conf.Proxy.Storage.DynamicCredentials.Enabled = true
+		conf.Proxy.Storage.DynamicCredentials.DisableEncryption = true
+		conf.Proxy.Storage.DynamicCredentials.PollInterval = time.Second * 3
+	}
 
 	// start fake s3 storages
 	g, ctx := errgroup.WithContext(ctx)
@@ -133,10 +149,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	workerConf := conf.Config
-	if len(workerConf.Redis.Addresses) == 0 {
-		workerConf.Redis.Addresses = []string{redisSvc.Addr()}
-	}
-
 	// deep copy worker config
 	wcBytes, err := yaml.Marshal(&workerConf)
 	if err != nil {
@@ -160,9 +172,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			Storage: conf.Proxy.Storage,
 			Cors:    conf.Proxy.Cors,
 		}
-		if len(proxyConf.Redis.Addresses) == 0 {
-			proxyConf.Redis.Addresses = []string{redisSvc.Addr()}
-		}
+		proxyConf.Redis = workerConf.Redis
 
 		// deep copy proxy config
 		pcBytes, err := yaml.Marshal(&proxyConf)
@@ -193,13 +203,20 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	_, useFakeStorageCreds := fake[conf.Proxy.Auth.UseStorage]
 
+	redisURL := conf.Config.Redis.Address
+	if len(conf.Config.Redis.Addresses) != 0 {
+		redisURL = conf.Config.Redis.Addresses[0]
+	}
+	if embededRedis {
+		redisURL += "  \u001B[33m(embedded)\u001B[0m"
+	}
 	fmt.Printf(connectInfo,
 		uiURL,
 		proxyURL,
 		printCreds(conf, useFakeStorageCreds),
 		localhost(conf.Api.GrpcPort),
 		httpLocalhost(conf.Api.HttpPort),
-		redisSvc.Addr(),
+		redisURL,
 		printStorages(fake, conf.Storage),
 	)
 

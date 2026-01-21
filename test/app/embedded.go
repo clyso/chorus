@@ -180,20 +180,26 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	storages := map[string]s3.Storage{
 		"main": {
 
-			Address:     mainTs.URL,
+			StorageAddress: s3.StorageAddress{
+				Address:  mainTs.URL,
+				Provider: "Other",
+			},
 			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-			Provider:    "Other",
 		},
 		"f1": {
 
-			Address:     f1Ts.URL,
+			StorageAddress: s3.StorageAddress{
+				Address:  f1Ts.URL,
+				Provider: "Other",
+			},
 			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-			Provider:    "Other",
 		},
 		"f2": {
-			Address:     f2Ts.URL,
+			StorageAddress: s3.StorageAddress{
+				Address:  f2Ts.URL,
+				Provider: "Other",
+			},
 			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-			Provider:    "Other",
 		},
 	}
 	proxyConf.Storage = ProxyS3Config("main", storages)
@@ -257,14 +263,18 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		}
 	})
 	e.ProxyClient, e.MpProxyClient = createClient(s3.Storage{
-		Address:     addr,
+		StorageAddress: s3.StorageAddress{
+			Address:  addr,
+			IsSecure: false,
+		},
 		Credentials: storages["main"].Credentials,
-		IsSecure:    false,
 	})
 	e.ProxyAwsClient = newAWSClient(s3.Storage{
-		Address:     addr,
+		StorageAddress: s3.StorageAddress{
+			Address:  addr,
+			IsSecure: false,
+		},
 		Credentials: storages["main"].Credentials,
-		IsSecure:    false,
 	})
 
 	grpcConn, err := grpc.DialContext(ctx, grpcAddr,

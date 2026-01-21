@@ -42,6 +42,7 @@ type Config struct {
 }
 
 type svc struct {
+	credsSvc                objstore.CredsService
 	clients                 objstore.Clients
 	versionSvc              meta.VersionService
 	listStateStore          *store.MigrationObjectListStateStore
@@ -56,13 +57,14 @@ type svc struct {
 	conf                    *Config
 }
 
-func New(conf *Config, clients objstore.Clients, versionSvc meta.VersionService,
+func New(conf *Config, credsSvc objstore.CredsService, clients objstore.Clients, versionSvc meta.VersionService,
 	copySvc copy.CopySvc, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
 	limit ratelimit.RPM, listStateStore *store.MigrationObjectListStateStore,
 	objectLocker *store.ObjectLocker, bucketLocker *store.BucketLocker,
 	replicationstatusLocker *store.ReplicationStatusLocker, versionedSvc *VersionedMigrationSvc) *svc {
 	return &svc{
 		conf:                    conf,
+		credsSvc:                credsSvc,
 		clients:                 clients,
 		versionSvc:              versionSvc,
 		listStateStore:          listStateStore,
