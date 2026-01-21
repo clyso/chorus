@@ -48,6 +48,7 @@ const (
 )
 
 func PolicyHandlers(
+	credsSvc objstore.CredsService,
 	clients objstore.Clients,
 	queueSvc tasks.QueueService,
 	policySvc policy.Service,
@@ -60,6 +61,7 @@ func PolicyHandlers(
 	userLocker *store.UserLocker,
 ) pb.PolicyServer {
 	return &policyHandlers{
+		credsSvc:                credsSvc,
 		clients:                 clients,
 		queueSvc:                queueSvc,
 		policySvc:               policySvc,
@@ -76,6 +78,7 @@ func PolicyHandlers(
 var _ pb.PolicyServer = &policyHandlers{}
 
 type policyHandlers struct {
+	credsSvc                objstore.CredsService
 	clients                 objstore.Clients
 	queueSvc                tasks.QueueService
 	policySvc               policy.Service
@@ -94,7 +97,7 @@ func (h *policyHandlers) AddReplication(ctx context.Context, req *pb.AddReplicat
 	if err != nil {
 		return nil, err
 	}
-	if err := h.clients.Config().ValidateReplicationID(uid); err != nil {
+	if err := h.credsSvc.ValidateReplicationID(uid); err != nil {
 		return nil, err
 	}
 	// acquire user lock
@@ -137,7 +140,7 @@ func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID e
 
 	// create s3/swift task:
 	var task tasks.ReplicationTask
-	storageType := h.clients.Config().Storages[replicationID.FromStorage].Type
+	storageType := h.credsSvc.Storages()[replicationID.FromStorage]
 	switch storageType {
 	case dom.S3:
 		task = &tasks.MigrateS3UserPayload{}
@@ -155,7 +158,7 @@ func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID e
 func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID entity.BucketReplicationPolicy, req *pb.AddReplicationRequest) error {
 	opts := pbToReplicationOpts(req.Opts)
 	isAgent := opts.AgentURL != ""
-	storageType := h.clients.Config().Storages[replicationID.FromStorage].Type
+	storageType := h.credsSvc.Storages()[replicationID.FromStorage]
 	// disallow agent replication for swift:
 	if storageType == dom.Swift && isAgent {
 		return fmt.Errorf("%w: agent is not supported for swift bucket replication", dom.ErrInvalidArg)
@@ -207,10 +210,10 @@ func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID
 
 func (h *policyHandlers) AvailableBuckets(ctx context.Context, req *pb.AvailableBucketsRequest) (*pb.AvailableBucketsResponse, error) {
 	// validate request:
-	if err := h.clients.Config().Exists(req.FromStorage, req.User); err != nil {
+	if err := h.credsSvc.HasUser(req.FromStorage, req.User); err != nil {
 		return nil, err
 	}
-	if err := h.clients.Config().Exists(req.ToStorage, req.User); err != nil {
+	if err := h.credsSvc.HasUser(req.ToStorage, req.User); err != nil {
 		return nil, err
 	}
 
@@ -378,7 +381,7 @@ func (h *policyHandlers) ListReplications(ctx context.Context, req *pb.ListRepli
 }
 
 func (h *policyHandlers) listBucketReplications(ctx context.Context, filter *pb.ListReplicationsRequest_Filter) ([]*pb.Replication, error) {
-	users := h.clients.Config().GetMain().UserList()
+	users := h.credsSvc.ListUsers(h.credsSvc.MainStorage())
 	if filter != nil && filter.User != nil && *filter.User != "" {
 		// filter by user if set
 		users = []string{*filter.User}
@@ -593,7 +596,7 @@ func (h *policyHandlers) SwitchWithZeroDowntime(ctx context.Context, req *pb.Swi
 	if err != nil {
 		return nil, err
 	}
-	storageType := h.clients.Config().Storages[uid.FromStorage()].Type
+	storageType := h.credsSvc.Storages()[uid.FromStorage()]
 	if storageType != dom.S3 {
 		return nil, fmt.Errorf("%w: zero-downtime switch is only supported for S3 storage type", dom.ErrInvalidArg)
 	}
@@ -684,7 +687,7 @@ func (h *policyHandlers) inReplicationLock(ctx context.Context, id entity.Univer
 }
 
 func (h *policyHandlers) AddRouting(ctx context.Context, req *pb.AddRoutingRequest) (*emptypb.Empty, error) {
-	if err := h.clients.Config().Exists(req.ToStorage, req.User); err != nil {
+	if err := h.credsSvc.HasUser(req.ToStorage, req.User); err != nil {
 		return nil, err
 	}
 	err := h.inUserLock(ctx, req.User, func() error {
@@ -761,10 +764,10 @@ func (h *policyHandlers) UnblockRouting(ctx context.Context, req *pb.RoutingID) 
 
 func (h *policyHandlers) ListRoutings(ctx context.Context, req *pb.RoutingsRequest) (*pb.RoutingsResponse, error) {
 	res := &pb.RoutingsResponse{
-		Main: h.clients.Config().Main,
+		Main: h.credsSvc.MainStorage(),
 	}
 
-	users := h.clients.Config().GetMain().UserList()
+	users := h.credsSvc.ListUsers(h.credsSvc.MainStorage())
 	if req.Filter != nil && req.Filter.User != nil && *req.Filter.User != "" {
 		// filter by user if set
 		users = []string{*req.Filter.User}

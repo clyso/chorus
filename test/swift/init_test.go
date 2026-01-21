@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/service/proxy"
@@ -147,8 +148,10 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	swiftCreds := swift.Storage{
-		StorageEndpointName: env.CKeystoneSwiftEndpointName,
-		AuthURL:             fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host.Local, keystoneAccessConfig.ExternalPort.Forwarded),
+		StorageAddress: swift.StorageAddress{
+			StorageEndpointName: env.CKeystoneSwiftEndpointName,
+			AuthURL:             fmt.Sprintf(CKeystoneURLTemplate, keystoneAccessConfig.Host.Local, keystoneAccessConfig.ExternalPort.Forwarded),
+		},
 		Credentials: map[string]swift.Credentials{
 			testAcc: {
 				Username:   CKeystoneTestUsername,
@@ -208,11 +211,12 @@ func TestMain(m *testing.M) {
 	if err := proxyStorages.Validate(); err != nil {
 		panic(err)
 	}
-	swiftClient, err := swift.New(swiftConf.SwiftStorages())
+	credsSvc, err := objstore.NewCredsSvc(tstCtx, &swiftConf, nil)
 	if err != nil {
 		panic(err)
 	}
-	clients, err = objstore.New(swiftConf, map[dom.StorageType]any{dom.Swift: swiftClient})
+
+	clients, err = objstore.NewRegistry(tstCtx, credsSvc, metrics.NewS3Service(false))
 	if err != nil {
 		panic(err)
 	}

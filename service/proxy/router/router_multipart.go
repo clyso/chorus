@@ -67,7 +67,7 @@ func (r *s3Router) completeMultipartUpload(req *http.Request) (resp *http.Respon
 		return
 	}
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -127,7 +127,7 @@ func (r *s3Router) abortMultipartUpload(req *http.Request) (resp *http.Response,
 		return
 	}
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -151,7 +151,7 @@ func (r *s3Router) listMultipartUploads(req *http.Request) (resp *http.Response,
 	if err != nil {
 		return
 	}
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -167,7 +167,7 @@ func (r *s3Router) uploadPart(req *http.Request) (resp *http.Response, storage s
 		return
 	}
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, "", false, err
 	}

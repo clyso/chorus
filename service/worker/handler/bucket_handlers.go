@@ -140,7 +140,11 @@ func (s *svc) createBucketIfNotExists(ctx context.Context, toClient s3client.Cli
 		},
 	})
 	if err != nil && (dom.ErrContains(err, "region", "location")) {
-		defaultRegion := toClient.Config().DefaultRegion
+		toStorageConfig, errConf := s.credsSvc.GetS3Address(p.ID.ToStorage())
+		if errConf != nil {
+			return fmt.Errorf("unable to get storage config for storage %q: %w", p.ID.ToStorage(), errConf)
+		}
+		defaultRegion := toStorageConfig.DefaultRegion
 		logger.Warn().Msgf("unable to create bucket: invalid region %q: retry with default region %q", p.Location, defaultRegion)
 		_, err = toClient.AWS().CreateBucketWithContext(ctx, &s3.CreateBucketInput{
 			Bucket: &toBucket,

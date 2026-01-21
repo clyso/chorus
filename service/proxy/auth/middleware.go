@@ -26,40 +26,25 @@ import (
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/util"
 )
 
-func Middleware(conf *Config, storages map[string]*s3.Storage) *middleware {
-	credentials := map[string]credMeta{}
-	for user, cred := range storages[conf.UseStorage].Credentials {
-		credentials[cred.AccessKeyID] = credMeta{
-			cred: cred,
-			user: user,
-		}
-	}
+func Middleware(conf *Config, credsSvc objstore.CredsService) *middleware {
+	custom := map[string]credMeta{}
 	for user, cred := range conf.Custom {
-		credentials[cred.AccessKeyID] = credMeta{
+		custom[cred.AccessKeyID] = credMeta{
 			cred: cred,
 			user: user,
 		}
 	}
 	return &middleware{
 		allowV2:     conf.AllowV2Signature,
-		credentials: credentials,
+		custom:      custom,
+		storageName: conf.UseStorage,
+		credsSvc:    credsSvc,
 	}
-}
-
-func Credentials(conf *Config, storages map[string]s3.Storage) []s3.CredentialsV4 {
-	credentialsCount := len(conf.Custom) + len(storages)
-	credentials := make([]s3.CredentialsV4, 0, credentialsCount)
-	for _, cred := range storages[conf.UseStorage].Credentials {
-		credentials = append(credentials, cred)
-	}
-	for _, cred := range conf.Custom {
-		credentials = append(credentials, cred)
-	}
-	return credentials
 }
 
 type credMeta struct {
@@ -69,7 +54,9 @@ type credMeta struct {
 
 type middleware struct {
 	allowV2     bool
-	credentials map[string]credMeta
+	custom      map[string]credMeta
+	storageName string
+	credsSvc    objstore.CredsService
 }
 
 func (m *middleware) Wrap(next http.Handler) http.Handler {
@@ -85,15 +72,30 @@ func (m *middleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+var authDeniedErr = mclient.ErrorResponse{
+	XMLName:    xml.Name{},
+	Code:       "InvalidAccessKeyId",
+	Message:    "The AWS access key ID that you provided does not exist in our records.",
+	StatusCode: http.StatusForbidden,
+}
+
 func (m *middleware) getCred(accessKey string) (credMeta, error) {
-	res, ok := m.credentials[accessKey]
-	if !ok {
-		return res, mclient.ErrorResponse{
-			XMLName:    xml.Name{},
-			Code:       "InvalidAccessKeyId",
-			Message:    "The AWS access key ID that you provided does not exist in our records.",
-			StatusCode: http.StatusForbidden,
+	if m.storageName != "" {
+		// check storage creds
+		user, cred, err := m.credsSvc.FindS3Credentials(m.storageName, accessKey)
+		if err == nil {
+			// found:
+			return credMeta{
+				cred: cred,
+				user: user,
+			}, nil
 		}
+		// fallback to custom creds
+	}
+	// check custom creds
+	res, ok := m.custom[accessKey]
+	if !ok {
+		return res, authDeniedErr
 	}
 	return res, nil
 }

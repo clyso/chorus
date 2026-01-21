@@ -167,31 +167,49 @@ func toPbDowntimeOpts(in entity.ReplicationSwitchDowntimeOpts) *pb.SwitchDowntim
 	}
 }
 
-func toPbStorages(in objstore.Config) []*pb.Storage {
-	res := make([]*pb.Storage, 0, len(in.Storages))
-	for name, storConf := range in.Storages {
+func toPbStorages(credsSvc objstore.CredsService) []*pb.Storage {
+	storages := credsSvc.Storages()
+	res := make([]*pb.Storage, 0, len(storages))
+	for name, storType := range storages {
 		storage := &pb.Storage{
 			Name:     name,
-			IsMain:   name == in.Main,
-			Provider: pb.Storage_Type(pb.Storage_Type_value[string(storConf.Type)]),
+			IsMain:   name == credsSvc.MainStorage(),
+			Provider: pb.Storage_Type(pb.Storage_Type_value[string(storType)]),
 		}
-		switch storConf.Type {
+		users := credsSvc.ListUsers(name)
+		switch storType {
 		case dom.S3:
-			for user, creds := range storConf.S3.Credentials {
+			for _, user := range users {
+				creds, err := credsSvc.GetS3Credentials(name, user)
+				if err != nil {
+					continue
+				}
 				storage.Credentials = append(storage.Credentials, &pb.Credential{
 					Alias:     user,
 					AccessKey: creds.AccessKeyID,
 				})
 			}
-			storage.Address = storConf.S3.Address
+			addr, err := credsSvc.GetS3Address(name)
+			if err != nil {
+				continue
+			}
+			storage.Address = addr.Address
 		case dom.Swift:
-			for user, creds := range storConf.Swift.Credentials {
+			for _, user := range users {
+				creds, err := credsSvc.GetSwiftCredentials(name, user)
+				if err != nil {
+					continue
+				}
 				storage.Credentials = append(storage.Credentials, &pb.Credential{
 					Alias:     user,
 					AccessKey: creds.Username,
 				})
 			}
-			storage.Address = fmt.Sprintf("[%s, Endpoint: %s]", storConf.Swift.AuthURL, storConf.Swift.StorageEndpointName)
+			storConf, err := credsSvc.GetSwiftAddress(name)
+			if err != nil {
+				continue
+			}
+			storage.Address = fmt.Sprintf("[%s, Endpoint: %s]", storConf.AuthURL, storConf.StorageEndpointName)
 		}
 		slices.SortFunc(storage.Credentials, func(a, b *pb.Credential) int {
 			if n := strings.Compare(a.Alias, b.Alias); n != 0 {

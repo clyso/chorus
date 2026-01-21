@@ -27,8 +27,7 @@ import (
 )
 
 const (
-	defaultHealthCheckInterval = time.Second * 5
-	defaultHttpTimeout         = time.Minute * 10
+	defaultHttpTimeout = time.Minute * 10
 )
 
 // Provider defines the S3 storage provider type
@@ -56,14 +55,17 @@ func (p Provider) SupportsRetainVersionID() bool {
 }
 
 type Storage struct {
-	Credentials   map[string]CredentialsV4 `yaml:"credentials"`
-	Address       string                   `yaml:"address"`
-	Provider      Provider                 `yaml:"provider"`
-	DefaultRegion string                   `yaml:"defaultRegion"`
+	Credentials    map[string]CredentialsV4 `yaml:"credentials"`
+	StorageAddress `yaml:",inline" mapstructure:",squash"`
+}
 
-	HealthCheckInterval time.Duration `yaml:"healthCheckInterval"`
-	HttpTimeout         time.Duration `yaml:"httpTimeout"`
-	IsSecure            bool          `yaml:"isSecure"`
+type StorageAddress struct {
+	Address       string   `yaml:"address"`
+	Provider      Provider `yaml:"provider"`
+	DefaultRegion string   `yaml:"defaultRegion"`
+
+	HttpTimeout time.Duration `yaml:"httpTimeout"`
+	IsSecure    bool          `yaml:"isSecure"`
 }
 
 func (s *Storage) HasUser(user string) bool {
@@ -84,22 +86,23 @@ type CredentialsV4 struct {
 	SecretAccessKey string `yaml:"secretAccessKey"`
 }
 
-func (s *Storage) Validate() error {
-	if len(s.Credentials) == 0 {
-		return fmt.Errorf("%w: no credentials in S3 storage config", dom.ErrInvalidStorageConfig)
+func (c CredentialsV4) Validate() error {
+	if c.AccessKeyID == "" {
+		return fmt.Errorf("%w: accessKeyID is not set", dom.ErrInvalidStorageConfig)
 	}
+	if c.SecretAccessKey == "" {
+		return fmt.Errorf("%w: secretAccessKey is not set", dom.ErrInvalidStorageConfig)
+	}
+	return nil
+}
+
+func (s *Storage) Validate() error {
 	for user, cred := range s.Credentials {
-		if cred.SecretAccessKey == "" {
-			return fmt.Errorf("%w: secretAccessKey for S3 user %q is not set", dom.ErrInvalidStorageConfig, user)
-		}
-		if cred.AccessKeyID == "" {
-			return fmt.Errorf("%w: accessKeyID for S3 user %q is not set", dom.ErrInvalidStorageConfig, user)
+		if err := cred.Validate(); err != nil {
+			return fmt.Errorf("%w: for user %q", err, user)
 		}
 	}
 
-	if s.HealthCheckInterval == 0 {
-		s.HealthCheckInterval = defaultHealthCheckInterval
-	}
 	if s.HttpTimeout == 0 {
 		s.HttpTimeout = defaultHttpTimeout
 	}

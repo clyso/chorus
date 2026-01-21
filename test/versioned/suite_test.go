@@ -205,24 +205,28 @@ var _ = Describe("Minio versioned migration", func() {
 
 		s3Storages := map[string]s3.Storage{
 			CMinioSrcInstance: {
-				Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+				StorageAddress: s3.StorageAddress{
+					Address:  fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+					Provider: CMinioProvider,
+				},
 				Credentials: map[string]s3.CredentialsV4{
 					CSyncUserKey: {
 						AccessKeyID:     CMinioSrcUser,
 						SecretAccessKey: CMinioSrcPass,
 					},
 				},
-				Provider: CMinioProvider,
 			},
 			CMinioDestInstance: {
-				Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
+				StorageAddress: s3.StorageAddress{
+					Address:  fmt.Sprintf("http://%s", minioDestS3Endpoint),
+					Provider: CMinioProvider,
+				},
 				Credentials: map[string]s3.CredentialsV4{
 					CSyncUserKey: {
 						AccessKeyID:     CMinioDestUser,
 						SecretAccessKey: CMinioDestPass,
 					},
 				},
-				Provider: CMinioProvider,
 			},
 		}
 		mainStorage := CMinioSrcInstance
@@ -506,24 +510,28 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 
 		s3Storages := map[string]s3.Storage{
 			CCephSrcInstance: {
-				Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+				StorageAddress: s3.StorageAddress{
+					Address:  fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+					Provider: CCephProvider,
+				},
 				Credentials: map[string]s3.CredentialsV4{
 					CSyncUserKey: {
 						AccessKeyID:     CCephSrcAccessKey,
 						SecretAccessKey: CCephSrcSecretKey,
 					},
 				},
-				Provider: CCephProvider,
 			},
 			CCephDestInstance: {
-				Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
+				StorageAddress: s3.StorageAddress{
+					Address:  fmt.Sprintf("http://%s", minioDestS3Endpoint),
+					Provider: CCephProvider,
+				},
 				Credentials: map[string]s3.CredentialsV4{
 					CSyncUserKey: {
 						AccessKeyID:     CCephDestAccessKey,
 						SecretAccessKey: CCephDestSecretKey,
 					},
 				},
-				Provider: CCephProvider,
 			},
 		}
 		mainStorage := CCephSrcInstance
@@ -796,14 +804,16 @@ var _ = Describe("Ceph system user versioned migration", func() {
 							Type: dom.S3,
 						},
 						S3: &s3.Storage{
-							Address: fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+							StorageAddress: s3.StorageAddress{
+								Address:  fmt.Sprintf("http://%s", minioSrcS3Endpoint),
+								Provider: CCephProvider,
+							},
 							Credentials: map[string]s3.CredentialsV4{
 								CSyncUserKey: {
 									AccessKeyID:     CCephSrcUserAccessKey,
 									SecretAccessKey: CCephSrcUserSecretKey,
 								},
 							},
-							Provider: CCephProvider,
 						},
 					},
 					CCephDestInstance: {
@@ -811,14 +821,16 @@ var _ = Describe("Ceph system user versioned migration", func() {
 							Type: dom.S3,
 						},
 						S3: &s3.Storage{
-							Address: fmt.Sprintf("http://%s", minioDestS3Endpoint),
+							StorageAddress: s3.StorageAddress{
+								Address:  fmt.Sprintf("http://%s", minioDestS3Endpoint),
+								Provider: CCephProvider,
+							},
 							Credentials: map[string]s3.CredentialsV4{
 								CSyncUserKey: {
 									AccessKeyID:     cephSrcAccessConfig.SystemUser,
 									SecretAccessKey: cephSrcAccessConfig.SystemPassword,
 								},
 							},
-							Provider: CCephProvider,
 						},
 					},
 				},

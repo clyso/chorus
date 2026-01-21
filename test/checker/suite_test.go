@@ -148,24 +148,28 @@ var _ = BeforeSuite(func() {
 
 	s3Storages := map[string]s3.Storage{
 		CStorage1Key: {
-			Address: fmt.Sprintf("http://%s", minioS3Endpoint),
+			StorageAddress: s3.StorageAddress{
+				Address:  fmt.Sprintf("http://%s", minioS3Endpoint),
+				Provider: CMinioProvider,
+			},
 			Credentials: map[string]s3.CredentialsV4{
 				CSyncUserKey: {
 					AccessKeyID:     CMinioUser,
 					SecretAccessKey: CMinioPass,
 				},
 			},
-			Provider: CMinioProvider,
 		},
 		CStorage2Key: {
-			Address: fmt.Sprintf("http://%s", minioS3Endpoint),
+			StorageAddress: s3.StorageAddress{
+				Address:  fmt.Sprintf("http://%s", minioS3Endpoint),
+				Provider: CMinioProvider,
+			},
 			Credentials: map[string]s3.CredentialsV4{
 				CSyncUserKey: {
 					AccessKeyID:     CMinioUser,
 					SecretAccessKey: CMinioPass,
 				},
 			},
-			Provider: CMinioProvider,
 		},
 	}
 	mainStorage := CStorage1Key

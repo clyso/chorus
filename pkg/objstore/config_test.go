@@ -45,44 +45,53 @@ storages:
         domainName: domain2
         tenantName: tenant2`
 
-func TestStoragesConfig_Validate(t *testing.T) {
-	var (
-		validS3 = s3.Storage{
-			Credentials: map[string]s3.CredentialsV4{
-				"user": {
-					AccessKeyID:     "id",
-					SecretAccessKey: "key",
-				},
+var (
+	validUser = "user"
+	validS3   = s3.Storage{
+		Credentials: map[string]s3.CredentialsV4{
+			validUser: {
+				AccessKeyID:     "id",
+				SecretAccessKey: "key",
 			},
+		},
+		StorageAddress: s3.StorageAddress{
 			Address:  "clyso.com",
 			Provider: "Ceph",
 			IsSecure: false,
-		}
-		invalidS3 = s3.Storage{
-			Credentials: nil, // missing credentials
-			Address:     "clyso.com",
-			Provider:    "Ceph",
-			IsSecure:    false,
-		}
-		validSwift = swift.Storage{
-			Credentials: map[string]swift.Credentials{
-				"user": {
-					Username:   "username",
-					Password:   "password",
-					DomainName: "domain",
-					TenantName: "tenant",
-				},
+		},
+	}
+	invalidS3 = s3.Storage{
+		Credentials: nil,
+		StorageAddress: s3.StorageAddress{
+			Address:  "", // missing address
+			Provider: "Ceph",
+			IsSecure: false,
+		},
+	}
+	validSwift = swift.Storage{
+		Credentials: map[string]swift.Credentials{
+			validUser: {
+				Username:   "username",
+				Password:   "password",
+				DomainName: "domain",
+				TenantName: "tenant",
 			},
+		},
+		StorageAddress: swift.StorageAddress{
 			StorageEndpointName: "endpoint",
 			AuthURL:             "http://auth.url",
-		}
-		invalidSwift = swift.Storage{
-			Credentials:         nil, // missing credentials
+		},
+	}
+	invalidSwift = swift.Storage{
+		Credentials: nil,
+		StorageAddress: swift.StorageAddress{
 			StorageEndpointName: "endpoint",
-			AuthURL:             "http://auth.url",
-		}
-	)
+			AuthURL:             "", // missing auth
+		},
+	}
+)
 
+func TestStoragesConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      Config
@@ -305,13 +314,17 @@ func TestStoragesConfig_Map(t *testing.T) {
 			"s3": {
 				CommonConfig: CommonConfig{Type: dom.S3},
 				S3: &s3.Storage{
-					Address: "clyso.com",
+					StorageAddress: s3.StorageAddress{
+						Address: "clyso.com",
+					},
 				},
 			},
 			"swift": {
 				CommonConfig: CommonConfig{Type: dom.Swift},
 				Swift: &swift.Storage{
-					AuthURL: "http://auth.url",
+					StorageAddress: swift.StorageAddress{
+						AuthURL: "http://auth.url",
+					},
 				},
 			},
 		},
@@ -390,9 +403,11 @@ func Test_YAML_Marshal(t *testing.T) {
 					},
 				},
 				S3: &s3.Storage{
-					Address:  "clyso.com",
-					Provider: "Ceph",
-					IsSecure: false,
+					StorageAddress: s3.StorageAddress{
+						Address:  "clyso.com",
+						Provider: "Ceph",
+						IsSecure: false,
+					},
 					Credentials: map[string]s3.CredentialsV4{
 						"user1": {
 							AccessKeyID:     "id1",
@@ -414,8 +429,10 @@ func Test_YAML_Marshal(t *testing.T) {
 					},
 				},
 				Swift: &swift.Storage{
-					AuthURL:             "http://auth.url",
-					StorageEndpointName: "endpoint",
+					StorageAddress: swift.StorageAddress{
+						AuthURL:             "http://auth.url",
+						StorageEndpointName: "endpoint",
+					},
 					Credentials: map[string]swift.Credentials{
 						"user1": {
 							Username:   "username1",

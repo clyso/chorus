@@ -26,9 +26,9 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/meta"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -38,7 +38,7 @@ type Router interface {
 }
 
 func NewS3Router(
-	clients s3client.Service,
+	clients objstore.Clients,
 	versionSvc meta.VersionService,
 	uploadSvc *storage.UploadSvc,
 	limit ratelimit.RPM) Router {
@@ -51,7 +51,7 @@ func NewS3Router(
 }
 
 type s3Router struct {
-	clients    s3client.Service
+	clients    objstore.Clients
 	versionSvc meta.VersionService
 	uploadSvc  *storage.UploadSvc
 	limit      ratelimit.RPM

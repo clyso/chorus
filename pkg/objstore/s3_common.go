@@ -20,24 +20,10 @@ import (
 	"github.com/clyso/chorus/pkg/s3client"
 )
 
-func wrapS3Common(s3 s3client.Service) commonGetter {
-	return &s3Common{
-		s3: s3,
-	}
-}
-
-type s3Common struct {
-	s3 s3client.Service
-}
-
-func (s *s3Common) AsCommon(ctx context.Context, storage string, user string) (Common, error) {
-	client, err := s.s3.GetByName(ctx, user, storage)
-	if err != nil {
-		return nil, err
-	}
+func wrapS3common(client s3client.Client) Common {
 	return &s3CommonClient{
 		client: client,
-	}, nil
+	}
 }
 
 type s3CommonClient struct {

@@ -34,7 +34,7 @@ func (r *s3Router) createBucket(req *http.Request) (resp *http.Response, task *t
 	bucket := xctx.GetBucket(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -65,7 +65,7 @@ func (r *s3Router) deleteBucket(req *http.Request) (resp *http.Response, task *t
 	bucket := xctx.GetBucket(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
 
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -85,7 +85,7 @@ func (r *s3Router) listBuckets(req *http.Request) (resp *http.Response, storage 
 
 	user := xctx.GetUser(ctx)
 	storage = xctx.GetRoutingPolicy(ctx)
-	client, err := r.clients.GetByName(ctx, user, storage)
+	client, err := r.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return nil, "", false, err
 	}

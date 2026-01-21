@@ -21,28 +21,12 @@ import (
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/pagination"
-
-	"github.com/clyso/chorus/pkg/swift"
 )
 
-func wrapSwiftCommon(client swift.Client) commonGetter {
-	return &swiftCommon{
-		client: client,
-	}
-}
-
-type swiftCommon struct {
-	client swift.Client
-}
-
-func (s *swiftCommon) AsCommon(ctx context.Context, storage string, user string) (Common, error) {
-	client, err := s.client.For(ctx, storage, user)
-	if err != nil {
-		return nil, err
-	}
+func wrapSwiftCommon(client *gophercloud.ServiceClient) Common {
 	return &swiftCommonClient{
 		client: client,
-	}, nil
+	}
 }
 
 type swiftCommonClient struct {

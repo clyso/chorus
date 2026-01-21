@@ -18,147 +18,22 @@ package s3client
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"sync/atomic"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	aws_credentials "github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
 	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func newClient(ctx context.Context, conf s3.Storage, name, user string, metricsSvc metrics.Service, _ trace.TracerProvider) (Client, error) {
-	c := &client{
-		c: &http.Client{
-			Timeout: conf.HttpTimeout,
-		},
-		online:     &atomic.Bool{},
-		conf:       conf,
-		name:       name,
-		user:       user,
-		cred:       conf.Credentials[user],
-		metricsSvc: metricsSvc,
-	}
-	host := strings.TrimPrefix(conf.Address, "http://")
-	host = strings.TrimPrefix(host, "https://")
-
-	mc, err := mclient.New(host, &mclient.Options{
-		Creds:  credentials.NewStaticV4(c.cred.AccessKeyID, c.cred.SecretAccessKey, ""),
-		Secure: conf.IsSecure,
-	})
-	if err != nil {
-		return nil, err
-	}
-	c.s3 = newMinioClient(name, user, mc, metricsSvc)
-	if err = isOnline(ctx, c); err != nil {
-		return nil, fmt.Errorf("s3 is offline: %w", err)
-	}
-	c.online.Store(true)
-	go func(duration time.Duration) {
-		timer := time.NewTimer(duration)
-		defer timer.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-timer.C:
-				// Do health check the first time and ONLY if the connection is marked offline
-				if !c.online.Load() {
-					if err = isOnline(ctx, c); err != nil {
-						c.online.Store(true)
-					}
-				}
-				timer.Reset(duration)
-			}
-		}
-	}(conf.HealthCheckInterval)
-
-	awsClient, err := newAWSClient(conf, name, user, metricsSvc)
-	if err != nil {
-		return nil, err
-	}
-	c.aws = awsClient
-	snsEndpoint := conf.Address
-	if !strings.HasPrefix(snsEndpoint, "http") {
-		if conf.IsSecure {
-			snsEndpoint = "https://" + snsEndpoint
-		} else {
-			snsEndpoint = "http://" + snsEndpoint
-		}
-	}
-
-	c.sns = sns.NewFromConfig(aws.Config{
-		Region:      "default",
-		Credentials: aws_credentials.NewStaticCredentialsProvider(conf.Credentials[user].AccessKeyID, conf.Credentials[user].SecretAccessKey, ""),
-		// EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-		// 	return aws.Endpoint{URL: snsEndpoint}, nil
-		// }),
-		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, opts ...interface{}) (aws.Endpoint, error) {
-			return aws.Endpoint{URL: snsEndpoint}, nil
-		}),
-	})
-
-	return c, nil
-}
-
-func isOnline(ctx context.Context, c *client) error {
-	_, err := c.s3.GetBucketLocation(ctx, "probe-health-test")
-	if err == nil {
-		return nil
-	} else if !mclient.IsNetworkOrHostDown(err, false) {
-		switch mclient.ToErrorResponse(err).Code {
-		case "NoSuchBucket", "AccessDenied", "":
-			return nil
-		}
-	}
-	return err
-}
-
-type client struct {
-	metricsSvc metrics.Service
-	c          *http.Client
-	s3         *S3
-	aws        *AWS
-	sns        *sns.Client
-	online     *atomic.Bool
-	cred       s3.CredentialsV4
-	name       string
-	user       string
-	conf       s3.Storage
-}
-
-func (c *client) SNS() *sns.Client {
-	return c.sns
-}
-
-func (c *client) AWS() *AWS {
-	return c.aws
-}
-
-func (c *client) Config() s3.Storage {
-	return c.conf
-}
-
-func (c *client) S3() *S3 {
-	return c.s3
-}
-
 func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err error) {
 	ctx, span := otel.Tracer("").Start(req.Context(), fmt.Sprintf("clientDo.%s", xctx.GetMethod(req.Context()).String()))
-	span.SetAttributes(attribute.String("storage", c.name), attribute.String("user", c.user))
+	span.SetAttributes(attribute.String("storage", c.storageName), attribute.String("user", c.userName))
 	if xctx.GetBucket(ctx) != "" {
 		span.SetAttributes(attribute.String("bucket", xctx.GetBucket(ctx)))
 	}
@@ -168,25 +43,20 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	defer span.End()
 	req = req.WithContext(ctx)
 	defer func() {
-		if mclient.IsNetworkOrHostDown(err, false) {
-			c.online.Store(false)
-		}
-	}()
-	defer func() {
 		if err != nil {
 			return
 		}
 		method := xctx.GetMethod(req.Context())
 		flow := xctx.GetFlow(req.Context())
-		c.metricsSvc.Count(flow, c.name, method.String())
+		c.metricsSvc.Count(flow, c.storageName, method.String())
 		switch method {
 		case s3.GetObject:
 			if resp.ContentLength != 0 {
-				c.metricsSvc.Download(flow, c.name, xctx.GetBucket(req.Context()), int(resp.ContentLength))
+				c.metricsSvc.Download(flow, c.storageName, xctx.GetBucket(req.Context()), int(resp.ContentLength))
 			}
 		case s3.PutObject, s3.UploadPart:
 			if req.ContentLength != 0 {
-				c.metricsSvc.Upload(flow, c.name, xctx.GetBucket(req.Context()), int(req.ContentLength))
+				c.metricsSvc.Upload(flow, c.storageName, xctx.GetBucket(req.Context()), int(req.ContentLength))
 			}
 		}
 	}()
@@ -259,8 +129,4 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		return nil, false, err
 	}
 	return
-}
-
-func (c *client) IsOnline() bool {
-	return c.online.Load()
 }

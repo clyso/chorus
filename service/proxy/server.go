@@ -33,12 +33,12 @@ import (
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
@@ -102,7 +102,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return err
 	}
 	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main)
-	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 
 	// configure object storage proxies:
 	proxyConfig := router.Config{
@@ -119,13 +118,22 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		proxyConfig.TraceMiddleware = trace.HttpMiddleware(tp)
 	}
 	if s3Conf := conf.Storage.S3Storages(); len(s3Conf) != 0 {
-		s3Clients, err := s3client.New(ctx, s3Conf, metricsSvc, tp)
+		metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
+		credsConf, err := ProxyToCredsConf(conf.Storage)
 		if err != nil {
 			return err
 		}
-		routeSvc := router.NewS3Router(s3Clients, verSvc, uploadSvc, limiter)
+		credsSvc, err := objstore.NewCredsSvc(ctx, &credsConf, appRedis)
+		if err != nil {
+			return err
+		}
+		clientRegistry, err := objstore.NewRegistry(ctx, credsSvc, metricsSvc)
+		if err != nil {
+			return err
+		}
+		routeSvc := router.NewS3Router(clientRegistry, verSvc, uploadSvc, limiter)
 		replSvc := replication.NewS3(queueSvc, verSvc, policySvc)
-		authCheck := auth.Middleware(conf.Auth, conf.Storage.S3Storages())
+		authCheck := auth.Middleware(conf.Auth, credsSvc)
 		proxyConfig.Storages[dom.S3] = router.StorageProxy{
 			Router:             routeSvc,
 			Replicator:         replSvc,
