@@ -35,7 +35,7 @@ func Test_api_proxy_creds(t *testing.T) {
 	r := require.New(t)
 	res, err := e.ChorusClient.GetProxyCredentials(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
-	r.Contains(res.Address, "localhost")
+	r.Contains(res.Address, "127.0.0.1")
 	r.Len(res.Credentials, 1)
 	r.EqualValues(res.Credentials[0].Alias, user)
 	r.NotEmpty(res.Credentials[0].AccessKey)

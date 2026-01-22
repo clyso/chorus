@@ -464,6 +464,194 @@ func (x *Agent) GetUrl() string {
 	return ""
 }
 
+type SetUserCredentialsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
+	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	S3Cred        *S3Credential          `protobuf:"bytes,3,opt,name=s3_cred,json=s3Cred,proto3,oneof" json:"s3_cred,omitempty"`
+	SwiftCred     *SwiftCredential       `protobuf:"bytes,4,opt,name=swift_cred,json=swiftCred,proto3,oneof" json:"swift_cred,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetUserCredentialsRequest) Reset() {
+	*x = SetUserCredentialsRequest{}
+	mi := &file_chorus_chorus_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetUserCredentialsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetUserCredentialsRequest) ProtoMessage() {}
+
+func (x *SetUserCredentialsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetUserCredentialsRequest.ProtoReflect.Descriptor instead.
+func (*SetUserCredentialsRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SetUserCredentialsRequest) GetStorage() string {
+	if x != nil {
+		return x.Storage
+	}
+	return ""
+}
+
+func (x *SetUserCredentialsRequest) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *SetUserCredentialsRequest) GetS3Cred() *S3Credential {
+	if x != nil {
+		return x.S3Cred
+	}
+	return nil
+}
+
+func (x *SetUserCredentialsRequest) GetSwiftCred() *SwiftCredential {
+	if x != nil {
+		return x.SwiftCred
+	}
+	return nil
+}
+
+type S3Credential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessKey     string                 `protobuf:"bytes,1,opt,name=access_key,json=accessKey,proto3" json:"access_key,omitempty"`
+	SecretKey     string                 `protobuf:"bytes,2,opt,name=secret_key,json=secretKey,proto3" json:"secret_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *S3Credential) Reset() {
+	*x = S3Credential{}
+	mi := &file_chorus_chorus_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *S3Credential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*S3Credential) ProtoMessage() {}
+
+func (x *S3Credential) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use S3Credential.ProtoReflect.Descriptor instead.
+func (*S3Credential) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *S3Credential) GetAccessKey() string {
+	if x != nil {
+		return x.AccessKey
+	}
+	return ""
+}
+
+func (x *S3Credential) GetSecretKey() string {
+	if x != nil {
+		return x.SecretKey
+	}
+	return ""
+}
+
+type SwiftCredential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	DomainName    string                 `protobuf:"bytes,3,opt,name=domain_name,json=domainName,proto3" json:"domain_name,omitempty"`
+	TenantName    string                 `protobuf:"bytes,4,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwiftCredential) Reset() {
+	*x = SwiftCredential{}
+	mi := &file_chorus_chorus_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwiftCredential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwiftCredential) ProtoMessage() {}
+
+func (x *SwiftCredential) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwiftCredential.ProtoReflect.Descriptor instead.
+func (*SwiftCredential) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SwiftCredential) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *SwiftCredential) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *SwiftCredential) GetDomainName() string {
+	if x != nil {
+		return x.DomainName
+	}
+	return ""
+}
+
+func (x *SwiftCredential) GetTenantName() string {
+	if x != nil {
+		return x.TenantName
+	}
+	return ""
+}
+
 var File_chorus_chorus_proto protoreflect.FileDescriptor
 
 const file_chorus_chorus_proto_rawDesc = "" +
@@ -498,12 +686,34 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x06agents\x18\x01 \x03(\v2\r.chorus.AgentR\x06agents\"3\n" +
 	"\x05Agent\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url2\xa8\x02\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"\xd5\x01\n" +
+	"\x19SetUserCredentialsRequest\x12\x18\n" +
+	"\astorage\x18\x01 \x01(\tR\astorage\x12\x12\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\x122\n" +
+	"\as3_cred\x18\x03 \x01(\v2\x14.chorus.S3CredentialH\x00R\x06s3Cred\x88\x01\x01\x12;\n" +
+	"\n" +
+	"swift_cred\x18\x04 \x01(\v2\x17.chorus.SwiftCredentialH\x01R\tswiftCred\x88\x01\x01B\n" +
+	"\n" +
+	"\b_s3_credB\r\n" +
+	"\v_swift_cred\"L\n" +
+	"\fS3Credential\x12\x1d\n" +
+	"\n" +
+	"access_key\x18\x01 \x01(\tR\taccessKey\x12\x1d\n" +
+	"\n" +
+	"secret_key\x18\x02 \x01(\tR\tsecretKey\"\x8b\x01\n" +
+	"\x0fSwiftCredential\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1f\n" +
+	"\vdomain_name\x18\x03 \x01(\tR\n" +
+	"domainName\x12\x1f\n" +
+	"\vtenant_name\x18\x04 \x01(\tR\n" +
+	"tenantName2\xf9\x02\n" +
 	"\x06Chorus\x12F\n" +
 	"\rGetAppVersion\x12\x16.google.protobuf.Empty\x1a\x1d.chorus.GetAppVersionResponse\x12B\n" +
 	"\vGetStorages\x12\x16.google.protobuf.Empty\x1a\x1b.chorus.GetStoragesResponse\x12R\n" +
 	"\x13GetProxyCredentials\x12\x16.google.protobuf.Empty\x1a#.chorus.GetProxyCredentialsResponse\x12>\n" +
-	"\tGetAgents\x12\x16.google.protobuf.Empty\x1a\x19.chorus.GetAgentsResponseB)Z'github.com/clyso/chorus/proto/chorus;pbb\x06proto3"
+	"\tGetAgents\x12\x16.google.protobuf.Empty\x1a\x19.chorus.GetAgentsResponse\x12O\n" +
+	"\x12SetUserCredentials\x12!.chorus.SetUserCredentialsRequest\x1a\x16.google.protobuf.EmptyB)Z'github.com/clyso/chorus/proto/chorus;pbb\x06proto3"
 
 var (
 	file_chorus_chorus_proto_rawDescOnce sync.Once
@@ -518,7 +728,7 @@ func file_chorus_chorus_proto_rawDescGZIP() []byte {
 }
 
 var file_chorus_chorus_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_chorus_chorus_proto_goTypes = []any{
 	(Storage_Type)(0),                   // 0: chorus.Storage.Type
 	(*GetAppVersionResponse)(nil),       // 1: chorus.GetAppVersionResponse
@@ -528,27 +738,34 @@ var file_chorus_chorus_proto_goTypes = []any{
 	(*GetProxyCredentialsResponse)(nil), // 5: chorus.GetProxyCredentialsResponse
 	(*GetAgentsResponse)(nil),           // 6: chorus.GetAgentsResponse
 	(*Agent)(nil),                       // 7: chorus.Agent
-	(*emptypb.Empty)(nil),               // 8: google.protobuf.Empty
+	(*SetUserCredentialsRequest)(nil),   // 8: chorus.SetUserCredentialsRequest
+	(*S3Credential)(nil),                // 9: chorus.S3Credential
+	(*SwiftCredential)(nil),             // 10: chorus.SwiftCredential
+	(*emptypb.Empty)(nil),               // 11: google.protobuf.Empty
 }
 var file_chorus_chorus_proto_depIdxs = []int32{
-	3, // 0: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
-	0, // 1: chorus.Storage.provider:type_name -> chorus.Storage.Type
-	4, // 2: chorus.Storage.credentials:type_name -> chorus.Credential
-	4, // 3: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
-	7, // 4: chorus.GetAgentsResponse.agents:type_name -> chorus.Agent
-	8, // 5: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
-	8, // 6: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
-	8, // 7: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
-	8, // 8: chorus.Chorus.GetAgents:input_type -> google.protobuf.Empty
-	1, // 9: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
-	2, // 10: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
-	5, // 11: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
-	6, // 12: chorus.Chorus.GetAgents:output_type -> chorus.GetAgentsResponse
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	3,  // 0: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
+	0,  // 1: chorus.Storage.provider:type_name -> chorus.Storage.Type
+	4,  // 2: chorus.Storage.credentials:type_name -> chorus.Credential
+	4,  // 3: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
+	7,  // 4: chorus.GetAgentsResponse.agents:type_name -> chorus.Agent
+	9,  // 5: chorus.SetUserCredentialsRequest.s3_cred:type_name -> chorus.S3Credential
+	10, // 6: chorus.SetUserCredentialsRequest.swift_cred:type_name -> chorus.SwiftCredential
+	11, // 7: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
+	11, // 8: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
+	11, // 9: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
+	11, // 10: chorus.Chorus.GetAgents:input_type -> google.protobuf.Empty
+	8,  // 11: chorus.Chorus.SetUserCredentials:input_type -> chorus.SetUserCredentialsRequest
+	1,  // 12: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
+	2,  // 13: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
+	5,  // 14: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
+	6,  // 15: chorus.Chorus.GetAgents:output_type -> chorus.GetAgentsResponse
+	11, // 16: chorus.Chorus.SetUserCredentials:output_type -> google.protobuf.Empty
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_chorus_chorus_proto_init() }
@@ -556,13 +773,14 @@ func file_chorus_chorus_proto_init() {
 	if File_chorus_chorus_proto != nil {
 		return
 	}
+	file_chorus_chorus_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chorus_chorus_proto_rawDesc), len(file_chorus_chorus_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

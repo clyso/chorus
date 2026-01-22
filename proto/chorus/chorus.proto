@@ -18,6 +18,10 @@ service Chorus {
       returns (GetProxyCredentialsResponse);
   // Returns list of registered chorus agents.
   rpc GetAgents(google.protobuf.Empty) returns (GetAgentsResponse);
+
+  // Sets user credentials for a given storage.
+  rpc SetUserCredentials(SetUserCredentialsRequest)
+      returns (google.protobuf.Empty);
 }
 
 message GetAppVersionResponse {
@@ -62,4 +66,23 @@ message Agent {
   string storage = 1;
   // Webhook URL of chorus agent to be used for agent-based replication.
   string url = 2;
+}
+
+message SetUserCredentialsRequest {
+  string storage = 1;
+  string user = 2;
+  optional S3Credential s3_cred = 3;
+  optional SwiftCredential swift_cred = 4;
+}
+
+message S3Credential {
+  string access_key = 1;
+  string secret_key = 2;
+}
+
+message SwiftCredential {
+  string username = 1;
+  string password = 2;
+  string domain_name = 3;
+  string tenant_name = 4;
 }

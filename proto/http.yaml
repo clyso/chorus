@@ -25,6 +25,9 @@ http:
       get: /proxy
     - selector: chorus.Chorus.GetAgents
       get: /agents
+    - selector: chorus.Chorus.SetUserCredentials
+      body: "*"
+      post: /credentials
       # Policy service - replication:
     - selector: chorus.Policy.AvailableBuckets
       post: /replication/list-buckets
