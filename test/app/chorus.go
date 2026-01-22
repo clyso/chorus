@@ -48,11 +48,11 @@ type Chorus struct {
 func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Config) Chorus {
 	t.Helper()
 	var err error
-	proxyConf, err = deepCopyStruct(proxyConf)
+	proxyConf, err = DeepCopyStruct(proxyConf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workerConf, err = deepCopyStruct(workerConf)
+	workerConf, err = DeepCopyStruct(workerConf)
 	if err != nil {
 		t.Fatal(err)
 	}

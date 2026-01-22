@@ -18,12 +18,15 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/rpc"
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
@@ -80,4 +83,47 @@ func (h *chorusHandlers) GetAgents(ctx context.Context, _ *emptypb.Empty) (*pb.G
 		}
 	}
 	return &pb.GetAgentsResponse{Agents: res}, nil
+}
+
+func (h *chorusHandlers) SetUserCredentials(ctx context.Context, req *pb.SetUserCredentialsRequest) (*emptypb.Empty, error) {
+	if req.Storage == "" {
+		return nil, fmt.Errorf("%w: storage is required", dom.ErrInvalidArg)
+	}
+	if req.User == "" {
+		return nil, fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	storType, ok := h.credsSvc.Storages()[req.Storage]
+	if !ok {
+		return nil, fmt.Errorf("%w: storage %s not found", dom.ErrNotFound, req.Storage)
+	}
+	switch storType {
+	case dom.S3:
+		if req.S3Cred == nil {
+			return nil, fmt.Errorf("%w: s3 credentials are required for storage type S3", dom.ErrInvalidArg)
+		}
+		err := h.credsSvc.SetS3Credentials(ctx, req.Storage, req.User, s3.CredentialsV4{
+			AccessKeyID:     req.S3Cred.AccessKey,
+			SecretAccessKey: req.S3Cred.SecretKey,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &emptypb.Empty{}, nil
+	case dom.Swift:
+		if req.SwiftCred == nil {
+			return nil, fmt.Errorf("%w: swift credentials are required for storage type Swift", dom.ErrInvalidArg)
+		}
+		err := h.credsSvc.SetSwiftCredentials(ctx, req.Storage, req.User, swift.Credentials{
+			Username:   req.SwiftCred.Username,
+			Password:   req.SwiftCred.Password,
+			DomainName: req.SwiftCred.DomainName,
+			TenantName: req.SwiftCred.TenantName,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &emptypb.Empty{}, nil
+	default:
+		return nil, fmt.Errorf("%w: unsupported storage type %s", dom.ErrInvalidArg, storType)
+	}
 }

@@ -202,9 +202,13 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 			Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
 		},
 	}
+	proxyDC := proxyConf.Storage.DynamicCredentials
 	proxyConf.Storage = ProxyS3Config("main", storages)
+	proxyConf.Storage.DynamicCredentials = proxyDC
 
+	workerDC := workerConf.Storage.DynamicCredentials
 	workerConf.Storage = WorkerS3Config("main", storages)
+	workerConf.Storage.DynamicCredentials = workerDC
 	// deep copy proxy config
 	pcBytes, err := yaml.Marshal(&workerConf.Storage)
 	if err != nil {
@@ -216,13 +220,14 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	}
 
 	proxyConf.Auth.UseStorage = "main"
-	e.MainClient, e.MpMainClient = createClient(storages["main"])
-	e.F1Client, e.MpF1Client = createClient(storages["f1"])
-	e.F2Client, e.MpF2Client = createClient(storages["f2"])
+	e.MainClient, e.MpMainClient = CreateClient(t, storages["main"].StorageAddress, storages["main"].Credentials[user])
+	e.F1Client, e.MpF1Client = CreateClient(t, storages["f1"].StorageAddress, storages["f1"].Credentials[user])
+	e.F2Client, e.MpF2Client = CreateClient(t, storages["f2"].StorageAddress, storages["f2"].Credentials[user])
 
 	addr := ""
 	proxyConf.Port, addr = getRandomPort()
 	workerConf.Api.Enabled = true
+	proxyConf.Address = addr
 	grpcAddr := ""
 	workerConf.Api.GrpcPort, grpcAddr = getRandomPort()
 	workerConf.Api.HttpPort, e.UrlHttpApi = getRandomPort()
@@ -230,11 +235,11 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 	ctx := t.Context()
 
 	// do deep copy of configs before passing to goroutines to avoid panic on concurrent hashmap usage:
-	proxyConfCopy, err := deepCopyStruct(proxyConf)
+	proxyConfCopy, err := DeepCopyStruct(proxyConf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workerConfCopy, err := deepCopyStruct(workerConf)
+	workerConfCopy, err := DeepCopyStruct(workerConf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,13 +267,12 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 			t.Error("embedded env services exited with error:", err)
 		}
 	})
-	e.ProxyClient, e.MpProxyClient = createClient(s3.Storage{
-		StorageAddress: s3.StorageAddress{
+	e.ProxyClient, e.MpProxyClient = CreateClient(t,
+		s3.StorageAddress{
 			Address:  addr,
 			IsSecure: false,
 		},
-		Credentials: storages["main"].Credentials,
-	})
+		storages["main"].Credentials[user])
 	e.ProxyAwsClient = newAWSClient(s3.Storage{
 		StorageAddress: s3.StorageAddress{
 			Address:  addr,
@@ -310,19 +314,20 @@ func getRandomPort() (int, string) {
 	return port, addr
 }
 
-func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
-	addr := strings.TrimPrefix(c.Address, "http://")
+func CreateClient(t testing.TB, storAddr s3.StorageAddress, cred s3.CredentialsV4) (*mclient.Client, *mclient.Core) {
+	t.Helper()
+	addr := strings.TrimPrefix(storAddr.Address, "http://")
 	addr = strings.TrimPrefix(addr, "https://")
 	mc, err := mclient.New(addr, &mclient.Options{
-		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
-		Secure: c.IsSecure,
+		Creds:  credentials.NewStaticV4(cred.AccessKeyID, cred.SecretAccessKey, ""),
+		Secure: storAddr.IsSecure,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	cancelHC, err := mc.HealthCheck(time.Second)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	defer cancelHC()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -334,15 +339,15 @@ func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
 		ready = !mc.IsOffline()
 	}
 	if !ready {
-		panic("client " + addr + " is not ready")
+		t.Fatal("client " + addr + " is not ready")
 	}
 
 	core, err := mclient.NewCore(addr, &mclient.Options{
-		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
-		Secure: c.IsSecure,
+		Creds:  credentials.NewStaticV4(cred.AccessKeyID, cred.SecretAccessKey, ""),
+		Secure: storAddr.IsSecure,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	return mc, core
@@ -433,7 +438,7 @@ func newAWSClient(conf s3.Storage) *aws_s3.S3 {
 }
 
 // generic parameter function to deepcopy struct using yaml marshal/unmarshal
-func deepCopyStruct[T any](in T) (out T, err error) {
+func DeepCopyStruct[T any](in T) (out T, err error) {
 	b, err := yaml.Marshal(in)
 	if err != nil {
 		return out, err

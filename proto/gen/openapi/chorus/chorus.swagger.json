@@ -193,6 +193,40 @@
         ]
       }
     },
+    "/credentials": {
+      "post": {
+        "summary": "Sets user credentials for a given storage.",
+        "operationId": "Chorus_SetUserCredentials",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSetUserCredentialsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/proxy": {
       "get": {
         "summary": "Returns connection details for proxy s3 endpoint",
@@ -1469,6 +1503,34 @@
         }
       }
     },
+    "chorusS3Credential": {
+      "type": "object",
+      "properties": {
+        "accessKey": {
+          "type": "string"
+        },
+        "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusSetUserCredentialsRequest": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "s3Cred": {
+          "$ref": "#/definitions/chorusS3Credential"
+        },
+        "swiftCred": {
+          "$ref": "#/definitions/chorusSwiftCredential"
+        }
+      }
+    },
     "chorusStartConsistencyCheckRequest": {
       "type": "object",
       "properties": {
@@ -1517,6 +1579,23 @@
             "$ref": "#/definitions/chorusCredential"
           },
           "title": "credentials: access key (public, aka username)"
+        }
+      }
+    },
+    "chorusSwiftCredential": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "domainName": {
+          "type": "string"
+        },
+        "tenantName": {
+          "type": "string"
         }
       }
     },

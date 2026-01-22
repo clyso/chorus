@@ -24,6 +24,7 @@ const (
 	Chorus_GetStorages_FullMethodName         = "/chorus.Chorus/GetStorages"
 	Chorus_GetProxyCredentials_FullMethodName = "/chorus.Chorus/GetProxyCredentials"
 	Chorus_GetAgents_FullMethodName           = "/chorus.Chorus/GetAgents"
+	Chorus_SetUserCredentials_FullMethodName  = "/chorus.Chorus/SetUserCredentials"
 )
 
 // ChorusClient is the client API for Chorus service.
@@ -38,6 +39,8 @@ type ChorusClient interface {
 	GetProxyCredentials(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProxyCredentialsResponse, error)
 	// Returns list of registered chorus agents.
 	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
+	// Sets user credentials for a given storage.
+	SetUserCredentials(ctx context.Context, in *SetUserCredentialsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type chorusClient struct {
@@ -88,6 +91,16 @@ func (c *chorusClient) GetAgents(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
+func (c *chorusClient) SetUserCredentials(ctx context.Context, in *SetUserCredentialsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Chorus_SetUserCredentials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChorusServer is the server API for Chorus service.
 // All implementations should embed UnimplementedChorusServer
 // for forward compatibility.
@@ -100,6 +113,8 @@ type ChorusServer interface {
 	GetProxyCredentials(context.Context, *emptypb.Empty) (*GetProxyCredentialsResponse, error)
 	// Returns list of registered chorus agents.
 	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
+	// Sets user credentials for a given storage.
+	SetUserCredentials(context.Context, *SetUserCredentialsRequest) (*emptypb.Empty, error)
 }
 
 // UnimplementedChorusServer should be embedded to have
@@ -120,6 +135,9 @@ func (UnimplementedChorusServer) GetProxyCredentials(context.Context, *emptypb.E
 }
 func (UnimplementedChorusServer) GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAgents not implemented")
+}
+func (UnimplementedChorusServer) SetUserCredentials(context.Context, *SetUserCredentialsRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetUserCredentials not implemented")
 }
 func (UnimplementedChorusServer) testEmbeddedByValue() {}
 
@@ -213,6 +231,24 @@ func _Chorus_GetAgents_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Chorus_SetUserCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetUserCredentialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).SetUserCredentials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_SetUserCredentials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).SetUserCredentials(ctx, req.(*SetUserCredentialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Chorus_ServiceDesc is the grpc.ServiceDesc for Chorus service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -235,6 +271,10 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAgents",
 			Handler:    _Chorus_GetAgents_Handler,
+		},
+		{
+			MethodName: "SetUserCredentials",
+			Handler:    _Chorus_SetUserCredentials_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
