@@ -67,7 +67,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	// detect fake s3 storages in config
 	fake := map[string]int{}
 	for name, storage := range conf.Storage.Storages {
-		fmt.Println("aaaaaaaaaaaaaaaa", name, storage.Type, storage.S3.Address)
 		if storage.Type != dom.S3 {
 			// only fake s3 storages supported
 			continue
