@@ -4,76 +4,128 @@ kind: Deployment
 metadata:
   name: {{ include "chorus.fullname" . }}-agent
   labels:
-    app: agent
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
 spec:
   replicas: {{ .Values.agent.replicas }}
   selector:
     matchLabels:
-      app: agent
-    {{- include "chorus.selectorLabels" . | nindent 6 }}
+      {{- include "chorus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
   template:
     metadata:
       labels:
-        app: agent
-      {{- include "chorus.selectorLabels" . | nindent 8 }}
-      {{- if .Values.agent.config.metrics.enabled }}
+        {{- include "chorus.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/agent/config.yaml") . | sha256sum }}
+        {{- if include "chorus.createCredentialsSecret" . }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.agent.config.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
         prometheus.io/port: "9090"
-      {{- end }}
+        {{- end }}
+        {{- with .Values.agent.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "chorus.serviceAccountName" . }}
-      containers:
-      - env:
-        - name: CFG_REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: password
-              name: redis-secret
-        - name: CFG_REDIS_ADDRESS
-          value: {{ printf "%s-redis-master:6379" ( .Release.Name ) }}
-        {{- if empty .Values.agent.config.url }}
-        - name: CFG_URL
-          value: {{ printf "http://%s-agent.%s.svc.cluster.local:9672" (include "chorus.fullname" . ) ( .Release.Namespace  ) | quote }}
-        {{- end }}
-        image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
-        name: agent
-        ports:
-        - containerPort: {{ .Values.agent.config.port | default 9673 }}
-          name: http
-          protocol: TCP
-        {{- if .Values.agent.config.metrics.enabled }}
-        - containerPort: 9090
-          name: metrics
-          protocol: TCP
-        {{- end }}
-        readinessProbe:
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          tcpSocket:
-            port: {{ .Values.agent.config.port | default 9673 }}
-        livenessProbe:
-          initialDelaySeconds: 15
-          periodSeconds: 20
-          tcpSocket:
-            port: {{ .Values.agent.config.port | default 9673 }}
-        resources: {{- toYaml .Values.agent.resources | nindent 10 }}
-        securityContext:
-          allowPrivilegeEscalation: false
-        volumeMounts:
-        - mountPath: /bin/config/config.yaml
-          name: config
-          subPath: config
+      {{- with .Values.agent.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
+      containers:
+        - name: agent
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          {{- with .Values.agent.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: CFG_REDIS_ADDRESS
+              value: {{ include "chorus.redisAddresses" . | quote }}
+            - name: CFG_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chorus.redisSecretName" . }}
+                  key: {{ include "chorus.redisSecretKey" . }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.sentinel.masterName }}
+            - name: CFG_REDIS_SENTINEL_MASTERNAME
+              value: {{ .Values.externalRedis.sentinel.masterName | quote }}
+            {{- end }}
+            {{- if .Values.dynamicCredentials.enabled }}
+            - name: CFG_STORAGE_DYNAMICCREDENTIALS_MASTERPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chorus.dynamicCredentialsSecretName" . }}
+                  key: {{ include "chorus.dynamicCredentialsSecretKey" . }}
+            {{- end }}
+            {{- if not .Values.agent.config.url }}
+            - name: CFG_URL
+              value: {{ printf "http://%s-agent.%s.svc.cluster.local:%d" (include "chorus.fullname" .) .Release.Namespace (int .Values.agent.service.port) | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.agent.config.port }}
+              protocol: TCP
+            {{- if .Values.agent.config.metrics.enabled }}
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.agent.config.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.agent.config.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.agent.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /bin/config/config.yaml
+              subPath: config.yaml
+            {{- if or .Values.existingCredentialsSecret (include "chorus.createCredentialsSecret" .) }}
+            - name: credentials
+              mountPath: /bin/config/override.yaml
+              subPath: config.yaml
+            {{- end }}
       volumes:
-      - configMap:
-          name: {{ include "chorus.fullname" . }}-agent
-        name: config
+        - name: config
+          configMap:
+            name: {{ include "chorus.fullname" . }}-agent
+        {{- if or .Values.existingCredentialsSecret (include "chorus.createCredentialsSecret" .) }}
+        - name: credentials
+          secret:
+            secretName: {{ include "chorus.credentialsSecretName" . }}
+        {{- end }}
+      {{- $nodeSelector := include "chorus.nodeSelector" (list .Values.agent.nodeSelector .Values.global.nodeSelector) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := include "chorus.tolerations" (list .Values.agent.tolerations .Values.global.tolerations) }}
+      {{- if $tolerations }}
+      tolerations:
+        {{- $tolerations | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "chorus.affinity" (list .Values.agent.affinity .Values.global.affinity) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
 {{- end }}

@@ -3,8 +3,16 @@ kind: ConfigMap
 metadata:
   name: {{ include "chorus.fullname" . }}-worker
   labels:
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
 data:
-  config: |-     
-  {{- .Values.worker.config | toYaml | nindent 4 }}
-  {{- .Values.commonConfig | toYaml | nindent 4 }}
+  config.yaml: |
+    {{- /* Worker-specific config */}}
+    {{- .Values.worker.config | toYaml | nindent 4 }}
+
+    {{- /* Features */}}
+    features:
+      {{- .Values.features | toYaml | nindent 6 }}
+
+    {{- /* Storage config (worker version - includes authURL for Swift) */}}
+    {{- include "chorus.workerStorageConfig" . | nindent 4 }}

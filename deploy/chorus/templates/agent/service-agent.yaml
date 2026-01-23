@@ -4,14 +4,20 @@ kind: Service
 metadata:
   name: {{ include "chorus.fullname" . }}-agent
   labels:
-    app: agent
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+  {{- with .Values.agent.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  selector:
-    app: agent
-  {{- include "chorus.selectorLabels" . | nindent 4 }}
-  type: {{ .Values.agent.agentService.type }}
+  type: {{ .Values.agent.service.type }}
   ports:
-  - name: http
-    {{- .Values.agent.agentService.portHttp | toYaml | nindent 4 -}}
+    - name: http
+      port: {{ .Values.agent.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "chorus.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
 {{- end }}

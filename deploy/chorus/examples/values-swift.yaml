@@ -1,0 +1,73 @@
+# Example: Swift Storage Configuration
+# This example shows how to configure Chorus with OpenStack Swift storage
+#
+# Note: Swift requires different configs for Worker and Proxy:
+# - Worker: Uses authURL for Keystone authentication
+# - Proxy: Uses storageURL directly (cannot perform Keystone auth)
+
+storage:
+  # Specify which storage is the main storage
+  main: swift-main
+
+  storages:
+    # Swift storage configuration
+    swift-main:
+      type: SWIFT
+      # Worker uses Keystone authentication
+      authURL: http://keystone.openstack.example.com:5000/v3
+      storageEndpointName: swift
+      storageEndpointType: object-store
+      region: RegionOne
+      # Proxy uses direct Swift endpoint (auto-filtered for proxy config)
+      storageURL: http://swift-proxy.openstack.example.com:8080/v1
+
+    # S3 backup storage (replication destination)
+    s3-backup:
+      type: S3
+      address: s3.backup.example.com
+      provider: Ceph
+      isSecure: true
+
+# Credentials (stored in Kubernetes Secret)
+credentials:
+  storages:
+    # Swift credentials - key must be OpenStack Project ID
+    swift-main:
+      # Project ID: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+      a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6:
+        username: swift-admin
+        password: "secret-password"
+        domainName: Default
+        tenantName: admin-project
+
+      # Another project
+      b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7:
+        username: app-user
+        password: "app-password"
+        domainName: Default
+        tenantName: app-project
+
+    # S3 backup credentials
+    s3-backup:
+      swift-admin:
+        accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Proxy configuration
+proxy:
+  enabled: true
+  replicas: 2
+  config:
+    auth:
+      # For Swift, you typically use custom credentials or disable auth
+      # since Swift handles its own authentication
+      custom:
+        swift-admin:
+          accessKeyID: "custom-access-key"
+          secretAccessKey: "custom-secret-key"
+
+# Worker configuration
+worker:
+  replicas: 2
+  config:
+    concurrency: 10

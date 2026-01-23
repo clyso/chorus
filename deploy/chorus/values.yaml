@@ -1,126 +1,299 @@
+# Chorus Helm Chart Values
+# See README.md for documentation
+
+# =============================================================================
+# GLOBAL SETTINGS
+# =============================================================================
+global:
+  # Node selector applied to all components
+  nodeSelector: {}
+  # Tolerations applied to all components
+  tolerations: []
+  # Affinity rules applied to all components
+  affinity: {}
+
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# =============================================================================
+# DYNAMIC CREDENTIALS
+# =============================================================================
+# Manage storage credentials via API instead of config files
+# When enabled, credentials can be added/updated via chorctl set-user command
+dynamicCredentials:
+  enabled: false
+  disableEncryption: false
+  pollInterval: 3s
+
+  # Master password for encrypting credentials in Redis
+  # Option 1: Inline password (for dev/testing only)
+  masterPassword: ""
+
+  # Option 2: Use existing secret (recommended for production)
+  # Secret should contain the master password
+  existingSecret: ""
+  existingSecretKey: "master-password"
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+# Storage definitions (non-secret parts go to ConfigMap)
+# Credentials are specified separately in 'credentials' section below
+storage:
+  # Name of the main storage (must match a key in storages below)
+  main: ""
+
+  # Storage definitions
+  # For S3: same config works for both proxy and worker
+  # For Swift: worker uses authURL (Keystone), proxy uses storageURL
+  storages: {}
+    # Example S3 storage:
+    # main:
+    #   type: S3
+    #   address: s3.example.com
+    #   provider: Ceph  # Ceph, Minio, or Other
+    #   isSecure: true
+    #   defaultRegion: "us-east-1"
+    #   healthCheckInterval: 10s
+    #   httpTimeout: 1m
+    #   rateLimit:
+    #     enabled: false
+    #     rpm: 60
+    #
+    # Example Swift storage:
+    # swift-main:
+    #   type: SWIFT
+    #   # Worker config - uses Keystone for authentication
+    #   authURL: http://keystone:5000/v3
+    #   storageEndpointName: swift
+    #   storageEndpointType: object-store
+    #   region: RegionOne
+    #   # Proxy config - direct Swift endpoint (proxy cannot use Keystone)
+    #   storageURL: http://swift:8080/v1
+
+# =============================================================================
+# CREDENTIALS (Secret)
+# =============================================================================
+# Storage credentials - stored in Kubernetes Secret
+credentials:
+  # Per-storage credentials
+  storages: {}
+    # S3 credentials example:
+    # main:
+    #   user1:
+    #     accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+    #     secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    #
+    # Swift credentials example (key must be OpenStack project ID):
+    # swift-main:
+    #   b6ebf758c9894224a105e5531eaa4ce9:
+    #     username: admin
+    #     password: secret
+    #     domainName: Default
+    #     tenantName: admin
+
+# Use existing secret instead of creating one
+# Secret must have 'config' key with YAML content matching override.yaml format
+existingCredentialsSecret: ""
+
+# =============================================================================
+# FEATURES
+# =============================================================================
+features:
+  tagging: true
+  acl: true
+
+# =============================================================================
+# REDIS CONFIGURATION
+# =============================================================================
+# Bundled Redis (Bitnami chart)
+# When redis.enabled=true, a password is auto-generated and stored in a secret
+# The Chorus components use this secret for Redis authentication
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    # Leave empty to auto-generate password, or specify existing secret name
+    existingSecret: ""
+    existingSecretPasswordKey: redis-password
+  # Persistence (recommended for production):
+  # master:
+  #   persistence:
+  #     enabled: true
+  #     size: 64Gi
+
+# External Redis (when redis.enabled=false)
+externalRedis:
+  # Single instance or sentinel addresses
+  addresses: []
+    # - redis.example.com:6379
+  user: ""
+  password: ""
+  # Or use existing secret
+  existingSecret: ""
+  existingSecretPasswordKey: "password"
+  # Sentinel configuration
+  sentinel:
+    masterName: ""
+    user: ""
+    password: ""
+  # TLS
+  tls:
+    enabled: false
+    insecure: false
+
+# =============================================================================
+# PROXY
+# =============================================================================
 proxy:
   enabled: true
+
+  replicas: 2
+
   image:
     repository: harbor.clyso.com/chorus/proxy
-    tag: "" # Chart appVersion will be used if empty
+    tag: "" # Defaults to Chart.appVersion
     pullPolicy: Always
-  replicas: 2
-  resources:
+
+  # Resource limits
+  resources: {}
     # limits:
-    #   cpu: 100m
-    #   memory: 300Mi
+    #   cpu: 500m
+    #   memory: 512Mi
     # requests:
-    #   cpu: 50m
-    #   memory: 150Mi
-  proxyService:
-    portHttp:
-      port: 9669
-      targetPort: http
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  # Pod-level settings
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+
+  # Scheduling
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+    # maxUnavailable: 1
+
+  # Service configuration
+  service:
     type: ClusterIP
-  config: # for full spec and default values see proxy config: https://github.com/clyso/chorus/blob/main/service/proxy/config.yaml and common config https://github.com/clyso/chorus/blob/main/pkg/config/config.yaml
-    metrics:
-      enabled: false
+    port: 9669
+    annotations: {}
+
+  # Proxy-specific config
+  config:
+    port: 9669
+    address: "" # External address (for CORS, etc.)
+
     log:
       json: true
       level: info
+
+    metrics:
+      enabled: false
+
     trace:
       enabled: false
-      endpoint: # url to Jaeger or other open trace provider
-    address: http://localhost:9669 # Chorus proxy s3 api address
-    port: 9669
+      endpoint: ""
+
     cors:
       enabled: false
       allowAll: false
-      whitelist:
+      whitelist: []
+
     auth:
       allowV2Signature: false
-      useStorage: # use credentials from one of configured storages <one|two>
-      custom: # or use custom credentials for proxy s3 endpoint
-    #    user1:
-    #      accessKeyID: <user1 v4 accessKey credential>
-    #      secretAccessKey: <user1 v4 secretKey credential>
-    #    user2:
-    #      accessKeyID: <user2 v4 accessKey credential>
-    #      secretAccessKey: <user2 v4 secretKey credential>
+      useStorage: "" # Use credentials from this storage
+      custom: {} # Or define custom credentials
+        # user1:
+        #   accessKeyID: xxx
+        #   secretAccessKey: xxx
+
+# =============================================================================
+# WORKER
+# =============================================================================
 worker:
   replicas: 2
+
   image:
     repository: harbor.clyso.com/chorus/worker
-    tag: "" # Chart appVersion will be used if empty
+    tag: "" # Defaults to Chart.appVersion
     pullPolicy: Always
-  resources:
-    # limits:
-    #   cpu: 100m
-    #   memory: 300Mi
-    # requests:
-    #   cpu: 50m
-    #   memory: 150Mi
-  restApiService:
-    portRest:
-      port: 9671
-      targetPort: rest
+
+  resources: {}
+
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+  # gRPC API service (for chorctl)
+  grpcService:
     type: ClusterIP
-  grpcApiService:
-    portGRPC:
-      port: 9670
-      targetPort: grpc
+    port: 9670
+    annotations: {}
+
+  # REST API service
+  restService:
     type: ClusterIP
-  config: # for full spec and default values see worker config: https://github.com/clyso/chorus/blob/main/service/worker/config.yaml and common config https://github.com/clyso/chorus/blob/main/pkg/config/config.yaml
-    metrics:
-      enabled: false
+    port: 9671
+    annotations: {}
+
+  config:
+    concurrency: 10
+
+    api:
+      enabled: true
+      grpcPort: 9670
+      httpPort: 9671
+
     log:
       json: true
       level: info
+
+    metrics:
+      enabled: false
+
     trace:
       enabled: false
-      endpoint: # url to Jaeger or other open trace provider
-    concurrency: 10
-    api:
-      enabled: true
-ui:
-  enabled: false
-  image:
-    repository: harbor.clyso.com/chorus/web-ui
-    tag: "" # Chart appVersion will be used if empty
-    pullPolicy: Always
-  replicas: 1
-  resources:
-    limits:
-      cpu: 50m
-      memory: 128Mi
-    requests:
-      cpu: 50m
-      memory: 128Mi
-  service:
-    portHttp:
-      port: 9672
-      targetPort: http
-    type: ClusterIP
-commonConfig:
-  features:
-    tagging: true
-    acl: true
-  storage:
-    defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
-    storages:
-      # one:
-      #   address: s3.clyso.com
-      #   provider: Ceph
-      #   isMain: true
-      #   isSecure: true
-      #   defaultRegion: ""
-      # two:
-      #   address: office.clyso.cloud
-      #   provider: Ceph
-      #   isSecure: true
-      #   defaultRegion: ""
+      endpoint: ""
+
+# =============================================================================
+# AGENT (Alternative to Proxy)
+# =============================================================================
 agent:
   enabled: false
+
+  replicas: 1
+
   image:
     repository: harbor.clyso.com/chorus/agent
-    tag: "" # Chart appVersion will be used if empty
+    tag: ""
     pullPolicy: Always
-  replicas: 1
+
   resources:
     limits:
       cpu: 100m
@@ -128,85 +301,115 @@ agent:
     requests:
       cpu: 50m
       memory: 64Mi
-  agentService:
-    portHttp:
-      port: 9673
-      targetPort: http
+
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  service:
     type: ClusterIP
-  config: # for full spec and default values see agent config: https://github.com/clyso/chorus/blob/main/service/agent/config.yaml and common config https://github.com/clyso/chorus/blob/main/pkg/config/config.yaml
-    metrics:
-      enabled: false
+    port: 9673
+    annotations: {}
+
+  config:
+    port: 9673
+    # URL for S3 storage to send notifications (auto-generated if empty)
+    url: ""
+    # Source storage name from storage config
+    fromStorage: ""
+
     log:
       json: true
       level: info
+
+    metrics:
+      enabled: false
+
     trace:
       enabled: false
-      endpoint: # url to Jaeger or other open trace provider
-    port: 9673 # agent port to listen incoming notifications
-    # REQUIRED: url to be used by s3 storage to send notifications. The URL should be reachable for s3 storage.
-    # set empty to use k8s service URL if fromStorage is in the same k8s cluster
-    # http://<helm_release>-agent.<release_ns>.svc.cluster.local:9672
-    url: ""
-    # REQUIRED: notifications source storage name from Chorus config. Normally name of the main storage from storage config.
-    fromStorage: ""
-existingSecret: "" # set name of existing secret with storage credentials or
-secret: "" #  set storage credentials here to create secret:
-# Example
-# secret: |-
-#  storage:
-#    storages:
-#      one:
-#        address: s3.clyso.com
-#        provider: Ceph
-#        isMain: true
-#        isSecure: true
-#        credentials:
-#          user1:
-#            accessKeyID: abc
-#            secretAccessKey: abc
-#          user2:
-#            accessKeyID: def
-#            secretAccessKey: jhi
-#      two:
-#        address: office.clyso.cloud
-#        provider: Ceph
-#        isMain: false
-#        isSecure: true
-#        credentials:
-#          user1:
-#            accessKeyID: jkl
-#            secretAccessKey: mno
-#          user2:
-#            accessKeyID: pqr
-#            secretAccessKey: stw
-redis:
-  enabled: true
-  architecture: standalone
-  # uncomment to enable redis persistence. Required for production setup
-  #   master:
-  #     persistence:
-  #       enabled: true
-  #       size: 64Gi # conservative estimate
-  #       storageClass: "" # Use default storage class or specify (e.g., "gp2")
-  #   reesources: {} # Redis requests/limits.
-  #   commonConfiguration: |-
-  #     appendonly yes
-  #     appendfsync everysec
-  #   metrics: # enable redis metrics
-  #     enabled: true
-  #     serviceMonitor:
-  #       enabled: true
-  #       additionalLabels:
-  #         release: kube-prometheus-stack
-  auth:
-    existingSecret: redis-secret
-    existingSecretPasswordKey: password
-imagePullSecrets:
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: ""
+      endpoint: ""
+
+# =============================================================================
+# WEB UI
+# =============================================================================
+ui:
+  enabled: false
+
+  replicas: 1
+
+  image:
+    repository: harbor.clyso.com/chorus/web-ui
+    tag: ""
+    pullPolicy: Always
+
+  resources:
+    limits:
+      cpu: 50m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  service:
+    type: ClusterIP
+    port: 9672
+    annotations: {}
+
+# =============================================================================
+# INGRESS
+# =============================================================================
+ingress:
+  # Ingress for S3 Proxy
+  proxy:
+    enabled: false
+    className: ""
+    annotations: {}
+      # nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      # nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    hosts: []
+      # - host: s3.example.com
+      #   paths:
+      #     - path: /
+      #       pathType: Prefix
+    tls: []
+      # - secretName: s3-tls
+      #   hosts:
+      #     - s3.example.com
+
+  # Ingress for Worker REST API
+  api:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts: []
+      # - host: chorus-api.example.com
+      #   paths:
+      #     - path: /
+      #       pathType: Prefix
+    tls: []
+
+  # Ingress for Web UI
+  ui:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts: []
+      # - host: chorus.example.com
+      #   paths:
+      #     - path: /
+      #       pathType: Prefix
+    tls: []

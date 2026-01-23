@@ -4,9 +4,17 @@ kind: ConfigMap
 metadata:
   name: {{ include "chorus.fullname" . }}-proxy
   labels:
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: proxy
 data:
-  config: |-     
-  {{- .Values.proxy.config | toYaml | nindent 4 }}
-  {{- .Values.commonConfig | toYaml | nindent 4 }}
+  config.yaml: |
+    {{- /* Proxy-specific config */}}
+    {{- .Values.proxy.config | toYaml | nindent 4 }}
+
+    {{- /* Features */}}
+    features:
+      {{- .Values.features | toYaml | nindent 6 }}
+
+    {{- /* Storage config (proxy version - uses storageURL for Swift) */}}
+    {{- include "chorus.proxyStorageConfig" . | nindent 4 }}
 {{- end }}

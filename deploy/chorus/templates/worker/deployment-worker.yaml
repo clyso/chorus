@@ -3,79 +3,120 @@ kind: Deployment
 metadata:
   name: {{ include "chorus.fullname" . }}-worker
   labels:
-    app: worker
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
 spec:
-  strategy:
-    # stop all old workers before starting new workes
-    type: Recreate
   replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
-      app: worker
-    {{- include "chorus.selectorLabels" . | nindent 6 }}
+      {{- include "chorus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
   template:
     metadata:
       labels:
-        app: worker
-      {{- include "chorus.selectorLabels" . | nindent 8 }}
-      {{- if .Values.worker.config.metrics.enabled }}
+        {{- include "chorus.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/worker/config.yaml") . | sha256sum }}
+        {{- if include "chorus.createCredentialsSecret" . }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.worker.config.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
         prometheus.io/port: "9090"
-      {{- end }}
+        {{- end }}
+        {{- with .Values.worker.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "chorus.serviceAccountName" . }}
-      containers:
-      - env:
-        - name: CFG_REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: password
-              name: redis-secret
-        - name: CFG_REDIS_ADDRESS
-          value: {{ printf "%s-redis-master:6379" ( .Release.Name ) }}
-        image: {{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
-        name: worker
-        ports:
-        {{- if .Values.worker.config.metrics.enabled }}
-        - containerPort: 9090
-          name: metrics
-          protocol: TCP
-        {{- end }}
-        {{- if .Values.worker.config.api.enabled }}
-        - containerPort: 9670
-          name: grpc
-          protocol: TCP
-        - containerPort: 9671
-          name: rest
-          protocol: TCP
-        {{- end }}
-        resources: {{- toYaml .Values.worker.resources | nindent 10 }}
-        securityContext:
-          allowPrivilegeEscalation: false
-        volumeMounts:
-        - mountPath: /bin/config/config.yaml
-          name: config
-          subPath: config
-        {{- if or .Values.existingSecret .Values.secret }}
-        - mountPath: /bin/config/override.yaml
-          name: secret
-          subPath: config
-        {{- end }}
+      {{- with .Values.worker.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
+      containers:
+        - name: worker
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          {{- with .Values.worker.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: CFG_REDIS_ADDRESS
+              value: {{ include "chorus.redisAddresses" . | quote }}
+            - name: CFG_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chorus.redisSecretName" . }}
+                  key: {{ include "chorus.redisSecretKey" . }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.sentinel.masterName }}
+            - name: CFG_REDIS_SENTINEL_MASTERNAME
+              value: {{ .Values.externalRedis.sentinel.masterName | quote }}
+            {{- end }}
+            {{- if .Values.dynamicCredentials.enabled }}
+            - name: CFG_STORAGE_DYNAMICCREDENTIALS_MASTERPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chorus.dynamicCredentialsSecretName" . }}
+                  key: {{ include "chorus.dynamicCredentialsSecretKey" . }}
+            {{- end }}
+          ports:
+            {{- if .Values.worker.config.api.enabled }}
+            - name: grpc
+              containerPort: {{ .Values.worker.config.api.grpcPort | default 9670 }}
+              protocol: TCP
+            - name: rest
+              containerPort: {{ .Values.worker.config.api.httpPort | default 9671 }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.worker.config.metrics.enabled }}
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+            {{- end }}
+          {{- with .Values.worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /bin/config/config.yaml
+              subPath: config.yaml
+            {{- if or .Values.existingCredentialsSecret (include "chorus.createCredentialsSecret" .) }}
+            - name: credentials
+              mountPath: /bin/config/override.yaml
+              subPath: config.yaml
+            {{- end }}
       volumes:
-      - configMap:
-          name: {{ include "chorus.fullname" . }}-worker
-        name: config
-      {{- if or .Values.existingSecret .Values.secret }}
-      - secret:
-          secretName: {{ .Values.existingSecret | default (printf "%s-secret" (include "chorus.fullname" . ) ) }}
-        name: secret
+        - name: config
+          configMap:
+            name: {{ include "chorus.fullname" . }}-worker
+        {{- if or .Values.existingCredentialsSecret (include "chorus.createCredentialsSecret" .) }}
+        - name: credentials
+          secret:
+            secretName: {{ include "chorus.credentialsSecretName" . }}
+        {{- end }}
+      {{- $nodeSelector := include "chorus.nodeSelector" (list .Values.worker.nodeSelector .Values.global.nodeSelector) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := include "chorus.tolerations" (list .Values.worker.tolerations .Values.global.tolerations) }}
+      {{- if $tolerations }}
+      tolerations:
+        {{- $tolerations | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "chorus.affinity" (list .Values.worker.affinity .Values.global.affinity) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
       {{- end }}
