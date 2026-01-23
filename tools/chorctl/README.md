@@ -1,71 +1,76 @@
 # Chorctl
-CLI for chorus management api.
+
+CLI for Chorus management API.
 
 ![chorctl.png](../../docs/media/chorctl.png)
 
 ## Install
+
+From source (requires [Go language](https://go.dev/doc/install)):
 ```shell
 cd ./tools/chorctl && go build .
 ```
+
+Or install globally:
+```shell
+cd ./tools/chorctl && go install .
+```
+
 Or download binary from [the latest release](https://github.com/clyso/chorus/releases).
 
-Or with homebrew (MacOS and Linux only):
+Or with homebrew (macOS and Linux only):
 ```shell
 brew install clyso/tap/chorctl
 ```
 
 ## Usage
 
-`chorctl` sends requests to GRPC api hosted by [Chorus worker](../../service/worker). 
-Deploy worker and provide GRPC api address to `chorctl` with `--address` flag or `CHORUS_ADDRESS` envar, for example:
+`chorctl` sends requests to the gRPC API hosted by [Chorus worker](../../service/worker).
+Deploy worker and provide gRPC API address to `chorctl` with `--address` flag or `CHORUS_ADDRESS` envar:
 ```shell
 export CHORUS_ADDRESS=127.0.0.1:9670
 ```
 
-```shell
- ./chorctl help
- 
-Chorctl is a CLI tool to monitor and manage chorus application
-performing live migrations and replication of s3 storages.
+Run `chorctl --help` for available commands. Key commands:
 
-Usage:
-  chorctl [command]
-
-Available Commands:
-  agent       Prints information about registered notification agents
-  check       Checks the files in the source and destination match.
-  completion  Generate the autocompletion script for the specified shell
-  dash        Open migration interactive dashboard
-  help        Help about any command
-  repl        list replications
-  storage     Prints information about underlying chorus s3 storages
-
-Flags:
-  -a, --address string   address to chorus management grpc api (default: http://localhost:9670) (default "localhost:9670")
-      --config string    config file (default is $HOME/.chorctl.yaml)
-  -h, --help             help for chorctl
-  -u, --user string      storage user
-  -v, --verbose          prints additional log information
-
-Use "chorctl [command] --help" for more information about a command.
-```
-
-### Useful commands:
-Show live dashboard with bucket replication statuses:
+### Dashboard
 ```shell
 chorctl dash
 ```
-Manage replicatoins (run `chorclt repl -h` to see all commands).
 
-List buckets avaiable for replication for given S3 user:
+### Replications
 ```shell
-chorctl repl buckets -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config>
+# List replications
+chorctl repl
+
+# User-level replication (all buckets for user)
+chorctl repl add -u <user> -f <from storage> -t <to storage>
+
+# Bucket-level replication
+chorctl repl add -u <user> -b <bucket> -f <from storage> -t <to storage>
+
+# See all repl subcommands
+chorctl repl --help
 ```
-Start replication for given S3 user/bucket:
+
+### Switch (change main storage after replication)
 ```shell
-chorctl repl add -b <bucket name> -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config>
+chorctl repl switch --help
 ```
-Enable replication for all user buckets:
+
+### Routing
 ```shell
-chorctl repl add-user -u <s3 user name from chorus config> -f <souce s3 storage from chorus config> -t <destination s3 storage from chorus config>
+chorctl route --help
 ```
+
+### Consistency Check
+```shell
+chorctl consistency --help
+```
+
+### Dynamic Credentials
+```shell
+chorctl set-user --help
+```
+
+For full command reference, run `chorctl <command> --help`.

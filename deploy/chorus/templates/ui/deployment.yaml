@@ -4,47 +4,75 @@ kind: Deployment
 metadata:
   name: {{ include "chorus.fullname" . }}-ui
   labels:
-    app: ui
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
 spec:
   replicas: {{ .Values.ui.replicas }}
   selector:
     matchLabels:
-      app: ui
-    {{- include "chorus.selectorLabels" . | nindent 6 }}
+      {{- include "chorus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ui
   template:
     metadata:
       labels:
-        app: ui
-      {{- include "chorus.selectorLabels" . | nindent 8 }}
+        {{- include "chorus.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ui
+      {{- with .Values.ui.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "chorus.serviceAccountName" . }}
+      {{- with .Values.ui.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
-      - name: ui
-        image: {{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
-        env:
-        - name: BACKEND_URL
-          value: {{ printf "http://%s-rest:%d" (include "chorus.fullname" . ) ( .Values.worker.restApiService.portRest.port | int) | quote }}
-        ports:
-        - containerPort: 80
-          name: http
-          protocol: TCP
-        livenessProbe:
-          initialDelaySeconds: 5
-          periodSeconds: 20
-          tcpSocket:
-            port: 80
-        readinessProbe:
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          tcpSocket:
-            port: 80
-        resources: {{- toYaml .Values.ui.resources | nindent 10 }}
-        securityContext:
-          allowPrivilegeEscalation: false
+        - name: ui
+          image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          {{- with .Values.ui.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: BACKEND_URL
+              value: {{ printf "http://%s-rest:%d" (include "chorus.fullname" .) (int .Values.worker.restService.port) | quote }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.ui.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- $nodeSelector := include "chorus.nodeSelector" (list .Values.ui.nodeSelector .Values.global.nodeSelector) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := include "chorus.tolerations" (list .Values.ui.tolerations .Values.global.tolerations) }}
+      {{- if $tolerations }}
+      tolerations:
+        {{- $tolerations | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "chorus.affinity" (list .Values.ui.affinity .Values.global.affinity) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
 {{- end }}

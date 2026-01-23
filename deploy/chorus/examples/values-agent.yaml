@@ -1,0 +1,83 @@
+# Example: Agent-Based Deployment
+# Use Agent instead of Proxy when:
+# - You cannot deploy a proxy in front of your S3 storage
+# - Your S3 storage supports bucket notifications (SNS/SQS, webhooks)
+# - You want to capture changes without intercepting traffic
+#
+# Agent receives S3 bucket notifications and creates replication tasks
+
+# Disable proxy - using agent instead
+proxy:
+  enabled: false
+
+# Enable agent
+agent:
+  enabled: true
+  replicas: 1
+
+  config:
+    port: 9673
+    # URL where S3 storage will send notifications
+    # Leave empty to auto-generate from Kubernetes service
+    # url: "http://chorus-agent.chorus.svc.cluster.local:9673"
+
+    # Source storage name (must match storage config)
+    fromStorage: main
+
+    log:
+      json: true
+      level: info
+
+  # Expose agent externally if S3 storage is outside the cluster
+  service:
+    type: ClusterIP  # Change to LoadBalancer or use Ingress for external access
+    port: 9673
+
+# Storage configuration
+storage:
+  # Specify which storage is the main storage
+  main: main
+
+  storages:
+    main:
+      type: S3
+      address: s3.example.com
+      provider: Other  # AWS, Ceph, or Minio
+      isSecure: true
+
+    backup:
+      type: S3
+      address: s3-backup.example.com
+      provider: Ceph
+      isSecure: true
+
+credentials:
+  storages:
+    main:
+      app-user:
+        accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+    backup:
+      app-user:
+        accessKeyID: "BKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "xJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Worker still processes replication tasks
+worker:
+  replicas: 2
+  config:
+    concurrency: 10
+
+# After deployment:
+# 1. Get the agent webhook URL:
+#    kubectl get svc -l app.kubernetes.io/component=agent
+#
+# 2. Configure S3 bucket notifications to send to the agent URL
+#    For AWS S3: Configure SNS -> HTTP endpoint
+#    For Ceph: Configure bucket notifications
+#    For MinIO: Configure webhook notifications
+#
+# 3. Create replication with agent:
+#    chorctl repl add -u app-user -b mybucket -f main -t backup \
+#      --agent-url http://<agent-url>:9673/webhook

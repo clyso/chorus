@@ -56,5 +56,5 @@ Open `chorus.yaml` and check the configuration. Edit config to use your own S3 e
 go run ./cmd/chorus -config chorus.yaml
 ```
 
-Install and run [chorctl CLI](../tools/chorctl) to manage chorus services.
+Install and run [chorctl CLI](../../tools/chorctl) to manage chorus services.
 

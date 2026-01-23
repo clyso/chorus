@@ -1,0 +1,41 @@
+{{- if .Values.proxy.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "chorus.fullname" . }}-proxy
+  labels:
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: proxy
+spec:
+  {{- if .Values.proxy.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.proxy.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.proxy.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.proxy.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "chorus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: proxy
+{{- end }}
+---
+{{- if .Values.worker.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "chorus.fullname" . }}-worker
+  labels:
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  {{- if .Values.worker.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.worker.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.worker.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.worker.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "chorus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+{{- end }}

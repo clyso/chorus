@@ -6,13 +6,15 @@
 # Chorus
 ![chorus.png](./docs/media/banner.png)
 
-Chorus is a distributed, vendor-agnostic, S3-compatible tool for backup, migration, and routing. It enables:
- - Faster data transfers between S3 storages using multiple machines.
+Chorus is a distributed, vendor-agnostic tool for backup, migration, and routing for Object Storages like S3 or OpenStack Swift. It enables:
+ - Faster data transfers between storages using multiple machines.
  - Resumable transfers with checkpointing on failure.
- - Syncing of existing buckets, objects, and metadata (e.g., ACLs) from source to destination S3.
+ - Syncing of existing buckets, objects, and metadata (e.g., ACLs) from source to destination.
  - Real-time capture and propagation of bucket/object changes.
+ - User-level and bucket-level replication policies.
  - Routing of S3 requests to different storages based on user-defined rules.
- - Reduce downtime up to zero for switching to different S3 provider.
+ - Consistency check to verify data integrity between storages.
+ - Reduce downtime up to zero for switching to different storage provider.
 
 Listed features can be configured per S3 user and per bucket with [management CLI](./tools/chorctl), [REST](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/clyso/chorus/refs/heads/main/proto/gen/openapi/chorus/chorus.swagger.json)/[gRPC](./proto/chorus/chorus.proto) API, or [WebUI](./ui/).
 

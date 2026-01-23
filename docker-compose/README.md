@@ -76,6 +76,10 @@ To run chorus with docker compose:
     ```shell
     chorctl repl add -u user1 -b test -f main -t follower
     ```
+    > **Tip**: For user-level replication (all existing and future buckets), omit the `-b` flag:
+    > ```shell
+    > chorctl repl add -u user1 -f main -t follower
+    > ```
 8. Check replication progress with:
     ```shell
     chorctl dash
@@ -122,7 +126,7 @@ docker-compose -f ./docker-compose/docker-compose.yml --profile agent up
 > [!NOTE]  
 > Chorus agent will not work with fake S3 backend because bucket notifications are not supported by fake S3 backend.
 
-Explore more features with [chorctl](../tools/chorctl) and [WebUI](../ui).
+Explore more features with [chorctl](../tools/chorctl) (`chorctl --help`) and [WebUI](../ui).
 
 ## How-to
 To tear-down:
