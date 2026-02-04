@@ -28,8 +28,8 @@ The S3 agent approach does not work for OpenStack Swift because Swift does not s
 
 | ID | Requirement | Target | Rationale |
 |----|-------------|--------|-----------|
-| N1 | Event capture latency | < 10 seconds | Chorus replicates ashynchronuosly. Data copy takes time. Capture latency is tolerable when it is small compared to obj copy time  |
-| N2 | Minimal impact on Swift hot path | No added latency to user requests, agent failure not leads to swift failure | Production safety |
+| N1 | Event capture latency | < 10 seconds | Chorus replicates asynchronously. Data copy takes time. Capture latency is tolerable when it is small compared to object copy time |
+| N2 | Minimal impact on Swift hot path | No added latency to user requests, agent failure does not lead to Swift failure | Production safety |
 | N3 | Deployment without Swift source modification | Preferred | Operational simplicity |
 | N4 | Support Kubernetes deployment | Required | Primary deployment model |
 | N5 | Support non-containerized deployment | Should | Customer flexibility |
@@ -40,7 +40,7 @@ The S3 agent approach does not work for OpenStack Swift because Swift does not s
 Chorus uses a policy-based replication model:
 
 1. User creates replication via Chorus API specifying: `user`, `from_storage`, `to_storage`, optionally `from_bucket`/`to_bucket`
-2. Replication policy stored in Redis (`pkg/store/replication_stores.go`)
+2. Replication policy stored in Redis
 3. Agent receives events and queries policy service to determine if event matches active replication
 4. For matching events, agent creates tasks in work queue
 5. Worker processes tasks idempotently: compares source/destination, copies if needed. It is tolerable to duplicated/reordered tasks.
@@ -116,7 +116,7 @@ pipeline = catch_errors gatekeeper healthcheck proxy-logging cache ... proxy-ser
 
 ### 2.2 Access Logs
 
-Swift logs all requests via the [`proxy_logging` middleware](https://docs.openstack.org/swift/latest/logs.html). Log format is configurable via `log_msg_template` parameter (since Swift 2.22.0).
+Swift logs all requests via the [`proxy_logging` middleware](https://docs.openstack.org/swift/latest/logs.html). Log format is configurable via `log_msg_template` parameter.
 
 **Default format** includes: client_ip, timestamp, method, path, status, bytes, transaction_id, request_time.
 
@@ -138,7 +138,7 @@ Path structure: `/v1/AUTH_<project_id>/<container>/<object>`
 
 **Key characteristic**: 
 - Log format is not fixed. Each Swift installation may configure different templates, requiring configurable parsing.
-- Log does not contain `Swift method`, only HTTP method and path. Swift method (Object/Container create/update/metadata-update/delete) have to be calculated.
+- Log does not contain Swift method, only HTTP method and path. Swift method (Object/Container create/update/metadata-update/delete) must be derived from HTTP method + path.
 
 ### 2.3 Extensibility: Ceph RGW
 
@@ -159,8 +159,8 @@ A log-based approach extends to Ceph RGW, which provides [ops logging](https://d
  "http_status":"201","user":"610acf37e0144593b76a8ce6a16f2c4f","object_size":12}
 ```
 
-**Key characteristic**: 
-- unlike openstack, RGW logs Swift/S3 method name in `operation` field.
+**Key characteristic**:
+- Unlike OpenStack, RGW logs the Swift/S3 method name in the `operation` field.
 
 ## 3. Comparison
 
@@ -171,9 +171,8 @@ A log-based approach extends to Ceph RGW, which provides [ops logging](https://d
 | **Deployment** | Swift config change + restart | Sidecar/file access only |
 | **Latency** | Lower | Higher |
 | **Format configuration** | Not needed | Required |
-| **Extensibility** | Works only with Openstack | can be extended to support logs from other verndors |
-| **Implementation** | Python | Go only |
-| **Maintenance** | Two codebases | Single codebase |
+| **Extensibility** | Works only with OpenStack | Can be extended to support logs from other vendors |
+| **Maintenance** | Two codebases (+ Python) | Single codebase |
 
 ## 4. Recommendation: Access Log Parsing
 
@@ -183,7 +182,7 @@ Log parsing is recommended based on trade-off analysis:
 
 1. **Production safety** (high weight): Log parsing cannot cause Swift outages. A middleware bug on the hot path risks production availability.
 2. **Deployment simplicity** (high weight): No Swift configuration changes. Sidecar deployment is standard Kubernetes practice.
-3. **Extensibility** (medium weight): Same architecture supports multiple storage venfors with different parser configuration.
+3. **Extensibility** (medium weight): Same architecture supports multiple storage vendors with different parser configuration.
 4. **Maintenance** (medium weight): Go-only implementation aligns with Chorus codebase. No Python component to maintain.
 5. **Latency trade-off** (acceptable): 1-10 second latency meets async replication requirements.
 6. **Durability trade-off** (acceptable): Modern log tailing/exporting libraries handle log rotation/truncation correctly.
@@ -197,18 +196,17 @@ Log parsing is recommended based on trade-off analysis:
 
 Agent architecture is inspired by popular log collector [FluentBit](https://fluentbit.io/how-it-works/)
 
-```css
+```
 [ Input ] → [ Parser ] → [ Filter ] → [ Buffer ] → [ Output ]
 ```
 
-1. Agent parse log entry to map it to S3 notification structure with 
-  - [Swift method](../../pkg/swift/methods.go)
-  - Resource name: Account/Container/[Object]/[ObjectVersion]
-2. Agent filters read requests and errors.
-3. Agent batch multiple entries into buffer
-4. Sends batch of events to Chorus webhook.
+1. Agent parses log entry to map it to S3 notification structure with:
+   - [Swift method](../../pkg/swift/methods.go)
+   - Resource name: Account/Container/[Object]/[ObjectVersion]
+2. Agent filters out read requests and errors.
+3. Agent batches multiple entries into buffer.
+4. Agent sends batch of events to Chorus webhook.
 
-TODO: add mermaid digram with agent sending webhook to chorus
 
 **Alternatives:**
 
@@ -239,12 +237,6 @@ This mapping logic could be described in a DSL, or using regexes, but would be c
 
 **Recommendation**: The agent uses predefined **source types** that encapsulate the mapping logic for each storage vendor. Users configure only the log parsing; the event classification (method + path → event type) is hardcoded per source.
 
-**Rationale**:
-- Mapping logic is well-defined per vendor (e.g., Swift PUT + 4 path segments = ObjectCreated)
-- Users shouldn't need to understand or configure this mapping
-- Keeps configuration simple; complex logic stays in testable Go code
-- Trade-off: adding new vendor requires code change, but this is infrequent and ensures correctness
-
 ```yaml
 swift_agent:
   source: openstack_swift
@@ -260,20 +252,27 @@ swift_agent:
   config: {} # not needed for RGW JSON logs
 ```
 
+**Rationale**:
+- Mapping logic is well-defined per vendor (e.g., Swift PUT + 4 path segments = ObjectCreated)
+- Users shouldn't need to understand or configure this mapping
+- Keeps configuration simple; complex logic stays in testable Go code
+- Trade-off: adding new vendor requires code change, but this is infrequent and ensures correctness
+
 ### 5.3 Alternative: parse logs with Fluent Bit
 
 Use Fluent Bit for log tailing and parsing, then send parsed events to Chorus agent via HTTP.
 Fluent Bit allows to use Lua scripts or regex parsers to extract needed fields and map to Swift method.
 
-Here is example Fluent Bit config for Swift logs:
+---
+Below is example Fluent Bit config for Swift logs:
 
 <details>
 
 <summary>Fluent Bit config + Lua script</summary>
 
+
 > [!WARNING]
-> Config and script are illustrative only. It was generated using AI.
-> Full implementation and testing is needed.
+> Config and script are illustrative only. It was generated using AI. Full implementation and testing is needed.
 
 
 ```ini
@@ -310,34 +309,50 @@ local BATCH_SIZE = 10
 function map_record(tag, ts, record)
   local path = record["path"]
   local method = record["method"]
+  local status = tonumber(record["status"])
 
-  if not path then
+  -- Filter: only process successful requests (2xx)
+  if not status or status < 200 or status >= 300 then
     return -1, ts, record
   end
 
-  -- /v1/AUTH_x/container/object
+  if not path or not method then
+    return -1, ts, record
+  end
+
+  -- Filter: only mutations (ignore GET, HEAD)
+  if method == "GET" or method == "HEAD" then
+    return -1, ts, record
+  end
+
+  -- Parse path: /v1/AUTH_x/container/object
   local parts = {}
   for p in string.gmatch(path, "[^/]+") do
     table.insert(parts, p)
   end
 
-  local account = parts[2]
+  local account = parts[2]    -- AUTH_xxx
   local container = parts[3]
-  local object = parts[4]
+  local object = parts[4]     -- may be nil for container ops
+
+  -- Extract account ID from AUTH_xxx prefix
+  if account and string.sub(account, 1, 5) == "AUTH_" then
+    account = string.sub(account, 6)
+  end
 
   local op = nil
 
   if object then
-    if method == "PUT" then op = "PutObject"
-    elseif method == "GET" then op = "GetObject"
-    elseif method == "HEAD" then op = "HeadObject"
-    elseif method == "DELETE" then op = "DeleteObject"
+    -- Object operations (4+ path segments)
+    if method == "PUT" then op = "ObjectCreated"
+    elseif method == "POST" then op = "ObjectMetadataUpdated"
+    elseif method == "DELETE" then op = "ObjectDeleted"
     end
   elseif container then
-    if method == "PUT" then op = "PutContainer"
-    elseif method == "GET" then op = "GetContainer"
-    elseif method == "HEAD" then op = "HeadContainer"
-    elseif method == "DELETE" then op = "DeleteContainer"
+    -- Container operations (3 path segments)
+    if method == "PUT" then op = "ContainerCreated"
+    elseif method == "POST" then op = "ContainerMetadataUpdated"
+    elseif method == "DELETE" then op = "ContainerDeleted"
     end
   end
 
@@ -370,9 +385,17 @@ end
 ```
 </details>
 
-**Drawbacks**:
-- Harder to test/debug mapping logic (spread across Lua script)
-- Not possible to copy swift `log_msg_template` config directly. For every log format change, Lua or regex must be updated.
+---
 
-**Benefits**:
-- Reuse Fluent Bit for log tailing, buffering, batching, HTTP sending
+### 5.4 Decision: Built-in vs Fluent Bit
+
+| Criterion | Built-in Agent | Fluent Bit + Webhook |
+|-----------|----------------|----------------------|
+| **Deployment** | Go sidecar | Fluent Bit sidecar |
+| **Configuration** | Single YAML file | Fluent Bit config + Lua script + Chorus webhook |
+| **Log format sync** | Can parse Swift `log_msg_template` directly | Must manually write regex matching the template |
+| **Testing** | Go unit tests for mapping logic | Lua script harder to test in CI |
+| **Maintenance** | More Go code to write | Less code, but Lua is separate language |
+| **User familiarity** | Chorus-specific config | Fluent Bit widely known in ops community |
+
+**Recommendation**: ???
