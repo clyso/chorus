@@ -16,10 +16,16 @@ package objstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"iter"
 	"sync"
+	"time"
 
 	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
+	"github.com/minio/minio-go/v7"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
@@ -28,8 +34,70 @@ import (
 	"github.com/clyso/chorus/pkg/swift"
 )
 
+var (
+	ErrBucketDoesntExist = errors.New("bucket doesn't exists")
+)
+
 type Config = StoragesConfig[*s3.Storage, *swift.Storage]
 type Storage = GenericStorage[*s3.Storage, *swift.Storage]
+
+type CommonObjectInfo struct {
+	LastModified time.Time
+	Key          string
+	VersionID    string
+	Etag         string
+	Size         uint64
+}
+
+type commonListOptions struct {
+	prefix    string
+	after     string
+	versioned bool
+}
+
+func (r *commonListOptions) toSwiftListOptions() objects.ListOpts {
+	return objects.ListOpts{
+		Prefix:   r.prefix,
+		Marker:   r.after,
+		Versions: r.versioned,
+	}
+}
+
+func (r *commonListOptions) toMinioListOptions() minio.ListObjectsOptions {
+	return minio.ListObjectsOptions{
+		Prefix:       r.prefix,
+		StartAfter:   r.after,
+		WithVersions: r.versioned,
+	}
+}
+
+func WithVersions() func(o *commonListOptions) {
+	return func(o *commonListOptions) {
+		o.versioned = true
+	}
+}
+
+func WithPrefix(prefix string) func(o *commonListOptions) {
+	return func(o *commonListOptions) {
+		o.prefix = prefix
+	}
+}
+
+func WithAfter(after string) func(o *commonListOptions) {
+	return func(o *commonListOptions) {
+		o.after = after
+	}
+}
+
+type commonObjectOptions struct {
+	versionID string
+}
+
+func WithVersionID(versionID string) func(o *commonObjectOptions) {
+	return func(o *commonObjectOptions) {
+		o.versionID = versionID
+	}
+}
 
 type Clients interface {
 	AsS3(ctx context.Context, storage, user string) (s3client.Client, error)
@@ -44,7 +112,17 @@ type commonGetter interface {
 // Common - common object storage client interface
 type Common interface {
 	BucketExists(ctx context.Context, bucket string) (bool, error)
+	IsBucketVersioned(ctx context.Context, bucket string) (bool, error)
 	ListBuckets(ctx context.Context) ([]string, error)
+	CreateBucket(ctx context.Context, bucket string) error
+	RemoveBucket(ctx context.Context, bucket string) error
+	EnableBucketVersioning(ctx context.Context, bucket string) error
+	PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error
+	ObjectInfo(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (*CommonObjectInfo, error)
+	ObjectExists(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (bool, error)
+	RemoveObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) error
+	RemoveObjects(ctx context.Context, bucket string, names []string) error
+	ListObjects(ctx context.Context, bucket string, opts ...func(o *commonListOptions)) iter.Seq2[CommonObjectInfo, error]
 }
 
 // TODO:
@@ -206,13 +284,17 @@ func (r *clients) AsCommon(ctx context.Context, storage string, user string) (Co
 		if err != nil {
 			return nil, err
 		}
-		return wrapS3common(client), nil
+		storageAddress, err := r.credsSvc.GetS3Address(storage)
+		if err != nil {
+			return nil, err
+		}
+		return WrapS3common(client, storageAddress.Provider), nil
 	case dom.Swift:
 		client, err := r.AsSwift(ctx, storage, user)
 		if err != nil {
 			return nil, err
 		}
-		return wrapSwiftCommon(client), nil
+		return WrapSwiftCommon(client), nil
 	default:
 		return nil, fmt.Errorf("%w: unsupported storage type %q for storage %q", dom.ErrInvalidStorageConfig, storageType, storage)
 	}

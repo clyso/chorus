@@ -92,14 +92,14 @@ func TestApi_Migrate_test(t *testing.T) {
 	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Len(diff.MissTo, 3)
-	r.ElementsMatch([]string{"obj1", "photo/sept/obj2", "photo/obj3"}, diff.MissTo)
+	r.ElementsMatch([]string{"/obj1", "/photo/sept/obj2", "/photo/obj3"}, diff.MissTo)
 
 	diff = replicationDiff(t, e, id2)
 	r.False(diff.IsMatch)
 	r.Empty(diff.Differ)
 	r.Empty(diff.MissFrom)
 	r.Len(diff.MissTo, 3)
-	r.ElementsMatch([]string{"obj4", "obj5", "obj6"}, diff.MissTo)
+	r.ElementsMatch([]string{"/obj4", "/obj5", "/obj6"}, diff.MissTo)
 
 	ur, err := e.PolicyClient.ListReplications(tstCtx, &pb.ListReplicationsRequest{})
 	r.NoError(err)

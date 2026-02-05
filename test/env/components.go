@@ -48,11 +48,11 @@ import (
 )
 
 const (
-	CRedisImage    = "redis:8.2.1-alpine"
+	CRedisImage    = "redis:8.4.0-alpine"
 	CRedisPort     = 6379
 	CRedisPassword = "password"
 
-	CKeystoneImage                    = "ghcr.io/aiivashchenko/docker-keystone:27.0.0"
+	CKeystoneImage                    = "ghcr.io/aiivashchenko/docker-keystone:28.0.0"
 	CKeystoneExternalPort             = 5000
 	CKeystoneAdminPort                = 35357
 	CKeystoneAdminUsername            = "admin"
@@ -80,7 +80,7 @@ const (
 	CGoFakeS3EC2AccessToken = "a7f1e798b7c2417cba4a02de97dc3cdc"
 	CGoFakeS3EC2SecretToken = "18f4f6761ada4e3795fa5273c30349b9"
 
-	CSwiftImage = "ghcr.io/aiivashchenko/docker-swift:2.35.0"
+	CSwiftImage = "ghcr.io/aiivashchenko/docker-swift:2.37.0"
 	CSwiftPort  = 8080
 
 	CMinioImage          = "minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1"
@@ -227,6 +227,8 @@ type KeystoneAccessConfig struct {
 type StorageKeystoneAccessConfig struct {
 	OperatorRole *roles.Role
 	ResellerRole *roles.Role
+	EndpointName string
+	ServiceType  string
 }
 
 type SwiftAccessConfig struct {
@@ -696,6 +698,8 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 			Local: containerHost,
 		},
 		Keystone: StorageKeystoneAccessConfig{
+			EndpointName: CKeystoneSwiftEndpointName,
+			ServiceType:  CKeystoneObjectStoreServiceType,
 			OperatorRole: operatorRole,
 			ResellerRole: resellerRole,
 		},
@@ -834,7 +838,7 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 	natPort := nat.Port(natPortString)
 	req := testcontainers.ContainerRequest{
 		Image:      CRedisImage,
-		Cmd:        []string{"/bin/sh", "-c", "redis-server", "--requirepass", CRedisPassword},
+		Cmd:        []string{"redis-server", "--save", "\"\"", "--appendonly", "no", "--requirepass", CRedisPassword},
 		WaitingFor: wait.ForExec([]string{"redis-cli", "ping"}),
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
@@ -1251,6 +1255,8 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 			Local: containerHost,
 		},
 		Keystone: StorageKeystoneAccessConfig{
+			EndpointName: CKeystoneCephEndpointName,
+			ServiceType:  CKeystoneObjectStoreServiceType,
 			OperatorRole: operatorRole,
 			ResellerRole: resellerRole,
 		},

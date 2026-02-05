@@ -132,7 +132,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
 	consistencyCheckListStateStore := store.NewConsistencyCheckListStateStore(confRedis)
 	consistencyCheckSetStore := store.NewConsistencyCheckSetStore(confRedis)
-	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, copySvc, queueSvc)
+	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, clientRegistry, queueSvc)
 	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
 
 	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
@@ -207,11 +207,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, workerSvc.HandleObjectVersionList)
 		mux.HandleFunc(tasks.TypeMigrateVersionedObject, workerSvc.HandleVersionedObjectMigration)
 		logger.Info().Msg("registered S3 versioned workers")
-
-		mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
-		mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
-		mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
-		logger.Info().Msg("registered S3 consistency check workers")
 	} else {
 		logger.Info().Msg("s3 workers not registered: no s3 storage configured")
 	}
@@ -232,6 +227,11 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	} else {
 		logger.Info().Msg("swift workers not registered: no swift storage configured")
 	}
+
+	mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
+	mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
+	mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
+	logger.Info().Msg("registered consistency check workers")
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {

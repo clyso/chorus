@@ -27,13 +27,9 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
-	"github.com/clyso/chorus/service/worker/copy"
-)
-
-const (
-	CEmptyDirETagPlaceholder = "d"
 )
 
 type ConsistencyCheckCtrl struct {
@@ -93,34 +89,19 @@ func (r *ConsistencyCheckCtrl) HandleConsistencyCheckList(ctx context.Context, t
 	objectTasks := r.svc.ObjectTasks(ctx, checkID, payload.User,
 		entity.NewConsistencyCheckLocation(storage, bucket), payload.Prefix,
 		payload.Versioned, payload.IgnoreEtags, payload.IgnoreSizes)
-	for objectTask, err := range objectTasks {
+	for objectKey, err := range objectTasks {
 		if err != nil {
 			return fmt.Errorf("unable to list object tasks: %w", err)
 		}
-
-		if objectTask.Dir {
-			if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListObjectsPayload{
-				Locations:   payload.Locations,
-				User:        payload.User,
-				Index:       payload.Index,
-				Prefix:      objectTask.Key,
-				Versioned:   payload.Versioned,
-				IgnoreEtags: payload.IgnoreEtags,
-				IgnoreSizes: payload.IgnoreSizes,
-			}); err != nil {
-				return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
-			}
-		} else {
-			if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListVersionsPayload{
-				Locations:    payload.Locations,
-				User:         payload.User,
-				Index:        payload.Index,
-				Prefix:       objectTask.Key,
-				IgonoreEtags: payload.IgnoreEtags,
-				IgnoreSizes:  payload.IgnoreSizes,
-			}); err != nil {
-				return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
-			}
+		if err := r.queueSvc.EnqueueTask(ctx, tasks.ConsistencyCheckListVersionsPayload{
+			Locations:    payload.Locations,
+			User:         payload.User,
+			Index:        payload.Index,
+			Prefix:       objectKey,
+			IgonoreEtags: payload.IgnoreEtags,
+			IgnoreSizes:  payload.IgnoreSizes,
+		}); err != nil {
+			return fmt.Errorf("unable to enqueue consistency check list task: %w", err)
 		}
 	}
 
@@ -157,17 +138,17 @@ type ConsistencyCheckSvc struct {
 	settingsStore  *store.ConsistencyCheckSettingsStore
 	listStateStore *store.ConsistencyCheckListStateStore
 	setStore       *store.ConsistencyCheckSetStore
-	copySvc        copy.CopySvc
+	clients        objstore.Clients
 	queueSvc       tasks.QueueService
 }
 
-func NewConsistencyCheckSvc(idStore *store.ConsistencyCheckIDStore, settingsStore *store.ConsistencyCheckSettingsStore, listStateStore *store.ConsistencyCheckListStateStore, setStore *store.ConsistencyCheckSetStore, copySvc copy.CopySvc, queueSvc tasks.QueueService) *ConsistencyCheckSvc {
+func NewConsistencyCheckSvc(idStore *store.ConsistencyCheckIDStore, settingsStore *store.ConsistencyCheckSettingsStore, listStateStore *store.ConsistencyCheckListStateStore, setStore *store.ConsistencyCheckSetStore, clients objstore.Clients, queueSvc tasks.QueueService) *ConsistencyCheckSvc {
 	return &ConsistencyCheckSvc{
 		idStore:        idStore,
 		settingsStore:  settingsStore,
 		listStateStore: listStateStore,
 		setStore:       setStore,
-		copySvc:        copySvc,
+		clients:        clients,
 		queueSvc:       queueSvc,
 	}
 }
@@ -176,7 +157,11 @@ func (r *ConsistencyCheckSvc) ShouldCheckVersions(ctx context.Context, user stri
 	versionedLocations := 0
 
 	for _, location := range locations {
-		versioned, err := r.copySvc.IsBucketVersioned(ctx, user, copy.NewBucket(location.Storage, location.Bucket))
+		client, err := r.clients.AsCommon(ctx, location.Storage, user)
+		if err != nil {
+			return false, fmt.Errorf("unable to obtain client: %w", err)
+		}
+		versioned, err := client.IsBucketVersioned(ctx, location.Bucket)
 		if err != nil {
 			return false, fmt.Errorf("unable to check if bucket is versioned: %w", err)
 		}
@@ -188,45 +173,41 @@ func (r *ConsistencyCheckSvc) ShouldCheckVersions(ctx context.Context, user stri
 	return versionedLocations == len(locations), nil
 }
 
-type ObjectTask struct {
-	Key string
-	Dir bool
-}
-
 func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.ConsistencyCheckID,
-	user string, location entity.ConsistencyCheckLocation, prefix string, versioned bool, ignoreEtags bool, ignoreSizes bool) iter.Seq2[ObjectTask, error] {
+	user string, location entity.ConsistencyCheckLocation, prefix string, versioned bool, ignoreEtags bool, ignoreSizes bool) iter.Seq2[string, error] {
 	locationCount := len(checkID.Locations)
 	objectID := entity.NewConsistencyCheckObjectID(checkID, location.Storage, prefix)
 
 	lastObject, err := r.listStateStore.Get(ctx, objectID)
 	if err != nil && !errors.Is(err, dom.ErrNotFound) {
-		return func(yield func(ObjectTask, error) bool) {
-			yield(ObjectTask{}, fmt.Errorf("unable to get last listed object: %w", err))
+		return func(yield func(string, error) bool) {
+			yield("", fmt.Errorf("unable to get last listed object: %w", err))
 		}
 	}
 
-	objectCount := uint64(0)
-	listBucket := copy.Bucket{
-		Storage: location.Storage,
-		Bucket:  location.Bucket,
+	client, err := r.clients.AsCommon(ctx, location.Storage, user)
+	if err != nil {
+		return func(yield func(string, error) bool) {
+			yield("", fmt.Errorf("unable to obtain client: %w", err))
+		}
 	}
 
-	objects := r.copySvc.BucketObjects(ctx, user, listBucket, copy.WithAfter(lastObject), copy.WithPrefix(prefix))
-	return func(yield func(ObjectTask, error) bool) {
+	objects := client.ListObjects(ctx, location.Bucket, objstore.WithPrefix(prefix), objstore.WithAfter(lastObject))
+	return func(yield func(string, error) bool) {
 		for object, err := range objects {
 			if err != nil {
-				yield(ObjectTask{}, fmt.Errorf("unable to list objects: %w", err))
+				if errors.Is(err, objstore.ErrBucketDoesntExist) {
+					return
+				}
+
+				yield("", fmt.Errorf("unable to list objects: %w", err))
 				return
 			}
 
-			isDir := object.Size == 0 && strings.HasSuffix(object.Key, "/")
-			if isDir {
-				yield(ObjectTask{Key: object.Key, Dir: true}, nil)
-				continue
-			}
+			isDir := object.Size == 0 && object.VersionID == "" && strings.HasSuffix(object.Key, "/")
 
-			if versioned {
-				yield(ObjectTask{Key: object.Key}, nil)
+			if versioned && !isDir {
+				yield(object.Key, nil)
 				continue
 			}
 
@@ -242,30 +223,18 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 
 			entry := entity.NewConsistencyCheckSetEntry(location)
 			if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
-				yield(ObjectTask{}, fmt.Errorf("unable to add storage to consistency check set: %w", err))
+				yield("", fmt.Errorf("unable to add storage to consistency check set: %w", err))
 				return
 			}
 
 			if err := r.listStateStore.Set(ctx, objectID, object.Key); err != nil {
-				yield(ObjectTask{}, fmt.Errorf("unable to set last listed object: %w", err))
+				yield("", fmt.Errorf("unable to set last listed object: %w", err))
 				return
 			}
-			objectCount++
 		}
 
-		isEmptyDir := lastObject == "" && objectCount == 0 && prefix != ""
-
-		id := entity.NewNameConsistencyCheckSetID(checkID, prefix)
-		entry := entity.NewConsistencyCheckSetEntry(location)
-		if err := r.setStore.Add(ctx, id, entry, uint8(locationCount)); err != nil {
-			yield(ObjectTask{}, fmt.Errorf("unable to add storage to consistency check set: %w", err))
-			return
-		}
-
-		if !isEmptyDir {
-			if _, err := r.listStateStore.Drop(ctx, objectID); err != nil {
-				yield(ObjectTask{}, fmt.Errorf("unable to delete last listed object: %w", err))
-			}
+		if _, err := r.listStateStore.Drop(ctx, objectID); err != nil {
+			yield("", fmt.Errorf("unable to delete last listed object: %w", err))
 		}
 	}
 }
@@ -273,13 +242,14 @@ func (r *ConsistencyCheckSvc) ObjectTasks(ctx context.Context, checkID entity.Co
 func (r *ConsistencyCheckSvc) AccountObjectVersions(ctx context.Context, checkID entity.ConsistencyCheckID,
 	user string, location entity.ConsistencyCheckLocation, prefix string, ignoreEtags bool, ignoreSizes bool) error {
 	locationCount := len(checkID.Locations)
-	listBucket := copy.Bucket{
-		Storage: location.Storage,
-		Bucket:  location.Bucket,
+
+	client, err := r.clients.AsCommon(ctx, location.Storage, user)
+	if err != nil {
+		return fmt.Errorf("unable to obtain client: %w", err)
 	}
 
 	versionIdx := uint64(0)
-	objects := r.copySvc.BucketObjects(ctx, user, listBucket, copy.WithPrefix(prefix), copy.WithVersions())
+	objects := client.ListObjects(ctx, location.Bucket, objstore.WithPrefix(prefix), objstore.WithVersions())
 	for object, err := range objects {
 		if err != nil {
 			return fmt.Errorf("unable to list object versions: %w", err)

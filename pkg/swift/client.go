@@ -112,7 +112,7 @@ func NewClient(ctx context.Context, addr StorageAddress, user Credentials) (*gop
 		DomainName:       user.DomainName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("swift client: failed to authenticate  for tenant %q: %w", user.TenantName, err)
+		return nil, fmt.Errorf("swift client: failed to authenticate for tenant %q: %w", user.TenantName, err)
 	}
 
 	if addr.StorageEndpointType == "" {

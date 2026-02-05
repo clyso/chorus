@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 	"net/http"
 	"net/url"
 	"time"
@@ -94,8 +93,6 @@ type ObjectInfo struct {
 }
 
 type CopySvc interface {
-	BucketObjects(ctx context.Context, user string, bucket Bucket, opts ...func(o *minio.ListObjectsOptions)) iter.Seq2[ObjectInfo, error]
-	IsBucketVersioned(ctx context.Context, user string, bucket Bucket) (bool, error)
 	GetVersionInfo(ctx context.Context, user string, to File) ([]entity.ObjectVersionInfo, error)
 	DeleteDestinationObject(ctx context.Context, user string, to File) error
 	GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (entity.ObjectVersionInfo, error)
@@ -117,77 +114,6 @@ func NewS3CopySvc(credsSvc objstore.CredsService, clientRegistry objstore.Client
 		clientRegistry: clientRegistry,
 		metricsSvc:     metricsSvc,
 	}
-}
-
-func WithVersions() func(o *minio.ListObjectsOptions) {
-	return func(o *minio.ListObjectsOptions) {
-		o.WithVersions = true
-	}
-}
-
-func WithPrefix(prefix string) func(o *minio.ListObjectsOptions) {
-	return func(o *minio.ListObjectsOptions) {
-		o.Prefix = prefix
-	}
-}
-
-func WithAfter(after string) func(o *minio.ListObjectsOptions) {
-	return func(o *minio.ListObjectsOptions) {
-		o.StartAfter = after
-	}
-}
-
-func (r *S3CopySvc) BucketObjects(ctx context.Context, user string, bucket Bucket, opts ...func(o *minio.ListObjectsOptions)) iter.Seq2[ObjectInfo, error] {
-	storageClient, err := r.clientRegistry.AsS3(ctx, bucket.Storage, user)
-	if err != nil {
-		return func(yield func(ObjectInfo, error) bool) {
-			yield(ObjectInfo{}, fmt.Errorf("unable to get %s storage client: %w", bucket.Storage, err))
-		}
-	}
-
-	listOpts := minio.ListObjectsOptions{}
-	for _, opt := range opts {
-		opt(&listOpts)
-	}
-
-	objects := storageClient.S3().ListObjects(ctx, bucket.Bucket, listOpts)
-	return func(yield func(ObjectInfo, error) bool) {
-		for object := range objects {
-			err := object.Err
-			// skip if bucket not found
-			if err != nil && minio.ToErrorResponse(err).Code == minio.NoSuchBucket {
-				return
-			}
-			info := ObjectInfo{
-				Key:          object.Key,
-				VersionID:    object.VersionID,
-				LastModified: object.LastModified,
-				Etag:         object.ETag,
-				Size:         uint64(object.Size),
-				StorageClass: object.StorageClass,
-			}
-			if !yield(info, err) {
-				return
-			}
-			if err != nil {
-				return
-			}
-		}
-	}
-}
-
-func (r *S3CopySvc) IsBucketVersioned(ctx context.Context, user string, bucket Bucket) (bool, error) {
-	storageClient, err := r.clientRegistry.AsS3(ctx, bucket.Storage, user)
-	if err != nil {
-		return false, fmt.Errorf("unable to get %s storage client: %w", bucket.Storage, err)
-	}
-
-	versioningConfig, err := storageClient.S3().GetBucketVersioning(ctx, bucket.Bucket)
-	if err != nil {
-		return false, fmt.Errorf("unable to get storage rversioning config: %w", err)
-	}
-
-	return versioningConfig.Enabled(), nil
 }
 
 func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([]entity.ObjectVersionInfo, error) {

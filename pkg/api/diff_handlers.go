@@ -221,7 +221,8 @@ func (h *diffHandlers) DeleteReport(ctx context.Context, req *pb.ConsistencyChec
 }
 
 var ccSupportedStorTypes = map[dom.StorageType]bool{
-	dom.S3: true,
+	dom.S3:    true,
+	dom.Swift: true,
 }
 
 func (h *diffHandlers) validateStorageLocations(locations []*pb.MigrateLocation) error {
