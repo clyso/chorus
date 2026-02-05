@@ -447,6 +447,23 @@ func DeepCopyStruct[T any](in T) (out T, err error) {
 	return out, err
 }
 
+func WorkerSwiftConfig(main string, storages map[string]swift.Storage) objstore.Config {
+	res := objstore.Config{
+		Main:     main,
+		Storages: map[string]objstore.GenericStorage[*s3.Storage, *swift.Storage]{},
+	}
+	for name, stor := range storages {
+		s := stor
+		res.Storages[name] = objstore.GenericStorage[*s3.Storage, *swift.Storage]{
+			Swift: &s,
+			CommonConfig: objstore.CommonConfig{
+				Type: dom.Swift,
+			},
+		}
+	}
+	return res
+}
+
 func WorkerS3Config(main string, storages map[string]s3.Storage) objstore.Config {
 	res := objstore.Config{
 		Main:     main,

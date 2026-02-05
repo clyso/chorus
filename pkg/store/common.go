@@ -44,6 +44,15 @@ if #keys > 0 then
 	return redis.call('UNLINK', unpack(keys))
 end
 return 0`)
+
+	luaHasKeys = redis.NewScript(`local cursor = "0"
+local count = 0
+repeat
+	local result = redis.call("SCAN", cursor, "MATCH", KEYS[1], "COUNT", 100)
+	cursor = result[1]
+	count = #result[2]
+until cursor == "0" or count ~= 0
+return count`)
 )
 
 type ErrorCollector func() error
@@ -314,17 +323,15 @@ func (r *RedisIDCommonStore[ID]) GetIDs(ctx context.Context, pager Pager, keyPar
 
 func (r *RedisIDCommonStore[ID]) HasIDsOp(ctx context.Context, keyParts ...string) OperationResult[bool] {
 	selector := r.MakeWildcardSelector(keyParts...)
-	// with count value set to low values client returns empty key set and cursor greater than zero,
-	// regardless of key count in database; default value is 10
-	cmd := r.client.Scan(ctx, 0, selector, 0)
+
+	cmd := luaHasKeys.Eval(ctx, r.client, []string{selector})
 
 	collectFunc := func() (bool, error) {
-		keys, _, err := cmd.Result()
+		hasKeys, err := cmd.Bool()
 		if err != nil {
-			return false, fmt.Errorf("unable to scan keys: %w", err)
+			return false, fmt.Errorf("unable to execute script: %w", err)
 		}
-
-		return len(keys) > 0, nil
+		return hasKeys, nil
 	}
 
 	return NewRedisOperationResult(collectFunc)

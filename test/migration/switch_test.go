@@ -686,7 +686,7 @@ func TestApi_scheduled_switch(t *testing.T) {
 	r.False(diff.IsMatch)
 	// obj1 is different
 	r.Len(diff.Differ, 1)
-	r.Equal(obj1.name, diff.Differ[0])
+	r.Equal("/"+obj1.name, diff.Differ[0])
 	r.Empty(diff.MissTo)
 	r.Empty(diff.MissFrom)
 

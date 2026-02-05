@@ -9,8 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var treeGen *TreeGenerator[*GeneratedS3Object]
-
 func TestEnv(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Test Env Suite")
@@ -20,17 +18,17 @@ var _ = Describe("Tree generation", func() {
 	It("Generated content with the same seed should match", func() {
 		seed := GinkgoRandomSeed()
 
-		objGen1 := NewS3ObjectGenerator()
-		treeGen1, err := NewTreeGenerator[*GeneratedS3Object](
-			WithRandomSeed[*GeneratedS3Object](seed),
-			WithObjectGenerator[*GeneratedS3Object](objGen1),
+		objGen1 := NewCommonObjectGenerator()
+		treeGen1, err := NewTreeGenerator[*GeneratedObject](
+			WithRandomSeed[*GeneratedObject](seed),
+			WithObjectGenerator[*GeneratedObject](objGen1),
 		)
 		Expect(err).NotTo(HaveOccurred())
 
-		objGen2 := NewS3ObjectGenerator()
-		treeGen2, err := NewTreeGenerator[*GeneratedS3Object](
-			WithRandomSeed[*GeneratedS3Object](seed),
-			WithObjectGenerator[*GeneratedS3Object](objGen2),
+		objGen2 := NewCommonObjectGenerator()
+		treeGen2, err := NewTreeGenerator[*GeneratedObject](
+			WithRandomSeed[*GeneratedObject](seed),
+			WithObjectGenerator[*GeneratedObject](objGen2),
 		)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -85,13 +83,13 @@ var _ = Describe("Tree generation", func() {
 	It("Content reader is repeatable", func() {
 		seed := GinkgoRandomSeed()
 
-		objGen := NewS3ObjectGenerator()
-		treeGen, err := NewTreeGenerator[*GeneratedS3Object](
-			WithRandomSeed[*GeneratedS3Object](seed),
-			WithObjectGenerator[*GeneratedS3Object](objGen),
-			WithForceTargetDepth[*GeneratedS3Object](),
-			WithDepthRange[*GeneratedS3Object](5, 5),
-			WithWidthRange[*GeneratedS3Object](2, 5),
+		objGen := NewCommonObjectGenerator()
+		treeGen, err := NewTreeGenerator[*GeneratedObject](
+			WithRandomSeed[*GeneratedObject](seed),
+			WithObjectGenerator[*GeneratedObject](objGen),
+			WithForceTargetDepth[*GeneratedObject](),
+			WithDepthRange[*GeneratedObject](5, 5),
+			WithWidthRange[*GeneratedObject](2, 5),
 		)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -119,10 +117,10 @@ var _ = Describe("Tree generation", func() {
 	It("Iterators returning same collection", func() {
 		seed := GinkgoRandomSeed()
 
-		objGen := NewS3ObjectGenerator()
-		treeGen, err := NewTreeGenerator[*GeneratedS3Object](
-			WithObjectGenerator[*GeneratedS3Object](objGen),
-			WithRandomSeed[*GeneratedS3Object](seed),
+		objGen := NewCommonObjectGenerator()
+		treeGen, err := NewTreeGenerator[*GeneratedObject](
+			WithObjectGenerator[*GeneratedObject](objGen),
+			WithRandomSeed[*GeneratedObject](seed),
 		)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -135,7 +133,7 @@ var _ = Describe("Tree generation", func() {
 		widthIter := tree.WidthFirstValueIterator()
 		widthCollection := slices.Collect(widthIter.Must())
 
-		sortFunc := func(a, b *GeneratedS3Object) int {
+		sortFunc := func(a, b *GeneratedObject) int {
 			if a.fullPath == b.fullPath {
 				return 0
 			}

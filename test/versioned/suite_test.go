@@ -65,7 +65,7 @@ var (
 	testCtx           context.Context
 	testCtxCancelFunc context.CancelFunc
 
-	testTree *gen.Tree[*gen.GeneratedS3Object]
+	testTree *gen.Tree[*gen.GeneratedObject]
 )
 
 func TestEnv(t *testing.T) {
@@ -76,16 +76,16 @@ func TestEnv(t *testing.T) {
 var _ = BeforeSuite(func() {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
-	objGen := gen.NewS3ObjectGenerator(
+	objGen := gen.NewCommonObjectGenerator(
 		gen.WithVersioned(),
 	)
-	genOpts := []gen.TreeGeneratorOption[*gen.GeneratedS3Object]{
-		gen.WithObjectGenerator[*gen.GeneratedS3Object](objGen),
+	genOpts := []gen.TreeGeneratorOption[*gen.GeneratedObject]{
+		gen.WithObjectGenerator[*gen.GeneratedObject](objGen),
 	}
 	if gen.CUseTestGenSeed {
-		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedS3Object](gen.CTestGenSeed))
+		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedObject](gen.CTestGenSeed))
 	} else {
-		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedS3Object](GinkgoRandomSeed()))
+		genOpts = append(genOpts, gen.WithRandomSeed[*gen.GeneratedObject](GinkgoRandomSeed()))
 	}
 	treeGen, err := gen.NewTreeGenerator(genOpts...)
 	Expect(err).NotTo(HaveOccurred())
@@ -192,7 +192,7 @@ var _ = Describe("Minio versioned migration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		filler := gen.NewS3Filler(testTree, minioSrcUserClient)
-		err = filler.Fill(ctx, CMinioSrcBucket)
+		err = filler.FillBucket(ctx, CMinioSrcBucket)
 		Expect(err).NotTo(HaveOccurred())
 
 		redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
@@ -246,6 +246,7 @@ var _ = Describe("Minio versioned migration", func() {
 				},
 				Redis: &config.Redis{
 					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
+					Password:  redisAccessConfig.Password,
 				},
 				Metrics: &metrics.Config{
 					Enabled: false,
@@ -497,7 +498,7 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		filler := gen.NewS3Filler(testTree, minioSrcUserClient)
-		err = filler.Fill(ctx, CCephSrcBucket)
+		err = filler.FillBucket(ctx, CCephSrcBucket)
 		Expect(err).NotTo(HaveOccurred())
 
 		redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
@@ -551,6 +552,7 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 				},
 				Redis: &config.Redis{
 					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
+					Password:  redisAccessConfig.Password,
 				},
 				Metrics: &metrics.Config{
 					Enabled: false,
@@ -757,7 +759,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		filler := gen.NewS3Filler(testTree, minioSrcUserClient)
-		err = filler.Fill(ctx, CCephSrcBucket)
+		err = filler.FillBucket(ctx, CCephSrcBucket)
 		Expect(err).NotTo(HaveOccurred())
 
 		redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
@@ -780,6 +782,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 				},
 				Redis: &config.Redis{
 					Addresses: []string{fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)},
+					Password:  redisAccessConfig.Password,
 				},
 				Metrics: &metrics.Config{
 					Enabled: false,
