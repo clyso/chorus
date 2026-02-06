@@ -1,11 +1,8 @@
 package objstore
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
@@ -459,27 +456,6 @@ func Test_YAML_Marshal(t *testing.T) {
 	r.NoError(yaml.Unmarshal(data, &fromYaml))
 	r.EqualValues(conf, fromYaml)
 	r.NoError(fromYaml.Validate())
-}
-
-func Test_Viper(t *testing.T) {
-
-	r := require.New(t)
-	v := viper.NewWithOptions(viper.WithDecodeHook(mapstructure.ComposeDecodeHookFunc(mapstructure.StringToTimeDurationHookFunc(), Config{}.ViperUnmarshallerHookFunc())))
-	v.SetConfigType("yaml")
-	r.NoError(v.ReadConfig(strings.NewReader(testStoragesYAML)))
-
-	// read via viper
-	var confFromViper Config
-	r.NoError(v.Unmarshal(&confFromViper))
-	r.EqualValues("s3storage", confFromViper.Main)
-	r.Len(confFromViper.Storages, 2)
-	r.NoError(confFromViper.Validate())
-
-	// read via yaml
-	var confFromYAML Config
-	r.NoError(yaml.Unmarshal([]byte(testStoragesYAML), &confFromYAML))
-	r.NoError(confFromYAML.Validate())
-	r.EqualValues(confFromYAML, confFromViper)
 }
 
 func TestStorage_UserList(t *testing.T) {

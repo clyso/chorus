@@ -23,7 +23,6 @@ import (
 	"slices"
 
 	"github.com/clyso/chorus/pkg/config"
-	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
@@ -114,7 +113,7 @@ func (c *Config) Validate() error {
 func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Opt{config.Reader(dc, "chorus_default_cfg"), config.Decoder(objstore.Config{}.ViperUnmarshallerHookFunc()), config.Decoder(proxy.Storages{}.ViperUnmarshallerHookFunc())}
+	cfgSource := []config.Opt{config.Reader(dc, "chorus_default_cfg")}
 	if len(src) == 0 {
 		src = []config.Opt{config.Reader(testConfig(), "chorus_test_cfg")}
 	}

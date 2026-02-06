@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
 	stdlog "github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
@@ -94,17 +92,9 @@ func Get(conf any, sources ...Opt) error {
 	}
 	defer data.Close()
 
-	var opts options
-	for _, o := range sources {
-		o.apply(&opts)
-	}
-	opts.decoders = append(opts.decoders, mapstructure.StringToTimeDurationHookFunc(), mapstructure.StringToSliceHookFunc(","))
-	v := viper.NewWithOptions(viper.EnvKeyReplacer(strings.NewReplacer(".", "_")), viper.WithDecodeHook(mapstructure.ComposeDecodeHookFunc(opts.decoders...)))
-
-	v.SetConfigType("yaml")
-	err = v.ReadConfig(data)
+	base, err := readYAMLMap(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: unable to parse default config.yaml", err)
 	}
 
 	stdlog.Info().Msg("app config: reading default common config")
@@ -117,27 +107,36 @@ func Get(conf any, sources ...Opt) error {
 				stdlog.Warn().Msgf("app config: no config file %q", string(src))
 				continue
 			}
-			v.SetConfigFile(string(src))
-			err = v.MergeInConfig()
+			f, err := os.Open(string(src))
 			if err != nil {
-				return fmt.Errorf("%w: unable merge config file %q", err, string(src))
+				return fmt.Errorf("%w: unable to open config file %q", err, string(src))
 			}
+			overlay, err := readYAMLMap(f)
+			f.Close()
+			if err != nil {
+				return fmt.Errorf("%w: unable to parse config file %q", err, string(src))
+			}
+			base = deepMerge(base, overlay)
 			stdlog.Info().Msgf("app config: override with: %s", string(src))
 		case readerOpt:
-			err = v.MergeConfig(src.Reader)
+			overlay, err := readYAMLMap(src.Reader)
 			if err != nil {
-				return fmt.Errorf("%w: unable merge config reader", err)
+				return fmt.Errorf("%w: unable to parse config reader %q", err, src.Name)
 			}
+			base = deepMerge(base, overlay)
 			stdlog.Info().Msgf("app config: override with: %s", src.Name)
 		}
 	}
 
-	// Override config values if there are envs
-	v.AutomaticEnv()
-	v.SetEnvPrefix("CFG")
+	if err = applyEnvOverrides(base, "CFG"); err != nil {
+		return err
+	}
 
-	err = v.Unmarshal(&conf)
+	yamlBytes, err := yaml.Marshal(base)
 	if err != nil {
+		return fmt.Errorf("%w: unable to marshal merged config", err)
+	}
+	if err = yaml.Unmarshal(yamlBytes, conf); err != nil {
 		return fmt.Errorf("%w: unable to unmarshal config", err)
 	}
 
@@ -167,30 +166,13 @@ func (c *Common) Validate() error {
 	return nil
 }
 
-type options struct {
-	sources  []any
-	decoders []mapstructure.DecodeHookFunc
-}
-
 type Opt interface {
-	apply(*options)
-}
-
-type decodeOpt mapstructure.DecodeHookFuncType
-
-func (p decodeOpt) apply(opts *options) {
-	opts.decoders = append(opts.decoders, p)
-}
-
-func Decoder(decoder mapstructure.DecodeHookFuncType) Opt {
-	return decodeOpt(decoder)
+	configOpt()
 }
 
 type pathOpt string
 
-func (p pathOpt) apply(opts *options) {
-	opts.sources = append(opts.sources, p)
-}
+func (pathOpt) configOpt() {}
 
 func Path(path string) Opt {
 	return pathOpt(path)
@@ -201,9 +183,7 @@ type readerOpt struct {
 	Name string
 }
 
-func (r readerOpt) apply(opts *options) {
-	opts.sources = append(opts.sources, r)
-}
+func (readerOpt) configOpt() {}
 
 func Reader(reader io.Reader, name string) Opt {
 	return readerOpt{reader, name}
