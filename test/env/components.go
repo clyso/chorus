@@ -192,6 +192,7 @@ type ComponentCreationConfig struct {
 	InstantiateFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
 	Dependencies    []string
 	DisabledLogs    []string
+	Container       bool
 }
 
 type RedisAccessConfig struct {
@@ -289,17 +290,10 @@ type TestEnvironment struct {
 func NewTestEnvironment(ctx context.Context, envConfig map[string]ComponentCreationConfig) (*TestEnvironment, error) {
 	configLen := len(envConfig)
 	env := &TestEnvironment{
-		creationConfigs: make(map[string]ComponentCreationConfig, configLen),
+		creationConfigs: envConfig,
 		accessConfigs:   make(map[string]any, configLen),
 		terminators:     make(map[string]Terminator, configLen),
 	}
-	env.creationConfigs = envConfig
-
-	vlan, err := vlan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create env network: %w", err)
-	}
-	env.network = vlan
 
 	for componentName, componentConfig := range envConfig {
 		if err := instantiate(ctx, env, componentName, &componentConfig); err != nil {
@@ -320,6 +314,9 @@ func (r *TestEnvironment) Terminate(ctx context.Context) error {
 		if err := terminate(ctx); err != nil {
 			return fmt.Errorf("unable to stop component %s: %w", name, err)
 		}
+	}
+	if r.network == nil {
+		return nil
 	}
 	if err := r.network.Remove(ctx); err != nil {
 		return fmt.Errorf("unable to remove network: %w", err)
@@ -414,6 +411,7 @@ func (r *TestEnvironment) GetCephAccessConfig(instanceName string) (*CephAccessC
 func AsMinio(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
 		InstantiateFunc: startMinioInstance,
+		Container:       true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -424,6 +422,7 @@ func AsMinio(opts ...ComponentOption) ComponentCreationConfig {
 func AsRedis(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
 		InstantiateFunc: startRedisInstance,
+		Container:       true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -454,6 +453,7 @@ func AsGoFakeS3(opts ...ComponentOption) ComponentCreationConfig {
 func AsKeystone(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
 		InstantiateFunc: startKeystoneInstance,
+		Container:       true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -465,6 +465,7 @@ func AsSwift(keystoneInstance string, opts ...ComponentOption) ComponentCreation
 	cfg := ComponentCreationConfig{
 		Dependencies:    []string{keystoneInstance},
 		InstantiateFunc: startSwiftInstance,
+		Container:       true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -475,6 +476,7 @@ func AsSwift(keystoneInstance string, opts ...ComponentOption) ComponentCreation
 func AsCeph(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
 		InstantiateFunc: startCephInstance,
+		Container:       true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -493,6 +495,14 @@ func vlan(ctx context.Context) (*testcontainers.DockerNetwork, error) {
 func instantiate(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	if _, ok := env.terminators[componentName]; ok {
 		return nil
+	}
+
+	if componentConfig.Container && env.network == nil {
+		vlan, err := vlan(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to create env network: %w", err)
+		}
+		env.network = vlan
 	}
 
 	for _, dependencyName := range componentConfig.Dependencies {
