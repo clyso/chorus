@@ -77,7 +77,7 @@ func (c *Config) Validate() error {
 func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Opt{config.Reader(dc, "worker_default_cfg"), config.Decoder(objstore.Config{}.ViperUnmarshallerHookFunc())}
+	cfgSource := []config.Opt{config.Reader(dc, "worker_default_cfg")}
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

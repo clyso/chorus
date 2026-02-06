@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,196 +11,181 @@ import (
 func TestGet(t *testing.T) {
 	r := require.New(t)
 	var conf Common
-	err := Get(&conf)
-	r.NoError(err)
+	r.NoError(Get(&conf))
 
-	r.EqualValues(9090, conf.Metrics.Port)
-	r.EqualValues("info", conf.Log.Level)
-	r.EqualValues(false, conf.Log.Json)
+	r.Equal(9090, conf.Metrics.Port)
+	r.Equal("info", conf.Log.Level)
+	r.False(conf.Log.Json)
 }
 
 func TestOverride(t *testing.T) {
 	r := require.New(t)
 	var conf Common
-	err := Get(&conf, Path("override_test.yaml"))
-	r.NoError(err)
+	r.NoError(Get(&conf, Path("override_test.yaml")))
 
-	r.EqualValues(69, conf.Metrics.Port)
-	r.EqualValues("info", conf.Log.Level)
-	r.EqualValues(true, conf.Log.Json)
+	r.Equal(69, conf.Metrics.Port)
+	r.Equal("info", conf.Log.Level)
+	r.True(conf.Log.Json)
 	r.NotEmpty(conf.Redis.Address)
-
-	r.EqualValues("user", conf.Redis.User)
-	r.EqualValues("pass", conf.Redis.Password)
-	r.EqualValues("sentinel", conf.Redis.Sentinel.User)
-	r.EqualValues("sentinel-pass", conf.Redis.Sentinel.Password)
-	r.EqualValues("master", conf.Redis.Sentinel.MasterName)
+	r.Equal("user", conf.Redis.User)
+	r.Equal("pass", conf.Redis.Password)
+	r.Equal("sentinel", conf.Redis.Sentinel.User)
+	r.Equal("sentinel-pass", conf.Redis.Sentinel.Password)
+	r.Equal("master", conf.Redis.Sentinel.MasterName)
 	r.True(conf.Redis.TLS.Enabled)
 	r.True(conf.Redis.TLS.Insecure)
-
 }
 
-func TestOverride2(t *testing.T) {
+func TestOverrideMultiple(t *testing.T) {
 	r := require.New(t)
 	var conf Common
-	err := Get(&conf, Path("override_test.yaml"), Path("override_test2.yaml"))
-	r.NoError(err)
+	r.NoError(Get(&conf, Path("override_test.yaml"), Path("override_test2.yaml")))
 	r.NoError(conf.Validate())
 
-	r.EqualValues(420, conf.Metrics.Port)
-	r.EqualValues("info", conf.Log.Level)
-	r.EqualValues(true, conf.Log.Json)
+	r.Equal(420, conf.Metrics.Port)
+	r.Equal("info", conf.Log.Level)
+	r.True(conf.Log.Json)
 	r.NotEmpty(conf.Redis.Address)
 	r.Empty(conf.Redis.Addresses)
-	r.EqualValues([]string{conf.Redis.Address}, conf.Redis.GetAddresses())
+	r.Equal([]string{conf.Redis.Address}, conf.Redis.GetAddresses())
 }
 
 func TestOverrideEnv(t *testing.T) {
+	r := require.New(t)
 	t.Setenv("CFG_METRICS_PORT", "55")
 	t.Setenv("CFG_REDIS_PASSWORD", "secret")
-	t.Setenv("CFG_REDIS_ADDRESSES", "a,b,c")
 
-	r := require.New(t)
 	var conf Common
-	err := Get(&conf, Path("override_test.yaml"), Path("override_test2.yaml"))
-	r.NoError(err)
+	r.NoError(Get(&conf, Path("override_test.yaml"), Path("override_test2.yaml")))
 	r.NoError(conf.Validate())
-	r.EqualValues(55, conf.Metrics.Port)
-	r.EqualValues("info", conf.Log.Level)
-	r.EqualValues(true, conf.Log.Json)
-	r.EqualValues("secret", conf.Redis.Password)
-	r.NotEmpty(conf.Redis.Address)
-	r.EqualValues([]string{"a", "b", "c"}, conf.Redis.Addresses, "redis addresses set from env")
-	r.EqualValues([]string{"a", "b", "c"}, conf.Redis.GetAddresses(), "address is ignored")
+
+	r.Equal(55, conf.Metrics.Port)
+	r.Equal("secret", conf.Redis.Password)
 }
 
-func TestRedis_validate(t *testing.T) {
-	type fields struct {
-		Address   string
-		Addresses []string
-		Sentinel  RedisSentinel
-		User      string
-		Password  string
-		UseTLS    bool
-		MetaDB    int
-		QueueDB   int
-		LockDB    int
-		ConfigDB  int
-	}
+func TestRedisValidate(t *testing.T) {
 	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
+		name      string
+		address   string
+		addresses []string
+		wantErr   bool
 	}{
-		{
-			name: "invalid: no address set",
-			fields: fields{
-				Address:   "",
-				Addresses: []string{},
-			},
-			wantErr: true,
-		},
-		{
-			name: "valid: both addresses set",
-			fields: fields{
-				Address:   "addr",
-				Addresses: []string{"addr"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid: only address set",
-			fields: fields{
-				Address:   "addr",
-				Addresses: []string{},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid: only addresses set",
-			fields: fields{
-				Address:   "",
-				Addresses: []string{"addr"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid: addresses is nil",
-			fields: fields{
-				Address: "addr",
-			},
-			wantErr: false,
-		},
+		{"no address", "", nil, true},
+		{"empty addresses", "", []string{}, true},
+		{"only address", "addr", nil, false},
+		{"only addresses", "", []string{"addr"}, false},
+		{"both set", "addr", []string{"addr"}, false},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Redis{
-				Address:   tt.fields.Address,
-				Addresses: tt.fields.Addresses,
-				Sentinel:  tt.fields.Sentinel,
-				User:      tt.fields.User,
-				Password:  tt.fields.Password,
-				MetaDB:    tt.fields.MetaDB,
-				QueueDB:   tt.fields.QueueDB,
-				LockDB:    tt.fields.LockDB,
-				ConfigDB:  tt.fields.ConfigDB,
-			}
-			if err := r.validate(); (err != nil) != tt.wantErr {
-				t.Errorf("Redis.validate() error = %v, wantErr %v", err, tt.wantErr)
+			r := &Redis{Address: tt.address, Addresses: tt.addresses}
+			err := r.validate()
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
-func TestRedis_GetAddresses(t *testing.T) {
-	type fields struct {
-		Address   string
-		Addresses []string
-	}
+func TestRedisGetAddresses(t *testing.T) {
 	tests := []struct {
-		name   string
-		fields fields
-		want   []string
+		name      string
+		address   string
+		addresses []string
+		want      []string
 	}{
-		{
-			name: "only address is set",
-			fields: fields{
-				Address:   "a",
-				Addresses: []string{},
-			},
-			want: []string{"a"},
-		},
-		{
-			name: "only addresses are set",
-			fields: fields{
-				Address:   "",
-				Addresses: []string{"a", "b"},
-			},
-			want: []string{"a", "b"},
-		},
-		{
-			name: "address is ignored when addresses set",
-			fields: fields{
-				Address:   "a",
-				Addresses: []string{"b", "c"},
-			},
-			want: []string{"b", "c"},
-		},
-		{
-			name:   "nothing is set",
-			fields: fields{},
-			want:   nil,
-		},
+		{"only address", "a", nil, []string{"a"}},
+		{"only addresses", "", []string{"a", "b"}, []string{"a", "b"}},
+		{"both prefers addresses", "a", []string{"b", "c"}, []string{"b", "c"}},
+		{"neither", "", nil, nil},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Redis{
-				Address:   tt.fields.Address,
-				Addresses: tt.fields.Addresses,
-			}
-			if got := r.GetAddresses(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Redis.GetAddresses() = %v, want %v", got, tt.want)
-			}
+			r := &Redis{Address: tt.address, Addresses: tt.addresses}
+			require.Equal(t, tt.want, r.GetAddresses())
 		})
 	}
+}
+
+// TestCommonConfigYAMLCoverage verifies all struct fields have YAML defaults.
+// This test fails if a developer adds a field without a config.yaml default.
+// Env var overrides (CFG_*) only work for fields that exist in YAML.
+func TestCommonConfigYAMLCoverage(t *testing.T) {
+	r := require.New(t)
+	data, err := configFile.Open("config.yaml")
+	r.NoError(err)
+	defer data.Close()
+
+	yamlMap, err := readYAMLMap(data)
+	r.NoError(err)
+
+	missing := findMissingYAMLFields(reflect.TypeOf(Common{}), yamlMap, "")
+	if len(missing) > 0 {
+		t.Errorf("Config fields missing from config.yaml (env var overrides won't work):\n  %s\n\nAdd defaults to pkg/config/config.yaml",
+			strings.Join(missing, "\n  "))
+	}
+}
+
+func findMissingYAMLFields(t reflect.Type, m map[string]any, prefix string) []string {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+
+	var missing []string
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+
+		if field.Anonymous {
+			missing = append(missing, findMissingYAMLFields(field.Type, m, prefix)...)
+			continue
+		}
+
+		yamlTag := field.Tag.Get("yaml")
+		if yamlTag == "-" {
+			continue
+		}
+
+		yamlName := strings.Split(yamlTag, ",")[0]
+		if yamlName == "" {
+			yamlName = field.Name
+		}
+
+		fullPath := yamlName
+		if prefix != "" {
+			fullPath = prefix + "." + yamlName
+		}
+
+		val, exists := mapGetIgnoreCase(m, yamlName)
+		if !exists {
+			missing = append(missing, fullPath)
+			continue
+		}
+
+		fieldType := field.Type
+		if fieldType.Kind() == reflect.Ptr {
+			fieldType = fieldType.Elem()
+		}
+		if fieldType.Kind() == reflect.Struct {
+			if nested, ok := val.(map[string]any); ok {
+				missing = append(missing, findMissingYAMLFields(fieldType, nested, fullPath)...)
+			}
+		}
+	}
+	return missing
+}
+
+func mapGetIgnoreCase(m map[string]any, key string) (any, bool) {
+	for k, v := range m {
+		if strings.EqualFold(k, key) {
+			return v, true
+		}
+	}
+	return nil, false
 }

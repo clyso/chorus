@@ -16,10 +16,8 @@ package objstore
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 
-	"github.com/go-viper/mapstructure/v2"
 	"gopkg.in/yaml.v3"
 
 	"github.com/clyso/chorus/pkg/dom"
@@ -245,53 +243,4 @@ func (a GenericStorage[S3conf, SwiftConf]) MarshalYAML() (any, error) {
 	default:
 		return nil, fmt.Errorf("%w: unsupported storage type %q", dom.ErrInvalidStorageConfig, a.Type)
 	}
-}
-
-func (s StoragesConfig[S3Config, SwiftConfig]) ViperUnmarshallerHookFunc() mapstructure.DecodeHookFuncType {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data any,
-	) (any, error) {
-		if t != reflect.TypeOf(GenericStorage[S3Config, SwiftConfig]{}) {
-			return data, nil
-		}
-		common := CommonConfig{}
-		if err := viperDecode(data, &common); err != nil {
-			return nil, err
-		}
-		switch common.Type {
-		case dom.S3:
-			s3conf := new(S3Config)
-			if err := viperDecode(data, s3conf); err != nil {
-				return nil, err
-			}
-			return GenericStorage[S3Config, SwiftConfig]{
-				CommonConfig: common,
-				S3:           *s3conf,
-			}, nil
-		case dom.Swift:
-			swiftconf := new(SwiftConfig)
-			if err := viperDecode(data, swiftconf); err != nil {
-				return nil, err
-			}
-			return GenericStorage[S3Config, SwiftConfig]{
-				CommonConfig: common,
-				Swift:        *swiftconf,
-			}, nil
-		default:
-			return nil, fmt.Errorf("%w: unsupported storage type %q", dom.ErrInvalidStorageConfig, common.Type)
-		}
-	}
-}
-
-func viperDecode(data any, result any) error {
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		DecodeHook: mapstructure.StringToTimeDurationHookFunc(),
-		Result:     result,
-	})
-	if err != nil {
-		return err
-	}
-	return decoder.Decode(data)
 }

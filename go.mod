@@ -27,7 +27,7 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.33.0
-	github.com/spf13/viper v1.21.0
+	github.com/spf13/viper v1.21.0 // indirect
 	github.com/stretchr/testify v1.11.1
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0
@@ -48,7 +48,6 @@ require (
 	github.com/ceph/go-ceph v0.36.0
 	github.com/docker/docker v28.5.0+incompatible
 	github.com/docker/go-connections v0.6.0
-	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/gophercloud/gophercloud/v2 v2.7.0
 	github.com/minio/madmin-go/v4 v4.0.17
@@ -57,8 +56,6 @@ require (
 	github.com/testcontainers/testcontainers-go v0.38.0
 	golang.org/x/crypto v0.43.0
 )
-
-require github.com/vektra/mockery/v2 v2.53.5 // indirect
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.3.0 // indirect
@@ -135,7 +132,6 @@ require (
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/chigopher/pathlib v0.19.1 // indirect
 	github.com/ckaznocha/intrange v0.3.1 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
@@ -181,6 +177,7 @@ require (
 	github.com/go-toolsmith/astp v1.1.0 // indirect
 	github.com/go-toolsmith/strparse v1.1.0 // indirect
 	github.com/go-toolsmith/typep v1.1.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godoc-lint/godoc-lint v0.10.0 // indirect
@@ -214,13 +211,10 @@ require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
-	github.com/huandu/xstrings v1.4.0 // indirect
-	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jdx/go-netrc v1.0.0 // indirect
 	github.com/jgautheron/goconst v1.8.2 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
-	github.com/jinzhu/copier v0.4.0 // indirect
 	github.com/jjti/go-spancheck v0.6.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/julz/importas v0.2.0 // indirect
@@ -257,7 +251,6 @@ require (
 	github.com/minio/crc64nvme v1.1.0 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
@@ -395,7 +388,6 @@ tool (
 	github.com/google/addlicense
 	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
 	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2
-	github.com/vektra/mockery/v2
 	golang.org/x/tools/cmd/goimports
 	golang.org/x/tools/cmd/stringer
 	golang.org/x/vuln/cmd/govulncheck

@@ -21,10 +21,10 @@ redis:
     enabled: false
     insecure: false
   sentinel:
-    masterName: 
+    masterName:
     user:
     password:
-  appDB: 0
+  metaDB: 0
   queueDB: 1
   lockDB: 2
   configDB: 3
