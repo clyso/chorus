@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"runtime"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -46,6 +48,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+func init() {
+	// Disable HTTP keep-alive for the default transport.
+	// Keystone's uwsgi http-socket mode closes connections between requests,
+	// causing EOF errors when Go's HTTP client reuses pooled connections.
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		t.DisableKeepAlives = true
+	}
+}
 
 const (
 	CRedisImage    = "redis:8.4.0-alpine"
@@ -678,23 +689,29 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 		return fmt.Errorf("unable to get swift api forwarded port: %w", err)
 	}
 
-	_, err = endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
-		Name:         CKeystoneSwiftEndpointName,
-		Availability: gophercloud.AvailabilityInternal,
-		URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Int()),
-		ServiceID:    swiftService.ID,
-	}).Extract()
-	if err != nil {
+	closeIdleConns()
+
+	if err := retryOnTransient(ctx, 3, time.Second, func() error {
+		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
+			Name:         CKeystoneSwiftEndpointName,
+			Availability: gophercloud.AvailabilityInternal,
+			URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Int()),
+			ServiceID:    swiftService.ID,
+		}).Extract()
+		return err
+	}); err != nil {
 		return fmt.Errorf("unable to create internal swift endpoint: %w", err)
 	}
 
-	_, err = endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
-		Name:         CKeystoneSwiftEndpointName,
-		Availability: gophercloud.AvailabilityPublic,
-		URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Int()),
-		ServiceID:    swiftService.ID,
-	}).Extract()
-	if err != nil {
+	if err := retryOnTransient(ctx, 3, time.Second, func() error {
+		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
+			Name:         CKeystoneSwiftEndpointName,
+			Availability: gophercloud.AvailabilityPublic,
+			URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Int()),
+			ServiceID:    swiftService.ID,
+		}).Extract()
+		return err
+	}); err != nil {
 		return fmt.Errorf("unable to create public swift endpoint: %w", err)
 	}
 
@@ -847,8 +864,8 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 	natPortString := fmt.Sprintf(CNATPortTemplate, CRedisPort)
 	natPort := nat.Port(natPortString)
 	req := testcontainers.ContainerRequest{
-		Image:      CRedisImage,
-		Cmd:        []string{"redis-server", "--save", "\"\"", "--appendonly", "no", "--requirepass", CRedisPassword},
+		Image: CRedisImage,
+		Cmd:   []string{"redis-server", "--save", "\"\"", "--appendonly", "no", "--requirepass", CRedisPassword},
 		WaitingFor: wait.ForAll(
 			wait.ForExec([]string{"redis-cli", "-a", CRedisPassword, "ping"}),
 			wait.ForListeningPort(natPort),
@@ -1228,33 +1245,43 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		return fmt.Errorf("unable to get ceph api forwarded port: %w", err)
 	}
 
-	cephService, err := services.Create(ctx, identityClient, services.CreateOpts{
-		Type: CKeystoneObjectStoreServiceType,
-		Extra: map[string]any{
-			"name": CKeystoneCephServiceName,
-		},
-	}).Extract()
-	if err != nil {
+	closeIdleConns()
+
+	var cephService *services.Service
+	if err := retryOnTransient(ctx, 3, time.Second, func() error {
+		var err error
+		cephService, err = services.Create(ctx, identityClient, services.CreateOpts{
+			Type: CKeystoneObjectStoreServiceType,
+			Extra: map[string]any{
+				"name": CKeystoneCephServiceName,
+			},
+		}).Extract()
+		return err
+	}); err != nil {
 		return fmt.Errorf("unable to create ceph service: %w", err)
 	}
 
-	_, err = endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
-		Name:         CKeystoneCephEndpointName,
-		Availability: gophercloud.AvailabilityInternal,
-		URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Int()),
-		ServiceID:    cephService.ID,
-	}).Extract()
-	if err != nil {
+	if err := retryOnTransient(ctx, 3, time.Second, func() error {
+		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
+			Name:         CKeystoneCephEndpointName,
+			Availability: gophercloud.AvailabilityInternal,
+			URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Int()),
+			ServiceID:    cephService.ID,
+		}).Extract()
+		return err
+	}); err != nil {
 		return fmt.Errorf("unable to create internal ceph endpoint: %w", err)
 	}
 
-	_, err = endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
-		Name:         CKeystoneCephEndpointName,
-		Availability: gophercloud.AvailabilityPublic,
-		URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Int()),
-		ServiceID:    cephService.ID,
-	}).Extract()
-	if err != nil {
+	if err := retryOnTransient(ctx, 3, time.Second, func() error {
+		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
+			Name:         CKeystoneCephEndpointName,
+			Availability: gophercloud.AvailabilityPublic,
+			URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Int()),
+			ServiceID:    cephService.ID,
+		}).Extract()
+		return err
+	}); err != nil {
 		return fmt.Errorf("unable to create public ceph endpoint: %w", err)
 	}
 
@@ -1393,4 +1420,47 @@ func stopContainer(ctx context.Context, container testcontainers.Container) erro
 		return fmt.Errorf("unable to stop container: %w", err)
 	}
 	return nil
+}
+
+// closeIdleConns closes idle HTTP connections in the default transport.
+// This prevents EOF errors caused by reusing connections that were closed
+// server-side (e.g., by uwsgi) during long container startup delays.
+func closeIdleConns() {
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		t.CloseIdleConnections()
+	}
+}
+
+func retryOnTransient(ctx context.Context, maxAttempts int, delay time.Duration, fn func() error) error {
+	var lastErr error
+	for i := 0; i < maxAttempts; i++ {
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+		if !isTransientErr(lastErr) {
+			return lastErr
+		}
+		if i < maxAttempts-1 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+	return lastErr
+}
+
+func isTransientErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	s := err.Error()
+	return strings.Contains(s, "EOF") ||
+		strings.Contains(s, "connection reset") ||
+		strings.Contains(s, "connection refused")
 }
