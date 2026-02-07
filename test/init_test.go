@@ -17,8 +17,6 @@
 package test
 
 import (
-	"time"
-
 	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/worker"
 )
@@ -34,7 +32,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
 	workerConf.Features.ACL = false
 	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"

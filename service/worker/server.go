@@ -140,6 +140,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
 
+	defaultRetry := fallbackRetryDelay(conf.Worker.CustomErrRetryInterval)
 	srv := asynq.NewServer(
 		queueRedis,
 		asynq.Config{
@@ -149,7 +150,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 				var rlErr *dom.ErrRateLimitExceeded
 				return !errors.As(err, &rlErr)
 			},
-			RetryDelayFunc: retryDelay,
+			RetryDelayFunc: retryDelayFunc(defaultRetry),
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
 				retried, _ := asynq.GetRetryCount(ctx)
 				maxRetry, _ := asynq.GetMaxRetry(ctx)
@@ -173,6 +174,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			StrictPriority:             true,
 			DynamicQueues:              true,
 			DynamicQueueUpdateInterval: conf.Worker.QueueUpdateInterval,
+			TaskCheckInterval:          conf.Worker.TaskCheckInterval,
+			DelayedTaskCheckInterval:   conf.Worker.DelayedTaskCheckInterval,
 		},
 	)
 
@@ -302,13 +305,21 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	return server.Start(ctx)
 }
 
-func retryDelay(n int, err error, task *asynq.Task) time.Duration {
-	var rlErr *dom.ErrRateLimitExceeded
-	if errors.As(err, &rlErr) {
-		return rlErr.RetryIn
+func retryDelayFunc(fallback asynq.RetryDelayFunc) asynq.RetryDelayFunc {
+	return func(n int, err error, task *asynq.Task) time.Duration {
+		var rlErr *dom.ErrRateLimitExceeded
+		if errors.As(err, &rlErr) {
+			return rlErr.RetryIn
+		}
+		return fallback(n, err, task)
 	}
-	return ErrRetryDelayFunc(n, err, task)
 }
 
-// override in e2e test for short retry
-var ErrRetryDelayFunc = asynq.DefaultRetryDelayFunc
+func fallbackRetryDelay(customInterval *time.Duration) asynq.RetryDelayFunc {
+	if customInterval == nil || *customInterval <= 0 {
+		return asynq.DefaultRetryDelayFunc
+	}
+	return func(_ int, _ error, _ *asynq.Task) time.Duration {
+		return *customInterval
+	}
+}

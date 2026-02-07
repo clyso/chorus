@@ -35,10 +35,35 @@ import (
 )
 
 type Config struct {
-	SwiftRetryInterval  time.Duration `yaml:"swiftRetryInterval"`
-	PauseRetryInterval  time.Duration `yaml:"pauseRetryInterval"`
-	SwitchRetryInterval time.Duration `yaml:"switchRetryInterval"`
-	QueueUpdateInterval time.Duration `yaml:"queueUpdateInterval"`
+	SwiftRetryInterval       time.Duration  `yaml:"swiftRetryInterval"`
+	PauseRetryInterval       time.Duration  `yaml:"pauseRetryInterval"`
+	SwitchRetryInterval      time.Duration  `yaml:"switchRetryInterval"`
+	QueueUpdateInterval      time.Duration  `yaml:"queueUpdateInterval"`
+	TaskCheckInterval        time.Duration  `yaml:"taskCheckInterval"`
+	DelayedTaskCheckInterval time.Duration  `yaml:"delayedTaskCheckInterval"`
+	CustomErrRetryInterval   *time.Duration `yaml:"customErrRetryInterval,omitempty"`
+}
+
+func (c *Config) Validate() error {
+	if c.SwiftRetryInterval <= 0 {
+		return fmt.Errorf("swiftRetryInterval must be greater than 0")
+	}
+	if c.PauseRetryInterval <= 0 {
+		return fmt.Errorf("pauseRetryInterval must be greater than 0")
+	}
+	if c.SwitchRetryInterval <= 0 {
+		return fmt.Errorf("switchRetryInterval must be greater than 0")
+	}
+	if c.QueueUpdateInterval <= 0 {
+		return fmt.Errorf("queueUpdateInterval must be greater than 0")
+	}
+	if c.TaskCheckInterval <= 0 {
+		return fmt.Errorf("taskCheckInterval must be greater than 0")
+	}
+	if c.DelayedTaskCheckInterval <= 0 {
+		return fmt.Errorf("delayedTaskCheckInterval must be greater than 0")
+	}
+	return nil
 }
 
 type svc struct {

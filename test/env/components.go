@@ -849,7 +849,10 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 	req := testcontainers.ContainerRequest{
 		Image:      CRedisImage,
 		Cmd:        []string{"redis-server", "--save", "\"\"", "--appendonly", "no", "--requirepass", CRedisPassword},
-		WaitingFor: wait.ForExec([]string{"redis-cli", "ping"}),
+		WaitingFor: wait.ForAll(
+			wait.ForExec([]string{"redis-cli", "-a", CRedisPassword, "ping"}),
+			wait.ForListeningPort(natPort),
+		),
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
 		},

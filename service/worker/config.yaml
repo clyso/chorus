@@ -1,10 +1,12 @@
 concurrency: 10 # max number of task that can be processed in parallel
 shutdownTimeout: 5s
 worker:
-  queueUpdateInterval: 5s
+  queueUpdateInterval: 3s
   swiftRetryInterval: 1m # used for swift task retries caused by swift inconsistent state
   pauseRetryInterval: 30s
   switchRetryInterval: 30s
+  taskCheckInterval: 1s
+  delayedTaskCheckInterval: 3s
 lock:
   overlap: 2s
 api:

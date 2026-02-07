@@ -24,7 +24,6 @@ import (
 	"github.com/clyso/chorus/pkg/trace"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker"
-	"github.com/clyso/chorus/service/worker/handler"
 	"github.com/clyso/chorus/test/app"
 	"github.com/clyso/chorus/test/env"
 	"github.com/clyso/chorus/test/gen"
@@ -432,10 +431,7 @@ func newWorkerConfig(objStoreConfig *objstore.Config, redisConfig *config.Redis,
 		Lock: &worker.Lock{
 			Overlap: time.Second,
 		},
-		Worker: &handler.Config{
-			SwitchRetryInterval: time.Millisecond * 500,
-			PauseRetryInterval:  time.Millisecond * 500,
-		},
+		Worker:  &app.WorkerRetryConf,
 		Storage: *objStoreConfig,
 		Api: &api.Config{
 			Enabled:  true,

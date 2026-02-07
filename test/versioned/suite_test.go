@@ -51,7 +51,6 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker"
 	"github.com/clyso/chorus/service/worker/copy"
-	"github.com/clyso/chorus/service/worker/handler"
 	"github.com/clyso/chorus/test/app"
 	"github.com/clyso/chorus/test/env"
 	"github.com/clyso/chorus/test/gen"
@@ -259,10 +258,7 @@ var _ = Describe("Minio versioned migration", func() {
 			Lock: &worker.Lock{
 				Overlap: time.Second,
 			},
-			Worker: &handler.Config{
-				SwitchRetryInterval: time.Millisecond * 500,
-				PauseRetryInterval:  time.Millisecond * 500,
-			},
+			Worker:  &app.WorkerRetryConf,
 			Storage: workerStorages,
 			Api: &api.Config{
 				Enabled:  true,
@@ -565,10 +561,7 @@ var _ = Describe("Ceph keystone versioned migration", func() {
 			Lock: &worker.Lock{
 				Overlap: time.Second,
 			},
-			Worker: &handler.Config{
-				SwitchRetryInterval: time.Millisecond * 500,
-				PauseRetryInterval:  time.Millisecond * 500,
-			},
+			Worker:  &app.WorkerRetryConf,
 			Storage: workerStorages,
 			Api: &api.Config{
 				Enabled:  true,
@@ -795,10 +788,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 			Lock: &worker.Lock{
 				Overlap: time.Second,
 			},
-			Worker: &handler.Config{
-				SwitchRetryInterval: time.Millisecond * 500,
-				PauseRetryInterval:  time.Millisecond * 500,
-			},
+			Worker: &app.WorkerRetryConf,
 			Storage: objstore.Config{
 				Main: CCephSrcInstance,
 				Storages: map[string]objstore.Storage{

@@ -59,8 +59,8 @@ import (
 const (
 	user = "test"
 
-	retryShort = 100 * time.Millisecond
-	retryLong  = 500 * time.Millisecond
+	retryShort = 20 * time.Millisecond
+	retryLong  = 50 * time.Millisecond
 )
 
 var (
@@ -139,12 +139,7 @@ func SetupEmbedded(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Con
 		WaitLong:   waitLong,
 		RetryLong:  retryLong,
 	}
-	worker.ErrRetryDelayFunc = func(n int, e error, t *asynq.Task) time.Duration {
-		return retryLong
-	}
-	t.Cleanup(func() {
-		worker.ErrRetryDelayFunc = asynq.DefaultRetryDelayFunc
-	})
+	workerConf.Worker = &WorkerRetryConf
 
 	redisAddr := testutil.SetupRedisAddr(t)
 
