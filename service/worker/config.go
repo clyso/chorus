@@ -62,6 +62,12 @@ func (c *Config) Validate() error {
 	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
+	if c.Worker == nil {
+		return fmt.Errorf("worker config: empty Worker config")
+	}
+	if err := c.Worker.Validate(); err != nil {
+		return fmt.Errorf("worker config: invalid Worker config: %w", err)
+	}
 	if c.Concurrency <= 0 {
 		return fmt.Errorf("worker config: concurency config must be positive: %d", c.Concurrency)
 	}

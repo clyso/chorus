@@ -25,11 +25,25 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/worker"
-	"github.com/hibiken/asynq"
+	"github.com/clyso/chorus/service/worker/handler"
 	"github.com/rs/xid"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
+
+var (
+	asynqRetry = 100 * time.Millisecond
+)
+
+var WorkerRetryConf = handler.Config{
+	SwiftRetryInterval:       asynqRetry * 5,
+	PauseRetryInterval:       asynqRetry * 2,
+	SwitchRetryInterval:      asynqRetry * 2,
+	QueueUpdateInterval:      asynqRetry * 2,
+	TaskCheckInterval:        asynqRetry,
+	DelayedTaskCheckInterval: asynqRetry * 2,
+	CustomErrRetryInterval:   &asynqRetry,
+}
 
 type Chorus struct {
 	PolicyClient pb.PolicyClient
@@ -56,19 +70,13 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 	if err != nil {
 		t.Fatal(err)
 	}
+	workerConf.Worker = &WorkerRetryConf
 	e := Chorus{
 		WaitShort:  waitShort,
 		RetryShort: retryShort,
 		WaitLong:   waitLong,
 		RetryLong:  retryLong,
 	}
-
-	worker.ErrRetryDelayFunc = func(n int, e error, t *asynq.Task) time.Duration {
-		return retryLong
-	}
-	t.Cleanup(func() {
-		worker.ErrRetryDelayFunc = asynq.DefaultRetryDelayFunc
-	})
 
 	redisAddr := testutil.SetupRedisAddr(t)
 
