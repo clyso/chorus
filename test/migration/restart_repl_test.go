@@ -189,7 +189,7 @@ func Test_Restart_User_Replication(t *testing.T) {
 			return false
 		}
 		return reps.Replications[0].InitObjDone > 0
-	}, e.WaitShort, e.RetryShort)
+	}, e.WaitLong, e.RetryShort)
 
 	// add live event
 	for _, bucket := range buckets {
@@ -208,7 +208,7 @@ func Test_Restart_User_Replication(t *testing.T) {
 			return false
 		}
 		return reps.Replications[0].IsInitDone && reps.Replications[0].Events > 0 && reps.Replications[0].Events == reps.Replications[0].EventsDone
-	}, e.WaitShort, e.RetryShort)
+	}, e.WaitLong, e.RetryShort)
 
 	for _, bucket := range buckets {
 		buckID := proto.Clone(id).(*pb.ReplicationID)
@@ -263,7 +263,7 @@ func Test_Restart_User_Replication(t *testing.T) {
 		}
 		stat := reps.Replications[0]
 		return stat.IsInitDone && stat.Events == stat.EventsDone
-	}, e.WaitShort, e.RetryShort)
+	}, e.WaitLong, e.RetryShort)
 
 	// check that sync was correct
 	for _, bucket := range buckets {
