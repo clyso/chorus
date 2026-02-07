@@ -58,7 +58,7 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 	zerolog.Ctx(ctx).Debug().Msg("creating replication task")
 
 	// 1. find repl rule(-s)
-	incVersions, replications, err := s.getDestinations(ctx, routedTo)
+	replications, skipTasks, err := s.getDestinations(ctx, routedTo)
 	if err != nil {
 		if errors.Is(err, dom.ErrPolicy) {
 			zerolog.Ctx(ctx).Info().Err(err).Msg("skip Replicate: replication is not configured")
@@ -66,16 +66,9 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 		}
 		return err
 	}
-	if !incVersions {
-		if len(replications) == 0 {
-			zerolog.Ctx(ctx).Info().Err(err).Msg("skip Replicate: replication is not configured")
-			return nil
-		} else {
-			// if we replicate, we have to increment source versions
-			// should never happen: sanity check for logic error
-			return fmt.Errorf("%w: replication destinations found but not incrementing source versions", dom.ErrInternal)
-		}
-
+	if len(replications) == 0 {
+		zerolog.Ctx(ctx).Info().Msg("skip Replicate: replication is not configured")
+		return nil
 	}
 	destination := meta.Destination{
 		Storage: routedTo,
@@ -87,7 +80,13 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 		case *tasks.BucketCreatePayload:
 		// no version increment needed
 		case *tasks.BucketDeletePayload:
-			err = s.versionSvc.DeleteBucketAll(ctx, replID, t.Bucket)
+			// During zero-downtime switch use Increment instead of DeleteAll
+			// to keep version non-empty so old events see From <= To and skip.
+			if skipTasks {
+				_, err = s.versionSvc.IncrementBucket(ctx, replID, t.Bucket, destination)
+			} else {
+				err = s.versionSvc.DeleteBucketAll(ctx, replID, t.Bucket)
+			}
 			if err != nil {
 				return err
 			}
@@ -102,7 +101,9 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 				return err
 			}
 		case *tasks.ObjectSyncPayload:
-			if t.Deleted {
+			// During zero-downtime switch use Increment even for deletes
+			// to keep version non-empty so old events see From <= To and skip.
+			if t.Deleted && !skipTasks {
 				err = s.versionSvc.DeleteObjAll(ctx, replID, t.Object)
 			} else {
 				_, err = s.versionSvc.IncrementObj(ctx, replID, t.Object, destination)
@@ -124,32 +125,31 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 			return fmt.Errorf("%w: unsupported replication task type %T", dom.ErrInternal, task)
 		}
 		// 3. fan out tasks for each destination
-		task.SetReplicationID(replID)
-		err := s.queueSvc.EnqueueTask(ctx, task)
-		if err != nil {
-			return fmt.Errorf("unable to fan out replication task to %+v: %w", replID, err)
+		if !skipTasks {
+			task.SetReplicationID(replID)
+			err := s.queueSvc.EnqueueTask(ctx, task)
+			if err != nil {
+				return fmt.Errorf("unable to fan out replication task to %+v: %w", replID, err)
+			}
 		}
 	}
 
 	return nil
 }
 
-func (s *s3Svc) getDestinations(ctx context.Context, routedTo string) (incSouceVersions bool, replicateTo []entity.UniversalReplicationID, err error) {
+// getDestinations returns replication targets for the current request.
+// skipTasks=true means: increment versions but do not enqueue replication tasks.
+// This is used during zero-downtime switch to prevent old pre-switch events from
+// overwriting post-switch data.
+func (s *s3Svc) getDestinations(ctx context.Context, routedTo string) (replicateTo []entity.UniversalReplicationID, skipTasks bool, err error) {
 	destinations := xctx.GetReplications(ctx)
 	if len(destinations) != 0 {
-		// normal flow increment source version and replicate to all followers
-		return true, destinations, nil
+		return destinations, false, nil
 	}
-	// no destinations means only 3 things:
-	// 1. bucket replication is not configured and user replication is not configured - no need to do anything
-	// 2. bucket replication is archived because zero-downtime switch is in progress
-	//    - increment source version only if request routed to main storage
-	//    - replicate only for dangling multipart uploads to old main storage
 
 	inProgressZeroDowntimeSwitch := xctx.GetInProgressZeroDowntime(ctx)
 	if inProgressZeroDowntimeSwitch == nil {
-		// do nothing - replication was not configured
-		return false, nil, nil
+		return nil, false, nil
 	}
 	originalReplID := inProgressZeroDowntimeSwitch.ReplicationID()
 
@@ -177,12 +177,10 @@ func (s *s3Svc) getDestinations(ctx context.Context, routedTo string) (incSouceV
 		// PROBLEM:
 		// - because replication policy is archived we dont create replication tasks
 		// - but we need to finish old multipart upload on A and replicate completed object to B
-		return true, []entity.UniversalReplicationID{
-			originalReplID,
-		}, nil
+		return []entity.UniversalReplicationID{originalReplID}, false, nil
 	}
 
 	// zero-downtime switch in progress.
 	// increment version in routed storage and skip creating replication tasks
-	return true, nil, nil
+	return []entity.UniversalReplicationID{originalReplID}, true, nil
 }
