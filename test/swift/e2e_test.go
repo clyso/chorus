@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/clyso/chorus/pkg/swift"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -42,9 +41,6 @@ func Test_e2e(t *testing.T) {
 
 	workerConf, err := worker.GetConfig()
 	r.NoError(err, "failed to get worker config")
-	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
-	workerConf.Worker.SwitchRetryInterval = time.Millisecond * 500
-	workerConf.Worker.PauseRetryInterval = time.Millisecond * 500
 	workerConf.Log.Level = "warn"
 	workerConf.Storage = swiftConf
 

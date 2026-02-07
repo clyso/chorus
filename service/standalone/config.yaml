@@ -29,5 +29,9 @@ proxy:
     #      - accessKeyID: <s3 v4 accessKey credential>
     #        secretAccessKey: <s3 v4 secretKey credential>
 worker:
-  pauseRetryInterval: 5s
-  switchRetryInterval: 5s
+  queueUpdateInterval: 3s
+  swiftRetryInterval: 1m # used for swift task retries caused by swift inconsistent state
+  pauseRetryInterval: 30s
+  switchRetryInterval: 30s
+  taskCheckInterval: 1s
+  delayedTaskCheckInterval: 3s
