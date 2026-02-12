@@ -258,10 +258,22 @@ swift_agent:
 - Keeps configuration simple; complex logic stays in testable Go code
 - Trade-off: adding new vendor requires code change, but this is infrequent and ensures correctness
 
-### 5.3 Alternative: parse logs with Fluent Bit
+### 5.3 Alternative: parse logs with external log exporter
 
-Use Fluent Bit for log tailing and parsing, then send parsed events to Chorus agent via HTTP.
-Fluent Bit allows to use Lua scripts or regex parsers to extract needed fields and map to Swift method.
+Use an existing log collector for log tailing and parsing, then send parsed events to Chorus agent via HTTP.
+The collector uses scripting (Lua, VRL, Ruby) to extract needed fields and map to Swift method.
+
+**Log collector options** (file tailing + scripting + HTTP output, permissive license):
+
+| Tool | Stars | Written in | Scripting | Config format | HTTP output | License |
+|------|-------|------------|-----------|---------------|-------------|---------|
+| [Fluent Bit](https://github.com/fluent/fluent-bit) | ~6k | C | [Lua](https://docs.fluentbit.io/manual/pipeline/filters/lua) | [INI-like](https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/classic-mode) or [YAML](https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/yaml) | [http output](https://docs.fluentbit.io/manual/pipeline/outputs/http) | Apache 2.0 |
+| [Vector](https://github.com/vectordotdev/vector) | ~21k | Rust | [VRL](https://vector.dev/docs/reference/vrl/) — purpose-built language: regex parsing, field manipulation, type coercion, compiled to Rust at startup | [TOML, YAML, or JSON](https://vector.dev/docs/reference/configuration/) | [http sink](https://vector.dev/docs/reference/configuration/sinks/http/) | MPL-2.0 |
+| [Fluentd](https://github.com/fluent/fluentd) | ~13k | Ruby/C | [Inline Ruby](https://docs.fluentd.org/filter/record_transformer) expressions in filters | [Custom tag-based](https://docs.fluentd.org/configuration/config-file) | [out_http](https://docs.fluentd.org/output/http) | Apache 2.0 |
+
+**Excluded alternatives**:
+- [OTel Collector](https://github.com/open-telemetry/opentelemetry-collector-contrib) — OTTL (its transform language) cannot express the method+path→event mapping or emit arbitrary JSON to a webhook. Requires a custom Go processor compiled with [ocb](https://github.com/open-telemetry/opentelemetry-collector/tree/main/cmd/builder).
+- [prometheus/statsd_exporter](https://github.com/prometheus/statsd_exporter) — converts StatsD metrics to Prometheus format. Does not support log tailing or event forwarding.
 
 ---
 Below is example Fluent Bit config for Swift logs:
@@ -275,21 +287,31 @@ Below is example Fluent Bit config for Swift logs:
 > Config and script are illustrative only. It was generated using AI. Full implementation and testing is needed.
 
 
+`parsers.conf`:
 ```ini
 [PARSER]
-  Name swift_proxy
+  Name   swift_proxy
   Format regex
-  Regex ^(?<sys_time>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?<host>\S+)\s+swift:\s+(?<remote_addr>\S+)\s+(?<xff>\S+)\s+(?<req_time>\d+\/\w+\/\d+\/\d+\/\d+\/\d+)\s+(?<method>GET|PUT|POST|HEAD|DELETE)\s+(?<path>\/v1\/[^ ]+)\s+HTTP\/(?<http_ver>[0-9.]+)\s+(?<status>\d{3})\s+
+  Regex  ^(?<sys_time>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?<host>\S+)\s+swift:\s+(?<remote_addr>\S+)\s+(?<xff>\S+)\s+(?<req_time>\d+\/\w+\/\d+\/\d+\/\d+\/\d+)\s+(?<method>GET|PUT|POST|HEAD|DELETE)\s+(?<path>\/v1\/[^ ]+)\s+HTTP\/(?<http_ver>[0-9.]+)\s+(?<status>\d{3})\s+
+```
+
+`fluent-bit.conf`:
+```ini
+[SERVICE]
+  Parsers_File parsers.conf
+
 [INPUT]
   Name   tail
   Path   /var/log/swift/proxy.log
   Parser swift_proxy
   Tag    swift.access
+
 [FILTER]
   Name   lua
   Match  swift.access
   Script swift_to_s3.lua
   Call   map_record
+
 [OUTPUT]
   Name   http
   Match  swift.access
@@ -303,9 +325,6 @@ Below is example Fluent Bit config for Swift logs:
 The Lua script `swift_to_s3.lua` would implement the mapping logic from HTTP method + path to Swift method and construct S3-like notification JSON.
 
 ```lua
-local batch = {}
-local BATCH_SIZE = 10
-
 function map_record(tag, ts, record)
   local path = record["path"]
   local method = record["method"]
@@ -360,42 +379,48 @@ function map_record(tag, ts, record)
     return -1, ts, record
   end
 
-  local event = {
+  -- Return transformed record. HTTP output batches multiple records
+  -- into a single JSON array request automatically.
+  return 2, ts, {
     eventTime = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     swiftOperation = op,
-    swift = {
-      account = account,
-      container = container,
-      object = object
-    }
+    account = account,
+    container = container,
+    object = object
   }
-
-  table.insert(batch, event)
-
-  if #batch >= BATCH_SIZE then
-    local payload = {
-      Records = batch
-    }
-    batch = {}
-    return 1, ts, payload
-  end
-
-  return -1, ts, record
 end
 ```
 </details>
 
 ---
 
-### 5.4 Decision: Built-in vs Fluent Bit
+### 5.4 Decision: Built-in vs External Log Exporter
 
-| Criterion | Built-in Agent | Fluent Bit + Webhook |
-|-----------|----------------|----------------------|
-| **Deployment** | Go sidecar | Fluent Bit sidecar |
-| **Configuration** | Single YAML file | Fluent Bit config + Lua script + Chorus webhook |
+| Criterion | Built-in Agent | External Log Exporter + Webhook |
+|-----------|----------------|--------------------------------|
+| **Deployment** | Go sidecar | Log exporter sidecar (Fluent Bit, Vector, etc.) |
+| **Configuration** | Single YAML file | Exporter config + transform script + Chorus webhook |
 | **Log format sync** | Can parse Swift `log_msg_template` directly | Must manually write regex matching the template |
-| **Testing** | Go unit tests for mapping logic | Lua script harder to test in CI |
-| **Maintenance** | More Go code to write | Less code, but Lua is separate language |
-| **User familiarity** | Chorus-specific config | Fluent Bit widely known in ops community |
+| **Testing** | Go unit tests for mapping logic | Transform script harder to test in CI |
+| **Maintenance** | More Go code to write | Less code, but transform logic in separate language |
+| **User familiarity** | Chorus-specific config | Log exporters widely known in ops community |
 
-**Recommendation**: ???
+**Recommendation**: External Log Exporter + Webhook
+
+Rationale:
+
+1. **Log tailing is a solved problem**. Fluent Bit (and similar tools) handle file rotation, position tracking, backpressure, and crash recovery. Reimplementing this in Go means owning edge cases that these tools have already fixed over years of production use.
+2. **Separation of concerns**. Chorus is a replication tool, not a log collector. Embedding log-tailing logic increases the maintenance surface with code unrelated to Chorus's core purpose.
+3. **Operational familiarity**. Fluent Bit is a standard Kubernetes sidecar. Ops teams already know how to deploy, monitor, and troubleshoot it. A custom Go agent is another binary to learn.
+4. **Chorus webhook already exists**. The [existing S3 agent webhook](../../service/agent/http_handler.go) provides the integration point. Fluent Bit's HTTP output plugin sends parsed events directly to it.
+
+Trade-offs accepted:
+
+- **Log format sync**: Users must ensure the Fluent Bit parser regex matches their Swift `log_msg_template`. Mitigated by shipping a default parser config and Lua script in the Chorus Helm chart that matches the Swift default log format.
+- **Lua testability**: The mapping logic lives in a Lua script rather than Go unit tests. Mitigated by keeping the script minimal (mapping only, no business logic) and providing example test inputs in documentation.
+- **Two artifacts**: Users deploy both Fluent Bit and the Chorus agent webhook. This is standard practice for sidecar-based log collection in Kubernetes.
+
+**When to reconsider built-in agent**:
+- If log format synchronization proves to be a frequent support issue
+- If Lua mapping logic becomes too complex to maintain outside Go
+- If a significant number of users deploy outside Kubernetes where Fluent Bit is less common
