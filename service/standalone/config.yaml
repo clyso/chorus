@@ -8,6 +8,8 @@ api:
   grpcPort: 9670
   httpPort: 9671
   secure: false
+  webhookGrpcPort: 0
+  webhookHttpPort: 0
 uiPort: 9672
 lock:
   overlap: 2s

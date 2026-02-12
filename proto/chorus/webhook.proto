@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package chorus;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/clyso/chorus/proto/chorus;pb";
+
+service Webhook {
+  rpc SwiftEvents(SwiftEventsRequest) returns (google.protobuf.Empty);
+}
+
+message SwiftEventsRequest {
+  string storage = 1;
+  repeated SwiftEvent events = 2;
+}
+
+message SwiftEvent {
+  string account = 1;
+  string container = 2;
+  string object = 3;
+  SwiftOperation operation = 4;
+  string etag = 5;
+  string last_modified = 6;
+  string version_id = 7;
+  string date = 8;
+  bool delete_multipart = 9;
+}
+
+enum SwiftOperation {
+  SWIFT_OPERATION_UNSPECIFIED = 0;
+  ACCOUNT_UPDATE = 1;
+  CONTAINER_UPDATE = 2;
+  CONTAINER_DELETE = 3;
+  OBJECT_CREATED = 4;
+  OBJECT_METADATA_UPDATED = 5;
+  OBJECT_DELETED = 6;
+}
