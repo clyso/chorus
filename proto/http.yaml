@@ -81,3 +81,7 @@ http:
     - selector: chorus.Policy.TestProxy
       post: /test-proxy
       body: "*"
+      # Webhook service:
+    - selector: chorus.Webhook.SwiftEvents
+      post: "/webhook/{storage}/swift"
+      body: "*"

@@ -13,6 +13,9 @@
     },
     {
       "name": "Policy"
+    },
+    {
+      "name": "Webhook"
     }
   ],
   "consumes": [
@@ -880,6 +883,45 @@
           "Chorus"
         ]
       }
+    },
+    "/webhook/{storage}/swift": {
+      "post": {
+        "operationId": "Webhook_SwiftEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "storage",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WebhookSwiftEventsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Webhook"
+        ]
+      }
     }
   },
   "definitions": {
@@ -890,6 +932,18 @@
         "SWIFT"
       ],
       "default": "S3"
+    },
+    "WebhookSwiftEventsBody": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusSwiftEvent"
+          }
+        }
+      }
     },
     "chorusAddReplicationRequest": {
       "type": "object",
@@ -1598,6 +1652,51 @@
           "type": "string"
         }
       }
+    },
+    "chorusSwiftEvent": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "container": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/definitions/chorusSwiftOperation"
+        },
+        "etag": {
+          "type": "string"
+        },
+        "lastModified": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "deleteMultipart": {
+          "type": "boolean"
+        }
+      }
+    },
+    "chorusSwiftOperation": {
+      "type": "string",
+      "enum": [
+        "SWIFT_OPERATION_UNSPECIFIED",
+        "ACCOUNT_UPDATE",
+        "CONTAINER_UPDATE",
+        "CONTAINER_DELETE",
+        "OBJECT_CREATED",
+        "OBJECT_METADATA_UPDATED",
+        "OBJECT_DELETED"
+      ],
+      "default": "SWIFT_OPERATION_UNSPECIFIED"
     },
     "chorusSwitchDowntimeOpts": {
       "type": "object",

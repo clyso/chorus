@@ -17,8 +17,10 @@
 package api
 
 type Config struct {
-	GrpcPort int  `yaml:"grpcPort"`
-	HttpPort int  `yaml:"httpPort"`
-	Enabled  bool `yaml:"enabled"`
-	Secure   bool `yaml:"secure"`
+	GrpcPort        int  `yaml:"grpcPort"`
+	HttpPort        int  `yaml:"httpPort"`
+	Enabled         bool `yaml:"enabled"`
+	Secure          bool `yaml:"secure"`
+	WebhookGrpcPort int  `yaml:"webhookGrpcPort"`
+	WebhookHttpPort int  `yaml:"webhookHttpPort"`
 }

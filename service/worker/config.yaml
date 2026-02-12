@@ -14,6 +14,8 @@ api:
   grpcPort: 9670
   httpPort: 9671
   secure: false
+  webhookGrpcPort: 0
+  webhookHttpPort: 0
 storage:
   # main: my_s3_storage # one of the storages in should be main
   dynamicCredentials:

@@ -39,6 +39,7 @@ import (
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
+	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
@@ -257,10 +258,19 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
 		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
 		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
+
+		replSvc := replication.NewSwift(queueSvc, policySvc)
+		webhookHandler := api.WebhookHandlers(credsSvc, policySvc, replSvc)
+
+		webhookOnSeparatePorts := conf.Api.WebhookGrpcPort > 0
+
 		registerServices := func(srv *grpc.Server) {
 			pb.RegisterChorusServer(srv, chorusHandler)
 			pb.RegisterDiffServer(srv, diffHandler)
 			pb.RegisterPolicyServer(srv, policyHandler)
+			if !webhookOnSeparatePorts {
+				pb.RegisterWebhookServer(srv, webhookHandler)
+			}
 		}
 		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, registerServices, tp, conf.Log, app)
 		if err != nil {
@@ -280,6 +290,11 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			if err := pb.RegisterPolicyHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
 				return err
 			}
+			if !webhookOnSeparatePorts {
+				if err := pb.RegisterWebhookHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
+					return err
+				}
+			}
 			return nil
 		})
 		if err != nil {
@@ -290,6 +305,34 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			return err
 		}
 		logger.Info().Msg("management api created")
+
+		if webhookOnSeparatePorts {
+			start, stop, err = api.NewGrpcServer(conf.Api.WebhookGrpcPort, func(srv *grpc.Server) {
+				pb.RegisterWebhookServer(srv, webhookHandler)
+			}, tp, conf.Log, app)
+			if err != nil {
+				return err
+			}
+			err = server.Add("webhook_grpc", start, stop)
+			if err != nil {
+				return err
+			}
+
+			webhookApiConf := &api.Config{
+				GrpcPort: conf.Api.WebhookGrpcPort,
+				HttpPort: conf.Api.WebhookHttpPort,
+				Secure:   conf.Api.Secure,
+			}
+			start, stop, err = api.GRPCGateway(ctx, webhookApiConf, pb.RegisterWebhookHandlerFromEndpoint)
+			if err != nil {
+				return err
+			}
+			err = server.Add("webhook_http", start, stop)
+			if err != nil {
+				return err
+			}
+			logger.Info().Int("grpc_port", conf.Api.WebhookGrpcPort).Int("http_port", conf.Api.WebhookHttpPort).Msg("webhook api created on separate ports")
+		}
 	}
 
 	if conf.Metrics.Enabled {
