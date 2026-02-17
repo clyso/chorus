@@ -6,27 +6,49 @@ import "google/protobuf/empty.proto";
 
 option go_package = "github.com/clyso/chorus/proto/chorus;pb";
 
+// Webhook service receives storage events and enqueues replication tasks.
+// Returns non-200 only on transient errors (context cancelled, Redis
+// unavailable) where a retry may succeed. Permanent errors (unknown storage,
+// invalid events, no replication policy) are logged server-side and return 200.
 service Webhook {
+  // SwiftEvents receives a batch of OpenStack Swift events parsed from
+  // access logs by an external log exporter (e.g. Fluent Bit, Vector)
+  // and enqueues replication tasks for events matching active policies.
+  // Events that cannot be processed are skipped and logged server-side.
   rpc SwiftEvents(SwiftEventsRequest) returns (google.protobuf.Empty);
 }
 
 message SwiftEventsRequest {
+  // Chorus storage alias (must be a configured SWIFT storage).
   string storage = 1;
+  // Events are processed independently; a failure in one does not affect others.
   repeated SwiftEvent events = 2;
 }
 
 message SwiftEvent {
+  // OpenStack project ID (tenant ID). Required.
   string account = 1;
+  // Required for container and object operations.
   string container = 2;
+  // Required for object operations.
   string object = 3;
   SwiftOperation operation = 4;
+  // Optional. Object ETag (MD5).
   string etag = 5;
+  // Optional. Object last modified timestamp.
   string last_modified = 6;
+  // Optional. Object version ID.
   string version_id = 7;
+  // Optional. Server response date, used as reference timestamp when
+  // Swift does not return Last-Modified (account/container/meta updates).
   string date = 8;
+  // Optional. If true, indicates SLO/DLO multipart manifest deletion.
   bool delete_multipart = 9;
 }
 
+// SwiftOperation determines which replication task is created.
+// Task handlers are idempotent — e.g. CONTAINER_UPDATE and CONTAINER_DELETE
+// both trigger a sync that compares source and destination state.
 enum SwiftOperation {
   SWIFT_OPERATION_UNSPECIFIED = 0;
   ACCOUNT_UPDATE = 1;

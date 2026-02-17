@@ -886,6 +886,7 @@
     },
     "/webhook/{storage}/swift": {
       "post": {
+        "summary": "SwiftEvents receives a batch of OpenStack Swift events parsed from\naccess logs by an external log exporter (e.g. Fluent Bit, Vector)\nand enqueues replication tasks for events matching active policies.\nEvents that cannot be processed are skipped and logged server-side.",
         "operationId": "Webhook_SwiftEvents",
         "responses": {
           "200": {
@@ -905,6 +906,7 @@
         "parameters": [
           {
             "name": "storage",
+            "description": "Chorus storage alias (must be a configured SWIFT storage).",
             "in": "path",
             "required": true,
             "type": "string"
@@ -941,7 +943,8 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/chorusSwiftEvent"
-          }
+          },
+          "description": "Events are processed independently; a failure in one does not affect others."
         }
       }
     },
@@ -1657,31 +1660,39 @@
       "type": "object",
       "properties": {
         "account": {
-          "type": "string"
+          "type": "string",
+          "description": "OpenStack project ID (tenant ID). Required."
         },
         "container": {
-          "type": "string"
+          "type": "string",
+          "description": "Required for container and object operations."
         },
         "object": {
-          "type": "string"
+          "type": "string",
+          "description": "Required for object operations."
         },
         "operation": {
           "$ref": "#/definitions/chorusSwiftOperation"
         },
         "etag": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional. Object ETag (MD5)."
         },
         "lastModified": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional. Object last modified timestamp."
         },
         "versionId": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional. Object version ID."
         },
         "date": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional. Server response date, used as reference timestamp when\nSwift does not return Last-Modified (account/container/meta updates)."
         },
         "deleteMultipart": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Optional. If true, indicates SLO/DLO multipart manifest deletion."
         }
       }
     },
@@ -1696,7 +1707,8 @@
         "OBJECT_METADATA_UPDATED",
         "OBJECT_DELETED"
       ],
-      "default": "SWIFT_OPERATION_UNSPECIFIED"
+      "default": "SWIFT_OPERATION_UNSPECIFIED",
+      "description": "SwiftOperation determines which replication task is created.\nTask handlers are idempotent — e.g. CONTAINER_UPDATE and CONTAINER_DELETE\nboth trigger a sync that compares source and destination state."
     },
     "chorusSwitchDowntimeOpts": {
       "type": "object",

@@ -74,6 +74,9 @@ func (c *Config) Validate() error {
 	if c.Api == nil {
 		return fmt.Errorf("worker config: empty Api config")
 	}
+	if err := c.Api.Webhook.Validate(); err != nil {
+		return fmt.Errorf("worker config: %w", err)
+	}
 	if c.Lock == nil {
 		return fmt.Errorf("app config: empty Lock config")
 	}

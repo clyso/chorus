@@ -22,6 +22,9 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// SwiftOperation determines which replication task is created.
+// Task handlers are idempotent — e.g. CONTAINER_UPDATE and CONTAINER_DELETE
+// both trigger a sync that compares source and destination state.
 type SwiftOperation int32
 
 const (
@@ -84,9 +87,11 @@ func (SwiftOperation) EnumDescriptor() ([]byte, []int) {
 }
 
 type SwiftEventsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
-	Events        []*SwiftEvent          `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Chorus storage alias (must be a configured SWIFT storage).
+	Storage string `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
+	// Events are processed independently; a failure in one does not affect others.
+	Events        []*SwiftEvent `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -136,16 +141,25 @@ func (x *SwiftEventsRequest) GetEvents() []*SwiftEvent {
 }
 
 type SwiftEvent struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Account         string                 `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
-	Container       string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
-	Object          string                 `protobuf:"bytes,3,opt,name=object,proto3" json:"object,omitempty"`
-	Operation       SwiftOperation         `protobuf:"varint,4,opt,name=operation,proto3,enum=chorus.SwiftOperation" json:"operation,omitempty"`
-	Etag            string                 `protobuf:"bytes,5,opt,name=etag,proto3" json:"etag,omitempty"`
-	LastModified    string                 `protobuf:"bytes,6,opt,name=last_modified,json=lastModified,proto3" json:"last_modified,omitempty"`
-	VersionId       string                 `protobuf:"bytes,7,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
-	Date            string                 `protobuf:"bytes,8,opt,name=date,proto3" json:"date,omitempty"`
-	DeleteMultipart bool                   `protobuf:"varint,9,opt,name=delete_multipart,json=deleteMultipart,proto3" json:"delete_multipart,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// OpenStack project ID (tenant ID). Required.
+	Account string `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	// Required for container and object operations.
+	Container string `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
+	// Required for object operations.
+	Object    string         `protobuf:"bytes,3,opt,name=object,proto3" json:"object,omitempty"`
+	Operation SwiftOperation `protobuf:"varint,4,opt,name=operation,proto3,enum=chorus.SwiftOperation" json:"operation,omitempty"`
+	// Optional. Object ETag (MD5).
+	Etag string `protobuf:"bytes,5,opt,name=etag,proto3" json:"etag,omitempty"`
+	// Optional. Object last modified timestamp.
+	LastModified string `protobuf:"bytes,6,opt,name=last_modified,json=lastModified,proto3" json:"last_modified,omitempty"`
+	// Optional. Object version ID.
+	VersionId string `protobuf:"bytes,7,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	// Optional. Server response date, used as reference timestamp when
+	// Swift does not return Last-Modified (account/container/meta updates).
+	Date string `protobuf:"bytes,8,opt,name=date,proto3" json:"date,omitempty"`
+	// Optional. If true, indicates SLO/DLO multipart manifest deletion.
+	DeleteMultipart bool `protobuf:"varint,9,opt,name=delete_multipart,json=deleteMultipart,proto3" json:"delete_multipart,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
