@@ -20,7 +20,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Webhook_SwiftEvents_FullMethodName = "/chorus.Webhook/SwiftEvents"
+	Webhook_SwiftEvents_FullMethodName     = "/chorus.Webhook/SwiftEvents"
+	Webhook_S3Notifications_FullMethodName = "/chorus.Webhook/S3Notifications"
 )
 
 // WebhookClient is the client API for Webhook service.
@@ -37,6 +38,10 @@ type WebhookClient interface {
 	// and enqueues replication tasks for events matching active policies.
 	// Events that cannot be processed are skipped and logged server-side.
 	SwiftEvents(ctx context.Context, in *SwiftEventsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// S3Notifications receives standard AWS S3 notification events and enqueues
+	// replication tasks. Compatible with S3 bucket notification push format.
+	// Events that cannot be processed are skipped and logged server-side.
+	S3Notifications(ctx context.Context, in *S3NotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type webhookClient struct {
@@ -57,6 +62,16 @@ func (c *webhookClient) SwiftEvents(ctx context.Context, in *SwiftEventsRequest,
 	return out, nil
 }
 
+func (c *webhookClient) S3Notifications(ctx context.Context, in *S3NotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Webhook_S3Notifications_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WebhookServer is the server API for Webhook service.
 // All implementations should embed UnimplementedWebhookServer
 // for forward compatibility.
@@ -71,6 +86,10 @@ type WebhookServer interface {
 	// and enqueues replication tasks for events matching active policies.
 	// Events that cannot be processed are skipped and logged server-side.
 	SwiftEvents(context.Context, *SwiftEventsRequest) (*emptypb.Empty, error)
+	// S3Notifications receives standard AWS S3 notification events and enqueues
+	// replication tasks. Compatible with S3 bucket notification push format.
+	// Events that cannot be processed are skipped and logged server-side.
+	S3Notifications(context.Context, *S3NotificationRequest) (*emptypb.Empty, error)
 }
 
 // UnimplementedWebhookServer should be embedded to have
@@ -82,6 +101,9 @@ type UnimplementedWebhookServer struct{}
 
 func (UnimplementedWebhookServer) SwiftEvents(context.Context, *SwiftEventsRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SwiftEvents not implemented")
+}
+func (UnimplementedWebhookServer) S3Notifications(context.Context, *S3NotificationRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method S3Notifications not implemented")
 }
 func (UnimplementedWebhookServer) testEmbeddedByValue() {}
 
@@ -121,6 +143,24 @@ func _Webhook_SwiftEvents_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Webhook_S3Notifications_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(S3NotificationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WebhookServer).S3Notifications(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Webhook_S3Notifications_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WebhookServer).S3Notifications(ctx, req.(*S3NotificationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Webhook_ServiceDesc is the grpc.ServiceDesc for Webhook service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -131,6 +171,10 @@ var Webhook_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SwiftEvents",
 			Handler:    _Webhook_SwiftEvents_Handler,
+		},
+		{
+			MethodName: "S3Notifications",
+			Handler:    _Webhook_S3Notifications_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

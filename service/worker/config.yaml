@@ -18,6 +18,7 @@ api:
     enabled: false # enable chorus webhook for event sources like S3 bucket notification or swift access logs
     grpcPort: 0 # host grpc webhook on a separate port. By default will be hosted with management API
     httpPort: 0 # host http webhook on a separate port. By default will be hosted with management API
+    baseUrl: "" # externally reachable base URL for webhook endpoints, used for S3 notification push endpoint
 storage:
   # main: my_s3_storage # one of the storages in should be main
   dynamicCredentials:

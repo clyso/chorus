@@ -12,6 +12,7 @@ api:
     enabled: true
     grpcPort: 0
     httpPort: 0
+    baseUrl: "http://localhost:9671"
 uiPort: 9672
 lock:
   overlap: 2s

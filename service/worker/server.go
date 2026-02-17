@@ -257,15 +257,20 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Api.Enabled {
 		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
 		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
-		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
+		var webhookConfPtr *api.WebhookConfig
+		if conf.Api.Webhook.Enabled {
+			webhookConfPtr = &conf.Api.Webhook
+		}
+		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, notifications.NewService(clientRegistry), replicationStatusLocker, userLocker, webhookConfPtr)
 
 		webhookEnabled := conf.Api.Webhook.Enabled
 		webhookOnSeparatePorts := webhookEnabled && conf.Api.Webhook.GrpcPort > 0
 
 		var webhookHandler pb.WebhookServer
 		if webhookEnabled {
-			replSvc := replication.NewSwift(queueSvc, policySvc)
-			webhookHandler = api.WebhookHandlers(credsSvc, policySvc, replSvc)
+			swiftReplSvc := replication.NewSwift(queueSvc, policySvc)
+			s3ReplSvc := replication.NewS3(queueSvc, versionSvc, policySvc)
+			webhookHandler = api.WebhookHandlers(credsSvc, policySvc, swiftReplSvc, s3ReplSvc)
 		}
 
 		registerServices := func(srv *grpc.Server) {
