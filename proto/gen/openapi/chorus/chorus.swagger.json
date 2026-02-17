@@ -884,6 +884,47 @@
         ]
       }
     },
+    "/webhook/{storage}/s3-notifications": {
+      "post": {
+        "summary": "S3Notifications receives standard AWS S3 notification events and enqueues\nreplication tasks. Compatible with S3 bucket notification push format.\nEvents that cannot be processed are skipped and logged server-side.",
+        "operationId": "Webhook_S3Notifications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "storage",
+            "description": "Chorus storage alias (must be a configured S3 storage). Bound to URL path.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WebhookS3NotificationsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
     "/webhook/{storage}/swift": {
       "post": {
         "summary": "SwiftEvents receives a batch of OpenStack Swift events parsed from\naccess logs by an external log exporter (e.g. Fluent Bit, Vector)\nand enqueues replication tasks for events matching active policies.\nEvents that cannot be processed are skipped and logged server-side.",
@@ -934,6 +975,19 @@
         "SWIFT"
       ],
       "default": "S3"
+    },
+    "WebhookS3NotificationsBody": {
+      "type": "object",
+      "properties": {
+        "Records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusS3EventRecord"
+          },
+          "description": "Standard AWS S3 notification records.\nEvents are processed independently; a failure in one does not affect others."
+        }
+      }
     },
     "WebhookSwiftEventsBody": {
       "type": "object",
@@ -1148,6 +1202,16 @@
           "type": "string"
         }
       }
+    },
+    "chorusEventSource": {
+      "type": "string",
+      "enum": [
+        "EVENT_SOURCE_PROXY",
+        "EVENT_SOURCE_S3_NOTIFICATION",
+        "EVENT_SOURCE_WEBHOOK"
+      ],
+      "default": "EVENT_SOURCE_PROXY",
+      "description": "Determines how ongoing data change events are captured for replication.\n\n - EVENT_SOURCE_PROXY: Default. Events captured by chorus proxy intercepting S3/Swift API calls.\n - EVENT_SOURCE_S3_NOTIFICATION: S3 bucket notifications. Worker creates SNS topic + bucket notification\npointing to its own webhook endpoint. Bucket-level replication only.\n - EVENT_SOURCE_WEBHOOK: External event source (e.g. Swift access log exporter).\nRequires webhook to be enabled in worker config. No automatic setup."
     },
     "chorusGetAgentsResponse": {
       "type": "object",
@@ -1426,7 +1490,11 @@
       "properties": {
         "agentUrl": {
           "type": "string",
-          "description": "Webhook URL of chorus agent. Can be configured only for bucket-level.\nRequired if chorus agent setup is used to capture ongoing storage events."
+          "description": "Deprecated. Use event_source instead.\nWebhook URL of chorus agent. Can be configured only for bucket-level."
+        },
+        "eventSource": {
+          "$ref": "#/definitions/chorusEventSource",
+          "description": "Determines how ongoing data change events are captured."
         }
       },
       "description": "Additional replication options for bucket and user-level replications."
@@ -1560,6 +1628,14 @@
         }
       }
     },
+    "chorusS3BucketInfo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "chorusS3Credential": {
       "type": "object",
       "properties": {
@@ -1567,6 +1643,48 @@
           "type": "string"
         },
         "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusS3EventPayload": {
+      "type": "object",
+      "properties": {
+        "configurationId": {
+          "type": "string",
+          "description": "Encoded chorus notification ID (contains user + bucket)."
+        },
+        "bucket": {
+          "$ref": "#/definitions/chorusS3BucketInfo"
+        },
+        "object": {
+          "$ref": "#/definitions/chorusS3ObjectInfo"
+        }
+      }
+    },
+    "chorusS3EventRecord": {
+      "type": "object",
+      "properties": {
+        "eventName": {
+          "type": "string",
+          "title": "e.g. \"s3:ObjectCreated:Put\", \"s3:ObjectRemoved:Delete\""
+        },
+        "s3": {
+          "$ref": "#/definitions/chorusS3EventPayload"
+        }
+      }
+    },
+    "chorusS3ObjectInfo": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string",
+          "format": "int64"
+        },
+        "eTag": {
           "type": "string"
         }
       }

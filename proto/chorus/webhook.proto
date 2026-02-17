@@ -16,6 +16,11 @@ service Webhook {
   // and enqueues replication tasks for events matching active policies.
   // Events that cannot be processed are skipped and logged server-side.
   rpc SwiftEvents(SwiftEventsRequest) returns (google.protobuf.Empty);
+
+  // S3Notifications receives standard AWS S3 notification events and enqueues
+  // replication tasks. Compatible with S3 bucket notification push format.
+  // Events that cannot be processed are skipped and logged server-side.
+  rpc S3Notifications(S3NotificationRequest) returns (google.protobuf.Empty);
 }
 
 message SwiftEventsRequest {
@@ -57,4 +62,35 @@ enum SwiftOperation {
   OBJECT_CREATED = 4;
   OBJECT_METADATA_UPDATED = 5;
   OBJECT_DELETED = 6;
+}
+
+message S3NotificationRequest {
+  // Chorus storage alias (must be a configured S3 storage). Bound to URL path.
+  string storage = 1;
+  // Standard AWS S3 notification records.
+  // Events are processed independently; a failure in one does not affect others.
+  repeated S3EventRecord records = 2 [json_name = "Records"];
+}
+
+message S3EventRecord {
+  // e.g. "s3:ObjectCreated:Put", "s3:ObjectRemoved:Delete"
+  string event_name = 1;
+  S3EventPayload s3 = 2;
+}
+
+message S3EventPayload {
+  // Encoded chorus notification ID (contains user + bucket).
+  string configuration_id = 1;
+  S3BucketInfo bucket = 2;
+  S3ObjectInfo object = 3;
+}
+
+message S3BucketInfo {
+  string name = 1;
+}
+
+message S3ObjectInfo {
+  string key = 1;
+  int64 size = 2;
+  string e_tag = 3;
 }

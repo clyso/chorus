@@ -142,11 +142,25 @@ message AddReplicationRequest {
   ReplicationOpts opts = 2;
 }
 
+// Determines how ongoing data change events are captured for replication.
+enum EventSource {
+  // Default. Events captured by chorus proxy intercepting S3/Swift API calls.
+  EVENT_SOURCE_PROXY = 0;
+  // S3 bucket notifications. Worker creates SNS topic + bucket notification
+  // pointing to its own webhook endpoint. Bucket-level replication only.
+  EVENT_SOURCE_S3_NOTIFICATION = 1;
+  // External event source (e.g. Swift access log exporter).
+  // Requires webhook to be enabled in worker config. No automatic setup.
+  EVENT_SOURCE_WEBHOOK = 2;
+}
+
 // Additional replication options for bucket and user-level replications.
 message ReplicationOpts {
+  // Deprecated. Use event_source instead.
   // Webhook URL of chorus agent. Can be configured only for bucket-level.
-  // Required if chorus agent setup is used to capture ongoing storage events.
   optional string agent_url = 1;
+  // Determines how ongoing data change events are captured.
+  EventSource event_source = 2;
 
   // TODO: implement for https://github.com/clyso/chorus/issues/141
   // message OriginToMeta {

@@ -24,6 +24,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Determines how ongoing data change events are captured for replication.
+type EventSource int32
+
+const (
+	// Default. Events captured by chorus proxy intercepting S3/Swift API calls.
+	EventSource_EVENT_SOURCE_PROXY EventSource = 0
+	// S3 bucket notifications. Worker creates SNS topic + bucket notification
+	// pointing to its own webhook endpoint. Bucket-level replication only.
+	EventSource_EVENT_SOURCE_S3_NOTIFICATION EventSource = 1
+	// External event source (e.g. Swift access log exporter).
+	// Requires webhook to be enabled in worker config. No automatic setup.
+	EventSource_EVENT_SOURCE_WEBHOOK EventSource = 2
+)
+
+// Enum value maps for EventSource.
+var (
+	EventSource_name = map[int32]string{
+		0: "EVENT_SOURCE_PROXY",
+		1: "EVENT_SOURCE_S3_NOTIFICATION",
+		2: "EVENT_SOURCE_WEBHOOK",
+	}
+	EventSource_value = map[string]int32{
+		"EVENT_SOURCE_PROXY":           0,
+		"EVENT_SOURCE_S3_NOTIFICATION": 1,
+		"EVENT_SOURCE_WEBHOOK":         2,
+	}
+)
+
+func (x EventSource) Enum() *EventSource {
+	p := new(EventSource)
+	*p = x
+	return p
+}
+
+func (x EventSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EventSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_chorus_policy_proto_enumTypes[0].Descriptor()
+}
+
+func (EventSource) Type() protoreflect.EnumType {
+	return &file_chorus_policy_proto_enumTypes[0]
+}
+
+func (x EventSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EventSource.Descriptor instead.
+func (EventSource) EnumDescriptor() ([]byte, []int) {
+	return file_chorus_policy_proto_rawDescGZIP(), []int{0}
+}
+
 type ReplicationSwitch_Status int32
 
 const (
@@ -82,11 +137,11 @@ func (x ReplicationSwitch_Status) String() string {
 }
 
 func (ReplicationSwitch_Status) Descriptor() protoreflect.EnumDescriptor {
-	return file_chorus_policy_proto_enumTypes[0].Descriptor()
+	return file_chorus_policy_proto_enumTypes[1].Descriptor()
 }
 
 func (ReplicationSwitch_Status) Type() protoreflect.EnumType {
-	return &file_chorus_policy_proto_enumTypes[0]
+	return &file_chorus_policy_proto_enumTypes[1]
 }
 
 func (x ReplicationSwitch_Status) Number() protoreflect.EnumNumber {
@@ -248,9 +303,11 @@ func (x *AddReplicationRequest) GetOpts() *ReplicationOpts {
 // Additional replication options for bucket and user-level replications.
 type ReplicationOpts struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated. Use event_source instead.
 	// Webhook URL of chorus agent. Can be configured only for bucket-level.
-	// Required if chorus agent setup is used to capture ongoing storage events.
-	AgentUrl      *string `protobuf:"bytes,1,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`
+	AgentUrl *string `protobuf:"bytes,1,opt,name=agent_url,json=agentUrl,proto3,oneof" json:"agent_url,omitempty"`
+	// Determines how ongoing data change events are captured.
+	EventSource   EventSource `protobuf:"varint,2,opt,name=event_source,json=eventSource,proto3,enum=chorus.EventSource" json:"event_source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -290,6 +347,13 @@ func (x *ReplicationOpts) GetAgentUrl() string {
 		return *x.AgentUrl
 	}
 	return ""
+}
+
+func (x *ReplicationOpts) GetEventSource() EventSource {
+	if x != nil {
+		return x.EventSource
+	}
+	return EventSource_EVENT_SOURCE_PROXY
 }
 
 // Filters replications list.
@@ -1910,9 +1974,10 @@ const file_chorus_policy_proto_rawDesc = "" +
 	"_to_bucket\"k\n" +
 	"\x15AddReplicationRequest\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\x15.chorus.ReplicationIDR\x02id\x12+\n" +
-	"\x04opts\x18\x02 \x01(\v2\x17.chorus.ReplicationOptsR\x04opts\"A\n" +
+	"\x04opts\x18\x02 \x01(\v2\x17.chorus.ReplicationOptsR\x04opts\"y\n" +
 	"\x0fReplicationOpts\x12 \n" +
-	"\tagent_url\x18\x01 \x01(\tH\x00R\bagentUrl\x88\x01\x01B\f\n" +
+	"\tagent_url\x18\x01 \x01(\tH\x00R\bagentUrl\x88\x01\x01\x126\n" +
+	"\fevent_source\x18\x02 \x01(\x0e2\x13.chorus.EventSourceR\veventSourceB\f\n" +
 	"\n" +
 	"_agent_url\"\xf0\x05\n" +
 	"\x17ListReplicationsRequest\x124\n" +
@@ -2087,7 +2152,11 @@ const file_chorus_policy_proto_rawDesc = "" +
 	"\x10route_to_storage\x18\x01 \x01(\tR\x0erouteToStorage\x12\x1d\n" +
 	"\n" +
 	"is_blocked\x18\x02 \x01(\bR\tisBlocked\x129\n" +
-	"\freplications\x18\x03 \x03(\v2\x15.chorus.ReplicationIDR\freplications2\xeb\t\n" +
+	"\freplications\x18\x03 \x03(\v2\x15.chorus.ReplicationIDR\freplications*a\n" +
+	"\vEventSource\x12\x16\n" +
+	"\x12EVENT_SOURCE_PROXY\x10\x00\x12 \n" +
+	"\x1cEVENT_SOURCE_S3_NOTIFICATION\x10\x01\x12\x18\n" +
+	"\x14EVENT_SOURCE_WEBHOOK\x10\x022\xeb\t\n" +
 	"\x06Policy\x12U\n" +
 	"\x10AvailableBuckets\x12\x1f.chorus.AvailableBucketsRequest\x1a .chorus.AvailableBucketsResponse\x12G\n" +
 	"\x0eAddReplication\x12\x1d.chorus.AddReplicationRequest\x1a\x16.google.protobuf.Empty\x12<\n" +
@@ -2121,107 +2190,109 @@ func file_chorus_policy_proto_rawDescGZIP() []byte {
 	return file_chorus_policy_proto_rawDescData
 }
 
-var file_chorus_policy_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_chorus_policy_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_chorus_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_chorus_policy_proto_goTypes = []any{
-	(ReplicationSwitch_Status)(0),          // 0: chorus.ReplicationSwitch.Status
-	(*ReplicationID)(nil),                  // 1: chorus.ReplicationID
-	(*AddReplicationRequest)(nil),          // 2: chorus.AddReplicationRequest
-	(*ReplicationOpts)(nil),                // 3: chorus.ReplicationOpts
-	(*ListReplicationsRequest)(nil),        // 4: chorus.ListReplicationsRequest
-	(*ListReplicationsResponse)(nil),       // 5: chorus.ListReplicationsResponse
-	(*Replication)(nil),                    // 6: chorus.Replication
-	(*AvailableBucketsRequest)(nil),        // 7: chorus.AvailableBucketsRequest
-	(*AvailableBucketsResponse)(nil),       // 8: chorus.AvailableBucketsResponse
-	(*CompareBucketRequest)(nil),           // 9: chorus.CompareBucketRequest
-	(*CompareBucketResponse)(nil),          // 10: chorus.CompareBucketResponse
-	(*SwitchZeroDowntimeRequest)(nil),      // 11: chorus.SwitchZeroDowntimeRequest
-	(*SwitchDowntimeRequest)(nil),          // 12: chorus.SwitchDowntimeRequest
-	(*SwitchDowntimeOpts)(nil),             // 13: chorus.SwitchDowntimeOpts
-	(*ReplicationSwitch)(nil),              // 14: chorus.ReplicationSwitch
-	(*RoutingsRequest)(nil),                // 15: chorus.RoutingsRequest
-	(*RoutingsResponse)(nil),               // 16: chorus.RoutingsResponse
-	(*UserRouting)(nil),                    // 17: chorus.UserRouting
-	(*BucketRouting)(nil),                  // 18: chorus.BucketRouting
-	(*AddRoutingRequest)(nil),              // 19: chorus.AddRoutingRequest
-	(*RoutingID)(nil),                      // 20: chorus.RoutingID
-	(*TestProxyRequest)(nil),               // 21: chorus.TestProxyRequest
-	(*TestProxyResponse)(nil),              // 22: chorus.TestProxyResponse
-	(*ListReplicationsRequest_Filter)(nil), // 23: chorus.ListReplicationsRequest.Filter
-	(*RoutingsRequest_Filter)(nil),         // 24: chorus.RoutingsRequest.Filter
-	(*timestamppb.Timestamp)(nil),          // 25: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),            // 26: google.protobuf.Duration
-	(*emptypb.Empty)(nil),                  // 27: google.protobuf.Empty
+	(EventSource)(0),                       // 0: chorus.EventSource
+	(ReplicationSwitch_Status)(0),          // 1: chorus.ReplicationSwitch.Status
+	(*ReplicationID)(nil),                  // 2: chorus.ReplicationID
+	(*AddReplicationRequest)(nil),          // 3: chorus.AddReplicationRequest
+	(*ReplicationOpts)(nil),                // 4: chorus.ReplicationOpts
+	(*ListReplicationsRequest)(nil),        // 5: chorus.ListReplicationsRequest
+	(*ListReplicationsResponse)(nil),       // 6: chorus.ListReplicationsResponse
+	(*Replication)(nil),                    // 7: chorus.Replication
+	(*AvailableBucketsRequest)(nil),        // 8: chorus.AvailableBucketsRequest
+	(*AvailableBucketsResponse)(nil),       // 9: chorus.AvailableBucketsResponse
+	(*CompareBucketRequest)(nil),           // 10: chorus.CompareBucketRequest
+	(*CompareBucketResponse)(nil),          // 11: chorus.CompareBucketResponse
+	(*SwitchZeroDowntimeRequest)(nil),      // 12: chorus.SwitchZeroDowntimeRequest
+	(*SwitchDowntimeRequest)(nil),          // 13: chorus.SwitchDowntimeRequest
+	(*SwitchDowntimeOpts)(nil),             // 14: chorus.SwitchDowntimeOpts
+	(*ReplicationSwitch)(nil),              // 15: chorus.ReplicationSwitch
+	(*RoutingsRequest)(nil),                // 16: chorus.RoutingsRequest
+	(*RoutingsResponse)(nil),               // 17: chorus.RoutingsResponse
+	(*UserRouting)(nil),                    // 18: chorus.UserRouting
+	(*BucketRouting)(nil),                  // 19: chorus.BucketRouting
+	(*AddRoutingRequest)(nil),              // 20: chorus.AddRoutingRequest
+	(*RoutingID)(nil),                      // 21: chorus.RoutingID
+	(*TestProxyRequest)(nil),               // 22: chorus.TestProxyRequest
+	(*TestProxyResponse)(nil),              // 23: chorus.TestProxyResponse
+	(*ListReplicationsRequest_Filter)(nil), // 24: chorus.ListReplicationsRequest.Filter
+	(*RoutingsRequest_Filter)(nil),         // 25: chorus.RoutingsRequest.Filter
+	(*timestamppb.Timestamp)(nil),          // 26: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),            // 27: google.protobuf.Duration
+	(*emptypb.Empty)(nil),                  // 28: google.protobuf.Empty
 }
 var file_chorus_policy_proto_depIdxs = []int32{
-	1,  // 0: chorus.AddReplicationRequest.id:type_name -> chorus.ReplicationID
-	3,  // 1: chorus.AddReplicationRequest.opts:type_name -> chorus.ReplicationOpts
-	23, // 2: chorus.ListReplicationsRequest.filter:type_name -> chorus.ListReplicationsRequest.Filter
-	6,  // 3: chorus.ListReplicationsResponse.replications:type_name -> chorus.Replication
-	1,  // 4: chorus.Replication.id:type_name -> chorus.ReplicationID
-	3,  // 5: chorus.Replication.opts:type_name -> chorus.ReplicationOpts
-	25, // 6: chorus.Replication.created_at:type_name -> google.protobuf.Timestamp
-	26, // 7: chorus.Replication.event_lag:type_name -> google.protobuf.Duration
-	25, // 8: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
-	14, // 9: chorus.Replication.switch_info:type_name -> chorus.ReplicationSwitch
-	1,  // 10: chorus.CompareBucketRequest.target:type_name -> chorus.ReplicationID
-	1,  // 11: chorus.SwitchZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationID
-	26, // 12: chorus.SwitchZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
-	1,  // 13: chorus.SwitchDowntimeRequest.replication_id:type_name -> chorus.ReplicationID
-	13, // 14: chorus.SwitchDowntimeRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	25, // 15: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
-	26, // 16: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
-	0,  // 17: chorus.ReplicationSwitch.last_status:type_name -> chorus.ReplicationSwitch.Status
-	26, // 18: chorus.ReplicationSwitch.multipart_ttl:type_name -> google.protobuf.Duration
-	13, // 19: chorus.ReplicationSwitch.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
-	25, // 20: chorus.ReplicationSwitch.last_started_at:type_name -> google.protobuf.Timestamp
-	25, // 21: chorus.ReplicationSwitch.done_at:type_name -> google.protobuf.Timestamp
-	1,  // 22: chorus.ReplicationSwitch.replication_id:type_name -> chorus.ReplicationID
-	24, // 23: chorus.RoutingsRequest.filter:type_name -> chorus.RoutingsRequest.Filter
-	17, // 24: chorus.RoutingsResponse.user_routings:type_name -> chorus.UserRouting
-	18, // 25: chorus.RoutingsResponse.bucket_routings:type_name -> chorus.BucketRouting
-	1,  // 26: chorus.TestProxyResponse.replications:type_name -> chorus.ReplicationID
-	7,  // 27: chorus.Policy.AvailableBuckets:input_type -> chorus.AvailableBucketsRequest
-	2,  // 28: chorus.Policy.AddReplication:input_type -> chorus.AddReplicationRequest
-	1,  // 29: chorus.Policy.GetReplication:input_type -> chorus.ReplicationID
-	4,  // 30: chorus.Policy.ListReplications:input_type -> chorus.ListReplicationsRequest
-	1,  // 31: chorus.Policy.StreamReplication:input_type -> chorus.ReplicationID
-	1,  // 32: chorus.Policy.PauseReplication:input_type -> chorus.ReplicationID
-	1,  // 33: chorus.Policy.ResumeReplication:input_type -> chorus.ReplicationID
-	1,  // 34: chorus.Policy.DeleteReplication:input_type -> chorus.ReplicationID
-	11, // 35: chorus.Policy.SwitchWithZeroDowntime:input_type -> chorus.SwitchZeroDowntimeRequest
-	12, // 36: chorus.Policy.SwitchWithDowntime:input_type -> chorus.SwitchDowntimeRequest
-	1,  // 37: chorus.Policy.DeleteSwitch:input_type -> chorus.ReplicationID
-	1,  // 38: chorus.Policy.GetSwitchStatus:input_type -> chorus.ReplicationID
-	15, // 39: chorus.Policy.ListRoutings:input_type -> chorus.RoutingsRequest
-	19, // 40: chorus.Policy.AddRouting:input_type -> chorus.AddRoutingRequest
-	20, // 41: chorus.Policy.DeleteRouting:input_type -> chorus.RoutingID
-	20, // 42: chorus.Policy.BlockRouting:input_type -> chorus.RoutingID
-	20, // 43: chorus.Policy.UnblockRouting:input_type -> chorus.RoutingID
-	21, // 44: chorus.Policy.TestProxy:input_type -> chorus.TestProxyRequest
-	8,  // 45: chorus.Policy.AvailableBuckets:output_type -> chorus.AvailableBucketsResponse
-	27, // 46: chorus.Policy.AddReplication:output_type -> google.protobuf.Empty
-	6,  // 47: chorus.Policy.GetReplication:output_type -> chorus.Replication
-	5,  // 48: chorus.Policy.ListReplications:output_type -> chorus.ListReplicationsResponse
-	6,  // 49: chorus.Policy.StreamReplication:output_type -> chorus.Replication
-	27, // 50: chorus.Policy.PauseReplication:output_type -> google.protobuf.Empty
-	27, // 51: chorus.Policy.ResumeReplication:output_type -> google.protobuf.Empty
-	27, // 52: chorus.Policy.DeleteReplication:output_type -> google.protobuf.Empty
-	27, // 53: chorus.Policy.SwitchWithZeroDowntime:output_type -> google.protobuf.Empty
-	27, // 54: chorus.Policy.SwitchWithDowntime:output_type -> google.protobuf.Empty
-	27, // 55: chorus.Policy.DeleteSwitch:output_type -> google.protobuf.Empty
-	14, // 56: chorus.Policy.GetSwitchStatus:output_type -> chorus.ReplicationSwitch
-	16, // 57: chorus.Policy.ListRoutings:output_type -> chorus.RoutingsResponse
-	27, // 58: chorus.Policy.AddRouting:output_type -> google.protobuf.Empty
-	27, // 59: chorus.Policy.DeleteRouting:output_type -> google.protobuf.Empty
-	27, // 60: chorus.Policy.BlockRouting:output_type -> google.protobuf.Empty
-	27, // 61: chorus.Policy.UnblockRouting:output_type -> google.protobuf.Empty
-	22, // 62: chorus.Policy.TestProxy:output_type -> chorus.TestProxyResponse
-	45, // [45:63] is the sub-list for method output_type
-	27, // [27:45] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	2,  // 0: chorus.AddReplicationRequest.id:type_name -> chorus.ReplicationID
+	4,  // 1: chorus.AddReplicationRequest.opts:type_name -> chorus.ReplicationOpts
+	0,  // 2: chorus.ReplicationOpts.event_source:type_name -> chorus.EventSource
+	24, // 3: chorus.ListReplicationsRequest.filter:type_name -> chorus.ListReplicationsRequest.Filter
+	7,  // 4: chorus.ListReplicationsResponse.replications:type_name -> chorus.Replication
+	2,  // 5: chorus.Replication.id:type_name -> chorus.ReplicationID
+	4,  // 6: chorus.Replication.opts:type_name -> chorus.ReplicationOpts
+	26, // 7: chorus.Replication.created_at:type_name -> google.protobuf.Timestamp
+	27, // 8: chorus.Replication.event_lag:type_name -> google.protobuf.Duration
+	26, // 9: chorus.Replication.archived_at:type_name -> google.protobuf.Timestamp
+	15, // 10: chorus.Replication.switch_info:type_name -> chorus.ReplicationSwitch
+	2,  // 11: chorus.CompareBucketRequest.target:type_name -> chorus.ReplicationID
+	2,  // 12: chorus.SwitchZeroDowntimeRequest.replication_id:type_name -> chorus.ReplicationID
+	27, // 13: chorus.SwitchZeroDowntimeRequest.multipart_ttl:type_name -> google.protobuf.Duration
+	2,  // 14: chorus.SwitchDowntimeRequest.replication_id:type_name -> chorus.ReplicationID
+	14, // 15: chorus.SwitchDowntimeRequest.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
+	26, // 16: chorus.SwitchDowntimeOpts.start_at:type_name -> google.protobuf.Timestamp
+	27, // 17: chorus.SwitchDowntimeOpts.max_duration:type_name -> google.protobuf.Duration
+	1,  // 18: chorus.ReplicationSwitch.last_status:type_name -> chorus.ReplicationSwitch.Status
+	27, // 19: chorus.ReplicationSwitch.multipart_ttl:type_name -> google.protobuf.Duration
+	14, // 20: chorus.ReplicationSwitch.downtime_opts:type_name -> chorus.SwitchDowntimeOpts
+	26, // 21: chorus.ReplicationSwitch.last_started_at:type_name -> google.protobuf.Timestamp
+	26, // 22: chorus.ReplicationSwitch.done_at:type_name -> google.protobuf.Timestamp
+	2,  // 23: chorus.ReplicationSwitch.replication_id:type_name -> chorus.ReplicationID
+	25, // 24: chorus.RoutingsRequest.filter:type_name -> chorus.RoutingsRequest.Filter
+	18, // 25: chorus.RoutingsResponse.user_routings:type_name -> chorus.UserRouting
+	19, // 26: chorus.RoutingsResponse.bucket_routings:type_name -> chorus.BucketRouting
+	2,  // 27: chorus.TestProxyResponse.replications:type_name -> chorus.ReplicationID
+	8,  // 28: chorus.Policy.AvailableBuckets:input_type -> chorus.AvailableBucketsRequest
+	3,  // 29: chorus.Policy.AddReplication:input_type -> chorus.AddReplicationRequest
+	2,  // 30: chorus.Policy.GetReplication:input_type -> chorus.ReplicationID
+	5,  // 31: chorus.Policy.ListReplications:input_type -> chorus.ListReplicationsRequest
+	2,  // 32: chorus.Policy.StreamReplication:input_type -> chorus.ReplicationID
+	2,  // 33: chorus.Policy.PauseReplication:input_type -> chorus.ReplicationID
+	2,  // 34: chorus.Policy.ResumeReplication:input_type -> chorus.ReplicationID
+	2,  // 35: chorus.Policy.DeleteReplication:input_type -> chorus.ReplicationID
+	12, // 36: chorus.Policy.SwitchWithZeroDowntime:input_type -> chorus.SwitchZeroDowntimeRequest
+	13, // 37: chorus.Policy.SwitchWithDowntime:input_type -> chorus.SwitchDowntimeRequest
+	2,  // 38: chorus.Policy.DeleteSwitch:input_type -> chorus.ReplicationID
+	2,  // 39: chorus.Policy.GetSwitchStatus:input_type -> chorus.ReplicationID
+	16, // 40: chorus.Policy.ListRoutings:input_type -> chorus.RoutingsRequest
+	20, // 41: chorus.Policy.AddRouting:input_type -> chorus.AddRoutingRequest
+	21, // 42: chorus.Policy.DeleteRouting:input_type -> chorus.RoutingID
+	21, // 43: chorus.Policy.BlockRouting:input_type -> chorus.RoutingID
+	21, // 44: chorus.Policy.UnblockRouting:input_type -> chorus.RoutingID
+	22, // 45: chorus.Policy.TestProxy:input_type -> chorus.TestProxyRequest
+	9,  // 46: chorus.Policy.AvailableBuckets:output_type -> chorus.AvailableBucketsResponse
+	28, // 47: chorus.Policy.AddReplication:output_type -> google.protobuf.Empty
+	7,  // 48: chorus.Policy.GetReplication:output_type -> chorus.Replication
+	6,  // 49: chorus.Policy.ListReplications:output_type -> chorus.ListReplicationsResponse
+	7,  // 50: chorus.Policy.StreamReplication:output_type -> chorus.Replication
+	28, // 51: chorus.Policy.PauseReplication:output_type -> google.protobuf.Empty
+	28, // 52: chorus.Policy.ResumeReplication:output_type -> google.protobuf.Empty
+	28, // 53: chorus.Policy.DeleteReplication:output_type -> google.protobuf.Empty
+	28, // 54: chorus.Policy.SwitchWithZeroDowntime:output_type -> google.protobuf.Empty
+	28, // 55: chorus.Policy.SwitchWithDowntime:output_type -> google.protobuf.Empty
+	28, // 56: chorus.Policy.DeleteSwitch:output_type -> google.protobuf.Empty
+	15, // 57: chorus.Policy.GetSwitchStatus:output_type -> chorus.ReplicationSwitch
+	17, // 58: chorus.Policy.ListRoutings:output_type -> chorus.RoutingsResponse
+	28, // 59: chorus.Policy.AddRouting:output_type -> google.protobuf.Empty
+	28, // 60: chorus.Policy.DeleteRouting:output_type -> google.protobuf.Empty
+	28, // 61: chorus.Policy.BlockRouting:output_type -> google.protobuf.Empty
+	28, // 62: chorus.Policy.UnblockRouting:output_type -> google.protobuf.Empty
+	23, // 63: chorus.Policy.TestProxy:output_type -> chorus.TestProxyResponse
+	46, // [46:64] is the sub-list for method output_type
+	28, // [28:46] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_chorus_policy_proto_init() }
@@ -2246,7 +2317,7 @@ func file_chorus_policy_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chorus_policy_proto_rawDesc), len(file_chorus_policy_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,

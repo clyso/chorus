@@ -36,7 +36,6 @@ import (
 	"github.com/clyso/chorus/pkg/notifications"
 	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
-	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -55,10 +54,10 @@ func PolicyHandlers(
 	versionSvc meta.VersionService,
 	objectListStateStore *store.MigrationObjectListStateStore,
 	bucketListStateStore *store.MigrationBucketListStateStore,
-	agentClient *rpc.AgentClient,
 	notificationSvc *notifications.Service,
 	replicationStatusLocker *store.ReplicationStatusLocker,
 	userLocker *store.UserLocker,
+	webhookConf *WebhookConfig,
 ) pb.PolicyServer {
 	return &policyHandlers{
 		credsSvc:                credsSvc,
@@ -68,10 +67,10 @@ func PolicyHandlers(
 		versionSvc:              versionSvc,
 		objectListStateStore:    objectListStateStore,
 		bucketListStateStore:    bucketListStateStore,
-		agentClient:             agentClient,
 		notificationSvc:         notificationSvc,
 		replicationStatusLocker: replicationStatusLocker,
 		userLocker:              userLocker,
+		webhookConf:             webhookConf,
 	}
 }
 
@@ -85,10 +84,10 @@ type policyHandlers struct {
 	versionSvc              meta.VersionService
 	objectListStateStore    *store.MigrationObjectListStateStore
 	bucketListStateStore    *store.MigrationBucketListStateStore
-	agentClient             *rpc.AgentClient
 	notificationSvc         *notifications.Service
 	replicationStatusLocker *store.ReplicationStatusLocker
 	userLocker              *store.UserLocker
+	webhookConf             *WebhookConfig
 }
 
 func (h *policyHandlers) AddReplication(ctx context.Context, req *pb.AddReplicationRequest) (*emptypb.Empty, error) {
@@ -120,8 +119,18 @@ func (h *policyHandlers) AddReplication(ctx context.Context, req *pb.AddReplicat
 
 func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID entity.UserReplicationPolicy, req *pb.AddReplicationRequest) (err error) {
 	opts := pbToReplicationOpts(req.Opts)
+	var eventSource pb.EventSource
+	if req.Opts != nil {
+		eventSource = req.Opts.EventSource
+	}
 	if opts.AgentURL != "" {
 		return fmt.Errorf("%w: agentUrl is not supported for user replication", dom.ErrInvalidArg)
+	}
+	if eventSource == pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION {
+		return fmt.Errorf("%w: s3_notification event source is not supported for user-level replication", dom.ErrInvalidArg)
+	}
+	if err := h.validateWebhookEventSource(eventSource); err != nil {
+		return err
 	}
 	err = h.policySvc.AddUserReplicationPolicy(ctx, replicationID, opts)
 	if err != nil {
@@ -157,14 +166,32 @@ func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID e
 
 func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID entity.BucketReplicationPolicy, req *pb.AddReplicationRequest) error {
 	opts := pbToReplicationOpts(req.Opts)
-	isAgent := opts.AgentURL != ""
 	storageType := h.credsSvc.Storages()[replicationID.FromStorage]
-	// disallow agent replication for swift:
-	if storageType == dom.Swift && isAgent {
-		return fmt.Errorf("%w: agent is not supported for swift bucket replication", dom.ErrInvalidArg)
+	var eventSource pb.EventSource
+	if req.Opts != nil {
+		eventSource = req.Opts.EventSource
 	}
-	if err := h.validateAgentURL(ctx, replicationID.FromStorage, opts.AgentURL); err != nil {
-		return fmt.Errorf("invalid agent URL: %w", err)
+	if opts.AgentURL != "" {
+		return fmt.Errorf("%w: agent_url is deprecated, use event_source instead", dom.ErrInvalidArg)
+	}
+
+	switch eventSource {
+	case pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION:
+		if storageType != dom.S3 {
+			return fmt.Errorf("%w: s3_notification event source is only supported for S3 storage", dom.ErrInvalidArg)
+		}
+		if h.webhookConf == nil {
+			return fmt.Errorf("%w: webhook must be enabled for s3_notification event source", dom.ErrInvalidArg)
+		}
+		agentURL, err := h.webhookConf.S3NotificationURL(replicationID.FromStorage)
+		if err != nil {
+			return err
+		}
+		opts.AgentURL = agentURL
+	case pb.EventSource_EVENT_SOURCE_WEBHOOK:
+		if err := h.validateWebhookEventSource(eventSource); err != nil {
+			return err
+		}
 	}
 
 	fromClient, err := h.clients.AsCommon(ctx, replicationID.FromStorage, replicationID.User)
@@ -628,27 +655,11 @@ func (h *policyHandlers) SwitchWithZeroDowntime(ctx context.Context, req *pb.Swi
 	return &emptypb.Empty{}, nil
 }
 
-func (h *policyHandlers) validateAgentURL(ctx context.Context, fromStorage string, agentURL string) error {
-	if agentURL == "" {
-		// agent is not set
-		return nil
+func (h *policyHandlers) validateWebhookEventSource(eventSource pb.EventSource) error {
+	if eventSource == pb.EventSource_EVENT_SOURCE_WEBHOOK && (h.webhookConf == nil || !h.webhookConf.Enabled) {
+		return fmt.Errorf("%w: webhook must be enabled for webhook event source", dom.ErrInvalidArg)
 	}
-
-	agents, err := h.agentClient.Ping(ctx)
-	if err != nil {
-		return err
-	}
-	for _, agent := range agents {
-		if agent.URL != agentURL {
-			continue
-		}
-		if agent.FromStorage != fromStorage {
-			return fmt.Errorf("%w: from storage %s is different from agent storage %s", dom.ErrInvalidArg, fromStorage, agent.FromStorage)
-		}
-		// valid
-		return nil
-	}
-	return fmt.Errorf("%w: agent not found", dom.ErrInvalidArg)
+	return nil
 }
 
 func (h *policyHandlers) createAgentBucketNotification(ctx context.Context, replicationID entity.BucketReplicationPolicy, agentURL string) error {

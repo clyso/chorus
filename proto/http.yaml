@@ -85,3 +85,6 @@ http:
     - selector: chorus.Webhook.SwiftEvents
       post: "/webhook/{storage}/swift"
       body: "*"
+    - selector: chorus.Webhook.S3Notifications
+      post: "/webhook/{storage}/s3-notifications"
+      body: "*"
