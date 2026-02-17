@@ -26,7 +26,16 @@ const (
 // WebhookClient is the client API for Webhook service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Webhook service receives storage events and enqueues replication tasks.
+// Returns non-200 only on transient errors (context cancelled, Redis
+// unavailable) where a retry may succeed. Permanent errors (unknown storage,
+// invalid events, no replication policy) are logged server-side and return 200.
 type WebhookClient interface {
+	// SwiftEvents receives a batch of OpenStack Swift events parsed from
+	// access logs by an external log exporter (e.g. Fluent Bit, Vector)
+	// and enqueues replication tasks for events matching active policies.
+	// Events that cannot be processed are skipped and logged server-side.
 	SwiftEvents(ctx context.Context, in *SwiftEventsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -51,7 +60,16 @@ func (c *webhookClient) SwiftEvents(ctx context.Context, in *SwiftEventsRequest,
 // WebhookServer is the server API for Webhook service.
 // All implementations should embed UnimplementedWebhookServer
 // for forward compatibility.
+//
+// Webhook service receives storage events and enqueues replication tasks.
+// Returns non-200 only on transient errors (context cancelled, Redis
+// unavailable) where a retry may succeed. Permanent errors (unknown storage,
+// invalid events, no replication policy) are logged server-side and return 200.
 type WebhookServer interface {
+	// SwiftEvents receives a batch of OpenStack Swift events parsed from
+	// access logs by an external log exporter (e.g. Fluent Bit, Vector)
+	// and enqueues replication tasks for events matching active policies.
+	// Events that cannot be processed are skipped and logged server-side.
 	SwiftEvents(context.Context, *SwiftEventsRequest) (*emptypb.Empty, error)
 }
 

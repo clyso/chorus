@@ -56,13 +56,18 @@ func (h *webhookHandlers) SwiftEvents(ctx context.Context, req *pb.SwiftEventsRe
 
 	storType, ok := h.credsSvc.Storages()[req.Storage]
 	if !ok {
-		return nil, fmt.Errorf("%w: storage %q not found", dom.ErrNotFound, req.Storage)
+		logger.Warn().Str("storage", req.Storage).Msg("webhook: storage not found, skipping events")
+		return &emptypb.Empty{}, nil
 	}
 	if storType != dom.Swift {
-		return nil, fmt.Errorf("%w: storage %q is %s, expected SWIFT", dom.ErrInvalidArg, req.Storage, storType)
+		logger.Warn().Str("storage", req.Storage).Str("type", string(storType)).Msg("webhook: storage is not SWIFT, skipping events")
+		return &emptypb.Empty{}, nil
 	}
 
 	for i, evt := range req.Events {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if err := h.processSwiftEvent(ctx, logger, req.Storage, evt); err != nil {
 			logger.Warn().Err(err).Int("event_index", i).Msg("skip swift event")
 		}

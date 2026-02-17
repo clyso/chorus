@@ -16,11 +16,31 @@
 
 package api
 
+import "fmt"
+
 type Config struct {
-	GrpcPort        int  `yaml:"grpcPort"`
-	HttpPort        int  `yaml:"httpPort"`
-	Enabled         bool `yaml:"enabled"`
-	Secure          bool `yaml:"secure"`
-	WebhookGrpcPort int  `yaml:"webhookGrpcPort"`
-	WebhookHttpPort int  `yaml:"webhookHttpPort"`
+	GrpcPort int           `yaml:"grpcPort"`
+	HttpPort int           `yaml:"httpPort"`
+	Enabled  bool          `yaml:"enabled"`
+	Secure   bool          `yaml:"secure"`
+	Webhook  WebhookConfig `yaml:"webhook"`
+}
+
+type WebhookConfig struct {
+	Enabled  bool `yaml:"enabled"`
+	GrpcPort int  `yaml:"grpcPort"`
+	HttpPort int  `yaml:"httpPort"`
+}
+
+func (c *WebhookConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+	if c.GrpcPort > 0 && c.HttpPort <= 0 {
+		return fmt.Errorf("webhook config: httpPort must be set when grpcPort is set (separate webhook ports require both)")
+	}
+	if c.HttpPort > 0 && c.GrpcPort <= 0 {
+		return fmt.Errorf("webhook config: grpcPort must be set when httpPort is set (separate webhook ports require both)")
+	}
+	return nil
 }

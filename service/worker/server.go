@@ -259,16 +259,20 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
 		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, rpc.NewAgentClient(appRedis), notifications.NewService(clientRegistry), replicationStatusLocker, userLocker)
 
-		replSvc := replication.NewSwift(queueSvc, policySvc)
-		webhookHandler := api.WebhookHandlers(credsSvc, policySvc, replSvc)
+		webhookEnabled := conf.Api.Webhook.Enabled
+		webhookOnSeparatePorts := webhookEnabled && conf.Api.Webhook.GrpcPort > 0
 
-		webhookOnSeparatePorts := conf.Api.WebhookGrpcPort > 0
+		var webhookHandler pb.WebhookServer
+		if webhookEnabled {
+			replSvc := replication.NewSwift(queueSvc, policySvc)
+			webhookHandler = api.WebhookHandlers(credsSvc, policySvc, replSvc)
+		}
 
 		registerServices := func(srv *grpc.Server) {
 			pb.RegisterChorusServer(srv, chorusHandler)
 			pb.RegisterDiffServer(srv, diffHandler)
 			pb.RegisterPolicyServer(srv, policyHandler)
-			if !webhookOnSeparatePorts {
+			if webhookEnabled && !webhookOnSeparatePorts {
 				pb.RegisterWebhookServer(srv, webhookHandler)
 			}
 		}
@@ -290,7 +294,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			if err := pb.RegisterPolicyHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
 				return err
 			}
-			if !webhookOnSeparatePorts {
+			if webhookEnabled && !webhookOnSeparatePorts {
 				if err := pb.RegisterWebhookHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
 					return err
 				}
@@ -307,7 +311,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		logger.Info().Msg("management api created")
 
 		if webhookOnSeparatePorts {
-			start, stop, err = api.NewGrpcServer(conf.Api.WebhookGrpcPort, func(srv *grpc.Server) {
+			start, stop, err = api.NewGrpcServer(conf.Api.Webhook.GrpcPort, func(srv *grpc.Server) {
 				pb.RegisterWebhookServer(srv, webhookHandler)
 			}, tp, conf.Log, app)
 			if err != nil {
@@ -319,8 +323,8 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			}
 
 			webhookApiConf := &api.Config{
-				GrpcPort: conf.Api.WebhookGrpcPort,
-				HttpPort: conf.Api.WebhookHttpPort,
+				GrpcPort: conf.Api.Webhook.GrpcPort,
+				HttpPort: conf.Api.Webhook.HttpPort,
 				Secure:   conf.Api.Secure,
 			}
 			start, stop, err = api.GRPCGateway(ctx, webhookApiConf, pb.RegisterWebhookHandlerFromEndpoint)
@@ -331,7 +335,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			if err != nil {
 				return err
 			}
-			logger.Info().Int("grpc_port", conf.Api.WebhookGrpcPort).Int("http_port", conf.Api.WebhookHttpPort).Msg("webhook api created on separate ports")
+			logger.Info().Int("grpc_port", conf.Api.Webhook.GrpcPort).Int("http_port", conf.Api.Webhook.HttpPort).Msg("webhook api created on separate ports")
 		}
 	}
 

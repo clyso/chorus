@@ -46,8 +46,9 @@ var WorkerRetryConf = handler.Config{
 }
 
 type Chorus struct {
-	PolicyClient pb.PolicyClient
-	ChorusClient pb.ChorusClient
+	PolicyClient  pb.PolicyClient
+	ChorusClient  pb.ChorusClient
+	WebhookClient pb.WebhookClient
 
 	UrlHttpApi string
 	ProxyAddr  string
@@ -86,10 +87,18 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 	proxyConf.Port, e.ProxyAddr = getRandomPort()
 	e.ProxyPort = proxyConf.Port
 	workerConf.Api.Enabled = true
+	workerConf.Api.Webhook.Enabled = true
 	grpcAddr := ""
 	workerConf.Api.GrpcPort, grpcAddr = getRandomPort()
 	workerConf.Api.HttpPort, e.UrlHttpApi = getRandomPort()
 	e.UrlHttpApi = "http://" + e.UrlHttpApi
+
+	webhookGrpcAddr := grpcAddr
+	if workerConf.Api.Webhook.GrpcPort > 0 {
+		workerConf.Api.Webhook.GrpcPort, webhookGrpcAddr = getRandomPort()
+		workerConf.Api.Webhook.HttpPort, _ = getRandomPort()
+	}
+
 	ctx := t.Context()
 	if err := workerConf.Validate(); err != nil {
 		t.Error("invalid worker config", err)
@@ -139,5 +148,19 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 	}
 	e.PolicyClient = pb.NewPolicyClient(grpcConn)
 	e.ChorusClient = pb.NewChorusClient(grpcConn)
+
+	if webhookGrpcAddr != grpcAddr {
+		webhookConn, err := grpc.DialContext(ctx, webhookGrpcAddr,
+			grpc.WithInsecure(),
+			grpc.WithBackoffMaxDelay(time.Second),
+			grpc.WithBlock(),
+		)
+		if err != nil {
+			t.Fatal("failed to dial webhook grpc api:", err)
+		}
+		e.WebhookClient = pb.NewWebhookClient(webhookConn)
+	} else {
+		e.WebhookClient = pb.NewWebhookClient(grpcConn)
+	}
 	return e
 }
