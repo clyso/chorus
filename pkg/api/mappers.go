@@ -51,9 +51,37 @@ func replicationToPb(id entity.UniversalReplicationID, value entity.ReplicationS
 		IsArchived:    value.IsArchived,
 		ArchivedAt:    tsToPb(value.ArchivedAt),
 		Id:            replicationIDToPb(id),
-		Opts:          replicationOptsToPb(value.ReplicationStatus),
 		EventLag:      durationToPb(value.Latency()),
 		SwitchInfo:    toPbSwitchStatus(value.Switch),
+		EventSource:   eventSourceFromStatus(value.ReplicationStatus),
+		WebhookUrl:    webhookURLFromStatus(value.ReplicationStatus),
+	}
+}
+
+func webhookURLFromStatus(s *entity.ReplicationStatus) string {
+	if s == nil {
+		return ""
+	}
+	return s.AgentURL
+}
+
+func eventSourceFromStatus(s *entity.ReplicationStatus) pb.EventSource {
+	if s == nil {
+		return pb.EventSource_EVENT_SOURCE_PROXY
+	}
+	switch dom.EventSource(s.EventSource) {
+	case dom.EventSourceS3Notification:
+		return pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION
+	case dom.EventSourceWebhook:
+		return pb.EventSource_EVENT_SOURCE_WEBHOOK
+	case dom.EventSourceProxy:
+		return pb.EventSource_EVENT_SOURCE_PROXY
+	default:
+		// backward compat: legacy replications without event_source
+		if s.AgentURL != "" {
+			return pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION
+		}
+		return pb.EventSource_EVENT_SOURCE_PROXY
 	}
 }
 
@@ -265,24 +293,6 @@ func dereferStr(s *string) string {
 		return ""
 	}
 	return *s
-}
-
-func pbToReplicationOpts(in *pb.ReplicationOpts) entity.ReplicationOptions {
-	if in == nil {
-		return entity.ReplicationOptions{}
-	}
-	return entity.ReplicationOptions{
-		AgentURL: dereferStr(in.AgentUrl),
-	}
-}
-
-func replicationOptsToPb(in *entity.ReplicationStatus) *pb.ReplicationOpts {
-	if in == nil {
-		return nil
-	}
-	return &pb.ReplicationOpts{
-		AgentUrl: strPtr(in.AgentURL),
-	}
 }
 
 func toUserRoutingsPb(filter *pb.RoutingsRequest_Filter, routings map[string]string, blocks map[string]bool) []*pb.UserRouting {

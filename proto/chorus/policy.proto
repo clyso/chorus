@@ -156,9 +156,7 @@ enum EventSource {
 
 // Additional replication options for bucket and user-level replications.
 message ReplicationOpts {
-  // Deprecated. Use event_source instead.
-  // Webhook URL of chorus agent. Can be configured only for bucket-level.
-  optional string agent_url = 1;
+  reserved 1; // was agent_url, removed in favor of event_source
   // Determines how ongoing data change events are captured.
   EventSource event_source = 2;
 
@@ -268,6 +266,11 @@ message Replication {
   google.protobuf.Timestamp archived_at = 13;
   // If replication has associated switch, contains its status info.
   optional ReplicationSwitch switch_info = 14;
+  // How ongoing data change events are captured for this replication.
+  EventSource event_source = 15;
+  // Webhook endpoint URL for this replication (if event source uses webhook).
+  // Read-only, computed by the server.
+  string webhook_url = 16;
 }
 
 // Request list of bucket available for replication for given user and from/to

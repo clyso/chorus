@@ -46,7 +46,8 @@ type UserReplicationPolicy struct {
 }
 
 type ReplicationOptions struct {
-	AgentURL string
+	AgentURL    string
+	EventSource dom.EventSource
 }
 
 func (p UserReplicationPolicy) LookupID() string {
@@ -101,7 +102,8 @@ type ReplicationStatus struct {
 	// Options belongs to status to store in the same hash in Redis.
 	// Embedded stucts are not supported by redis tag parser.
 	// TODO: add other replication options here, like copy origin timestamp, etc.
-	AgentURL string `redis:"agent_url,omitempty"`
+	AgentURL    string `redis:"agent_url,omitempty"`
+	EventSource string `redis:"event_source,omitempty"`
 
 	IsArchived bool `redis:"archived"`
 }
@@ -109,7 +111,8 @@ type ReplicationStatus struct {
 func StatusFromOptions(opts ReplicationOptions) ReplicationStatus {
 	// TODO: add other replication options here, like copy origin timestamp, etc.
 	return ReplicationStatus{
-		AgentURL: opts.AgentURL,
+		AgentURL:    opts.AgentURL,
+		EventSource: string(opts.EventSource),
 	}
 }
 

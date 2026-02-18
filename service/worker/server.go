@@ -257,11 +257,11 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Api.Enabled {
 		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), &app)
 		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
-		var webhookConfPtr *api.WebhookConfig
+		var webhookConf *api.WebhookConfig
 		if conf.Api.Webhook.Enabled {
-			webhookConfPtr = &conf.Api.Webhook
+			webhookConf = &conf.Api.Webhook
 		}
-		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, notifications.NewService(clientRegistry), replicationStatusLocker, userLocker, webhookConfPtr)
+		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, notifications.NewService(clientRegistry), replicationStatusLocker, userLocker, webhookConf)
 
 		webhookEnabled := conf.Api.Webhook.Enabled
 		webhookOnSeparatePorts := webhookEnabled && conf.Api.Webhook.GrpcPort > 0

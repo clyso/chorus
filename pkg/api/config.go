@@ -63,12 +63,27 @@ func (c *WebhookConfig) Validate() error {
 }
 
 func (c *WebhookConfig) S3NotificationURL(storage string) (string, error) {
+	base, err := c.baseURL()
+	if err != nil {
+		return "", err
+	}
+	return base + "/webhook/" + storage + "/s3-notifications", nil
+}
+
+func (c *WebhookConfig) SwiftWebhookURL(storage string) (string, error) {
+	base, err := c.baseURL()
+	if err != nil {
+		return "", err
+	}
+	return base + "/webhook/" + storage + "/swift", nil
+}
+
+func (c *WebhookConfig) baseURL() (string, error) {
 	if !c.Enabled {
-		return "", fmt.Errorf("webhook must be enabled for s3_notification event source")
+		return "", fmt.Errorf("webhook must be enabled")
 	}
 	if c.BaseURL == "" {
-		return "", fmt.Errorf("webhook baseUrl is required for s3_notification event source")
+		return "", fmt.Errorf("webhook baseUrl is required")
 	}
-	base := strings.TrimRight(c.BaseURL, "/")
-	return base + "/webhook/" + storage + "/s3-notifications", nil
+	return strings.TrimRight(c.BaseURL, "/"), nil
 }
