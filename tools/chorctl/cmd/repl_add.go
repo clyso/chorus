@@ -31,7 +31,6 @@ var (
 	raFrom        string
 	raTo          string
 	raUser        string
-	raAgentURL    string
 	raEventSource string
 	raFromBucket  string
 	raToBucket    string
@@ -56,16 +55,10 @@ S3 notification event source (worker creates SNS topic + bucket notification):
   chorctl repl add --from main --to follower --user admin --from-bucket bucket1 --event-source s3-notification
 
 External webhook event source (e.g. Swift access log exporter):
-  chorctl repl add --from main --to follower --user admin --event-source webhook
-
-Agent-based bucket replication (deprecated, use --event-source instead):
-  chorctl repl add --from main --to follower --user admin --from-bucket bucket1 --agent-url https://agent.chorus.com/webhook`,
+  chorctl repl add --from main --to follower --user admin --event-source webhook`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if raToBucket != "" && raFromBucket == "" {
 			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
-		}
-		if raAgentURL != "" && raEventSource != "" {
-			return fmt.Errorf("--agent-url and --event-source are mutually exclusive")
 		}
 		if raEventSource != "" && raEventSource != "proxy" && raEventSource != "s3-notification" && raEventSource != "webhook" {
 			return fmt.Errorf("--event-source must be one of: proxy, s3-notification, webhook")
@@ -76,25 +69,13 @@ Agent-based bucket replication (deprecated, use --event-source instead):
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Validate that agent-url is only used for bucket-level replication.
-		if raAgentURL != "" && raFromBucket == "" {
-			logrus.Fatal("--agent-url can only be used for bucket-level replication (from-bucket must be set)")
-		}
-
 		conn, client := newPolicyClient(ctx)
 		defer conn.Close()
 
 		id := buildReplicationID(raUser, raFrom, raTo, raFromBucket, raToBucket)
 		req := &pb.AddReplicationRequest{Id: id}
-		if raAgentURL != "" {
-			req.Opts = &pb.ReplicationOpts{
-				AgentUrl: &raAgentURL,
-			}
-		}
 		if raEventSource != "" && raEventSource != "proxy" {
-			if req.Opts == nil {
-				req.Opts = &pb.ReplicationOpts{}
-			}
+			req.Opts = &pb.ReplicationOpts{}
 			switch raEventSource {
 			case "s3-notification":
 				req.Opts.EventSource = pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION
@@ -115,8 +96,6 @@ func init() {
 	addCmd.Flags().StringVarP(&raFrom, "from", "f", "", "source storage name")
 	addCmd.Flags().StringVarP(&raTo, "to", "t", "", "destination storage name")
 	addCmd.Flags().StringVarP(&raUser, "user", "u", "", "replication user")
-	addCmd.Flags().StringVar(&raAgentURL, "agent-url", "", "deprecated: use --event-source instead")
-	_ = addCmd.Flags().MarkDeprecated("agent-url", "use --event-source instead")
 	addCmd.Flags().StringVar(&raEventSource, "event-source", "", "event source: proxy, s3-notification, webhook")
 	addCmd.Flags().StringVarP(&raFromBucket, "from-bucket", "b", "", "source bucket name; omit for user-level policies")
 	addCmd.Flags().StringVar(&raToBucket, "to-bucket", "", "destination bucket name; defaults to from-bucket for bucket-level policies")

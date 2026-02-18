@@ -20,3 +20,11 @@ const (
 	S3    StorageType = "S3"
 	Swift StorageType = "SWIFT"
 )
+
+type EventSource string
+
+const (
+	EventSourceProxy          EventSource = "proxy"
+	EventSourceS3Notification EventSource = "s3_notification"
+	EventSourceWebhook        EventSource = "webhook"
+)

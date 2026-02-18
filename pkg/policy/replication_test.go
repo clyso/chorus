@@ -598,7 +598,7 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 				}
 			}
 
-			err := svc.AddBucketReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{AgentURL: tt.name})
+			err := svc.AddBucketReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{AgentURL: tt.name, EventSource: dom.EventSourceS3Notification})
 			if tt.wantErr != nil {
 				r.ErrorIs(err, tt.wantErr)
 				return
@@ -610,6 +610,7 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 			r.NoError(err)
 			r.WithinDuration(time.Now(), info.CreatedAt, time.Second)
 			r.Equal(tt.name, info.AgentURL)
+			r.Equal(string(dom.EventSourceS3Notification), info.EventSource)
 
 			// list
 			policies, err := svc.ListBucketReplicationsInfo(ctx, tt.policy.User)
@@ -618,6 +619,7 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 			r.True(ok)
 			r.WithinDuration(info.CreatedAt, infoFromList.CreatedAt, time.Millisecond)
 			r.Equal(tt.name, infoFromList.AgentURL)
+			r.Equal(string(dom.EventSourceS3Notification), infoFromList.EventSource)
 			_, err = svc.ListBucketReplicationsInfo(ctx, tt.policy.User+"-qwerasdfasdf")
 			r.ErrorIs(err, dom.ErrNotFound, "other user not affected")
 			// custom bucket blocked

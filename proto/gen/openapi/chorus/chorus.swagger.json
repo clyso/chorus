@@ -1455,6 +1455,14 @@
         "switchInfo": {
           "$ref": "#/definitions/chorusReplicationSwitch",
           "description": "If replication has associated switch, contains its status info."
+        },
+        "eventSource": {
+          "$ref": "#/definitions/chorusEventSource",
+          "description": "How ongoing data change events are captured for this replication."
+        },
+        "webhookUrl": {
+          "type": "string",
+          "description": "Webhook endpoint URL for this replication (if event source uses webhook).\nRead-only, computed by the server."
         }
       },
       "description": "Represents specification and status of user-level or bucket-level\nreplication."
@@ -1488,10 +1496,6 @@
     "chorusReplicationOpts": {
       "type": "object",
       "properties": {
-        "agentUrl": {
-          "type": "string",
-          "description": "Deprecated. Use event_source instead.\nWebhook URL of chorus agent. Can be configured only for bucket-level."
-        },
         "eventSource": {
           "$ref": "#/definitions/chorusEventSource",
           "description": "Determines how ongoing data change events are captured."

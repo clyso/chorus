@@ -36,7 +36,8 @@ func TestBucketReplicationStatusStore(t *testing.T) {
 
 	// add
 	status := entity.ReplicationStatus{
-		AgentURL: "123",
+		AgentURL:    "123",
+		EventSource: string(dom.EventSourceS3Notification),
 	}
 	statusCreated := time.Now()
 	err = store.AddOp(ctx, policy1, status).Get()
@@ -46,6 +47,7 @@ func TestBucketReplicationStatusStore(t *testing.T) {
 	got, err := store.GetOp(ctx, policy1).Get()
 	r.NoError(err)
 	r.Equal(status.AgentURL, got.AgentURL)
+	r.Equal(status.EventSource, got.EventSource)
 	r.Nil(got.ArchivedAt)
 	r.False(got.IsArchived)
 	r.WithinDuration(got.CreatedAt, statusCreated, time.Second)
@@ -234,7 +236,8 @@ func TestUserReplicationStatusStore(t *testing.T) {
 
 	// add
 	status := entity.ReplicationStatus{
-		AgentURL: "123",
+		AgentURL:    "123",
+		EventSource: string(dom.EventSourceS3Notification),
 	}
 	statusCreated := time.Now()
 	err = store.AddOp(ctx, policy1, status).Get()
@@ -244,6 +247,7 @@ func TestUserReplicationStatusStore(t *testing.T) {
 	got, err := store.GetOp(ctx, policy1).Get()
 	r.NoError(err)
 	r.Equal(status.AgentURL, got.AgentURL)
+	r.Equal(status.EventSource, got.EventSource)
 	r.Nil(got.ArchivedAt)
 	r.False(got.IsArchived)
 	r.WithinDuration(got.CreatedAt, statusCreated, time.Second)

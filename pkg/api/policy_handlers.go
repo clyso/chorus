@@ -118,19 +118,18 @@ func (h *policyHandlers) AddReplication(ctx context.Context, req *pb.AddReplicat
 }
 
 func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID entity.UserReplicationPolicy, req *pb.AddReplicationRequest) (err error) {
-	opts := pbToReplicationOpts(req.Opts)
 	var eventSource pb.EventSource
 	if req.Opts != nil {
 		eventSource = req.Opts.EventSource
-	}
-	if opts.AgentURL != "" {
-		return fmt.Errorf("%w: agentUrl is not supported for user replication", dom.ErrInvalidArg)
 	}
 	if eventSource == pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION {
 		return fmt.Errorf("%w: s3_notification event source is not supported for user-level replication", dom.ErrInvalidArg)
 	}
 	if err := h.validateWebhookEventSource(eventSource); err != nil {
 		return err
+	}
+	opts := entity.ReplicationOptions{
+		EventSource: pbToEventSource(eventSource),
 	}
 	err = h.policySvc.AddUserReplicationPolicy(ctx, replicationID, opts)
 	if err != nil {
@@ -165,14 +164,13 @@ func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID e
 }
 
 func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID entity.BucketReplicationPolicy, req *pb.AddReplicationRequest) error {
-	opts := pbToReplicationOpts(req.Opts)
 	storageType := h.credsSvc.Storages()[replicationID.FromStorage]
 	var eventSource pb.EventSource
 	if req.Opts != nil {
 		eventSource = req.Opts.EventSource
 	}
-	if opts.AgentURL != "" {
-		return fmt.Errorf("%w: agent_url is deprecated, use event_source instead", dom.ErrInvalidArg)
+	opts := entity.ReplicationOptions{
+		EventSource: pbToEventSource(eventSource),
 	}
 
 	switch eventSource {
@@ -192,6 +190,11 @@ func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID
 		if err := h.validateWebhookEventSource(eventSource); err != nil {
 			return err
 		}
+		webhookURL, err := h.webhookURLForStorage(replicationID.FromStorage, storageType)
+		if err != nil {
+			return err
+		}
+		opts.AgentURL = webhookURL
 	}
 
 	fromClient, err := h.clients.AsCommon(ctx, replicationID.FromStorage, replicationID.User)
@@ -653,6 +656,28 @@ func (h *policyHandlers) SwitchWithZeroDowntime(ctx context.Context, req *pb.Swi
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func pbToEventSource(es pb.EventSource) dom.EventSource {
+	switch es {
+	case pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION:
+		return dom.EventSourceS3Notification
+	case pb.EventSource_EVENT_SOURCE_WEBHOOK:
+		return dom.EventSourceWebhook
+	default:
+		return dom.EventSourceProxy
+	}
+}
+
+func (h *policyHandlers) webhookURLForStorage(storage string, storageType dom.StorageType) (string, error) {
+	switch storageType {
+	case dom.S3:
+		return h.webhookConf.S3NotificationURL(storage)
+	case dom.Swift:
+		return h.webhookConf.SwiftWebhookURL(storage)
+	default:
+		return "", fmt.Errorf("%w: unsupported storage type %s for webhook", dom.ErrInvalidArg, storageType)
+	}
 }
 
 func (h *policyHandlers) validateWebhookEventSource(eventSource pb.EventSource) error {

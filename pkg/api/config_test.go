@@ -117,3 +117,50 @@ func TestWebhookConfig_S3NotificationURL(t *testing.T) {
 		})
 	}
 }
+
+func TestWebhookConfig_SwiftWebhookURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		conf    WebhookConfig
+		storage string
+		want    string
+		wantErr string
+	}{
+		{
+			name:    "disabled webhook",
+			conf:    WebhookConfig{Enabled: false, BaseURL: "http://localhost:9671"},
+			storage: "main",
+			wantErr: "webhook must be enabled",
+		},
+		{
+			name:    "empty baseUrl",
+			conf:    WebhookConfig{Enabled: true},
+			storage: "main",
+			wantErr: "webhook baseUrl is required",
+		},
+		{
+			name:    "valid",
+			conf:    WebhookConfig{Enabled: true, BaseURL: "http://localhost:9671"},
+			storage: "swift-main",
+			want:    "http://localhost:9671/webhook/swift-main/swift",
+		},
+		{
+			name:    "trailing slash trimmed",
+			conf:    WebhookConfig{Enabled: true, BaseURL: "http://localhost:9671/"},
+			storage: "main",
+			want:    "http://localhost:9671/webhook/main/swift",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			got, err := tt.conf.SwiftWebhookURL(tt.storage)
+			if tt.wantErr == "" {
+				r.NoError(err)
+				r.Equal(tt.want, got)
+			} else {
+				r.ErrorContains(err, tt.wantErr)
+			}
+		})
+	}
+}
