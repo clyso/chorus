@@ -24,6 +24,7 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/notifications"
 	"github.com/clyso/chorus/pkg/objstore"
@@ -227,6 +228,8 @@ func (h *webhookHandlers) S3Notifications(ctx context.Context, req *pb.S3Notific
 }
 
 func (h *webhookHandlers) processS3Record(evtCtx context.Context, logger *zerolog.Logger, storage, bucket string, record *pb.S3EventRecord) error {
+	evtCtx = xctx.SetBucket(evtCtx, bucket)
+
 	objectKey := ""
 	if record.S3.Object != nil {
 		objectKey = record.S3.Object.Key
