@@ -166,6 +166,18 @@ func WithKeystone(instanceName string) ComponentOption {
 	}
 }
 
+type hostAccessPorts struct {
+	ports []int
+}
+
+func (r *hostAccessPorts) apply(cfg *ComponentCreationConfig) {
+	cfg.HostAccessPorts = append(cfg.HostAccessPorts, r.ports...)
+}
+
+func WithHostAccessPorts(ports ...int) ComponentOption {
+	return &hostAccessPorts{ports: ports}
+}
+
 type ContainerLogConsumer struct {
 	disabledLogs  map[string]struct{}
 	componentName string
@@ -203,6 +215,7 @@ type ComponentCreationConfig struct {
 	InstantiateFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
 	Dependencies    []string
 	DisabledLogs    []string
+	HostAccessPorts []int
 	Container       bool
 }
 
@@ -1336,7 +1349,7 @@ func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, comp
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
 		},
-		HostAccessPorts: []int{CCephAPIPort},
+		HostAccessPorts: append([]int{CCephAPIPort}, componentConfig.HostAccessPorts...),
 		ExposedPorts:    []string{apiNatPortString},
 		Networks:        []string{env.network.Name},
 		LogConsumerCfg: &testcontainers.LogConsumerConfig{
