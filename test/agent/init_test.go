@@ -40,9 +40,17 @@ func TestMain(m *testing.M) {
 func setup(m *testing.M) int {
 	ctx := context.Background()
 
+	// Pre-allocate worker HTTP port before creating containers so Ceph can
+	// reach the worker webhook endpoint on the host via HostAccessPorts.
+	var err error
+	workerHttpPort, err = env.RandomFreePort()
+	if err != nil {
+		panic(fmt.Sprintf("unable to allocate worker http port: %v", err))
+	}
+
 	testEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
-		cephKey:  env.AsCeph(),
-		minioKey: env.AsMinio(),
+		cephKey:  env.AsCeph(env.WithHostAccessPorts(workerHttpPort), env.WithDisabledSTDErrLog()),
+		minioKey: env.AsMinio(env.WithDisabledSTDErrLog()),
 	})
 	if err != nil {
 		panic(fmt.Sprintf("unable to create test environment: %v", err))
@@ -109,12 +117,6 @@ func setup(m *testing.M) int {
 		},
 	}
 	workerStorage = app.WorkerS3Config(cephKey, s3Storages)
-
-	// Pre-allocate worker HTTP port so tests can set webhook baseURL before SetupChorus.
-	workerHttpPort, err = env.RandomFreePort()
-	if err != nil {
-		panic(fmt.Sprintf("unable to allocate worker http port: %v", err))
-	}
 
 	return m.Run()
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,12 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/worker"
 	"github.com/clyso/chorus/test/app"
+)
+
+const (
+	// Ceph batches notifications with ~20s delay, so we need a longer timeout
+	// than the default WaitLong (20s) for webhook-triggered replication checks.
+	webhookWait = 60 * time.Second
 )
 
 func notifID(user, bucket string) string {
@@ -62,7 +69,7 @@ func Test_e2e_s3_notification_webhook(t *testing.T) {
 	workerConf.Log.Level = "warn"
 	workerConf.Storage = workerStorage
 	workerConf.Api.HttpPort = workerHttpPort
-	workerConf.Api.Webhook.BaseURL = fmt.Sprintf("http://host.docker.internal:%d", workerHttpPort)
+	workerConf.Api.Webhook.BaseURL = fmt.Sprintf("http://host.testcontainers.internal:%d", workerHttpPort)
 
 	e := app.SetupChorus(t, workerConf, nil)
 
@@ -126,7 +133,7 @@ func Test_e2e_s3_notification_webhook(t *testing.T) {
 			}
 			d, err := io.ReadAll(obj)
 			return err == nil && string(d) == obj2Content
-		}, e.WaitLong, e.RetryLong)
+		}, webhookWait, e.RetryLong)
 
 		// Delete object on Ceph — Ceph sends notification → worker replicates delete.
 		err = cephClient.RemoveObject(ctx, bucket, "obj1.txt", minio.RemoveObjectOptions{})
@@ -135,7 +142,7 @@ func Test_e2e_s3_notification_webhook(t *testing.T) {
 		r.Eventually(func() bool {
 			_, err := minioClient.StatObject(ctx, bucket, "obj1.txt", minio.StatObjectOptions{})
 			return err != nil
-		}, e.WaitLong, e.RetryLong)
+		}, webhookWait, e.RetryLong)
 
 		_, err = e.PolicyClient.DeleteReplication(ctx, replID)
 		r.NoError(err)
