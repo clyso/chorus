@@ -1,176 +1,120 @@
-//go:build agent
-
 package agent
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	mclient "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/rs/xid"
-	"google.golang.org/grpc"
+	cadmin "github.com/ceph/go-ceph/rgw/admin"
+	"github.com/minio/minio-go/v7"
+	mcredentials "github.com/minio/minio-go/v7/pkg/credentials"
 
-	"github.com/clyso/chorus/pkg/config"
-	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
-	"github.com/clyso/chorus/service/agent"
-	"github.com/clyso/chorus/service/worker"
-)
-
-var (
-	mainClient   *mclient.Client
-	f1Client     *mclient.Client
-	mpMainClient *mclient.Core
-	mpF1Client   *mclient.Core
-	tstCtx       context.Context
-	apiClient    pb.ChorusClient
-
-	workerConf *worker.Config
-	agentConf  *agent.Config
-
-	urlHttpApi string
+	"github.com/clyso/chorus/test/app"
+	"github.com/clyso/chorus/test/env"
 )
 
 const (
-	user = "test"
+	cephKey  = "ceph"
+	minioKey = "minio"
+	user     = "testuser"
+
+	accessKey = "TESTUSER0ACCESS00KEY"
+	secretKey = "testuser0secret00key0testuser0sec"
+)
+
+var (
+	workerStorage  objstore.Config
+	workerHttpPort int
+
+	cephClient  *minio.Client
+	minioClient *minio.Client
 )
 
 func TestMain(m *testing.M) {
-	var err error
-	workerConf, err = worker.GetConfig(config.Path("override.yaml"))
-	if err != nil {
-		panic(err)
-	}
-	workerConf.Features.ACL = false
-	workerConf.Worker.QueueUpdateInterval = 500 * time.Millisecond
-
-	agentConf, err = agent.GetConfig(config.Path("agent_config.yaml"))
-	if err != nil {
-		panic(err)
-	}
-
-	redisSvc, err := miniredis.Run()
-	if err != nil {
-		panic(err)
-	}
-	workerConf.Redis.Address = redisSvc.Addr()
-	agentConf.Redis.Address = redisSvc.Addr()
-	agentConf.Features.ACL = false
-
-	fmt.Println("redis url", agentConf.Redis.Address)
-
-	//f1Backend := s3mem.New()
-	//f1Faker := gofakes3.New(f1Backend)
-	//f1Ts := httptest.NewServer(f1Faker.Server())
-	//defer f1Ts.Close()
-
-	//workerConf.Storage.Storages["f1"] = s3.Storage{
-	//	Address:     f1Ts.URL,
-	//	Credentials: map[string]s3.CredentialsV4{user: generateCredentials()},
-	//	Provider:    "Other",
-	//	IsMain:      false,
-	//}
-	//
-	//fmt.Println("f1 s3", f1Ts.URL)
-
-	mainClient, mpMainClient = createClient(workerConf.Storage.Storages["main"])
-	f1Client, mpF1Client = createClient(workerConf.Storage.Storages["f1"])
-
-	workerConf.Api.Enabled = true
-	grpcAddr := fmt.Sprintf("127.0.0.1:%d", workerConf.Api.GrpcPort)
-	fmt.Println("grpc api", grpcAddr)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	tstCtx = ctx
-
-	go func() {
-		app := dom.AppInfo{
-			Version: "test",
-			App:     "worker",
-			AppID:   xid.New().String(),
-		}
-		workerCtx, cancelFn := context.WithCancel(ctx)
-		defer cancelFn()
-
-		err = worker.Start(workerCtx, app, workerConf)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		app := dom.AppInfo{
-			Version: "test",
-			App:     "agent",
-			AppID:   xid.New().String(),
-		}
-		agentCtx, cancelFn := context.WithCancel(ctx)
-		defer cancelFn()
-
-		err = agent.Start(agentCtx, app, agentConf)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	grpcConn, err := grpc.DialContext(ctx, grpcAddr,
-		grpc.WithInsecure(),
-		grpc.WithBackoffMaxDelay(time.Second),
-		grpc.WithBlock(),
-	)
-	if err != nil {
-		panic(err)
-	}
-	apiClient = pb.NewChorusClient(grpcConn)
-
-	exitCode := m.Run()
-	cancel()
-	// exit
-	os.Exit(exitCode)
-
+	os.Exit(setup(m))
 }
 
-func createClient(c s3.Storage) (*mclient.Client, *mclient.Core) {
-	addr := strings.TrimPrefix(c.Address, "http://")
-	addr = strings.TrimPrefix(addr, "https://")
-	mc, err := mclient.New(addr, &mclient.Options{
-		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
-		Secure: c.IsSecure,
+func setup(m *testing.M) int {
+	ctx := context.Background()
+
+	testEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
+		cephKey:  env.AsCeph(),
+		minioKey: env.AsMinio(),
 	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("unable to create test environment: %v", err))
 	}
-	cancelHC, err := mc.HealthCheck(time.Second)
+	defer testEnv.Terminate(ctx)
+
+	cephAccess, err := testEnv.GetCephAccessConfig(cephKey)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("unable to get ceph config: %v", err))
 	}
-	defer cancelHC()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	_, _ = mc.BucketExists(ctx, "probeBucketName")
-	ready := !mc.IsOffline()
-	for i := 0; !ready && i < 30; i++ {
-		time.Sleep(100 * time.Millisecond)
-		ready = !mc.IsOffline()
-	}
-	if !ready {
-		panic("client " + addr + " is not ready")
+	minioAccess, err := testEnv.GetMinioAccessConfig(minioKey)
+	if err != nil {
+		panic(fmt.Sprintf("unable to get minio config: %v", err))
 	}
 
-	core, err := mclient.NewCore(addr, &mclient.Options{
-		Creds:  credentials.NewStaticV4(c.Credentials[user].AccessKeyID, c.Credentials[user].SecretAccessKey, ""),
-		Secure: c.IsSecure,
+	// Create user on Ceph with hardcoded creds.
+	cephEndpoint := fmt.Sprintf("http://%s:%d", cephAccess.Host.Local, cephAccess.Port.Forwarded)
+	cephAdminClient, err := cadmin.New(cephEndpoint, cephAccess.SystemUser, cephAccess.SystemPassword, nil)
+	if err != nil {
+		panic(fmt.Sprintf("unable to create ceph admin client: %v", err))
+	}
+	_, err = cephAdminClient.CreateUser(ctx, cadmin.User{
+		ID:          user,
+		DisplayName: user,
+		Keys: []cadmin.UserKeySpec{
+			{AccessKey: accessKey, SecretKey: secretKey},
+		},
 	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("unable to create ceph user: %v", err))
 	}
 
-	return mc, core
+	// Create S3 clients for direct access.
+	cephS3Endpoint := fmt.Sprintf("%s:%d", cephAccess.Host.Local, cephAccess.Port.Forwarded)
+	cephClient, err = minio.New(cephS3Endpoint, &minio.Options{
+		Creds:  mcredentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure: false,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("unable to create ceph client: %v", err))
+	}
+
+	minioS3Endpoint := fmt.Sprintf("%s:%d", minioAccess.Host.Local, minioAccess.S3Port.Forwarded)
+	minioClient, err = minio.New(minioS3Endpoint, &minio.Options{
+		Creds:  mcredentials.NewStaticV4(minioAccess.User, minioAccess.Password, ""),
+		Secure: false,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("unable to create minio client: %v", err))
+	}
+
+	// Build storage config.
+	cephURL := fmt.Sprintf("http://%s", cephS3Endpoint)
+	minioURL := fmt.Sprintf("http://%s", minioS3Endpoint)
+
+	s3Storages := map[string]s3.Storage{
+		cephKey: {
+			StorageAddress: s3.StorageAddress{Address: cephURL, Provider: s3.ProviderCeph},
+			Credentials:    map[string]s3.CredentialsV4{user: {AccessKeyID: accessKey, SecretAccessKey: secretKey}},
+		},
+		minioKey: {
+			StorageAddress: s3.StorageAddress{Address: minioURL, Provider: s3.ProviderMinIO},
+			Credentials:    map[string]s3.CredentialsV4{user: {AccessKeyID: minioAccess.User, SecretAccessKey: minioAccess.Password}},
+		},
+	}
+	workerStorage = app.WorkerS3Config(cephKey, s3Storages)
+
+	// Pre-allocate worker HTTP port so tests can set webhook baseURL before SetupChorus.
+	workerHttpPort, err = env.RandomFreePort()
+	if err != nil {
+		panic(fmt.Sprintf("unable to allocate worker http port: %v", err))
+	}
+
+	return m.Run()
 }

@@ -63,10 +63,6 @@ type Chorus struct {
 func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Config) Chorus {
 	t.Helper()
 	var err error
-	proxyConf, err = DeepCopyStruct(proxyConf)
-	if err != nil {
-		t.Fatal(err)
-	}
 	workerConf, err = DeepCopyStruct(workerConf)
 	if err != nil {
 		t.Fatal(err)
@@ -80,17 +76,32 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 	}
 
 	redisAddr := testutil.SetupRedisAddr(t)
-
-	proxyConf.Redis.Address = redisAddr
 	workerConf.Redis.Address = redisAddr
 
-	proxyConf.Port, e.ProxyAddr = getRandomPort()
-	e.ProxyPort = proxyConf.Port
+	if proxyConf != nil {
+		proxyConf, err = DeepCopyStruct(proxyConf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		proxyConf.Redis.Address = redisAddr
+		proxyConf.Port, e.ProxyAddr = getRandomPort()
+		e.ProxyPort = proxyConf.Port
+		if err := proxyConf.Validate(); err != nil {
+			t.Error("invalid proxy config", err)
+		}
+	}
+
 	workerConf.Api.Enabled = true
 	workerConf.Api.Webhook.Enabled = true
 	grpcAddr := ""
 	workerConf.Api.GrpcPort, grpcAddr = getRandomPort()
-	workerConf.Api.HttpPort, e.UrlHttpApi = getRandomPort()
+	// HttpPort may be pre-set when the caller needs to know the port before
+	// starting the worker (e.g. to build webhook baseURL for container→host push).
+	if workerConf.Api.HttpPort == 0 {
+		workerConf.Api.HttpPort, e.UrlHttpApi = getRandomPort()
+	} else {
+		e.UrlHttpApi = fmt.Sprintf("127.0.0.1:%d", workerConf.Api.HttpPort)
+	}
 	e.UrlHttpApi = "http://" + e.UrlHttpApi
 
 	webhookGrpcAddr := grpcAddr
@@ -104,22 +115,20 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 		t.Error("invalid worker config", err)
 	}
 
-	if err := proxyConf.Validate(); err != nil {
-		t.Error("invalid proxy config", err)
-	}
-
 	wg, ctx := errgroup.WithContext(ctx)
-	wg.Go(func() error {
-		app := dom.AppInfo{
-			Version: "test",
-			App:     "proxy",
-			AppID:   xid.New().String(),
-		}
-		if err := proxy.Start(ctx, app, proxyConf); err != nil {
-			return fmt.Errorf("proxy error: %w", err)
-		}
-		return nil
-	})
+	if proxyConf != nil {
+		wg.Go(func() error {
+			app := dom.AppInfo{
+				Version: "test",
+				App:     "proxy",
+				AppID:   xid.New().String(),
+			}
+			if err := proxy.Start(ctx, app, proxyConf); err != nil {
+				return fmt.Errorf("proxy error: %w", err)
+			}
+			return nil
+		})
+	}
 	wg.Go(func() error {
 		app := dom.AppInfo{
 			Version: "test",

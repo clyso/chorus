@@ -71,8 +71,7 @@ func (r *Lock) Do(ctx context.Context, refresh time.Duration, work func() error)
 	if err != nil {
 		return err
 	}
-	errCh := make(chan error)
-	defer close(errCh)
+	errCh := make(chan error, 1)
 	go func() {
 		errCh <- work()
 	}()
