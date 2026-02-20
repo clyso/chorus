@@ -22,6 +22,7 @@ See the [examples/](./examples/) directory for ready-to-use configurations:
 |---------|-------------|
 | [values-s3.yaml](./examples/values-s3.yaml) | S3 to S3 replication |
 | [values-swift.yaml](./examples/values-swift.yaml) | OpenStack Swift storage |
+| [values-webhook.yaml](./examples/values-webhook.yaml) | Webhook-based replication (without proxy) |
 | [values-dynamic-credentials.yaml](./examples/values-dynamic-credentials.yaml) | Manage credentials via API |
 | [values-external-redis.yaml](./examples/values-external-redis.yaml) | External Redis configuration |
 

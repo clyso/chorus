@@ -69,6 +69,14 @@ spec:
                   name: {{ include "chorus.dynamicCredentialsSecretName" . }}
                   key: {{ include "chorus.dynamicCredentialsSecretKey" . }}
             {{- end }}
+            {{- if and .Values.worker.config.api.webhook.enabled (not .Values.worker.config.api.webhook.baseUrl) }}
+            - name: CFG_API_WEBHOOK_BASEURL
+              {{- if gt (int (.Values.worker.config.api.webhook.httpPort | default 0)) 0 }}
+              value: {{ printf "http://%s-webhook.%s.svc.cluster.local:%d" (include "chorus.fullname" .) .Release.Namespace (int .Values.worker.config.api.webhook.httpPort) | quote }}
+              {{- else }}
+              value: {{ printf "http://%s-rest.%s.svc.cluster.local:%d" (include "chorus.fullname" .) .Release.Namespace (int .Values.worker.restService.port) | quote }}
+              {{- end }}
+            {{- end }}
           ports:
             {{- if .Values.worker.config.api.enabled }}
             - name: grpc
@@ -77,6 +85,14 @@ spec:
             - name: rest
               containerPort: {{ .Values.worker.config.api.httpPort | default 9671 }}
               protocol: TCP
+            {{- if and .Values.worker.config.api.webhook.enabled (gt (int (.Values.worker.config.api.webhook.grpcPort | default 0)) 0) }}
+            - name: webhook-grpc
+              containerPort: {{ .Values.worker.config.api.webhook.grpcPort }}
+              protocol: TCP
+            - name: webhook-http
+              containerPort: {{ .Values.worker.config.api.webhook.httpPort }}
+              protocol: TCP
+            {{- end }}
             {{- end }}
             {{- if .Values.worker.config.metrics.enabled }}
             - name: metrics

@@ -262,6 +262,11 @@ worker:
     port: 9671
     annotations: {}
 
+  # Webhook service (only created when webhook uses separate ports)
+  webhookService:
+    type: ClusterIP
+    annotations: {}
+
   config:
     concurrency: 10
 
@@ -270,58 +275,19 @@ worker:
       grpcPort: 9670
       httpPort: 9671
 
-    log:
-      json: true
-      level: info
-
-    metrics:
-      enabled: false
-
-    trace:
-      enabled: false
-      endpoint: ""
-
-# =============================================================================
-# AGENT (Alternative to Proxy)
-# =============================================================================
-agent:
-  enabled: false
-
-  replicas: 1
-
-  image:
-    repository: harbor.clyso.com/chorus/agent
-    tag: ""
-    pullPolicy: Always
-
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 50m
-      memory: 64Mi
-
-  podAnnotations: {}
-  podSecurityContext: {}
-  securityContext:
-    allowPrivilegeEscalation: false
-
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
-  service:
-    type: ClusterIP
-    port: 9673
-    annotations: {}
-
-  config:
-    port: 9673
-    # URL for S3 storage to send notifications (auto-generated if empty)
-    url: ""
-    # Source storage name from storage config
-    fromStorage: ""
+      webhook:
+        # Enable webhook endpoints for S3 notifications and Swift events.
+        # Webhook is handled by the worker — no separate service needed.
+        enabled: false
+        # Externally reachable base URL for webhook endpoints.
+        # If empty and webhook is enabled, auto-filled with internal k8s service URL:
+        #   http://<fullname>-rest.<namespace>.svc.cluster.local:<restPort>
+        # Override when the storage pushes from outside the cluster (e.g. via ingress).
+        baseUrl: ""
+        # Run webhook on separate ports (both must be set, or both 0).
+        # When 0, webhook shares the main API ports above.
+        grpcPort: 0
+        httpPort: 0
 
     log:
       json: true
@@ -397,6 +363,23 @@ ingress:
     annotations: {}
     hosts: []
       # - host: chorus-api.example.com
+      #   paths:
+      #     - path: /
+      #       pathType: Prefix
+    tls: []
+
+  # Ingress for webhook endpoints (S3 notifications, Swift events).
+  # Useful when the source storage is outside the cluster.
+  webhook:
+    enabled: false
+    className: ""
+    annotations: {}
+      # nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # Route to webhook gRPC port instead of HTTP.
+    # Adds nginx.ingress.kubernetes.io/backend-protocol: GRPC automatically.
+    grpc: false
+    hosts: []
+      # - host: chorus-webhook.example.com
       #   paths:
       #     - path: /
       #       pathType: Prefix
