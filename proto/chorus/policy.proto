@@ -211,8 +211,9 @@ message ListReplicationsRequest {
     optional bool is_init_done = 8;
     // If set, filters replications that have or not have associated switch.
     optional bool has_switch = 9;
-    // If set, filters replications by agent-based or proxy-based replication.
-    optional bool is_agent = 10;
+    reserved 10; // was is_agent
+    // Filters replications by event source.
+    optional EventSource event_source = 11;
   }
 }
 

@@ -33,13 +33,11 @@ import (
 func ChorusHandlers(
 	credsSvc objstore.CredsService,
 	proxyClient rpc.Proxy,
-	agentClient *rpc.AgentClient,
 	appInfo *dom.AppInfo,
 ) pb.ChorusServer {
 	return &chorusHandlers{
 		credsSvc:    credsSvc,
 		proxyClient: proxyClient,
-		agentClient: agentClient,
 		appInfo:     appInfo,
 	}
 }
@@ -48,7 +46,6 @@ var _ pb.ChorusServer = &chorusHandlers{}
 
 type chorusHandlers struct {
 	proxyClient rpc.Proxy
-	agentClient *rpc.AgentClient
 	appInfo     *dom.AppInfo
 	credsSvc    objstore.CredsService
 }
@@ -68,21 +65,6 @@ func (h *chorusHandlers) GetStorages(_ context.Context, _ *emptypb.Empty) (*pb.G
 
 func (h *chorusHandlers) GetProxyCredentials(ctx context.Context, _ *emptypb.Empty) (*pb.GetProxyCredentialsResponse, error) {
 	return h.proxyClient.GetCredentials(ctx)
-}
-
-func (h *chorusHandlers) GetAgents(ctx context.Context, _ *emptypb.Empty) (*pb.GetAgentsResponse, error) {
-	agents, err := h.agentClient.Ping(ctx)
-	if err != nil {
-		return nil, err
-	}
-	res := make([]*pb.Agent, len(agents))
-	for i, agent := range agents {
-		res[i] = &pb.Agent{
-			Storage: agent.FromStorage,
-			Url:     agent.URL,
-		}
-	}
-	return &pb.GetAgentsResponse{Agents: res}, nil
 }
 
 func (h *chorusHandlers) SetUserCredentials(ctx context.Context, req *pb.SetUserCredentialsRequest) (*emptypb.Empty, error) {

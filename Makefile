@@ -6,7 +6,7 @@ TEST_WAIT_SHORT=5s
 TEST_WAIT_LONG=20s
 
 .PHONY: all
-all: agent chorus proxy worker chorctl bench
+all: chorus proxy worker chorctl bench
 
 .PHONY: tidy
 tidy:
@@ -68,10 +68,6 @@ mkdir-build:
 # `:` is a no-op operator in shell.
 %-bin: pretty mkdir-build
 	:
-
-.PHONY: agent
-agent: agent-bin
-	go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o build/agent cmd/agent/main.go
 
 .PHONY: chorus
 chorus: chorus-bin

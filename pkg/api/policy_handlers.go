@@ -493,7 +493,7 @@ func (h *policyHandlers) skipBucketReplication(k entity.BucketReplicationPolicy,
 	if filter.IsPaused != nil && v.IsPaused != *filter.IsPaused {
 		return true
 	}
-	if filter.IsAgent != nil && v.AgentURL != "" != *filter.IsAgent {
+	if filter.EventSource != nil && eventSourceFromStatus(v.ReplicationStatus) != *filter.EventSource {
 		return true
 	}
 	if filter.IsArchived != nil && v.IsArchived != *filter.IsArchived {
@@ -521,7 +521,7 @@ func (h *policyHandlers) skipUserReplication(k entity.UserReplicationPolicy, v e
 	if filter.IsPaused != nil && v.IsPaused != *filter.IsPaused {
 		return true
 	}
-	if filter.IsAgent != nil && v.AgentURL != "" != *filter.IsAgent {
+	if filter.EventSource != nil && eventSourceFromStatus(v.ReplicationStatus) != *filter.EventSource {
 		return true
 	}
 	if filter.IsArchived != nil && v.IsArchived != *filter.IsArchived {

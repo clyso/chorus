@@ -24,7 +24,6 @@ See the [examples/](./examples/) directory for ready-to-use configurations:
 | [values-swift.yaml](./examples/values-swift.yaml) | OpenStack Swift storage |
 | [values-dynamic-credentials.yaml](./examples/values-dynamic-credentials.yaml) | Manage credentials via API |
 | [values-external-redis.yaml](./examples/values-external-redis.yaml) | External Redis configuration |
-| [values-agent.yaml](./examples/values-agent.yaml) | Agent-based deployment (instead of proxy) |
 
 ## Configuration
 
@@ -83,7 +82,6 @@ externalRedis:
 |-----------|-------------|---------|
 | **proxy** | S3 proxy for request routing and change capture | enabled |
 | **worker** | Processes replication tasks | enabled |
-| **agent** | Alternative to proxy using S3 bucket notifications | disabled |
 | **ui** | Web dashboard | disabled |
 
 ## Documentation

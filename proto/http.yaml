@@ -23,8 +23,6 @@ http:
       get: /storage
     - selector: chorus.Chorus.GetProxyCredentials
       get: /proxy
-    - selector: chorus.Chorus.GetAgents
-      get: /agents
     - selector: chorus.Chorus.SetUserCredentials
       body: "*"
       post: /credentials

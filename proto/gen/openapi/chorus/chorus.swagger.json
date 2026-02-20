@@ -25,29 +25,6 @@
     "application/json"
   ],
   "paths": {
-    "/agents": {
-      "get": {
-        "summary": "Returns list of registered chorus agents.",
-        "operationId": "Chorus_GetAgents",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/chorusGetAgentsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Chorus"
-        ]
-      }
-    },
     "/consistency/delete": {
       "put": {
         "operationId": "Diff_DeleteReport",
@@ -1033,19 +1010,6 @@
         }
       }
     },
-    "chorusAgent": {
-      "type": "object",
-      "properties": {
-        "storage": {
-          "type": "string",
-          "description": "Storage name from chorus storage config associated with this agent."
-        },
-        "url": {
-          "type": "string",
-          "description": "Webhook URL of chorus agent to be used for agent-based replication."
-        }
-      }
-    },
     "chorusAvailableBucketsRequest": {
       "type": "object",
       "properties": {
@@ -1213,19 +1177,6 @@
       "default": "EVENT_SOURCE_PROXY",
       "description": "Determines how ongoing data change events are captured for replication.\n\n - EVENT_SOURCE_PROXY: Default. Events captured by chorus proxy intercepting S3/Swift API calls.\n - EVENT_SOURCE_S3_NOTIFICATION: S3 bucket notifications. Worker creates SNS topic + bucket notification\npointing to its own webhook endpoint. Bucket-level replication only.\n - EVENT_SOURCE_WEBHOOK: External event source (e.g. Swift access log exporter).\nRequires webhook to be enabled in worker config. No automatic setup."
     },
-    "chorusGetAgentsResponse": {
-      "type": "object",
-      "properties": {
-        "agents": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/chorusAgent"
-          }
-        }
-      },
-      "description": "List of registered chorus agents."
-    },
     "chorusGetAppVersionResponse": {
       "type": "object",
       "properties": {
@@ -1364,9 +1315,9 @@
           "type": "boolean",
           "description": "If set, filters replications that have or not have associated switch."
         },
-        "isAgent": {
-          "type": "boolean",
-          "description": "If set, filters replications by agent-based or proxy-based replication."
+        "eventSource": {
+          "$ref": "#/definitions/chorusEventSource",
+          "description": "Filters replications by event source."
         }
       }
     },

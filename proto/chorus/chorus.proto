@@ -16,9 +16,6 @@ service Chorus {
   // Returns connection details for proxy s3 endpoint
   rpc GetProxyCredentials(google.protobuf.Empty)
       returns (GetProxyCredentialsResponse);
-  // Returns list of registered chorus agents.
-  rpc GetAgents(google.protobuf.Empty) returns (GetAgentsResponse);
-
   // Sets user credentials for a given storage.
   rpc SetUserCredentials(SetUserCredentialsRequest)
       returns (google.protobuf.Empty);
@@ -56,16 +53,6 @@ message Credential {
 message GetProxyCredentialsResponse {
   string address = 1;
   repeated Credential credentials = 2;
-}
-
-// List of registered chorus agents.
-message GetAgentsResponse { repeated Agent agents = 1; }
-
-message Agent {
-  // Storage name from chorus storage config associated with this agent.
-  string storage = 1;
-  // Webhook URL of chorus agent to be used for agent-based replication.
-  string url = 2;
 }
 
 message SetUserCredentialsRequest {
