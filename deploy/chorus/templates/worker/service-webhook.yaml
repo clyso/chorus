@@ -1,0 +1,28 @@
+{{- $sep := and .Values.worker.config.api.webhook.enabled (gt (int (.Values.worker.config.api.webhook.grpcPort | default 0)) 0) }}
+{{- if $sep }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "chorus.fullname" . }}-webhook
+  labels:
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.worker.webhookService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.worker.webhookService.type }}
+  ports:
+    - name: http
+      port: {{ .Values.worker.config.api.webhook.httpPort }}
+      targetPort: webhook-http
+      protocol: TCP
+    - name: grpc
+      port: {{ .Values.worker.config.api.webhook.grpcPort }}
+      targetPort: webhook-grpc
+      protocol: TCP
+  selector:
+    {{- include "chorus.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+{{- end }}

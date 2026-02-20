@@ -104,6 +104,8 @@ helm install <release name> oci://harbor.clyso.com/chorus/chorus
 ```
 The chart source is located in [deploy/chorus](./deploy/chorus).
 
+See Helm example values in [deploy/chorus/examples/](./deploy/chorus/examples/).
+
 ## Develop
 
 Chorus is written in Go—no other dependencies are required to build, run, or test.
