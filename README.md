@@ -19,10 +19,9 @@ Chorus is a distributed, vendor-agnostic tool for backup, migration, and routing
 Listed features can be configured per S3 user and per bucket with [management CLI](./tools/chorctl), [REST](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/clyso/chorus/refs/heads/main/proto/gen/openapi/chorus/chorus.swagger.json)/[gRPC](./proto/chorus/chorus.proto) API, or [WebUI](./ui/).
 
 ## Components
-[Chorus S3 Proxy](./service/proxy) service responsible for routing S3 requests and capturing data change events. 
-[Chorus Agent](./service/agent) can be used as an alternative solution for capturing events instead of Proxy.
-[Chorus Worker](./service/worker) service does actual data replication. Worker also hosts management API so it is a central and the only required component to start with Chorus.
-Communication between Proxy/Agent and Worker is done over work queue. 
+[Chorus S3 Proxy](./service/proxy) service responsible for routing S3 requests and capturing data change events.
+[Chorus Worker](./service/worker) service does actual data replication. Worker also hosts management API and webhook endpoints, so it is a central and the only required component to start with Chorus.
+Communication between Proxy and Worker is done over work queue.
 [Asynq](https://github.com/hibiken/asynq) with [Redis](https://github.com/redis/redis) is used as a work queue.
 
 ![diagram.png](./docs/media/diagram.png)
@@ -30,7 +29,6 @@ Communication between Proxy/Agent and Worker is done over work queue.
 For more details, see:
 - [Proxy](./service/proxy)
 - [Worker](./service/worker)
-- [Agent](./service/agent)
 - [Management CLI](./tools/chorctl)
 - [Web UI](./ui)
 - [Standalone](./service/standalone) - all-in-one binary. Local playground with zero dependencies.
@@ -64,7 +62,6 @@ go build ./cmd/worker
 # Run with custom config
 go run ./cmd/worker -config <path-to-worker.yaml>
 go run ./cmd/proxy -config <path-to-proxy.yaml>
-go run ./cmd/agent -config <path-to-agent.yaml>
 ```
 
 Or install globally:
@@ -75,7 +72,6 @@ export PATH=$PATH:$GOPATH/bin
 # Install binaries
 go install github.com/clyso/chorus/cmd/worker@latest
 go install github.com/clyso/chorus/cmd/proxy@latest
-go install github.com/clyso/chorus/cmd/agent@latest
 go install github.com/clyso/chorus/cmd/chorus@latest
 
 # Run with config
@@ -90,7 +86,6 @@ Download binaries for Linux, Windows, and macOS from [GitHub releases](https://g
 Multi-platform images are available at:
 - `harbor.clyso.com/chorus/proxy`
 - `harbor.clyso.com/chorus/worker`
-- `harbor.clyso.com/chorus/agent`
 - `harbor.clyso.com/chorus/web-ui`
 
 Example:

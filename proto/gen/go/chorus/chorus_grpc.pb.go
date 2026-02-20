@@ -23,7 +23,6 @@ const (
 	Chorus_GetAppVersion_FullMethodName       = "/chorus.Chorus/GetAppVersion"
 	Chorus_GetStorages_FullMethodName         = "/chorus.Chorus/GetStorages"
 	Chorus_GetProxyCredentials_FullMethodName = "/chorus.Chorus/GetProxyCredentials"
-	Chorus_GetAgents_FullMethodName           = "/chorus.Chorus/GetAgents"
 	Chorus_SetUserCredentials_FullMethodName  = "/chorus.Chorus/SetUserCredentials"
 )
 
@@ -37,8 +36,6 @@ type ChorusClient interface {
 	GetStorages(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStoragesResponse, error)
 	// Returns connection details for proxy s3 endpoint
 	GetProxyCredentials(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProxyCredentialsResponse, error)
-	// Returns list of registered chorus agents.
-	GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error)
 	// Sets user credentials for a given storage.
 	SetUserCredentials(ctx context.Context, in *SetUserCredentialsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -81,16 +78,6 @@ func (c *chorusClient) GetProxyCredentials(ctx context.Context, in *emptypb.Empt
 	return out, nil
 }
 
-func (c *chorusClient) GetAgents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAgentsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetAgentsResponse)
-	err := c.cc.Invoke(ctx, Chorus_GetAgents_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *chorusClient) SetUserCredentials(ctx context.Context, in *SetUserCredentialsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -111,8 +98,6 @@ type ChorusServer interface {
 	GetStorages(context.Context, *emptypb.Empty) (*GetStoragesResponse, error)
 	// Returns connection details for proxy s3 endpoint
 	GetProxyCredentials(context.Context, *emptypb.Empty) (*GetProxyCredentialsResponse, error)
-	// Returns list of registered chorus agents.
-	GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error)
 	// Sets user credentials for a given storage.
 	SetUserCredentials(context.Context, *SetUserCredentialsRequest) (*emptypb.Empty, error)
 }
@@ -132,9 +117,6 @@ func (UnimplementedChorusServer) GetStorages(context.Context, *emptypb.Empty) (*
 }
 func (UnimplementedChorusServer) GetProxyCredentials(context.Context, *emptypb.Empty) (*GetProxyCredentialsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProxyCredentials not implemented")
-}
-func (UnimplementedChorusServer) GetAgents(context.Context, *emptypb.Empty) (*GetAgentsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAgents not implemented")
 }
 func (UnimplementedChorusServer) SetUserCredentials(context.Context, *SetUserCredentialsRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetUserCredentials not implemented")
@@ -213,24 +195,6 @@ func _Chorus_GetProxyCredentials_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Chorus_GetAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ChorusServer).GetAgents(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Chorus_GetAgents_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChorusServer).GetAgents(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Chorus_SetUserCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SetUserCredentialsRequest)
 	if err := dec(in); err != nil {
@@ -267,10 +231,6 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProxyCredentials",
 			Handler:    _Chorus_GetProxyCredentials_Handler,
-		},
-		{
-			MethodName: "GetAgents",
-			Handler:    _Chorus_GetAgents_Handler,
 		},
 		{
 			MethodName: "SetUserCredentials",

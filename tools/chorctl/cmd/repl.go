@@ -33,14 +33,14 @@ import (
 
 // Filters for `chorctl repl`.
 var (
-	replType       string
-	replUserFilter string
-	replFromFilter string
-	replToFilter   string
-	replFromBucket string
-	replToBucket   string
-	replHasSwitch  bool
-	replAgentOnly  bool
+	replType        string
+	replUserFilter  string
+	replFromFilter  string
+	replToFilter    string
+	replFromBucket  string
+	replToBucket    string
+	replHasSwitch   bool
+	replEventSource string
 )
 
 // replCmd represents the repl command
@@ -74,9 +74,6 @@ Examples:
 			req.HideUserReplications = true
 		case "user":
 			req.HideBucketReplications = true
-		case "agent":
-			v := true
-			filter.IsAgent = &v
 		case "all", "":
 			// default: no hiding
 		default:
@@ -109,9 +106,13 @@ Examples:
 			filter.HasSwitch = &v
 			anyFilter = true
 		}
-		if replAgentOnly {
-			v := true
-			filter.IsAgent = &v
+		if replEventSource != "" {
+			esVal, ok := pb.EventSource_value["EVENT_SOURCE_"+replEventSource]
+			if !ok {
+				logrus.Fatalf("invalid --event-source %q (must be one of: PROXY, S3_NOTIFICATION, WEBHOOK)", replEventSource)
+			}
+			es := pb.EventSource(esVal)
+			filter.EventSource = &es
 			anyFilter = true
 		}
 		if anyFilter {
@@ -139,10 +140,11 @@ Examples:
 func init() {
 	rootCmd.AddCommand(replCmd)
 
-	replCmd.Flags().StringVar(&replType, "type", "all", "replication type filter: bucket, user, agent")
+	replCmd.Flags().StringVar(&replType, "type", "all", "replication type filter: bucket, user")
 	replCmd.Flags().StringVarP(&replUserFilter, "user", "u", "", "filter by replication user")
 	replCmd.Flags().StringVarP(&replFromFilter, "from", "f", "", "filter by source storage")
 	replCmd.Flags().StringVarP(&replToFilter, "to", "t", "", "filter by destination storage")
 	replCmd.Flags().StringVarP(&replFromBucket, "from-bucket", "b", "", "filter by source bucket of bucket-level replication")
 	replCmd.Flags().StringVar(&replToBucket, "to-bucket", "", "filter by destination bucket of bucket-level replication")
+	replCmd.Flags().StringVar(&replEventSource, "event-source", "", "filter by event source: PROXY, S3_NOTIFICATION, WEBHOOK")
 }
