@@ -16,7 +16,8 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { CTooltip, CTag, CIcon } from '@clyso/clyso-ui-kit';
+  import { CIcon } from '@clyso/clyso-ui-kit';
+  import ChorusStorageTag from '../../common/ChorusStorageTag/ChorusStorageTag.vue';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import type { ChorusReplication } from '@/utils/types/chorus';
   import type { AddId } from '@/utils/types/helper';
@@ -33,22 +34,10 @@
 
 <template>
   <div class="replication-direction-cell">
-    <CTooltip :delay="500">
-      <template #trigger>
-        <CTag
-          class="replication-direction-cell__from"
-          round
-          type="success"
-          size="small"
-        >
-          {{ replication.id.fromStorage }}
-        </CTag>
-      </template>
-      <span class="replication-direction-cell__from-tooltip">
-        <strong>{{ replication.id.fromStorage }}</strong
-        >: {{ t('replicationFrom') }}
-      </span>
-    </CTooltip>
+    <ChorusStorageTag
+      :storage-name="replication.id.fromStorage"
+      :tooltip="t('replicationFrom')"
+    />
 
     <CIcon
       class="replication-direction-cell__arrow"
@@ -56,22 +45,11 @@
       :name="IconName.BASE_ARROW_FORWARD"
     />
 
-    <CTooltip :delay="500">
-      <template #trigger>
-        <CTag
-          round
-          class="replication-direction-cell__to"
-          type="warning"
-          size="small"
-        >
-          {{ replication.id.toStorage }}
-        </CTag>
-      </template>
-      <span class="replication-direction-cell__to-tooltip">
-        <strong>{{ replication.id.toStorage }}</strong
-        >: {{ t('replicationTo') }}
-      </span>
-    </CTooltip>
+    <ChorusStorageTag
+      :storage-name="replication.id.toStorage"
+      :tooltip="t('replicationTo')"
+      type="warning"
+    />
   </div>
 </template>
 
