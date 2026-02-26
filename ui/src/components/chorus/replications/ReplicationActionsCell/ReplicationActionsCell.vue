@@ -15,15 +15,8 @@
   -->
 
 <script setup lang="ts">
-  import {
-    CButton,
-    CIcon,
-    CTooltip,
-    type NotificationConfig,
-    useDialog,
-    useNotification,
-  } from '@clyso/clyso-ui-kit';
-  import { computed, h, type Ref, ref } from 'vue';
+  import { CButton, CIcon, CTooltip, useDialog } from '@clyso/clyso-ui-kit';
+  import { computed, h, ref } from 'vue';
   import { storeToRefs } from 'pinia';
   import { useI18n } from 'vue-i18n';
   import {
@@ -35,6 +28,7 @@
   import { IconName } from '@/utils/types/icon';
   import ReplicationsShortList from '@/components/chorus/replications/ReplicationsShortList/ReplicationsShortList.vue';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
+  import { useChorusNotification } from '@/utils/composables/useChorusNotification';
 
   const { t } = useI18n({
     messages: i18nReplications,
@@ -54,9 +48,7 @@
     useChorusReplicationsStore(),
   );
 
-  const { createNotification, removeNotification } = useNotification();
-
-  const replicationNotificationId: Ref<string | null> = ref(null);
+  const { addNotification } = useChorusNotification();
 
   const replicationMetadata = computed(() => ({
     [ReplicationType.BUCKET]: {
@@ -87,30 +79,13 @@
     },
   }));
 
-  function clearReplicationNotification() {
-    if (!replicationNotificationId.value) {
-      return;
-    }
-
-    const notificationId = replicationNotificationId.value;
-
-    setTimeout(() => removeNotification(notificationId));
-    replicationNotificationId.value = null;
-  }
-
-  function createReplicationNotification(config: NotificationConfig) {
-    clearReplicationNotification();
-
-    replicationNotificationId.value = createNotification(config).value.id;
-  }
-
   async function pauseReplication() {
     isPauseResumeLoading.value = true;
 
     try {
       await setReplicationPaused(props.replication, true);
 
-      createReplicationNotification({
+      addNotification({
         type: 'success',
         title: t('pauseSuccessTitle'),
         duration: 4000,
@@ -123,12 +98,11 @@
           ]),
       });
     } catch {
-      createReplicationNotification({
+      addNotification({
         type: 'error',
         title: t('pauseErrorTitle'),
         positiveText: t('pauseErrorAction'),
         positiveHandler: () => {
-          clearReplicationNotification();
           pauseReplication();
         },
         content: () =>
@@ -150,7 +124,7 @@
     try {
       await setReplicationPaused(props.replication, false);
 
-      createReplicationNotification({
+      addNotification({
         type: 'success',
         title: t('resumeSuccessTitle'),
         duration: 4000,
@@ -163,12 +137,11 @@
           ]),
       });
     } catch {
-      createReplicationNotification({
+      addNotification({
         type: 'error',
         title: t('resumeErrorTitle'),
         positiveText: t('resumeErrorAction'),
         positiveHandler: () => {
-          clearReplicationNotification();
           resumeReplication();
         },
         content: () =>
@@ -210,7 +183,7 @@
         (selectedId) => selectedId !== props.replication.idStr,
       );
 
-      createReplicationNotification({
+      addNotification({
         type: 'success',
         title: successTitle,
         duration: 4000,
@@ -223,12 +196,11 @@
           ]),
       });
     } catch {
-      createReplicationNotification({
+      addNotification({
         type: 'error',
         title: errorTitle,
         positiveText: errorAction,
         positiveHandler: () => {
-          clearReplicationNotification();
           deleteReplication();
         },
         content: () =>
