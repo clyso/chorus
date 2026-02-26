@@ -79,38 +79,30 @@ type svc struct {
 	enabled bool
 }
 
+func workerCopyLabels(ctx context.Context) prometheus.Labels {
+	flow := xctx.GetFlow(ctx)
+	user := xctx.GetUser(ctx)
+	bucket := xctx.GetBucket(ctx)
+
+	return prometheus.Labels{
+		"flow":   string(flow),
+		"user":   user,
+		"bucket": bucket,
+	}
+}
+
 func (s svc) WorkerInProgressBytesInc(ctx context.Context, bytes int64) {
 	if !s.enabled {
 		return
 	}
-	labels := prometheus.Labels{}
-	if flow := xctx.GetFlow(ctx); flow != "" {
-		labels["flow"] = string(flow)
-	}
-	if user := xctx.GetUser(ctx); user != "" {
-		labels["user"] = user
-	}
-	if bucket := xctx.GetBucket(ctx); bucket != "" {
-		labels["bucket"] = bucket
-	}
-	copyInProgressBytes.With(labels).Add(float64(bytes))
+	copyInProgressBytes.With(workerCopyLabels(ctx)).Add(float64(bytes))
 }
 
 func (s svc) WorkerInProgressBytesDec(ctx context.Context, bytes int64) {
 	if !s.enabled {
 		return
 	}
-	labels := prometheus.Labels{}
-	if flow := xctx.GetFlow(ctx); flow != "" {
-		labels["flow"] = string(flow)
-	}
-	if user := xctx.GetUser(ctx); user != "" {
-		labels["user"] = user
-	}
-	if bucket := xctx.GetBucket(ctx); bucket != "" {
-		labels["bucket"] = bucket
-	}
-	copyInProgressBytes.With(labels).Sub(float64(bytes))
+	copyInProgressBytes.With(workerCopyLabels(ctx)).Sub(float64(bytes))
 }
 
 func (s svc) Count(flow xctx.Flow, storage string, method string) {
