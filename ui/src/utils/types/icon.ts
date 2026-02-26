@@ -38,6 +38,8 @@ export enum IconName {
   BASE_KEY = 'base-key',
   BASE_COPY = 'base-copy',
   BASE_LIST = 'base-list',
+  BASE_LOCK_CLOSED = 'base-lock-closed',
+  BASE_LOCK_OPEN = 'base-lock-open',
   BASE_ELLIPSIS_HORIZONTAL = 'base-ellipsis-horizontal',
   BASE_REMOVE_CIRCLE = 'base-remove-circle',
   BASE_DOCUMENT = 'base-document',

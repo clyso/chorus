@@ -28,6 +28,7 @@ import type {
   RoutingPolicyListRequest,
   RoutingPolicyListResponse,
   ChorusStorageListResponse,
+  RoutingPolicyEditRequest,
 } from '@/utils/types/chorus';
 
 export abstract class ChorusService {
@@ -124,5 +125,23 @@ export abstract class ChorusService {
       userRoutings: data.userRoutings ?? [],
       bucketRoutings: data.bucketRoutings ?? [],
     };
+  }
+
+  static async deleteRoutingPolicy(
+    payload: RoutingPolicyEditRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/delete'), payload);
+  }
+
+  static async blockRoutingPolicy(
+    payload: RoutingPolicyEditRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/block'), payload);
+  }
+
+  static async unblockRoutingPolicy(
+    payload: RoutingPolicyEditRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/unblock'), payload);
   }
 }
