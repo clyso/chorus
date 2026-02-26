@@ -25,6 +25,7 @@ export enum IconName {
   BASE_BUCKET = 'base-bucket',
   BASE_CYLINDER = 'base-cylinder',
   BASE_CHORUS_LOGO = 'base-chorus-logo',
+  BASE_CLOSE_CIRCLE = 'base-close-circle',
   BASE_TIMER = 'base-timer',
   BASE_TRASH = 'base-trash',
   BASE_PLAY = 'base-play',
