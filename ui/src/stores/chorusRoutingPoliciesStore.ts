@@ -18,14 +18,18 @@ import { type DataTablePaginationObject } from '@clyso/clyso-ui-kit';
 import type { DataTableSortState } from 'naive-ui';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { GeneralHelper } from '@/utils/helpers/GeneralHelper';
 import {
   RoutingPolicyStatusFilter,
   RoutingPolicyTypes,
   type RoutingPolicyListRequest,
   type RoutingPolicy,
+  type RoutingPolicyDeleteRequest,
 } from '@/utils/types/chorus';
 import { ChorusService } from '@/services/ChorusService';
+import { ErrorHelper } from '@/utils/helpers/ErrorHelper';
+import i18nRoutingPolicies from '@/components/chorus/routing-policies/i18nRoutingPolicies';
 
 interface ChorusRoutingPoliciesState {
   isLoading: boolean;
@@ -36,8 +40,8 @@ interface ChorusRoutingPoliciesState {
   pageSize: number;
   pollingRequest: Promise<unknown> | null;
   pollingTimeout: number | null;
-
   selectedRoutingPolicyIds: string[];
+  isDeleteSelectedProcessing: boolean;
 
   routingPoliciesRequestOptions: RoutingPolicyListRequest | null;
 
@@ -60,6 +64,7 @@ function getInitialState(): ChorusRoutingPoliciesState {
     pollingRequest: null,
     pollingTimeout: null,
     selectedRoutingPolicyIds: [],
+    isDeleteSelectedProcessing: false,
 
     routingPoliciesRequestOptions: null,
 
@@ -74,6 +79,10 @@ export const useChorusRoutingPoliciesStore = defineStore(
   'chorusRoutingPolicies',
   () => {
     const state = reactive<ChorusRoutingPoliciesState>(getInitialState());
+
+    const { t } = useI18n({
+      messages: i18nRoutingPolicies,
+    });
 
     const filteredRoutingPolicies = computed<RoutingPolicy[]>(() =>
       state.routingPolicies.filter((routingPolicy) => {
@@ -243,6 +252,72 @@ export const useChorusRoutingPoliciesStore = defineStore(
       },
     }));
 
+    async function deleteRoutingPolicy(routingPolicy: RoutingPolicy) {
+      const deleteRequestData: RoutingPolicyDeleteRequest = {
+        user: routingPolicy.user,
+        bucket: routingPolicy.bucket === '*' ? undefined : routingPolicy.bucket,
+      };
+
+      state.isDeleteSelectedProcessing = true;
+      await stopRoutingPoliciesPolling();
+
+      try {
+        await ChorusService.deleteRoutingPolicy(deleteRequestData);
+      } catch (error: unknown) {
+        const reason =
+          ErrorHelper.getReason(error) || t('deleteRoutingPolicyErrorUnknown');
+
+        throw new Error(reason);
+      } finally {
+        startRoutingPoliciesPolling();
+        state.isDeleteSelectedProcessing = false;
+      }
+    }
+
+    async function deleteRoutingPolicies(
+      routingPolicies: RoutingPolicy[],
+    ): Promise<{
+      successList: RoutingPolicy[];
+      errorList: [RoutingPolicy, string][];
+    }> {
+      const successList: RoutingPolicy[] = [];
+      const errorList: [RoutingPolicy, string][] = [];
+
+      await Promise.all(
+        routingPolicies.map(async (routingPolicy) => {
+          try {
+            await deleteRoutingPolicy(routingPolicy);
+            successList.push(routingPolicy);
+          } catch (error: unknown) {
+            errorList.push([
+              routingPolicy,
+              error instanceof Error ? error.message : String(error),
+            ]);
+          }
+        }),
+      );
+
+      if (successList.length > 0) {
+        const successListIds = successList.map((item) => item.id);
+
+        state.routingPolicies = state.routingPolicies.filter(
+          (item) => !successListIds.includes(item.id),
+        );
+
+        state.selectedRoutingPolicyIds = state.selectedRoutingPolicyIds.filter(
+          (item) => !successListIds.includes(item),
+        );
+
+        const pageCount = pagination.value.pageCount ?? 1;
+
+        if (state.page > pageCount) {
+          state.page = pageCount;
+        }
+      }
+
+      return { successList, errorList };
+    }
+
     const selectedRoutingPoliciesCount = computed(
       () => state.selectedRoutingPolicyIds.length,
     );
@@ -269,6 +344,8 @@ export const useChorusRoutingPoliciesStore = defineStore(
       ...toRefs(state),
       hasNoData,
       pagination,
+      deleteRoutingPolicy,
+      deleteRoutingPolicies,
       computedRoutingPolicies,
       initRoutingPoliciesPage,
       selectedRoutingPoliciesCount,

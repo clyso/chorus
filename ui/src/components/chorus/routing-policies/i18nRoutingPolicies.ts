@@ -39,6 +39,31 @@ export default <I18nMessages>{
     filterStatusAllowed: 'Allowed',
     filterStatusBlocked: 'Blocked',
     filterByStatusPlaceholder: 'Filter by Status',
+    columnActions: 'Actions',
+    actionDelete: 'Delete',
+    routingPolicyDeletionConfirmTitle: 'Delete Routing Policy',
+    routingPolicyDeletionConfirmContent:
+      'You are about to delete the routing policy as follows:',
+    routingPolicyDeletionConfirmQuestion: 'Are you sure you want to continue?',
+    routingPolicyDeletionConfirmAction: 'Confirm Deletion',
+    routingPolicyDeletionCancelAction: 'Cancel',
+    deleteSuccessTitle: 'Deleted!',
+    deleteSuccessContent: 'The following routing policies have been deleted:',
+    deleteErrorTitle: 'Deletion failed!',
+    deleteErrorContent:
+      'An error occurred when deleting the following routing policies:',
+    deleteErrorAction: 'Retry',
+    deleteRoutingPolicyErrorUnknown: 'Unknown error',
+    deleteErrorDetailsLabel: 'Details',
+    cancel: 'Cancel',
+    actionSelectedDeleteTitle: 'Delete Routing Policies',
+    actionSelectedDeleteContent:
+      'You are about to delete the following routing policies:',
+    actionSelectedDeleteQuestion: 'Are you sure you want to continue?',
+    deleteSelectedErrorContent:
+      'An error occurred while deleting the following {total} routing policies:',
+    deleteSelectedSuccessContent:
+      'The following {total} routing policies have been deleted:',
   },
   [I18nLocale.DE]: {
     routingPoliciesTitle: 'Routing-Richtlinien',
@@ -62,5 +87,29 @@ export default <I18nMessages>{
     filterStatusAllowed: 'Zugelassen',
     filterStatusBlocked: 'Blockiert',
     filterByStatusPlaceholder: 'Nach Status filtern',
+    columnActions: 'Aktionen',
+    actionDelete: 'Löschen',
+    routingPolicyDeletionConfirmTitle: 'Routing-Richtlinie Löschen',
+    routingPolicyDeletionConfirmContent:
+      'Sie löschen folgende Routing-Richtlinie:',
+    routingPolicyDeletionConfirmQuestion: 'Möchten Sie fortfahren?',
+    routingPolicyDeletionConfirmAction: 'Löschen bestätigen',
+    routingPolicyDeletionCancelAction: 'Abbrechen',
+    deleteSuccessTitle: 'Gelöscht!',
+    deleteSuccessContent: 'Die folgenden Routing-Richtlinien wurde gelöscht:',
+    deleteErrorTitle: 'Löschen fehlgeschlagen!',
+    deleteErrorContent:
+      'Beim Löschen der folgenden Routing-Richtlinien ist ein Fehler aufgetreten:',
+    deleteErrorAction: 'Erneut versuchen',
+    deleteRoutingPolicyErrorUnknown: 'Unbekannter Fehler',
+    deleteErrorDetailsLabel: 'Details',
+    cancel: 'Abbrechen',
+    actionSelectedDeleteTitle: 'Routing-Richtlinien Löschen',
+    actionSelectedDeleteContent: 'Sie löschen folgende Routing-Richtlinien:',
+    actionSelectedDeleteQuestion: 'Möchten Sie fortfahren?',
+    deleteSelectedErrorContent:
+      'Es ist ein Fehler beim Löschen der folgenden {total} Routing-Richtlinien aufgetreten:',
+    deleteSelectedSuccessContent:
+      'Die folgenden {total} Routing-Richtlinien wurden gelöscht:',
   },
 };

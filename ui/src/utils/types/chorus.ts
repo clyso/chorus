@@ -261,3 +261,8 @@ export enum RoutingPolicyStatusFilter {
   ALLOWED = 0,
   BLOCKED = 1,
 }
+
+export interface RoutingPolicyDeleteRequest {
+  user: string;
+  bucket?: string;
+}
