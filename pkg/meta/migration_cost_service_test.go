@@ -4,19 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/testutil"
 )
 
 func Test_svc_GetMigrationCosts(t *testing.T) {
 	r := require.New(t)
-	red := miniredis.RunT(t)
-	var s MigrationCostService = NewMigrationCostService(redis.NewClient(&redis.Options{
-		Addr: red.Addr(),
-	}))
+	c := testutil.SetupRedis(t)
+	var s MigrationCostService = NewMigrationCostService(c)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	from, to := "from1", "to1"

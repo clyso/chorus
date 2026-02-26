@@ -42,10 +42,11 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/trace"
-	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerProvider, logConf *log.Config, version dom.AppInfo) (start func(context.Context) error, stop func(context.Context) error, err error) {
+type RegisterServicesFunc func(srv *grpc.Server)
+
+func NewGrpcServer(port int, register RegisterServicesFunc, tracer otel_trace.TracerProvider, logConf *log.Config, version dom.AppInfo) (start func(context.Context) error, stop func(context.Context) error, err error) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, nil, err
@@ -80,7 +81,7 @@ func NewGrpcServer(port int, handlers pb.ChorusServer, tracer otel_trace.TracerP
 			streamServerRecover,
 		)))
 
-	pb.RegisterChorusServer(srv, handlers)
+	register(srv)
 	return func(ctx context.Context) error {
 			return srv.Serve(lis)
 		}, func(ctx context.Context) error {

@@ -20,57 +20,51 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/tasks"
 )
 
 type Router interface {
-	Route(r *http.Request) (resp *http.Response, task []tasks.SyncTask, storage string, isApiErr bool, err error)
+	Route(r *http.Request) (resp *http.Response, task []tasks.ReplicationTask, storage string, isApiErr bool, err error)
 }
 
-func NewRouter(
-	clients s3client.Service,
-	taskClient *asynq.Client,
+func NewS3Router(
+	clients objstore.Clients,
 	versionSvc meta.VersionService,
-	policySvc policy.Service,
-	storageSvc storage.Service,
+	uploadSvc *storage.UploadSvc,
 	limit ratelimit.RPM) Router {
-	return &router{
+	return &s3Router{
 		clients:    clients,
-		taskClient: taskClient,
 		versionSvc: versionSvc,
-		policySvc:  policySvc,
-		storageSvc: storageSvc,
+		uploadSvc:  uploadSvc,
 		limit:      limit,
 	}
 }
 
-type router struct {
-	clients    s3client.Service
-	taskClient *asynq.Client
+type s3Router struct {
+	clients    objstore.Clients
 	versionSvc meta.VersionService
-	policySvc  policy.Service
-	storageSvc storage.Service
+	uploadSvc  *storage.UploadSvc
 	limit      ratelimit.RPM
 }
 
-func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks.SyncTask, storage string, isApiErr bool, err error) {
+func (r *s3Router) Route(req *http.Request) (resp *http.Response, taskList []tasks.ReplicationTask, storage string, isApiErr bool, err error) {
 	var (
 		ctx    = req.Context()
 		method = xctx.GetMethod(req.Context())
 		bucket = xctx.GetBucket(ctx)
 		object = xctx.GetObject(ctx)
-		task   tasks.SyncTask
+		objVer = xctx.GetObjectVer(ctx)
+		task   tasks.ReplicationTask
 	)
 
 	switch method {
@@ -112,19 +106,21 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 	case s3.PutBucketTagging, s3.DeleteBucketTagging:
 		resp, storage, isApiErr, err = r.commonWrite(req)
 		task = &tasks.BucketSyncTagsPayload{Bucket: bucket}
-	case s3.PutBucketAcl, s3.PutObjectAcl:
+	case s3.PutBucketAcl:
 		resp, storage, isApiErr, err = r.commonWrite(req)
-		task = &tasks.ObjSyncACLPayload{Object: dom.Object{Bucket: bucket, Name: object}}
+		task = &tasks.BucketSyncACLPayload{Bucket: bucket}
+	case s3.PutObjectAcl:
+		resp, storage, isApiErr, err = r.commonWrite(req)
+		task = &tasks.ObjSyncACLPayload{Object: dom.Object{Bucket: bucket, Name: object, Version: objVer}}
 	case s3.PutObjectTagging, s3.DeleteObjectTagging:
 		resp, storage, isApiErr, err = r.commonWrite(req)
-		task = &tasks.ObjSyncTagsPayload{Object: dom.Object{Bucket: bucket, Name: object}}
+		task = &tasks.ObjSyncTagsPayload{Object: dom.Object{Bucket: bucket, Name: object, Version: objVer}}
 	case s3.PutObject, s3.CopyObject:
 		resp, taskList, storage, isApiErr, err = r.putObject(req)
 	case s3.DeleteObject:
 		resp, storage, isApiErr, err = r.commonWrite(req)
 		task = &tasks.ObjectSyncPayload{
-			Object:  dom.Object{Bucket: bucket, Name: object},
-			Sync:    tasks.Sync{FromStorage: storage},
+			Object:  dom.Object{Bucket: bucket, Name: object, Version: objVer},
 			Deleted: true,
 		}
 	case s3.DeleteObjects:
@@ -144,10 +140,16 @@ func (r *router) Route(req *http.Request) (resp *http.Response, taskList []tasks
 		err = dom.ErrNotImplemented
 	}
 	if err == nil && task != nil {
-		task.SetFrom(storage)
 		if taskList == nil {
-			taskList = []tasks.SyncTask{task}
+			taskList = []tasks.ReplicationTask{task}
 		}
+	}
+
+	if err != nil || isApiErr {
+		return
+	}
+	if rlErr := r.limit.StorReq(ctx, storage, ratelimit.S3Method(method)); rlErr != nil && !dom.IsErrRateLimitExceeded(rlErr) {
+		zerolog.Ctx(ctx).Err(rlErr).Str("storage", storage).Msg("rate limit error")
 	}
 
 	return

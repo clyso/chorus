@@ -24,8 +24,7 @@ import (
 
 	"github.com/clyso/chorus/pkg/api"
 	"github.com/clyso/chorus/pkg/config"
-	"github.com/clyso/chorus/pkg/rclone"
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/service/worker/handler"
 )
 
@@ -42,13 +41,12 @@ func defaultConfig() fs.File {
 
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
-	Storage       *s3.StorageConfig `yaml:"storage,omitempty"`
+	Storage       objstore.Config `yaml:"storage,omitempty"`
 
 	Concurrency     int           `yaml:"concurrency"`
 	ShutdownTimeout time.Duration `yaml:"shutdownTimeout"`
 
 	Api    *api.Config     `yaml:"api,omitempty"`
-	RClone *rclone.Config  `yaml:"rclone,omitempty"`
 	Lock   *Lock           `yaml:"lock,omitempty"`
 	Worker *handler.Config `yaml:"worker,omitempty"`
 }
@@ -61,11 +59,14 @@ func (c *Config) Validate() error {
 	if err := c.Common.Validate(); err != nil {
 		return err
 	}
-	if c.Storage == nil {
-		return fmt.Errorf("app config: empty storages config")
-	}
-	if err := c.Storage.Init(); err != nil {
+	if err := c.Storage.Validate(); err != nil {
 		return err
+	}
+	if c.Worker == nil {
+		return fmt.Errorf("worker config: empty Worker config")
+	}
+	if err := c.Worker.Validate(); err != nil {
+		return fmt.Errorf("worker config: invalid Worker config: %w", err)
 	}
 	if c.Concurrency <= 0 {
 		return fmt.Errorf("worker config: concurency config must be positive: %d", c.Concurrency)
@@ -73,8 +74,8 @@ func (c *Config) Validate() error {
 	if c.Api == nil {
 		return fmt.Errorf("worker config: empty Api config")
 	}
-	if c.RClone == nil {
-		return fmt.Errorf("app config: empty RClone config")
+	if err := c.Api.Webhook.Validate(); err != nil {
+		return fmt.Errorf("worker config: %w", err)
 	}
 	if c.Lock == nil {
 		return fmt.Errorf("app config: empty Lock config")
@@ -82,10 +83,10 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func GetConfig(src ...config.Src) (*Config, error) {
+func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Src{config.Reader(dc, "worker_default_cfg")}
+	cfgSource := []config.Opt{config.Reader(dc, "worker_default_cfg")}
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

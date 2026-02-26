@@ -21,12 +21,11 @@ import (
 	"strings"
 )
 
-func ParseReq(r *http.Request) (bucket string, object string, method Method) {
-	var (
-		path  = strings.Trim(r.URL.Path, "/")
-		parts = strings.SplitN(path, "/", 2)
-		query = r.URL.Query()
-	)
+// ParseBucketAndObject extracts bucket and object from the request based on hostname and path
+// Returns bucket, object, and whether bucket was found in hostname (virtual host style)
+func ParseBucketAndObject(r *http.Request) (bucket string, object string) {
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	parts := strings.SplitN(path, "/", 2)
 	bucket = parts[0]
 	if bucket == "" {
 		bucket = r.Header.Get("x-amz-bucket")
@@ -35,6 +34,21 @@ func ParseReq(r *http.Request) (bucket string, object string, method Method) {
 	if len(parts) == 2 {
 		object = parts[1]
 	}
+
+	return
+}
+
+type ParseResult struct {
+	Bucket       string
+	Object       string
+	ObjVersionID string
+	Method       Method
+}
+
+func ParseReq(r *http.Request) ParseResult {
+	query := r.URL.Query()
+	bucket, object := ParseBucketAndObject(r)
+	var method Method
 
 	switch {
 	case query.Has("lifecycle") && bucket != "":
@@ -105,7 +119,12 @@ func ParseReq(r *http.Request) (bucket string, object string, method Method) {
 	default:
 		method = UndefinedMethod
 	}
-	return
+	return ParseResult{
+		Bucket:       bucket,
+		Object:       object,
+		Method:       method,
+		ObjVersionID: query.Get("versionId"),
+	}
 }
 
 func routeObject(r *http.Request) Method {

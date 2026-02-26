@@ -1,5 +1,5 @@
 /*
- * Copyright © 2025 Clyso GmbH
+ * Copyright © 2026 Clyso GmbH
  *
  *  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -56,7 +56,13 @@ export default defineConfig({
   server: {
     port: 8081,
     proxy: {
-      '^/(token|api|spec|prometheus/api.*)': {
+      '/api': {
+        target: 'http://localhost:9671',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (rewrite_path) => rewrite_path.replace(/^\/api/, ''),
+      },
+      '^/(token|spec|prometheus/api.*)': {
         target: 'http://localhost:9671',
         changeOrigin: true,
         secure: true,
@@ -74,10 +80,5 @@ export default defineConfig({
   },
   css: {
     devSourcemap: true,
-    preprocessorOptions: {
-      scss: {
-        api: 'modern',
-      },
-    },
   },
 });

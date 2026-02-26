@@ -36,19 +36,20 @@ import (
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/notifications"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/rclone"
+	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/rpc"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/service/worker/copy"
 	"github.com/clyso/chorus/service/worker/handler"
-	"github.com/clyso/chorus/service/worker/policy_helper"
+	swift_worker "github.com/clyso/chorus/service/worker/handler/swift"
 )
 
 func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
@@ -83,7 +84,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("app redis connected")
 
 	versionSvc := meta.NewVersionService(appRedis)
-	storageSvc := storage.New(appRedis)
+	uploadSvc := storage.NewUploadSvc(appRedis)
+	objectListStateStore := store.NewMigrationObjectListStateStore(appRedis)
+	bucketListStateStore := store.NewMigrationBucketListStateStore(appRedis)
 
 	confRedis := util.NewRedis(conf.Redis, conf.Redis.ConfigDB)
 	defer confRedis.Close()
@@ -91,47 +94,28 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
-	policySvc := policy.NewService(confRedis)
 
+	credsSvc, err := objstore.NewCredsSvc(ctx, &conf.Storage, appRedis)
+	if err != nil {
+		return err
+	}
 	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
-
-	s3Clients, err := s3client.New(ctx, conf.Storage, metricsSvc, tp)
+	clientRegistry, err := objstore.NewRegistry(ctx, credsSvc, metricsSvc)
 	if err != nil {
 		return err
 	}
-	logger.Info().Msg("s3 clients connected")
-
-	memLimitBytes, err := util.ParseBytes(conf.RClone.MemoryLimit.Limit)
-	if err != nil && conf.RClone.MemoryLimit.Enabled {
-		return err
-	}
-	memLimiter := ratelimit.LocalSemaphore(ratelimit.SemaphoreConfig{
-		Enabled:  conf.RClone.MemoryLimit.Enabled,
-		Limit:    memLimitBytes,
-		RetryMin: conf.RClone.MemoryLimit.RetryMin,
-		RetryMax: conf.RClone.MemoryLimit.RetryMax,
-	}, "rclone_mem")
-	var filesLimiter ratelimit.Semaphore
-	if conf.RClone.GlobalFileLimit.Enabled {
-		filesLimiter = ratelimit.GlobalSemaphore(appRedis, conf.RClone.GlobalFileLimit, "rclone_files")
-	} else {
-		filesLimiter = ratelimit.LocalSemaphore(conf.RClone.LocalFileLimit, "rclone_files")
-	}
-	memCalc := rclone.NewMemoryCalculator(conf.RClone.MemoryCalc)
-	rc, err := rclone.New(conf.Storage, conf.Log.Json, metricsSvc, memCalc, memLimiter, filesLimiter)
-	if err != nil {
-		return err
-	}
-	logger.Info().Msg("rclone connected")
 
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
-
-	err = policy_helper.CreateMainFollowerPolicies(ctx, *conf.Storage, s3Clients, policySvc, taskClient)
+	inspector := asynq.NewInspector(queueRedis)
+	defer inspector.Close()
+	queueSvc := tasks.NewQueueService(taskClient, inspector)
+	err = policy.CheckSchemaCompatibility(ctx, app.Version, confRedis)
 	if err != nil {
-		return fmt.Errorf("%w: unable to create defaul main-follower policies", err)
+		return err
 	}
+	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main)
 
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 	lockRedis := util.NewRedis(conf.Redis, conf.Redis.LockDB)
@@ -141,11 +125,23 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	objectLocker := store.NewObjectLocker(lockRedis, conf.Lock.Overlap)
 	bucketLocker := store.NewBucketLocker(lockRedis, conf.Lock.Overlap)
 
-	workerSvc := handler.New(conf.Worker, s3Clients, versionSvc, policySvc, storageSvc, rc, taskClient, limiter, objectLocker, bucketLocker, replicationStatusLocker)
+	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
+	copySvc := copy.NewS3CopySvc(credsSvc, clientRegistry, metricsSvc)
+	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
+
+	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
+	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
+	consistencyCheckListStateStore := store.NewConsistencyCheckListStateStore(confRedis)
+	consistencyCheckSetStore := store.NewConsistencyCheckSetStore(confRedis)
+	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, clientRegistry, queueSvc)
+	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
+
+	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
 
+	defaultRetry := fallbackRetryDelay(conf.Worker.CustomErrRetryInterval)
 	srv := asynq.NewServer(
 		queueRedis,
 		asynq.Config{
@@ -155,7 +151,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 				var rlErr *dom.ErrRateLimitExceeded
 				return !errors.As(err, &rlErr)
 			},
-			RetryDelayFunc: retryDelay,
+			RetryDelayFunc: retryDelayFunc(defaultRetry),
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
 				retried, _ := asynq.GetRetryCount(ctx)
 				maxRetry, _ := asynq.GetMaxRetry(ctx)
@@ -173,29 +169,14 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 				}
 				taskLogger.Warn().Err(err).Msg("process task failed. task will be retried")
 			}),
-			Logger:   stdLogger,
-			LogLevel: asynq.LogLevel(zerolog.GlobalLevel() + 1),
-			Queues: map[string]int{
-				// highest priority
-				tasks.QueueAPI: 200,
-
-				tasks.QueueMigrateBucketListObjects: 100,
-
-				tasks.QueueConsistencyCheck: 12,
-
-				tasks.QueueMigrateObjCopyHighest5: 11,
-				tasks.QueueEventsHighest5:         10,
-				tasks.QueueMigrateObjCopy4:        9,
-				tasks.QueueEvents4:                8,
-				tasks.QueueMigrateObjCopy3:        7,
-				tasks.QueueEvents3:                6,
-				tasks.QueueMigrateObjCopy2:        5,
-				tasks.QueueEvents2:                4,
-				tasks.QueueMigrateObjCopyDefault1: 3,
-				tasks.QueueEventsDefault1:         2,
-				// lowest priority
-			},
-			StrictPriority: true,
+			Logger:                     stdLogger,
+			LogLevel:                   asynq.LogLevel(zerolog.GlobalLevel() + 1),
+			Queues:                     tasks.Priority,
+			StrictPriority:             true,
+			DynamicQueues:              true,
+			DynamicQueueUpdateInterval: conf.Worker.QueueUpdateInterval,
+			TaskCheckInterval:          conf.Worker.TaskCheckInterval,
+			DelayedTaskCheckInterval:   conf.Worker.DelayedTaskCheckInterval,
 		},
 	)
 
@@ -206,23 +187,55 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Metrics.Enabled {
 		mux.Use(metrics.WorkerMiddleware())
 	}
-	mux.HandleFunc(tasks.TypeBucketCreate, workerSvc.HandleBucketCreate)
-	mux.HandleFunc(tasks.TypeBucketDelete, workerSvc.HandleBucketDelete)
-	mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
-	mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
-	mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
-	mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
-	mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
-	mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
-	mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
-	mux.HandleFunc(tasks.TypeApiCostEstimation, workerSvc.CostsEstimation)
-	mux.HandleFunc(tasks.TypeApiCostEstimationList, workerSvc.CostsEstimationList)
-	mux.HandleFunc(tasks.TypeConsistencyCheck, workerSvc.HandleConsistencyCheck)
-	mux.HandleFunc(tasks.TypeConsistencyCheckList, workerSvc.HandleConsistencyCheckList)
-	mux.HandleFunc(tasks.TypeConsistencyCheckReadiness, workerSvc.HandleConsistencyCheckReadiness)
-	mux.HandleFunc(tasks.TypeConsistencyCheckResult, workerSvc.HandleConsistencyCheckDelete)
-	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, workerSvc.HandleZeroDowntimeReplicationSwitch)
-	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, workerSvc.HandleSwitchWithDowntime)
+	// common workers
+	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, uploadSvc, replicationStatusLocker)
+	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, switchWorker.HandleZeroDowntimeReplicationSwitch)
+	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, switchWorker.HandleSwitchWithDowntime)
+	logger.Info().Msg("registered common workers")
+
+	// S3 workers
+	if len(conf.Storage.S3Storages()) != 0 {
+		mux.HandleFunc(tasks.TypeBucketCreate, workerSvc.HandleBucketCreate)
+		mux.HandleFunc(tasks.TypeBucketDelete, workerSvc.HandleBucketDelete)
+		mux.HandleFunc(tasks.TypeBucketSyncTags, workerSvc.HandleBucketTags)
+		mux.HandleFunc(tasks.TypeBucketSyncACL, workerSvc.HandleBucketACL)
+		mux.HandleFunc(tasks.TypeObjectSync, workerSvc.HandleObjectSync)
+		mux.HandleFunc(tasks.TypeObjectSyncTags, workerSvc.HandleObjectTags)
+		mux.HandleFunc(tasks.TypeObjectSyncACL, workerSvc.HandleObjectACL)
+		mux.HandleFunc(tasks.TypeMigrateS3User, workerSvc.HandleMigrationS3User)
+		mux.HandleFunc(tasks.TypeMigrateBucketListObjects, workerSvc.HandleMigrationBucketListObj)
+		mux.HandleFunc(tasks.TypeMigrateObjCopy, workerSvc.HandleMigrationObjCopy)
+		logger.Info().Msg("registered S3 workers")
+
+		// versioned object migration workers
+		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, workerSvc.HandleObjectVersionList)
+		mux.HandleFunc(tasks.TypeMigrateVersionedObject, workerSvc.HandleVersionedObjectMigration)
+		logger.Info().Msg("registered S3 versioned workers")
+	} else {
+		logger.Info().Msg("s3 workers not registered: no s3 storage configured")
+	}
+
+	// swift workers
+	if len(conf.Storage.SwiftStorages()) != 0 {
+		swiftWorkerSvc := swift_worker.New(conf.Worker, clientRegistry, bucketListStateStore, objectListStateStore, queueSvc, limiter, objectLocker, userLocker, bucketLocker)
+		// swift tasks:
+		mux.HandleFunc(tasks.TypeSwiftAccountUpdate, swiftWorkerSvc.HandleAccountUpdate)
+		mux.HandleFunc(tasks.TypeSwiftContainerUpdate, swiftWorkerSvc.HandleContainerUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjUpdate, swiftWorkerSvc.HandleObjectUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjMetaUpdate, swiftWorkerSvc.HandleObjectMetaUpdate)
+		mux.HandleFunc(tasks.TypeSwiftObjDelete, swiftWorkerSvc.HandleObjectDelete)
+		mux.HandleFunc(tasks.TypeSwiftAccountMigration, swiftWorkerSvc.HandleSwiftAccountMigration)
+		mux.HandleFunc(tasks.TypeSwiftContainerMigration, swiftWorkerSvc.HandleSwiftContainerMigration)
+		mux.HandleFunc(tasks.TypeSwiftObjectMigration, swiftWorkerSvc.HandleSwiftObjectMigration)
+		logger.Info().Msg("registered swift workers")
+	} else {
+		logger.Info().Msg("swift workers not registered: no swift storage configured")
+	}
+
+	mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
+	mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
+	mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
+	logger.Info().Msg("registered consistency check workers")
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
@@ -242,8 +255,33 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		handlers := api.GrpcHandlers(conf.Storage, s3Clients, taskClient, rc, policySvc, versionSvc, storageSvc, rpc.NewProxyClient(appRedis), rpc.NewAgentClient(appRedis), notifications.NewService(s3Clients), replicationStatusLocker, userLocker, &app)
-		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, handlers, tp, conf.Log, app)
+		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), &app)
+		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
+		var webhookConf *api.WebhookConfig
+		if conf.Api.Webhook.Enabled {
+			webhookConf = &conf.Api.Webhook
+		}
+		policyHandler := api.PolicyHandlers(credsSvc, clientRegistry, queueSvc, policySvc, versionSvc, objectListStateStore, bucketListStateStore, notifications.NewService(clientRegistry), replicationStatusLocker, userLocker, webhookConf)
+
+		webhookEnabled := conf.Api.Webhook.Enabled
+		webhookOnSeparatePorts := webhookEnabled && conf.Api.Webhook.GrpcPort > 0
+
+		var webhookHandler pb.WebhookServer
+		if webhookEnabled {
+			swiftReplSvc := replication.NewSwift(queueSvc, policySvc)
+			s3ReplSvc := replication.NewS3(queueSvc, versionSvc, policySvc)
+			webhookHandler = api.WebhookHandlers(credsSvc, policySvc, swiftReplSvc, s3ReplSvc)
+		}
+
+		registerServices := func(srv *grpc.Server) {
+			pb.RegisterChorusServer(srv, chorusHandler)
+			pb.RegisterDiffServer(srv, diffHandler)
+			pb.RegisterPolicyServer(srv, policyHandler)
+			if webhookEnabled && !webhookOnSeparatePorts {
+				pb.RegisterWebhookServer(srv, webhookHandler)
+			}
+		}
+		start, stop, err := api.NewGrpcServer(conf.Api.GrpcPort, registerServices, tp, conf.Log, app)
 		if err != nil {
 			return err
 		}
@@ -252,9 +290,19 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			return err
 		}
 		start, stop, err = api.GRPCGateway(ctx, conf.Api, func(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) error {
-			err = pb.RegisterChorusHandlerFromEndpoint(ctx, mux, endpoint, opts)
-			if err != nil {
+			if err := pb.RegisterChorusHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
 				return err
+			}
+			if err := pb.RegisterDiffHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
+				return err
+			}
+			if err := pb.RegisterPolicyHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
+				return err
+			}
+			if webhookEnabled && !webhookOnSeparatePorts {
+				if err := pb.RegisterWebhookHandlerFromEndpoint(ctx, mux, endpoint, opts); err != nil {
+					return err
+				}
 			}
 			return nil
 		})
@@ -266,6 +314,34 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 			return err
 		}
 		logger.Info().Msg("management api created")
+
+		if webhookOnSeparatePorts {
+			start, stop, err = api.NewGrpcServer(conf.Api.Webhook.GrpcPort, func(srv *grpc.Server) {
+				pb.RegisterWebhookServer(srv, webhookHandler)
+			}, tp, conf.Log, app)
+			if err != nil {
+				return err
+			}
+			err = server.Add("webhook_grpc", start, stop)
+			if err != nil {
+				return err
+			}
+
+			webhookApiConf := &api.Config{
+				GrpcPort: conf.Api.Webhook.GrpcPort,
+				HttpPort: conf.Api.Webhook.HttpPort,
+				Secure:   conf.Api.Secure,
+			}
+			start, stop, err = api.GRPCGateway(ctx, webhookApiConf, pb.RegisterWebhookHandlerFromEndpoint)
+			if err != nil {
+				return err
+			}
+			err = server.Add("webhook_http", start, stop)
+			if err != nil {
+				return err
+			}
+			logger.Info().Int("grpc_port", conf.Api.Webhook.GrpcPort).Int("http_port", conf.Api.Webhook.HttpPort).Msg("webhook api created on separate ports")
+		}
 	}
 
 	if conf.Metrics.Enabled {
@@ -281,10 +357,21 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	return server.Start(ctx)
 }
 
-func retryDelay(n int, err error, task *asynq.Task) time.Duration {
-	var rlErr *dom.ErrRateLimitExceeded
-	if errors.As(err, &rlErr) {
-		return rlErr.RetryIn
+func retryDelayFunc(fallback asynq.RetryDelayFunc) asynq.RetryDelayFunc {
+	return func(n int, err error, task *asynq.Task) time.Duration {
+		var rlErr *dom.ErrRateLimitExceeded
+		if errors.As(err, &rlErr) {
+			return rlErr.RetryIn
+		}
+		return fallback(n, err, task)
 	}
-	return asynq.DefaultRetryDelayFunc(n, err, task)
+}
+
+func fallbackRetryDelay(customInterval *time.Duration) asynq.RetryDelayFunc {
+	if customInterval == nil || *customInterval <= 0 {
+		return asynq.DefaultRetryDelayFunc
+	}
+	return func(_ int, _ error, _ *asynq.Task) time.Duration {
+		return *customInterval
+	}
 }

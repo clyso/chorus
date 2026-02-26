@@ -26,20 +26,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/minio/minio-go/v7/pkg/notification"
 
+	"slices"
+
 	"github.com/clyso/chorus/pkg/dom"
-	"github.com/clyso/chorus/pkg/s3client"
+	"github.com/clyso/chorus/pkg/objstore"
 )
 
 type Service struct {
-	clients s3client.Service
+	clients objstore.Clients
 }
 
-func NewService(clients s3client.Service) *Service {
+func NewService(clients objstore.Clients) *Service {
 	return &Service{clients: clients}
 }
 
 func (s *Service) SubscribeToBucketNotifications(ctx context.Context, storage, user, bucket, agentURL string) error {
-	client, err := s.clients.GetByName(ctx, storage)
+	client, err := s.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return err
 	}
@@ -49,9 +51,6 @@ func (s *Service) SubscribeToBucketNotifications(ctx context.Context, storage, u
 		return err
 	}
 	notifications, err := client.S3().GetBucketNotification(ctx, bucket)
-	if err != nil {
-		return err
-	}
 	if err != nil {
 		return err
 	}
@@ -81,14 +80,11 @@ func (s *Service) SubscribeToBucketNotifications(ctx context.Context, storage, u
 }
 
 func (s *Service) DeleteBucketNotification(ctx context.Context, storage, user, bucket string) error {
-	client, err := s.clients.GetByName(ctx, storage)
+	client, err := s.clients.AsS3(ctx, storage, user)
 	if err != nil {
 		return err
 	}
 	notifications, err := client.S3().GetBucketNotification(ctx, bucket)
-	if err != nil {
-		return err
-	}
 	if err != nil {
 		return err
 	}
@@ -103,7 +99,7 @@ func (s *Service) DeleteBucketNotification(ctx context.Context, storage, user, b
 	if toRemove == -1 {
 		return nil
 	}
-	notifications.TopicConfigs = append(notifications.TopicConfigs[:toRemove], notifications.TopicConfigs[toRemove+1:]...)
+	notifications.TopicConfigs = slices.Delete(notifications.TopicConfigs, toRemove, toRemove+1)
 	return client.S3().SetBucketNotification(ctx, bucket, notifications)
 }
 

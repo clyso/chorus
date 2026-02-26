@@ -31,12 +31,14 @@ import (
 )
 
 func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
-	zerolog.Ctx(ctx).Err(err).Msg("error returned")
 	s3Err := mclient.ErrorResponse{}
+	logLevel := zerolog.ErrorLevel
 
 	switch {
 	case errors.As(err, &s3Err):
+		logLevel = zerolog.InfoLevel
 	case errors.Is(err, dom.ErrAuth):
+		logLevel = zerolog.WarnLevel
 		s3Err = mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "AccessDenied",
@@ -60,6 +62,7 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			StatusCode: http.StatusBadRequest,
 		}
 	case errors.Is(err, dom.ErrRoutingBlock):
+		logLevel = zerolog.WarnLevel
 		s3Err = mclient.ErrorResponse{
 			Code:       "NoSuchBucket",
 			Message:    "Bucket already used as replication destination",
@@ -83,6 +86,7 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 			StatusCode: http.StatusInternalServerError,
 		}
 	}
+	zerolog.Ctx(ctx).WithLevel(logLevel).Err(err).Msg("error returned")
 	w.WriteHeader(s3Err.StatusCode)
 
 	var buf bytes.Buffer

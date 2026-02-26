@@ -15,9 +15,11 @@
 package entity
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
-	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 type BucketReplicationPolicyID struct {
@@ -32,27 +34,49 @@ func NewBucketReplicationPolicyID(user string, fromBucket string) BucketReplicat
 	}
 }
 
-type BucketReplicationPolicy struct {
-	FromStorage string
-	ToStorage   string
-	ToBucket    string
-}
-
-func NewBucketReplicationPolicy(fromStorage string, toStorage string, toBucket string) BucketReplicationPolicy {
-	return BucketReplicationPolicy{
-		FromStorage: fromStorage,
-		ToStorage:   toStorage,
-		ToBucket:    toBucket,
-	}
+type BucketReplicationPolicyDestination struct {
+	ToStorage string
+	ToBucket  string
 }
 
 type UserReplicationPolicy struct {
+	User        string
 	FromStorage string
 	ToStorage   string
 }
 
-func NewUserReplicationPolicy(fromStorage string, toStorage string) UserReplicationPolicy {
+type ReplicationOptions struct {
+	AgentURL    string
+	EventSource dom.EventSource
+}
+
+func (p UserReplicationPolicy) LookupID() string {
+	return p.User
+}
+
+func (p UserReplicationPolicy) RoutingID() string {
+	return p.User
+}
+
+func (p UserReplicationPolicy) Validate() error {
+	if p.User == "" {
+		return fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	if p.FromStorage == "" {
+		return fmt.Errorf("%w: from storage is required", dom.ErrInvalidArg)
+	}
+	if p.ToStorage == "" {
+		return fmt.Errorf("%w: to storage is required", dom.ErrInvalidArg)
+	}
+	if p.FromStorage == p.ToStorage {
+		return fmt.Errorf("%w: from/to storages should differ", dom.ErrInvalidArg)
+	}
+	return nil
+}
+
+func NewUserReplicationPolicy(user string, fromStorage string, toStorage string) UserReplicationPolicy {
 	return UserReplicationPolicy{
+		User:        user,
 		FromStorage: fromStorage,
 		ToStorage:   toStorage,
 	}
@@ -71,32 +95,66 @@ func NewBucketRoutingPolicyID(user string, bucket string) BucketRoutingPolicyID 
 }
 
 type ReplicationStatus struct {
-	CreatedAt       time.Time `redis:"created_at"`
-	IsPaused        bool      `redis:"paused"`
-	IsArchived      bool      `redis:"archived"`
-	InitObjListed   int64     `redis:"obj_listed"`
-	InitObjDone     int64     `redis:"obj_done"`
-	InitBytesListed int64     `redis:"bytes_listed"`
-	InitBytesDone   int64     `redis:"bytes_done"`
-	Events          int64     `redis:"events"`
-	EventsDone      int64     `redis:"events_done"`
-	AgentURL        string    `redis:"agent_url,omitempty"`
+	CreatedAt time.Time `redis:"created_at"`
 
-	InitDoneAt      *time.Time `redis:"init_done_at,omitempty"`
-	LastEmittedAt   *time.Time `redis:"last_emitted_at,omitempty"`
-	LastProcessedAt *time.Time `redis:"last_processed_at,omitempty"`
-	ArchivedAt      *time.Time `redis:"archived_at,omitempty"`
+	ArchivedAt *time.Time `redis:"archived_at,omitempty"`
 
-	ListingStarted bool `redis:"listing_started"`
+	// Options belongs to status to store in the same hash in Redis.
+	// Embedded stucts are not supported by redis tag parser.
+	// TODO: add other replication options here, like copy origin timestamp, etc.
+	AgentURL    string `redis:"agent_url,omitempty"`
+	EventSource string `redis:"event_source,omitempty"`
 
-	HasSwitch bool `redis:"-"`
+	IsArchived bool `redis:"archived"`
 }
 
-func (r *ReplicationStatus) InitDone() bool {
-	return r.ListingStarted && r.InitDoneAt != nil && r.InitObjDone >= r.InitObjListed
+func StatusFromOptions(opts ReplicationOptions) ReplicationStatus {
+	// TODO: add other replication options here, like copy origin timestamp, etc.
+	return ReplicationStatus{
+		AgentURL:    opts.AgentURL,
+		EventSource: string(opts.EventSource),
+	}
 }
 
-type ReplicationStatusID struct {
+type ReplicationStatusExtended struct {
+	*ReplicationStatus
+
+	Switch *ReplicationSwitchInfo `redis:"-"`
+
+	// True if at least one of the queues is paused.
+	IsPaused bool
+	// Aggregated stats for initial migration list buckets/object tasks.
+	InitMigrationListing QueueStats
+	// Aggregated stats for initial migration queues.
+	InitMigration QueueStats
+	// Aggregated stats for event migration queues.
+	EventMigration QueueStats
+}
+
+func (r *ReplicationStatusExtended) InitDone() bool {
+	// all listing tasks done and all listed objects processed
+	return r.InitMigrationListing.Unprocessed == 0 && r.InitMigration.Unprocessed == 0
+}
+
+func (r *ReplicationStatusExtended) Latency() time.Duration {
+	if r.InitDone() {
+		return r.EventMigration.Latency
+	}
+	return r.InitMigration.Latency
+}
+
+type QueueStats struct {
+	// Number of tasks left. Includes, new, in_progress, and retried tasks.
+	Unprocessed int
+	// Total number of successfully processed tasks.
+	Done int
+	// Age of the oldest pending task in the queue.
+	Latency time.Duration
+	// Approx bytes used by the queue and its tasks in Redis.
+	MemoryUsage int64
+}
+
+type BucketReplicationPolicy struct {
 	User        string
 	FromStorage string
 	FromBucket  string
@@ -104,25 +162,66 @@ type ReplicationStatusID struct {
 	ToBucket    string
 }
 
-type ReplicationPolicyDestination struct {
-	Storage string
-	Bucket  string
-}
-
-func NewBucketReplicationPolicyDestination(storage string, bucket string) ReplicationPolicyDestination {
-	return ReplicationPolicyDestination{
-		Storage: storage,
-		Bucket:  bucket,
+func (p BucketReplicationPolicy) LookupID() BucketReplicationPolicyID {
+	return BucketReplicationPolicyID{
+		User:       p.User,
+		FromBucket: p.FromBucket,
 	}
 }
 
-func NewUserReplicationPolicyDestination(storage string) ReplicationPolicyDestination {
-	return ReplicationPolicyDestination{
-		Storage: storage,
+func (p BucketReplicationPolicy) Destination() BucketReplicationPolicyDestination {
+	return BucketReplicationPolicyDestination{
+		ToStorage: p.ToStorage,
+		ToBucket:  p.ToBucket,
 	}
 }
 
-type StorageReplicationPolicies struct {
-	FromStorage  string
-	Destinations map[ReplicationPolicyDestination]tasks.Priority
+func (p BucketReplicationPolicy) RoutingID() BucketRoutingPolicyID {
+	return BucketRoutingPolicyID{
+		User:   p.User,
+		Bucket: p.FromBucket,
+	}
+}
+
+func (p BucketReplicationPolicy) Validate() error {
+	errs := make([]error, 0)
+	if p.User == "" {
+		err := fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.FromStorage == "" {
+		err := fmt.Errorf("%w: from storage is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.FromBucket == "" {
+		err := fmt.Errorf("%w: from bucket is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.ToStorage == "" {
+		err := fmt.Errorf("%w: to storage is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.ToBucket == "" {
+		err := fmt.Errorf("%w: to bucket is required", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+	if p.FromStorage == p.ToStorage && p.FromBucket == p.ToBucket {
+		err := fmt.Errorf("%w: from/to storages and/or buckets should differ", dom.ErrInvalidArg)
+		errs = append(errs, err)
+	}
+
+	if len(errs) != 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func NewBucketRepliationPolicy(user string, fromStorage string, fromBucket string, toStorage string, toBucket string) BucketReplicationPolicy {
+	return BucketReplicationPolicy{
+		User:        user,
+		FromStorage: fromStorage,
+		FromBucket:  fromBucket,
+		ToStorage:   toStorage,
+		ToBucket:    toBucket,
+	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2025 Clyso GmbH
+ * Copyright © 2026 Clyso GmbH
  *
  *  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -48,12 +48,6 @@ export enum IconName {
   BASE_SERVER = 'base-server',
 
   // custom folder
-  PROVIDER_ALIBABA = 'custom-provider-alibaba',
-  PROVIDER_AWS = 'custom-provider-aws',
-  PROVIDER_CEPH = 'custom-provider-ceph',
-  PROVIDER_CLOUDFLARE = 'custom-provider-cloudflare',
-  PROVIDER_DIGITALOCEAN = 'custom-provider-digitalocean',
-  PROVIDER_GOOGLE = 'custom-provider-google',
-  PROVIDER_MINIO = 'custom-provider-minio',
+  // TODO: we may want to define specific icons for S3 and SWIFT
   PROVIDER_OTHER = 'custom-provider-other',
 }

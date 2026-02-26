@@ -2,8 +2,11 @@ GIT_COMMIT=$(shell git log -1 --format=%H)
 GIT_TAG=$(shell git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 BUILD_DATE=$(shell date -Is -u)
 
+TEST_WAIT_SHORT=5s
+TEST_WAIT_LONG=20s
+
 .PHONY: all
-all: agent chorus proxy worker chorctl bench
+all: chorus proxy worker chorctl bench
 
 .PHONY: tidy
 tidy:
@@ -30,6 +33,12 @@ imports:
 	go tool goimports -local github.com/clyso/chorus -w ./service
 	go tool goimports -local github.com/clyso/chorus -w ./tools
 
+.PHONY: fieldalignment
+fieldalignment:
+	until go tool betteralign -apply ./pkg/... ./test/... ./cmd/... ; do :; done
+	cd ./tools/chorctl && until go tool betteralign -apply ./... ; do :; done
+	cd ./tools/bench && until go tool betteralign -apply ./... ; do :; done
+
 .PHONY: lint
 lint:
 	go tool golangci-lint run
@@ -47,7 +56,7 @@ license-fix:
 	find . -name "*.go" ! -name "*_test.go" | xargs go tool addlicense -c 'Clyso GmbH' || (echo "Missing license headers"; exit 1)
 
 .PHONY: pretty
-pretty: tidy gen fmt vet imports lint vuln license-check
+pretty: tidy gen fmt vet imports fieldalignment lint vuln license-check
 
 .PHONY: mkdir-build
 mkdir-build: 
@@ -59,10 +68,6 @@ mkdir-build:
 # `:` is a no-op operator in shell.
 %-bin: pretty mkdir-build
 	:
-
-.PHONY: agent
-agent: agent-bin
-	go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o build/agent cmd/agent/main.go
 
 .PHONY: chorus
 chorus: chorus-bin
@@ -86,7 +91,7 @@ bench: bench-bin
 
 .PHONY: test
 test: pretty
-	go test ./...
+	TEST_WAIT_SHORT=$(TEST_WAIT_SHORT) TEST_WAIT_LONG=$(TEST_WAIT_LONG) go test ./...
 
 .PHONY: proto-gen
 proto-gen:

@@ -4,14 +4,20 @@ kind: Service
 metadata:
   name: {{ include "chorus.fullname" . }}-rest
   labels:
-    app: worker
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.worker.restService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  selector:
-    app: worker
-  {{- include "chorus.selectorLabels" . | nindent 4 }}
-  type: {{ .Values.worker.restApiService.type }}
+  type: {{ .Values.worker.restService.type }}
   ports:
-  - name: rest
-	{{- .Values.worker.restApiService.portRest | toYaml | nindent 4 -}}
+    - name: rest
+      port: {{ .Values.worker.restService.port }}
+      targetPort: rest
+      protocol: TCP
+  selector:
+    {{- include "chorus.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
 {{- end }}

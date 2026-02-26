@@ -93,7 +93,7 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
-	var configSrc config.Src
+	var configSrc config.Opt
 	if configPath != nil && *configPath != "" {
 		configSrc = config.Path(*configPath)
 	} else {

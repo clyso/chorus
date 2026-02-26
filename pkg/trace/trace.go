@@ -31,8 +31,8 @@ import (
 )
 
 type Config struct {
-	Enabled  bool   `yaml:"enabled"`
 	Endpoint string `yaml:"endpoint"`
+	Enabled  bool   `yaml:"enabled"`
 }
 
 func NewTracerProvider(conf *Config, version dom.AppInfo) (func(ctx context.Context) error, trace.TracerProvider, error) {

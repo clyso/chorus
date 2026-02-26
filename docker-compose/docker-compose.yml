@@ -61,25 +61,6 @@ services:
         target: /bin/config/override.yaml
     ports:
       - "9669:9669" # expose proxy s3 api
-  # Chorus agent is alternative to proxy. It can be used to capture data change and backup it with worker to another S3.
-  # Source S3 should support bucket notifications.
-  agent:
-    # To enable run with agent profile: "docker-compose up --profile agent up". See https://docs.docker.com/compose/profiles/
-    profiles:
-      - "agent"
-    depends_on:
-      - redis
-    build:
-      context: ../
-      args:
-        SERVICE: agent
-    volumes:
-      # agent config
-      - type: bind
-        source: ./agent-conf.yaml
-        target: /bin/config/config.yaml
-    ports:
-      - "9673:9673" # expose agent bucket notifications webhook
   # Chorus web UI
   # Access UI on http://localhost:8080
   web-ui:

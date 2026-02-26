@@ -1,5 +1,5 @@
 <!--
-  - Copyright © 2025 Clyso GmbH
+  - Copyright © 2026 Clyso GmbH
   -
   -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
   -  you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
   import ReplicationsFilterByToStorage from '@/components/chorus/replications/ReplicationsFilterByToStorage/ReplicationsFilterByToStorage.vue';
   import ReplicationsFilterByStatus from '@/components/chorus/replications/ReplicationsFilterByStatus/ReplicationsFilterByStatus.vue';
   import ReplicationsFilterByCreatedAt from '@/components/chorus/replications/ReplicationsFilterByCreatedAt/ReplicationsFilterByCreatedAt.vue';
+  import ReplicationsFilterByType from '@/components/chorus/replications/ReplicationsFilterByType/ReplicationsFilterByType.vue';
 
   const { isLoading } = storeToRefs(useChorusReplicationsStore());
 </script>
@@ -46,6 +47,8 @@
       key="filters"
       class="replications-filters__list"
     >
+      <ReplicationsFilterByType class="replications-filters__type" />
+
       <ReplicationsFilterByUser class="replications-filters__user" />
 
       <ReplicationsFilterByBucket class="replications-filters__bucket" />

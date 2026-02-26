@@ -1,1 +1,2 @@
+cd ui
 yarn commitlint --edit "$1"

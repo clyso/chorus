@@ -22,7 +22,9 @@ import (
 	"github.com/rs/zerolog"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 )
 
 func WithMethod(ctx context.Context, method s3.Method) context.Context {
@@ -30,6 +32,20 @@ func WithMethod(ctx context.Context, method s3.Method) context.Context {
 		return c.Str(Method, method.String())
 	})
 	return xctx.SetMethod(ctx, method)
+}
+
+func WithSwiftMethod(ctx context.Context, method swift.Method) context.Context {
+	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str(Method, method.String())
+	})
+	return xctx.SetSwiftMethod(ctx, method)
+}
+
+func WithStorType(ctx context.Context, in dom.StorageType) context.Context {
+	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str(storType, string(in))
+	})
+	return xctx.SetStorType(ctx, in)
 }
 
 func WithObjName(ctx context.Context, objName string) context.Context {
@@ -40,6 +56,16 @@ func WithObjName(ctx context.Context, objName string) context.Context {
 		return c.Str(Object, objName)
 	})
 	return xctx.SetObject(ctx, objName)
+}
+
+func WithObjVer(ctx context.Context, objVer string) context.Context {
+	if objVer == "" {
+		return ctx
+	}
+	zerolog.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str(ObjectVer, objVer)
+	})
+	return xctx.SetObjectVer(ctx, objVer)
 }
 
 func WithBucket(ctx context.Context, bucket string) context.Context {
@@ -116,6 +142,15 @@ func StartNew(from context.Context) (context.Context, context.CancelFunc) {
 	}
 	if t := xctx.GetTraceID(from); t != "" {
 		ctx = xctx.SetTraceID(ctx, t)
+	}
+	if rp := xctx.GetRoutingPolicy(from); rp != "" {
+		ctx = xctx.SetRoutingPolicy(ctx, rp)
+	}
+	if reps := xctx.GetReplications(from); len(reps) != 0 {
+		ctx = xctx.SetReplications(ctx, reps)
+	}
+	if switchInfo := xctx.GetInProgressZeroDowntime(from); switchInfo != nil {
+		ctx = xctx.SetInProgressZeroDowntime(ctx, *switchInfo)
 	}
 	return ctx, cancel
 }

@@ -31,11 +31,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
-	"github.com/clyso/chorus/pkg/trace"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/bench/pkg/config"
 	"github.com/clyso/chorus/tools/bench/pkg/db"
@@ -58,7 +56,7 @@ func Start(conf *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to connect to api %s", err, conf.Api)
 	}
-	apiClient := pb.NewChorusClient(conn)
+	apiClient := pb.NewPolicyClient(conn)
 	defer conn.Close()
 
 	kv, err := db.New(conf.DB, false)
@@ -192,7 +190,7 @@ func restoreState(conf *config.Config, kv *db.DB) error {
 	return kv.PutInt(db.Parallel, conf.ParallelWrites)
 }
 
-func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Client, apiClient pb.ChorusClient) error {
+func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Client, apiClient pb.PolicyClient) error {
 	exists, err := proxy.S3().BucketExists(ctx, conf.Bucket)
 	if err != nil {
 		return err
@@ -207,11 +205,13 @@ func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Clie
 	}
 	logrus.Infof("bucket %s exists", conf.Bucket)
 	_, err = apiClient.AddReplication(ctx, &pb.AddReplicationRequest{
-		User:            "admin",
-		From:            "one",
-		To:              "two",
-		Buckets:         []string{conf.Bucket},
-		IsForAllBuckets: false,
+		Id: &pb.ReplicationID{
+			FromStorage: "one",
+			ToStorage:   "two",
+			FromBucket:  &conf.Bucket,
+			ToBucket:    &conf.Bucket,
+			User:        "admin",
+		},
 	})
 	return err
 }
@@ -219,41 +219,27 @@ func prepareBucket(ctx context.Context, conf *config.Config, proxy s3client.Clie
 func createS3Clients(ctx context.Context, conf *config.Config) (newCtx context.Context, main s3client.Client, proxy s3client.Client, err error) {
 	user := "user"
 	newCtx = xctx.SetUser(ctx, user)
-	_, tp, _ := trace.NewTracerProvider(&trace.Config{}, dom.AppInfo{})
-	clients, err := s3client.New(newCtx, &s3.StorageConfig{Storages: map[string]s3.Storage{
-		"proxy": {
-			Address: "chorus-dev.clyso.cloud",
-			Credentials: map[string]s3.CredentialsV4{user: {
-				AccessKeyID:     conf.AccessKey,
-				SecretAccessKey: conf.SecretKey,
-			}},
-			Provider:            "Ceph",
-			IsMain:              true,
-			HealthCheckInterval: time.Second * 10,
-			HttpTimeout:         time.Minute * 2,
-			IsSecure:            true,
-		},
-		"main": {
-			Address: "s3.clyso.com",
-			Credentials: map[string]s3.CredentialsV4{user: {
-				AccessKeyID:     conf.AccessKey,
-				SecretAccessKey: conf.SecretKey,
-			}},
-			Provider:            "Ceph",
-			IsMain:              false,
-			HealthCheckInterval: time.Second * 10,
-			HttpTimeout:         time.Minute * 2,
-			IsSecure:            true,
-		},
-	}}, metrics.NewS3Service(false), tp)
+	proxy, err = s3client.NewClient(ctx, metrics.NewS3Service(false), s3.StorageAddress{
+		Address:     "chorus-dev.clyso.cloud",
+		Provider:    "Ceph",
+		HttpTimeout: time.Minute * 2,
+		IsSecure:    true,
+	}, s3.CredentialsV4{
+		AccessKeyID:     conf.AccessKey,
+		SecretAccessKey: conf.SecretKey,
+	}, "proxy", user)
 	if err != nil {
 		return
 	}
-	proxy, err = clients.GetByName(newCtx, "proxy")
-	if err != nil {
-		return
-	}
-	main, err = clients.GetByName(newCtx, "main")
+	main, err = s3client.NewClient(ctx, metrics.NewS3Service(false), s3.StorageAddress{
+		Address:     "s3.clyso.com",
+		Provider:    "Ceph",
+		HttpTimeout: time.Minute * 2,
+		IsSecure:    true,
+	}, s3.CredentialsV4{
+		AccessKeyID:     conf.AccessKey,
+		SecretAccessKey: conf.SecretKey,
+	}, "main", user)
 	if err != nil {
 		return
 	}

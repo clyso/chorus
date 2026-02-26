@@ -1,5 +1,5 @@
 /*
- * Copyright © 2025 Clyso GmbH
+ * Copyright © 2026 Clyso GmbH
  *
  *  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ export default [
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
   },
-  oxlint.configs['flat/recommended'],
   skipFormatting,
   {
     plugins: {
@@ -67,7 +66,7 @@ export default [
           },
         },
       ],
-      'vue/component-tags-order': [
+      'vue/block-order': [
         'error',
         { order: ['script', 'template', 'style'] },
       ],
@@ -115,4 +114,5 @@ export default [
       'no-console': ['error'],
     },
   },
+  ...oxlint.configs['flat/recommended'],
 ];

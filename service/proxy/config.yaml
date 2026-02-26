@@ -15,9 +15,12 @@ auth:
 #      accessKeyID: <user2 v4 accessKey credential>
 #      secretAccessKey: <user2 v4 secretKey credential>
 storage:
-  createRouting: true # create roting rules to route proxy requests to main storage
-  createReplication: false  # create replication rules to replicate data from main to other storages
   defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
+  dynamicCredentials:
+    enabled: false # set true to enable to manage storage credentials via API
+    disableEncryption: false
+    masterPassword: "" # master password to encrypt/decrypt storage credentials.
+    pollInterval: 3s # poll interval to check for updated credentials by chorus replicas
   storages:
 #    one: # yaml key with some handy storage name
 #      address: <s3.chorus.com>
@@ -28,7 +31,7 @@ storage:
 #        user2:
 #          accessKeyID: <user2 v4 accessKey credential>
 #          secretAccessKey: <user2 v4 secretKey credential>
-#      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
+#      provider: <Ceph|Minio|Other> # S3 provider name. Required to use provider-specific APIs, like keeping original versionID. Use 'Other' if your storage is S3 compatible but not listed.
 #      isMain: true # <true|false> one of the storages in should be main
 #      healthCheckInterval: 10s
 #      httpTimeout: 1m
@@ -45,7 +48,7 @@ storage:
 #        user2:
 #          accessKeyID: <user2 v4 accessKey credential>
 #          secretAccessKey: <user2 v4 secretKey credential>
-#      provider: <Ceph|Minio|AWS|Other see providers list in rclone config> # https://rclone.org/s3/#configuration
+#      provider: <Ceph|Minio|Other> # S3 provider name. Required to use provider-specific APIs, like keeping original versionID. Use 'Other' if your storage is S3 compatible but not listed.
 #      isMain: false # <true|false> one of the storages in should be main
 #      healthCheckInterval: 10s
 #      httpTimeout: 1m

@@ -24,7 +24,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
@@ -32,24 +31,97 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Filters for `chorctl repl`.
+var (
+	replType        string
+	replUserFilter  string
+	replFromFilter  string
+	replToFilter    string
+	replFromBucket  string
+	replToBucket    string
+	replHasSwitch   bool
+	replEventSource string
+)
+
 // replCmd represents the repl command
 var replCmd = &cobra.Command{
 	Use:   "repl",
-	Short: "list replications",
-	Long: `Example:
-chorctl repl`,
+	Short: "list and manage replication policies",
+	Long: `List replication policies.
+
+Examples:
+  # list all policies
+  chorctl repl
+
+  # list only bucket-level policies
+  chorctl repl --type=bucket
+
+  # filter by user and from/to storages
+  chorctl repl --user admin --from main --to follower`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
-		}
+
+		conn, client := newPolicyClient(ctx)
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
-		res, err := client.ListReplications(ctx, &emptypb.Empty{})
+
+		req := &pb.ListReplicationsRequest{}
+		filter := &pb.ListReplicationsRequest_Filter{}
+
+		// type filter: user/bucket/all
+		switch replType {
+		case "bucket":
+			req.HideUserReplications = true
+		case "user":
+			req.HideBucketReplications = true
+		case "all", "":
+			// default: no hiding
+		default:
+			logrus.Fatalf("invalid --type %q (must be one of: all, bucket, user)", replType)
+		}
+
+		anyFilter := false
+		if replUserFilter != "" {
+			filter.User = &replUserFilter
+			anyFilter = true
+		}
+		if replFromFilter != "" {
+			filter.FromStorage = &replFromFilter
+			anyFilter = true
+		}
+		if replToFilter != "" {
+			filter.ToStorage = &replToFilter
+			anyFilter = true
+		}
+		if replFromBucket != "" {
+			filter.FromBucket = &replFromBucket
+			anyFilter = true
+		}
+		if replToBucket != "" {
+			filter.ToBucket = &replToBucket
+			anyFilter = true
+		}
+		if replHasSwitch {
+			v := true
+			filter.HasSwitch = &v
+			anyFilter = true
+		}
+		if replEventSource != "" {
+			esVal, ok := pb.EventSource_value["EVENT_SOURCE_"+replEventSource]
+			if !ok {
+				logrus.Fatalf("invalid --event-source %q (must be one of: PROXY, S3_NOTIFICATION, WEBHOOK)", replEventSource)
+			}
+			es := pb.EventSource(esVal)
+			filter.EventSource = &es
+			anyFilter = true
+		}
+		if anyFilter {
+			req.Filter = filter
+		}
+
+		res, err := client.ListReplications(ctx, req)
 		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
+			api.PrintGrpcError(err)
 		}
 		sort.Slice(res.Replications, func(i, j int) bool {
 			return res.Replications[i].CreatedAt.AsTime().After(res.Replications[j].CreatedAt.AsTime())
@@ -68,13 +140,11 @@ chorctl repl`,
 func init() {
 	rootCmd.AddCommand(replCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// replCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// replCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	replCmd.Flags().StringVar(&replType, "type", "all", "replication type filter: bucket, user")
+	replCmd.Flags().StringVarP(&replUserFilter, "user", "u", "", "filter by replication user")
+	replCmd.Flags().StringVarP(&replFromFilter, "from", "f", "", "filter by source storage")
+	replCmd.Flags().StringVarP(&replToFilter, "to", "t", "", "filter by destination storage")
+	replCmd.Flags().StringVarP(&replFromBucket, "from-bucket", "b", "", "filter by source bucket of bucket-level replication")
+	replCmd.Flags().StringVar(&replToBucket, "to-bucket", "", "filter by destination bucket of bucket-level replication")
+	replCmd.Flags().StringVar(&replEventSource, "event-source", "", "filter by event source: PROXY, S3_NOTIFICATION, WEBHOOK")
 }

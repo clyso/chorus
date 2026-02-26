@@ -1,0 +1,22 @@
+Feb  3 10:55:03 bebdc3f90a3d proxy-server: Adding required filter copy to pipeline at position 9
+Feb  3 10:55:03 bebdc3f90a3d proxy-server: Adding required filter listing_formats to pipeline at position 3
+Feb  3 10:55:03 bebdc3f90a3d proxy-server: Adding required filter gatekeeper to pipeline at position 0
+Feb  3 10:55:03 bebdc3f90a3d proxy-server: Adding required filter catch_errors to pipeline at position 0
+Feb  3 10:55:03 bebdc3f90a3d proxy-server: Pipeline was modified. New pipeline is "catch_errors gatekeeper healthcheck proxy-logging cache listing_formats bulk tempurl s3api s3token authtoken keystoneauth copy slo dlo versioned_writes symlink proxy-logging proxy-server".
+Feb  3 10:55:03 bebdc3f90a3d proxy-server: Starting Keystone auth_token middleware
+Feb  3 10:55:04 bebdc3f90a3d proxy-server: Adding required filter copy to pipeline at position 9
+Feb  3 10:55:04 bebdc3f90a3d proxy-server: Adding required filter listing_formats to pipeline at position 3
+Feb  3 10:55:04 bebdc3f90a3d proxy-server: Adding required filter gatekeeper to pipeline at position 0
+Feb  3 10:55:04 bebdc3f90a3d proxy-server: Adding required filter catch_errors to pipeline at position 0
+Feb  3 10:55:04 bebdc3f90a3d proxy-server: Pipeline was modified. New pipeline is "catch_errors gatekeeper healthcheck proxy-logging cache listing_formats bulk tempurl s3api s3token authtoken keystoneauth copy slo dlo versioned_writes symlink proxy-logging proxy-server".
+Feb  3 10:55:04 bebdc3f90a3d proxy-server: Starting Keystone auth_token middleware
+Feb  3 10:55:26 bebdc3f90a3d swift: - - 03/Feb/2026/10/55/26 HEAD /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d%3Fformat%3Djson HTTP/1.0 200 - Swift - - - - txf36cd49816a94803b9c15-006981d41d - 0.0022 KS - 1770116126.333855629 1770116126.336057425 -
+Feb  3 10:55:26 bebdc3f90a3d proxy-server: autocreate account '/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d' (txn: txf36cd49816a94803b9c15-006981d41d)
+Feb  3 10:55:26 bebdc3f90a3d swift: - - 03/Feb/2026/10/55/26 HEAD /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d%3Fformat%3Djson HTTP/1.0 204 - Swift - - - - txf36cd49816a94803b9c15-006981d41d - 0.0014 GET_ACCOUNT_INFO - 1770116126.342313290 1770116126.343704462 -
+Feb  3 10:55:26 bebdc3f90a3d swift: ::ffff:172.19.0.1 ::ffff:172.19.0.1 03/Feb/2026/10/55/26 PUT /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket HTTP/1.0 201 - gophercloud/v2.7.0 gAAAAABpgdQdLWt5... - - - txf36cd49816a94803b9c15-006981d41d - 0.5012 - - 1770116125.849053621 1770116126.350236416 0
+Feb  3 10:55:29 bebdc3f90a3d swift: - - 03/Feb/2026/10/55/29 HEAD /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket HTTP/1.0 204 - Swift - - - - txef200785ab7b42459b59f-006981d421 - 0.0024 VW - 1770116129.309740305 1770116129.312097788 0
+Feb  3 10:55:29 bebdc3f90a3d swift: ::ffff:172.19.0.1 ::ffff:172.19.0.1 03/Feb/2026/10/55/29 PUT /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket/test-obj-meta-object HTTP/1.0 201 - gophercloud/v2.7.0 gAAAAABpgdQdLWt5... 12 - 9749fad13d6e7092a6337c4af9d83764 txef200785ab7b42459b59f-006981d421 - 0.0113 - - 1770116129.309001207 1770116129.320282936 0
+Feb  3 10:55:29 bebdc3f90a3d swift: ::ffff:172.19.0.1 ::ffff:172.19.0.1 03/Feb/2026/10/55/29 HEAD /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket/test-obj-meta-object HTTP/1.0 200 - gophercloud/v2.7.0 gAAAAABpgdQdLWt5... - - - txc4d5912066774b479c816-006981d421 - 0.0021 - - 1770116129.320931673 1770116129.323052883 0
+Feb  3 10:55:31 bebdc3f90a3d swift: ::ffff:172.19.0.1 ::ffff:172.19.0.1 03/Feb/2026/10/55/31 HEAD /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket/test-obj-meta-object HTTP/1.0 200 - gophercloud/v2.7.0 gAAAAABpgdQdLWt5... - - - tx74adef78d1cd49deabbe2-006981d423 - 0.0029 - - 1770116131.322312355 1770116131.325252295 0
+Feb  3 10:55:31 bebdc3f90a3d swift: ::ffff:172.19.0.1 ::ffff:172.19.0.1 03/Feb/2026/10/55/31 DELETE /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket/test-obj-meta-object HTTP/1.0 204 - gophercloud/v2.7.0 gAAAAABpgdQdLWt5... - - - txe785d2a1b4a445639bae3-006981d423 - 0.0043 - - 1770116131.329430580 1770116131.333723545 0
+Feb  3 10:55:31 bebdc3f90a3d swift: ::ffff:172.19.0.1 ::ffff:172.19.0.1 03/Feb/2026/10/55/31 HEAD /v1/AUTH_d3e36f6e2a6c44b1b4417b1ebc83492d/test-obj-meta-bucket/test-obj-meta-object HTTP/1.0 404 - gophercloud/v2.7.0 gAAAAABpgdQdLWt5... - - - txdd6096ed8ab8476a85c16-006981d423 - 0.0016 - - 1770116131.334082365 1770116131.335656643 0

@@ -16,9 +16,74 @@
 
 package api
 
+import (
+	"fmt"
+	"net/url"
+	"strings"
+)
+
 type Config struct {
-	Enabled  bool `yaml:"enabled"`
-	GrpcPort int  `yaml:"grpcPort"`
-	HttpPort int  `yaml:"httpPort"`
-	Secure   bool `yaml:"secure"`
+	Webhook  WebhookConfig `yaml:"webhook"`
+	GrpcPort int           `yaml:"grpcPort"`
+	HttpPort int           `yaml:"httpPort"`
+	Enabled  bool          `yaml:"enabled"`
+	Secure   bool          `yaml:"secure"`
+}
+
+type WebhookConfig struct {
+	BaseURL  string `yaml:"baseUrl"`
+	GrpcPort int    `yaml:"grpcPort"`
+	HttpPort int    `yaml:"httpPort"`
+	Enabled  bool   `yaml:"enabled"`
+}
+
+func (c *WebhookConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+	if c.GrpcPort > 0 && c.HttpPort <= 0 {
+		return fmt.Errorf("webhook config: httpPort must be set when grpcPort is set (separate webhook ports require both)")
+	}
+	if c.HttpPort > 0 && c.GrpcPort <= 0 {
+		return fmt.Errorf("webhook config: grpcPort must be set when httpPort is set (separate webhook ports require both)")
+	}
+	if c.BaseURL != "" {
+		u, err := url.Parse(c.BaseURL)
+		if err != nil {
+			return fmt.Errorf("webhook config: invalid baseUrl: %w", err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return fmt.Errorf("webhook config: baseUrl must include scheme (http:// or https://)")
+		}
+		if u.Host == "" {
+			return fmt.Errorf("webhook config: baseUrl must include host")
+		}
+	}
+	return nil
+}
+
+func (c *WebhookConfig) S3NotificationURL(storage string) (string, error) {
+	base, err := c.baseURL()
+	if err != nil {
+		return "", err
+	}
+	return base + "/webhook/" + storage + "/s3-notifications", nil
+}
+
+func (c *WebhookConfig) SwiftWebhookURL(storage string) (string, error) {
+	base, err := c.baseURL()
+	if err != nil {
+		return "", err
+	}
+	return base + "/webhook/" + storage + "/swift", nil
+}
+
+func (c *WebhookConfig) baseURL() (string, error) {
+	if !c.Enabled {
+		return "", fmt.Errorf("webhook must be enabled")
+	}
+	if c.BaseURL == "" {
+		return "", fmt.Errorf("webhook baseUrl is required")
+	}
+	return strings.TrimRight(c.BaseURL, "/"), nil
 }

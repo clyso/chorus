@@ -43,7 +43,7 @@ var (
 
 func main() {
 	flag.Parse()
-	var configs []config.Src
+	var configs []config.Opt
 	if configPath != nil && *configPath != "" {
 		configs = append(configs, config.Path(*configPath))
 	}

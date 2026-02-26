@@ -27,23 +27,24 @@ import (
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 
+	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/meta"
 	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/rpc"
 	"github.com/clyso/chorus/pkg/s3"
-	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/proxy/auth"
-	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/proxy/router"
 )
 
@@ -81,7 +82,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("app redis connected")
 
 	verSvc := meta.NewVersionService(appRedis)
-	storageSvc := storage.New(appRedis)
+	uploadSvc := storage.NewUploadSvc(appRedis)
 	limiter := ratelimit.New(appRedis, conf.Storage.RateLimitConf())
 
 	confRedis := util.NewRedis(conf.Redis, conf.Redis.ConfigDB)
@@ -90,33 +91,73 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if err != nil {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
-	policySvc := policy.NewService(confRedis)
-
-	metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
-
 	queueRedis := util.NewRedisAsynq(conf.Redis, conf.Redis.QueueDB)
 	taskClient := asynq.NewClient(queueRedis)
 	defer taskClient.Close()
-
-	s3Clients, err := s3client.New(ctx, conf.Storage, metricsSvc, tp)
+	inspector := asynq.NewInspector(queueRedis)
+	defer inspector.Close()
+	queueSvc := tasks.NewQueueService(taskClient, inspector)
+	err = policy.CheckSchemaCompatibility(ctx, app.Version, confRedis)
 	if err != nil {
 		return err
 	}
-	logger.Info().Msg("s3 clients connected")
+	policySvc := policy.NewService(confRedis, queueSvc, conf.Storage.Main)
 
-	routeSvc := router.NewRouter(s3Clients, taskClient, verSvc, policySvc, storageSvc, limiter)
-	replSvc := replication.New(taskClient, verSvc, policySvc)
-	proxyMux := router.Serve(routeSvc, replSvc)
-	authCheck := auth.Middleware(conf.Auth, conf.Storage.Storages)
-	var handler http.Handler
-	if conf.Metrics.Enabled {
-		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, router.Middleware(trace.HttpMiddleware(tp, metrics.ProxyMiddleware(authCheck.Wrap(proxyMux)))))
-	} else {
-		handler = log.HttpMiddleware(conf.Log, app.App, app.AppID, router.Middleware(trace.HttpMiddleware(tp, authCheck.Wrap(proxyMux))))
+	// configure object storage proxies:
+	proxyConfig := router.Config{
+		Storages:          map[dom.StorageType]router.StorageProxy{},
+		LogMiddleware:     log.HttpMiddleware(conf.Log, app.App, app.AppID, xctx.Event),
+		TraceMiddleware:   nil,
+		MetricsMiddleware: nil,
+		PolicyMiddleware:  router.PolicyMiddleware(policySvc),
 	}
-	handler = cors.HttpMiddleware(conf.Cors, handler)
-
-	proxyServer := http.Server{Addr: fmt.Sprintf(":%d", conf.Port), Handler: handler}
+	if conf.Metrics.Enabled {
+		proxyConfig.MetricsMiddleware = metrics.ProxyMiddleware()
+	}
+	if conf.Trace.Enabled {
+		proxyConfig.TraceMiddleware = trace.HttpMiddleware(tp)
+	}
+	if s3Conf := conf.Storage.S3Storages(); len(s3Conf) != 0 {
+		metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
+		credsConf, err := ProxyToCredsConf(conf.Storage)
+		if err != nil {
+			return err
+		}
+		credsSvc, err := objstore.NewCredsSvc(ctx, &credsConf, appRedis)
+		if err != nil {
+			return err
+		}
+		clientRegistry, err := objstore.NewRegistry(ctx, credsSvc, metricsSvc)
+		if err != nil {
+			return err
+		}
+		routeSvc := router.NewS3Router(clientRegistry, verSvc, uploadSvc, limiter)
+		replSvc := replication.NewS3(queueSvc, verSvc, policySvc)
+		authCheck := auth.Middleware(conf.Auth, credsSvc)
+		proxyConfig.Storages[dom.S3] = router.StorageProxy{
+			Router:             routeSvc,
+			Replicator:         replSvc,
+			AuthMiddleware:     authCheck.Wrap,
+			ReqParseMiddleware: router.S3Middleware(),
+		}
+		logger.Info().Msg("s3 proxy configured")
+	}
+	if swiftConf := conf.Storage.SwiftStorages(); len(swiftConf) != 0 {
+		routeSvc := router.NewSwiftRouter(swiftConf, limiter)
+		replSvc := replication.NewSwift(queueSvc, policySvc)
+		proxyConfig.Storages[dom.Swift] = router.StorageProxy{
+			Router:             routeSvc,
+			Replicator:         replSvc,
+			AuthMiddleware:     nil, // no auth check for swift
+			ReqParseMiddleware: router.SwiftMiddleware(),
+		}
+		logger.Info().Msg("swift proxy configured")
+	}
+	proxyMux, err := router.New(proxyConfig)
+	if err != nil {
+		return err
+	}
+	proxyServer := http.Server{Addr: fmt.Sprintf(":%d", conf.Port), Handler: proxyMux}
 
 	server := util.NewServer()
 	err = server.Add("proxy_http", func(_ context.Context) error {
@@ -127,8 +168,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	logger.Info().Msg("proxy created")
 
+	credentials := []map[string]s3.CredentialsV4{conf.Auth.Custom}
+	if s3torageConf, ok := conf.Storage.S3Storages()[conf.Auth.UseStorage]; ok {
+		credentials = append(credentials, s3torageConf.Credentials)
+	}
 	err = server.Add("proxy_request_reply", func(ctx context.Context) error {
-		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address, conf.Auth.Custom, conf.Storage.Storages[conf.Auth.UseStorage].Credentials))
+		return rpc.ProxyServe(ctx, appRedis, requestReplyServer(conf.Address, credentials...))
 	}, func(ctx context.Context) error { return nil })
 	if err != nil {
 		return err

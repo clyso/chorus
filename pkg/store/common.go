@@ -16,8 +16,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -25,6 +27,32 @@ import (
 const (
 	CKeyPartsDelimiter = ":"
 	CWildcardSelector  = "*"
+)
+
+var (
+	luaUnlinkKeys = redis.NewScript(`local cursor = "0"
+local keys = {}
+repeat
+	local result = redis.call("SCAN", cursor, "MATCH", KEYS[1], "COUNT", 100)
+	cursor = result[1]
+	local page = result[2]
+	for _, key in ipairs(page) do
+		table.insert(keys, key)
+	end
+until cursor == "0"
+if #keys > 0 then
+	return redis.call('UNLINK', unpack(keys))
+end
+return 0`)
+
+	luaHasKeys = redis.NewScript(`local cursor = "0"
+local count = 0
+repeat
+	local result = redis.call("SCAN", cursor, "MATCH", KEYS[1], "COUNT", 100)
+	cursor = result[1]
+	count = #result[2]
+until cursor == "0" or count ~= 0
+return count`)
 )
 
 type ErrorCollector func() error
@@ -37,6 +65,7 @@ type OperationStatus interface {
 
 type OperationResult[T any] interface {
 	Get() (T, error)
+	Status() OperationStatus
 }
 
 type RedisOperationStatus struct {
@@ -46,6 +75,45 @@ type RedisOperationStatus struct {
 func NewRedisOperationStatus(confirm ErrorCollector) *RedisOperationStatus {
 	return &RedisOperationStatus{
 		collect: confirm,
+	}
+}
+
+func JoinRedisOperationStatus(message string, in ...OperationStatus) *RedisOperationStatus {
+	return &RedisOperationStatus{
+		collect: func() error {
+			var err error
+			for _, op := range in {
+				opErr := op.Get()
+				if opErr == nil {
+					continue
+				}
+				err = errors.Join(err, opErr)
+			}
+			if err != nil && message != "" {
+				err = fmt.Errorf("%s: %w", message, err)
+			}
+			return err
+		},
+	}
+}
+
+func JoinRedisOperationStatusWithMessages(message string, in map[string]OperationStatus) *RedisOperationStatus {
+	return &RedisOperationStatus{
+		collect: func() error {
+			var err error
+			for msg, op := range in {
+				opErr := op.Get()
+				if opErr == nil {
+					continue
+				}
+				opErr = fmt.Errorf("%s: %w", msg, opErr)
+				err = errors.Join(err, opErr)
+			}
+			if err != nil && message != "" {
+				err = fmt.Errorf("%s: %w", message, err)
+			}
+			return err
+		},
 	}
 }
 
@@ -85,6 +153,10 @@ func (r *RedisFailedOperationResult[T]) Get() (T, error) {
 	return noVal, fmt.Errorf("unable to create command: %w", r.err)
 }
 
+func (r *RedisFailedOperationResult[T]) Status() OperationStatus {
+	return NewRedisFailedOperationStatus(r.err)
+}
+
 type RedisOperationResult[T any] struct {
 	collect ValueCollector[T]
 }
@@ -105,9 +177,23 @@ func (r *RedisOperationResult[T]) Get() (T, error) {
 	return result, nil
 }
 
+func (r *RedisOperationResult[T]) Status() OperationStatus {
+	return NewRedisOperationStatus(func() error {
+		_, err := r.collect()
+		return err
+	})
+}
+
 type Pager struct {
 	From  uint64
 	Count uint64
+}
+
+func NewPager(from uint64, count uint64) Pager {
+	return Pager{
+		From:  from,
+		Count: count,
+	}
 }
 
 type Page[T any] struct {
@@ -235,6 +321,46 @@ func (r *RedisIDCommonStore[ID]) GetIDs(ctx context.Context, pager Pager, keyPar
 	return r.GetIDsOp(ctx, pager, keyParts...).Get()
 }
 
+func (r *RedisIDCommonStore[ID]) HasIDsOp(ctx context.Context, keyParts ...string) OperationResult[bool] {
+	selector := r.MakeWildcardSelector(keyParts...)
+
+	cmd := luaHasKeys.Eval(ctx, r.client, []string{selector})
+
+	collectFunc := func() (bool, error) {
+		hasKeys, err := cmd.Bool()
+		if err != nil {
+			return false, fmt.Errorf("unable to execute script: %w", err)
+		}
+		return hasKeys, nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDCommonStore[ID]) HasIDs(ctx context.Context, keyParts ...string) (bool, error) {
+	return r.HasIDsOp(ctx, keyParts...).Get()
+}
+
+func (r *RedisIDCommonStore[ID]) DropIDsOp(ctx context.Context, keyParts ...string) OperationResult[uint64] {
+	selector := r.MakeWildcardSelector(keyParts...)
+
+	cmd := luaUnlinkKeys.Eval(ctx, r.client, []string{selector})
+
+	collectFunc := func() (uint64, error) {
+		affected, err := cmd.Uint64()
+		if err != nil {
+			return 0, fmt.Errorf("unable to execute script: %w", err)
+		}
+		return uint64(affected), nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDCommonStore[ID]) DropIDs(ctx context.Context, keyParts ...string) (uint64, error) {
+	return r.DropIDsOp(ctx, keyParts...).Get()
+}
+
 func (r *RedisIDCommonStore[ID]) DropOp(ctx context.Context, id ID) OperationResult[uint64] {
 	key, err := r.MakeKey(id)
 	if err != nil {
@@ -258,6 +384,29 @@ func (r *RedisIDCommonStore[ID]) Drop(ctx context.Context, id ID) (uint64, error
 	return r.DropOp(ctx, id).Get()
 }
 
+func (r *RedisIDCommonStore[ID]) SetTTLOp(ctx context.Context, id ID, ttl time.Duration) OperationResult[bool] {
+	key, err := r.MakeKey(id)
+	if err != nil {
+		return NewRedisFailedOperationResult[bool](fmt.Errorf("unable to make key: %w", err))
+	}
+
+	cmd := r.client.Expire(ctx, key, ttl)
+
+	collectFunc := func() (bool, error) {
+		set, err := cmd.Result()
+		if err != nil {
+			return false, fmt.Errorf("unable to unlink key: %w", err)
+		}
+		return set, nil
+	}
+
+	return NewRedisOperationResult(collectFunc)
+}
+
+func (r *RedisIDCommonStore[ID]) SetTTL(ctx context.Context, id ID, ttl time.Duration) (bool, error) {
+	return r.SetTTLOp(ctx, id, ttl).Get()
+}
+
 func (r *RedisIDCommonStore[ID]) MakeKey(id ID) (string, error) {
 	idTokens, err := r.tokenizeID(id)
 	if err != nil {
@@ -277,8 +426,8 @@ func (r *RedisIDCommonStore[ID]) RestoreID(key string) (ID, error) {
 }
 
 type RedisCommonStore struct {
-	keyPrefix string
 	client    redis.Cmdable
+	keyPrefix string
 }
 
 func NewRedisCommonStore(client redis.Cmdable, keyPrefix string) *RedisCommonStore {

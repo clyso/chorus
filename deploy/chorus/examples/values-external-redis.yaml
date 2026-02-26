@@ -1,0 +1,59 @@
+# Example: External Redis Configuration
+# Use this when you have your own Redis instance (managed Redis, existing cluster, etc.)
+
+# Disable bundled Redis
+redis:
+  enabled: false
+
+# Configure external Redis
+externalRedis:
+  # Redis addresses (single instance or cluster)
+  addresses:
+    - redis.example.com:6379
+
+  # Authentication
+  # Option 1: Use existing Kubernetes secret
+  existingSecret: "my-redis-secret"
+  existingSecretPasswordKey: "password"
+
+  # Option 2: Inline password (not recommended for production)
+  # password: "redis-password"
+
+  # Optional: Redis user (if ACL enabled)
+  # user: "chorus"
+
+  # TLS configuration
+  tls:
+    enabled: false
+    insecure: false
+
+# Storage configuration (minimal example)
+storage:
+  main: main
+
+  storages:
+    main:
+      type: S3
+      address: s3.example.com
+      provider: Ceph
+      isSecure: true
+
+credentials:
+  storages:
+    main:
+      user1:
+        accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+---
+# Example with Redis Sentinel
+# externalRedis:
+#   addresses:
+#     - sentinel1.example.com:26379
+#     - sentinel2.example.com:26379
+#     - sentinel3.example.com:26379
+#   existingSecret: "my-redis-secret"
+#   sentinel:
+#     masterName: "mymaster"
+#     user: ""
+#     password: ""

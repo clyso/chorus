@@ -1,69 +1,52 @@
+/*
+ * Copyright © 2024 Clyso GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package tasks
 
 import (
-	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/clyso/chorus/pkg/entity"
 )
 
-func Test_custom_bucket_compatibility(t *testing.T) {
+func Test_ReplicationGetterSetter(t *testing.T) {
 	r := require.New(t)
-	//setup:
-	type OldSync struct {
-		FromStorage string
-		ToStorage   string
-		CreatedAt   time.Time
+	expect := BucketCreatePayload{
+		Bucket:   "fb",
+		Location: "l",
 	}
-	type OldBucketCreatePayload struct {
-		OldSync
-		Bucket   string
-		Location string
-	}
+	r.Empty(expect.ID.AsString())
+	r.True(expect.ID.IsEmpty())
 
-	oldTask := OldBucketCreatePayload{
-		OldSync: OldSync{
-			FromStorage: "stor1",
-			ToStorage:   "stor2",
-			CreatedAt:   time.Now(),
-		},
-		Bucket:   "buck1",
-		Location: "loc",
-	}
-	oldJson, err := json.Marshal(&oldTask)
-	r.NoError(err)
-	t.Run("new handler works with old", func(t *testing.T) {
-		r := require.New(t)
-		var p BucketCreatePayload
-		r.NoError(json.Unmarshal(oldJson, &p))
-		r.EqualValues(oldTask.FromStorage, p.FromStorage)
-		r.EqualValues(oldTask.ToStorage, p.ToStorage)
-		r.EqualValues(oldTask.CreatedAt.Unix(), p.CreatedAt.Unix())
-		r.EqualValues(oldTask.Bucket, p.Bucket)
-		r.EqualValues(oldTask.Location, p.Location)
-		r.Empty(p.ToBucket)
-	})
-
-	t.Run("custom bucket name preserved", func(t *testing.T) {
-		r := require.New(t)
-		bucket := "bucket"
-		src := BucketCreatePayload{
-			Sync: Sync{
-				ToBucket: bucket,
-			},
-		}
-		srcJson, err := json.Marshal(&src)
-		r.NoError(err)
-		var dst BucketCreatePayload
-		r.NoError(json.Unmarshal(srcJson, &dst))
-		r.NotNil(dst.ToBucket)
-		r.EqualValues(src.ToBucket, dst.ToBucket, "custom bucket preserved")
-
-		src = BucketCreatePayload{}
-		srcJson, err = json.Marshal(&src)
-		r.NoError(err)
-		r.NoError(json.Unmarshal(srcJson, &dst))
-		r.Empty(dst.ToBucket, "no custom bucket unmarshal")
-	})
+	expect.SetReplicationID(entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
+		User:        "u",
+		FromStorage: "fs",
+		FromBucket:  "fb",
+		ToStorage:   "ts",
+		ToBucket:    "tb",
+	}))
+	r.NotEmpty(expect.ID.AsString())
+	r.False(expect.ID.IsEmpty())
+	r.EqualValues("u", expect.ID.User())
+	r.EqualValues("fs", expect.ID.FromStorage())
+	r.EqualValues("ts", expect.ID.ToStorage())
+	fromBucket, toBucket := expect.ID.FromToBuckets(expect.Bucket)
+	r.EqualValues("fb", fromBucket)
+	r.EqualValues("tb", toBucket)
+	r.EqualValues(expect.ID, expect.GetReplicationID())
 }

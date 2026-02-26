@@ -1,5 +1,5 @@
 <!--
-  - Copyright © 2025 Clyso GmbH
+  - Copyright © 2026 Clyso GmbH
   -
   -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
   -  you may not use this file except in compliance with the License.
@@ -36,7 +36,14 @@
 
   const bucketOptions = computed<string[]>(() => {
     const uniqueBucketOptions = [
-      ...new Set(replications.value.map((replication) => replication.bucket)),
+      ...new Set(
+        replications.value
+          .flatMap((replication) => [
+            replication.id.fromBucket,
+            replication.id.toBucket,
+          ])
+          .filter((bucket) => bucket !== undefined && bucket !== null),
+      ),
     ];
 
     return uniqueBucketOptions

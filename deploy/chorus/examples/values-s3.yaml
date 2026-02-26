@@ -1,0 +1,69 @@
+# Example: S3 to S3 Replication
+# This example shows how to configure Chorus for replicating between two S3 storages
+
+storage:
+  # Specify which storage is the main (source) storage
+  main: main
+
+  storages:
+    # Main storage - source of replication
+    main:
+      type: S3
+      address: s3.main-datacenter.example.com
+      provider: Ceph  # Ceph, Minio, or Other
+      isSecure: true
+      defaultRegion: us-east-1
+
+    # Follower storage - replication destination
+    follower:
+      type: S3
+      address: s3.backup-datacenter.example.com
+      provider: Ceph
+      isSecure: true
+      defaultRegion: eu-west-1
+
+# Storage credentials (stored in Kubernetes Secret)
+credentials:
+  storages:
+    main:
+      # User credentials for main storage
+      admin:
+        accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      backup-service:
+        accessKeyID: "AKIAI44QH8DHBEXAMPLE"
+        secretAccessKey: "je7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY"
+
+    follower:
+      admin:
+        accessKeyID: "BKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "xJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      backup-service:
+        accessKeyID: "BKIAI44QH8DHBEXAMPLE"
+        secretAccessKey: "ke7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY"
+
+# Proxy configuration
+proxy:
+  enabled: true
+  replicas: 2
+  config:
+    auth:
+      # Use credentials from main storage for S3 proxy authentication
+      useStorage: main
+
+# Worker configuration
+worker:
+  replicas: 3
+  config:
+    concurrency: 20
+
+# Enable UI
+ui:
+  enabled: true
+
+# Redis persistence for production
+redis:
+  master:
+    persistence:
+      enabled: true
+      size: 32Gi

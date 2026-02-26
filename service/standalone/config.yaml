@@ -8,6 +8,11 @@ api:
   grpcPort: 9670
   httpPort: 9671
   secure: false
+  webhook:
+    enabled: true
+    grpcPort: 0
+    httpPort: 0
+    baseUrl: "http://localhost:9671"
 uiPort: 9672
 lock:
   overlap: 2s
@@ -28,25 +33,10 @@ proxy:
     #        secretAccessKey: <s3 v4 secretKey credential>
     #      - accessKeyID: <s3 v4 accessKey credential>
     #        secretAccessKey: <s3 v4 secretKey credential>
-rclone:
-  memoryLimit:
-    enabled: true
-    limit: 300M # Max RAM memory for file copy. Possible values: 50M <= mem <= (total app RAM - 50M). More memory -> faster s3 replication. # For example: if worker container resources.memory.limit = 500M, then mem = 450M
-    retryMin: 2s
-    retryMax: 20s
-  memoryCalc:
-    mul: 1.5
-    const: 0M
-  localFileLimit:
-    enabled: false
-    limit: 3
-    retryMin: 2s
-    retryMax: 20s
-  globalFileLimit:
-    enabled: false
-    limit: 3
-    retryMin: 2s
-    retryMax: 20s
 worker:
-  pauseRetryInterval: 5s
-  switchRetryInterval: 5s
+  queueUpdateInterval: 3s
+  swiftRetryInterval: 1m # used for swift task retries caused by swift inconsistent state
+  pauseRetryInterval: 30s
+  switchRetryInterval: 30s
+  taskCheckInterval: 1s
+  delayedTaskCheckInterval: 3s

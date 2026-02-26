@@ -35,8 +35,8 @@ const (
 
 type SignValues struct {
 	Credential    CredentialHeader
-	SignedHeaders []string
 	Signature     string
+	SignedHeaders []string
 }
 
 func ParseSignV4(v4Auth string) (sv SignValues, err error) {

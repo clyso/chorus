@@ -20,9 +20,10 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"slices"
 
 	"github.com/clyso/chorus/pkg/config"
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/service/proxy"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/worker"
@@ -56,11 +57,12 @@ type Config struct {
 	UIPort int `yaml:"uiPort"`
 
 	Proxy struct {
-		Enabled bool         `yaml:"enabled"`
-		Auth    *auth.Config `yaml:"auth,omitempty"`
-		Port    int          `yaml:"port"`
-		Address string       `yaml:"address"`
-		Cors    *cors.Config `yaml:"cors"`
+		Storage proxy.Storages `yaml:"storage,omitempty"`
+		Enabled bool           `yaml:"enabled"`
+		Auth    *auth.Config   `yaml:"auth,omitempty"`
+		Port    int            `yaml:"port"`
+		Address string         `yaml:"address"`
+		Cors    *cors.Config   `yaml:"cors"`
 	} `yaml:"proxy"`
 }
 
@@ -68,54 +70,52 @@ func (c *Config) Validate() error {
 	if err := c.Config.Validate(); err != nil {
 		return err
 	}
-	if c.Storage == nil {
-		return fmt.Errorf("chorus config: empty storages config")
-	}
-	if err := c.Storage.Init(); err != nil {
-		return err
-	}
 	if c.UIPort <= 0 {
 		return fmt.Errorf("chorus config: uiPort must be positive: %d", c.Concurrency)
 	}
 
 	if c.Proxy.Enabled {
-		if c.Proxy.Auth == nil {
-			return fmt.Errorf("chorus config: empty Auth config")
+		if err := proxy.ValidateAuth(c.Proxy.Storage, c.Proxy.Auth); err != nil {
+			return err
 		}
-		if c.Proxy.Auth.UseStorage != "" {
-			if _, ok := c.Storage.Storages[c.Proxy.Auth.UseStorage]; !ok {
-				return fmt.Errorf("chorus config: auth UseStorage points to unknown storage")
-			}
-		}
-		if len(c.Proxy.Auth.Custom) != 0 {
-			var storCreds map[string]s3.CredentialsV4
-			for _, storage := range c.Storage.Storages {
-				storCreds = storage.Credentials
-				break
-			}
-			for user := range c.Proxy.Auth.Custom {
-				if _, ok := storCreds[user]; !ok {
-					return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
-				}
-			}
-		}
-		if c.Proxy.Auth.UseStorage == "" && len(c.Proxy.Auth.Custom) == 0 {
-			return fmt.Errorf("chorus config: auth credentials enabled but not set")
-		}
-
 		if c.Proxy.Port <= 0 {
 			return fmt.Errorf("chorus config: Port must be positive: %d", c.Proxy.Port)
+		}
+		if err := c.Proxy.Storage.Validate(); err != nil {
+			return fmt.Errorf("chorus config: invalid proxy storage config: %w", err)
+		}
+		// check that proxy and worker storage configs match
+		if c.Storage.Main != c.Proxy.Storage.Main {
+			return fmt.Errorf("chorus config: proxy main storage %q does not match worker main storage %q", c.Proxy.Storage.Main, c.Storage.Main)
+		}
+		if len(c.Storage.Storages) != len(c.Proxy.Storage.Storages) {
+			return fmt.Errorf("chorus config: number of proxy storages %d does not match number of worker storages %d", len(c.Proxy.Storage.Storages), len(c.Storage.Storages))
+		}
+		for name, workerStorage := range c.Storage.Storages {
+			proxyStorage, ok := c.Proxy.Storage.Storages[name]
+			if !ok {
+				return fmt.Errorf("chorus config: proxy storage %q not found in worker storages", name)
+			}
+			if workerStorage.Type != proxyStorage.Type {
+				return fmt.Errorf("chorus config: proxy storage %q type %q does not match worker storage type %q", name, proxyStorage.Type, workerStorage.Type)
+			}
+		}
+		// check that proxy and worker storage users match
+		workerUserList := c.Storage.GetMain().UserList()
+		proxUserList := c.Proxy.Storage.GetMain().UserList()
+		if !slices.Equal(workerUserList, proxUserList) {
+			return fmt.Errorf("chorus config: proxy main storage users %v do not match worker main storage users %v", proxUserList, workerUserList)
 		}
 	}
 	return nil
 }
 
-func GetConfig(src ...config.Src) (*Config, error) {
+func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Src{config.Reader(dc, "chorus_default_cfg")}
+	cfgSource := []config.Opt{config.Reader(dc, "chorus_default_cfg")}
 	if len(src) == 0 {
-		src = []config.Src{config.Reader(testConfig(), "chorus_test_cfg")}
+		src = []config.Opt{config.Reader(testConfig(), "chorus_test_cfg")}
 	}
 
 	cfgSource = append(cfgSource, src...)

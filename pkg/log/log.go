@@ -26,8 +26,10 @@ import (
 const (
 	Storage    = "stor_name"
 	Object     = "obj_name"
+	ObjectVer  = "obj_ver"
 	Bucket     = "bucket"
 	Method     = "method"
+	storType   = "stor_type"
 	user       = "user"
 	TraceID    = "trace_id"
 	httpPath   = "http_path"
@@ -38,8 +40,8 @@ const (
 )
 
 type Config struct {
-	Json  bool   `yaml:"json"`
 	Level string `yaml:"level"`
+	Json  bool   `yaml:"json"`
 }
 
 func GetLogger(cfg *Config, app, appID string) zerolog.Logger {

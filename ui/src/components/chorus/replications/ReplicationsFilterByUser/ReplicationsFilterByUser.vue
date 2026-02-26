@@ -1,5 +1,5 @@
 <!--
-  - Copyright © 2025 Clyso GmbH
+  - Copyright © 2026 Clyso GmbH
   -
   -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
   -  you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@
     }[]
   >(() => {
     const sortedUniqueUsers = [
-      ...new Set(replications.value.map((replication) => replication.user)),
+      ...new Set(replications.value.map((replication) => replication.id.user)),
     ].sort();
 
     return sortedUniqueUsers.map((user) => ({ label: user, value: user }));

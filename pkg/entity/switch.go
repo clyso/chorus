@@ -27,18 +27,6 @@ var (
 	TimeNow = time.Now
 )
 
-type ReplicationSwitchInfoID struct {
-	User       string
-	FromBucket string
-}
-
-func NewReplicationSwitchInfoID(user string, fromBucket string) ReplicationSwitchInfoID {
-	return ReplicationSwitchInfoID{
-		User:       user,
-		FromBucket: fromBucket,
-	}
-}
-
 type ReplicationSwitchStatus string
 
 const (
@@ -74,11 +62,11 @@ type ReplicationSwitchZeroDowntimeOpts struct {
 }
 
 type ReplicationSwitchDowntimeOpts struct {
-	StartOnInitDone     bool          `redis:"onInitDone"`
 	Cron                *string       `redis:"cron,omitempty"`
 	StartAt             *time.Time    `redis:"startAt,omitempty"`
-	MaxDuration         time.Duration `redis:"maxDuration,omitempty"`
 	MaxEventLag         *uint32       `redis:"maxEventLag,omitempty"`
+	MaxDuration         time.Duration `redis:"maxDuration,omitempty"`
+	StartOnInitDone     bool          `redis:"onInitDone"`
 	SkipBucketCheck     bool          `redis:"skipBucketCheck,omitempty"`
 	ContinueReplication bool          `redis:"continueReplication,omitempty"`
 }
@@ -111,46 +99,50 @@ func (w *ReplicationSwitchDowntimeOpts) GetMaxDuration() (time.Duration, bool) {
 	return 0, false
 }
 
-// Reduced replication switch info for in progress zero downtime switch.
-// Subset of SwitchInfo fields.
-// Used by proxy to route requests to correct bucket during zero downtime switch.
-type ZeroDowntimeSwitchInProgressInfo struct {
-	ReplID              ReplicationStatusID     `redis:"-"`
-	ReplicationIDStr    string                  `redis:"replicationID"`
-	Status              ReplicationSwitchStatus `redis:"lastStatus"`
-	MultipartTTL        time.Duration           `redis:"multipartTTL"`
-	ReplicationPriority uint8                   `redis:"replPriority,omitempty"`
-}
-
-func (s *ZeroDowntimeSwitchInProgressInfo) ReplicationID() ReplicationStatusID {
-	return s.ReplID
-}
-
 // Contains all information about replication switch including its configuration and current status.
 type ReplicationSwitchInfo struct {
-	// Options for downtime switch
-	ReplicationSwitchDowntimeOpts
-	// Options for zero downtime switch
-	ReplicationSwitchZeroDowntimeOpts
-	// Task priority of replication policy of this switch
-	ReplicationPriority uint8 `redis:"replPriority,omitempty"`
-	// ID of replication policy of this switch
-	ReplID           ReplicationStatusID `redis:"-"`
-	ReplicationIDStr string              `redis:"replicationID"`
 	// Time of switch creation
 	CreatedAt time.Time `redis:"createdAt"`
-	// Last status of switch
-	LastStatus ReplicationSwitchStatus `redis:"lastStatus,omitempty"`
 	// Time of last switch was in progress
 	LastStartedAt *time.Time `redis:"startedAt,omitempty"`
 	// Time of last switch was done
 	DoneAt *time.Time `redis:"doneAt,omitempty"`
+	// Options for downtime switch
+	ReplicationSwitchDowntimeOpts
+	// ID of replication policy of this switch
+	ReplicationIDStr string `redis:"replicationID"`
+	// Last status of switch
+	LastStatus ReplicationSwitchStatus `redis:"lastStatus,omitempty"`
 	// History of switch status changes
 	History []string `redis:"-"`
+	// Options for zero downtime switch
+	ReplicationSwitchZeroDowntimeOpts
 }
 
-func (s *ReplicationSwitchInfo) ReplicationID() ReplicationStatusID {
-	return s.ReplID
+func (s *ReplicationSwitchInfo) ReplicationID() UniversalReplicationID {
+	id, err := UniversalIDFromString(s.ReplicationIDStr)
+	if err != nil {
+		panic(fmt.Sprintf("invalid replication ID stored in switch info: %q", s.ReplicationIDStr))
+	}
+	return id
+}
+
+func (s *ReplicationSwitchInfo) SetReplicationID(id UniversalReplicationID) {
+	s.ReplicationIDStr = id.AsString()
+}
+
+func (s *ReplicationSwitchInfo) Validate() error {
+	if s.ReplicationIDStr == "" {
+		return fmt.Errorf("replicationID is required")
+	}
+	replID := s.ReplicationID()
+	if err := replID.Validate(); err != nil {
+		return fmt.Errorf("invalid replicationID: %w", err)
+	}
+	if s.CreatedAt.IsZero() {
+		return fmt.Errorf("createdAt is required")
+	}
+	return nil
 }
 
 func (s *ReplicationSwitchInfo) IsZeroDowntime() bool {

@@ -18,7 +18,9 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -36,9 +38,9 @@ type server struct {
 }
 
 type worker struct {
-	name    string
 	work    func(ctx context.Context) error
 	cleanUp func(ctx context.Context) error
+	name    string
 }
 
 func (s *server) Add(name string, work func(ctx context.Context) error, cleanUp func(ctx context.Context) error) error {
@@ -68,7 +70,7 @@ func (s *server) Start(ctx context.Context) error {
 		g.Go(func() error {
 			zerolog.Ctx(groupCtx).Info().Msgf("server: starting worker %q", w.name)
 			err := w.work(groupCtx)
-			if err != nil {
+			if IsServerError(err) {
 				zerolog.Ctx(groupCtx).Err(err).Msgf("server: worker %q returned error", w.name)
 			} else {
 				zerolog.Ctx(groupCtx).Info().Msgf("server: worker %q done", w.name)
@@ -98,11 +100,19 @@ func (s *server) Start(ctx context.Context) error {
 	}
 	zerolog.Ctx(ctx).Info().Msg("server: start serving")
 	err := g.Wait()
-	if err != nil {
+	if IsServerError(err) {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("unable to serve start")
 	}
 	zerolog.Ctx(ctx).Info().Msg("server: done serving, waiting for cleanup done")
 	cleanWG.Wait()
 	zerolog.Ctx(ctx).Info().Msg("server: done serving, cleanup done")
 	return err
+}
+
+func IsServerError(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, http.ErrServerClosed) {
+		// ignore shutdown errors
+		return false
+	}
+	return err != nil
 }

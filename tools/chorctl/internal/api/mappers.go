@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,21 +46,53 @@ func StorageRow(in *pb.Storage) string {
 }
 
 func ReplHeader() string {
-	return "NAME\tPROGRESS\tSIZE\tOBJECTS\tEVENTS\tPAUSED\tAGE\tHAS_SWITCH"
+	return "NAME\tPROGRESS\tOBJECTS\tEVENTS\tLAG\tPAUSED\tAGE\tARCHIEVED\tHAS_SWITCH"
 }
 
 func ReplRow(in *pb.Replication) string {
-	p := 0.0
-	if in.InitBytesListed != 0 {
-		p = float64(in.InitBytesDone) / float64(in.InitBytesListed)
-	}
-	bytes := fmt.Sprintf("%s/%s", ByteCountIEC(in.InitBytesDone), ByteCountIEC(in.InitBytesListed))
+	id := ReplIDToString(in.Id)
+	p := ToProgress(in)
 	objects := fmt.Sprintf("%d/%d", in.InitObjDone, in.InitObjListed)
 	events := fmt.Sprintf("%d/%d", in.EventsDone, in.Events)
-	if in.ToBucket != "" {
-		in.To += ":" + in.ToBucket
+	switchStatus := "-"
+	if in.HasSwitch {
+		switchStatus = in.SwitchInfo.LastStatus.String()
 	}
-	return fmt.Sprintf("%s:%s:%s->%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v", in.User, in.Bucket, in.From, in.To, ToPercentage(p), bytes, objects, events, in.IsPaused, DateToAge(in.CreatedAt), in.HasSwitch)
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v\t%s",
+		id,
+		ToPercentage(p),
+		objects,
+		events,
+		DurationToStr(in.EventLag.AsDuration()),
+		in.IsPaused,
+		DateToAge(in.CreatedAt),
+		in.IsArchived,
+		switchStatus,
+	)
+}
+
+func ReplIDToString(in *pb.ReplicationID) string {
+	from := in.FromStorage
+	if in.FromBucket != nil && *in.FromBucket != "" {
+		from += ":" + *in.FromBucket
+	}
+	to := in.ToStorage
+	if in.ToBucket != nil && *in.ToBucket != "" {
+		to += ":" + *in.ToBucket
+	}
+	return fmt.Sprintf("%s:%s->%s", in.User, from, to)
+}
+
+func ToProgress(in *pb.Replication) float64 {
+	p := 0.0
+	todo := in.InitObjListed + in.Events
+	done := in.InitObjDone + in.EventsDone
+	if todo != 0 {
+		p = float64(done) / float64(todo)
+	} else if in.IsInitDone {
+		p = 1.0
+	}
+	return p
 }
 
 func ToPercentage(in float64) string {
@@ -111,7 +144,7 @@ func DateToAge(d *timestamppb.Timestamp) string {
 	if d == nil {
 		return "-"
 	}
-	age := time.Now().Sub(d.AsTime())
+	age := time.Since(d.AsTime())
 	return DurationToStr(age)
 }
 
@@ -142,7 +175,7 @@ func DurationToStr(age time.Duration) string {
 }
 
 func ConsistencyCheckHeader() string {
-	return "READY\tQUEUED\tCOMPLETED\tSTORAGES"
+	return "READY\tQUEUED\tCOMPLETED\tCONSISTENT\tVERSIONED\tWITH SIZE\tWITH ETAG\tSTORAGES"
 }
 
 func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
@@ -150,49 +183,91 @@ func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
 	for _, location := range in.Locations {
 		storageLocations = append(storageLocations, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
 	}
-	return fmt.Sprintf("%t\t%d\t%d\t%s", in.Ready, in.Queued, in.Completed, strings.Join(storageLocations, ", "))
+	return fmt.Sprintf("%t\t%d\t%d\t%s", in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.WithSize, in.WithEtag, strings.Join(storageLocations, ", "))
 }
 
 func ConsistencyCheckReportBrief(in *pb.ConsistencyCheck) string {
 	briefTable := `READY:	%t
 QUEUED:	%d
 COMPLETED:	%d
-CONSISTENT:	%t`
-	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent)
+CONSISTENT:	%t
+VERSIONED:	%t
+WITH SIZE:	%t
+WITH ETAG:	%T`
+	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.WithSize, in.WithEtag)
 }
 
-func ConsistencyCheckReportHeader(storages []string) string {
-	return fmt.Sprintf("PATH\tETAG\t%s", strings.Join(storages, "\t"))
+func ConsistencyCheckReportHeader(storages []string, versioned bool, withSize bool, withEtag bool) string {
+	columns := []string{"PATH"}
+	if versioned {
+		columns = append(columns, "VERSION IDX")
+	}
+	if withSize {
+		columns = append(columns, "SIZE")
+	}
+	if withEtag {
+		columns = append(columns, "ETAG")
+	}
+	columns = append(columns, storages...)
+	return strings.Join(columns, "\t")
 }
 
-func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry) string {
-	storageMarkers := ""
+func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry, versioned bool, withSize bool, withEtag bool) string {
+	columns := []string{}
+	if versioned {
+		columns = append(columns, strconv.FormatUint(entry.VersionIdx, 10))
+	}
+	if withSize {
+		columns = append(columns, strconv.FormatUint(entry.Size, 10))
+	}
+	if withEtag {
+		columns = append(columns, entry.Etag)
+	}
 	for _, storage := range storages {
-		if slices.Contains(entry.Storages, storage) {
-			storageMarkers += "\t✓"
+		if slices.ContainsFunc(entry.StorageEntries, func(e *pb.ConsistencyCheckStorageEntry) bool {
+			return e.Storage == storage
+		}) {
+			columns = append(columns, "✓")
 		} else {
-			storageMarkers += "\tX"
+			columns = append(columns, "X")
 		}
 	}
-	return fmt.Sprintf("%s\t%s%s", entry.Object, entry.Etag, storageMarkers)
+	return strings.Join(columns, "\t")
 }
 
 func SwitchHeader() string {
-	return "USER\tBUCKET\tFROM\tTO\tSTATUS\tLAST_STARTED\tDONE"
+	return "REPLICATION_ID\tTYPE\tSTATUS\tLAST_STARTED\tDONE"
 }
 
-func PrintSwitchRow(w io.Writer, in *pb.GetBucketSwitchStatusResponse, wide bool) {
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		in.ReplicationId.User,
-		in.ReplicationId.Bucket,
-		in.ReplicationId.From,
-		in.ReplicationId.To,
+func PrintSwitchRow(w io.Writer, in *pb.ReplicationSwitch, wide bool) {
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		ReplIDToString(in.ReplicationId),
+		switchType(in),
 		in.LastStatus.String(),
 		DateToAge(in.LastStartedAt),
 		DateToAge(in.DoneAt))
 	if wide {
 		for _, hist := range in.History {
-			fmt.Fprintf(w, "\t\t%s\n", hist)
+			fmt.Fprintf(w, "\t%s\n", hist)
 		}
 	}
+}
+
+func switchType(in *pb.ReplicationSwitch) string {
+	if in.ZeroDowntime {
+		return "ZERO_DOWNTIME"
+	}
+	if in.DowntimeOpts == nil {
+		return "DOWNTIME: IMMEDIATE"
+	}
+	if in.DowntimeOpts.StartOnInitDone {
+		return "DOWNTIME: ON_INIT_DONE"
+	}
+	if in.DowntimeOpts.StartAt != nil {
+		return fmt.Sprintf("DOWNTIME: AT %s", DateToStr(in.DowntimeOpts.StartAt))
+	}
+	if in.DowntimeOpts.Cron != nil && *in.DowntimeOpts.Cron != "" {
+		return fmt.Sprintf("DOWNTIME: CRON [%s]", *in.DowntimeOpts.Cron)
+	}
+	return "DOWNTIME: IMMEDIATE"
 }

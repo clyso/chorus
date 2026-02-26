@@ -71,8 +71,7 @@ func (r *Lock) Do(ctx context.Context, refresh time.Duration, work func() error)
 	if err != nil {
 		return err
 	}
-	errCh := make(chan error)
-	defer close(errCh)
+	errCh := make(chan error, 1)
 	go func() {
 		errCh <- work()
 	}()
@@ -131,9 +130,9 @@ func WithRetry(retry bool) LockOpt {
 }
 
 type RedisIDKeyLocker[ID any] struct {
-	overlap time.Duration
-	locker  *redislock.Client
+	locker *redislock.Client
 	RedisIDCommonStore[ID]
+	overlap time.Duration
 }
 
 func NewRedisIDKeyLocker[ID any](client redis.Cmdable, keyPrefix string,

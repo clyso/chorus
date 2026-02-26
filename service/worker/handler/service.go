@@ -24,63 +24,106 @@ import (
 	"github.com/hibiken/asynq"
 
 	"github.com/clyso/chorus/pkg/meta"
-	"github.com/clyso/chorus/pkg/policy"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/ratelimit"
-	"github.com/clyso/chorus/pkg/rclone"
+	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
+	"github.com/clyso/chorus/pkg/tasks"
+	"github.com/clyso/chorus/service/worker/copy"
 )
 
 type Config struct {
-	PauseRetryInterval  time.Duration `yaml:"pauseRetryInterval"`
-	SwitchRetryInterval time.Duration `yaml:"switchRetryInterval"`
+	SwiftRetryInterval       time.Duration  `yaml:"swiftRetryInterval"`
+	PauseRetryInterval       time.Duration  `yaml:"pauseRetryInterval"`
+	SwitchRetryInterval      time.Duration  `yaml:"switchRetryInterval"`
+	QueueUpdateInterval      time.Duration  `yaml:"queueUpdateInterval"`
+	TaskCheckInterval        time.Duration  `yaml:"taskCheckInterval"`
+	DelayedTaskCheckInterval time.Duration  `yaml:"delayedTaskCheckInterval"`
+	CustomErrRetryInterval   *time.Duration `yaml:"customErrRetryInterval,omitempty"`
+}
+
+func (c *Config) Validate() error {
+	if c.SwiftRetryInterval <= 0 {
+		return fmt.Errorf("swiftRetryInterval must be greater than 0")
+	}
+	if c.PauseRetryInterval <= 0 {
+		return fmt.Errorf("pauseRetryInterval must be greater than 0")
+	}
+	if c.SwitchRetryInterval <= 0 {
+		return fmt.Errorf("switchRetryInterval must be greater than 0")
+	}
+	if c.QueueUpdateInterval <= 0 {
+		return fmt.Errorf("queueUpdateInterval must be greater than 0")
+	}
+	if c.TaskCheckInterval <= 0 {
+		return fmt.Errorf("taskCheckInterval must be greater than 0")
+	}
+	if c.DelayedTaskCheckInterval <= 0 {
+		return fmt.Errorf("delayedTaskCheckInterval must be greater than 0")
+	}
+	return nil
 }
 
 type svc struct {
-	clients                 s3client.Service
+	credsSvc                objstore.CredsService
+	clients                 objstore.Clients
 	versionSvc              meta.VersionService
-	policySvc               policy.Service
-	storageSvc              storage.Service
-	rc                      rclone.Service
-	taskClient              *asynq.Client
+	listStateStore          *store.MigrationObjectListStateStore
+	uploadSvc               *storage.UploadSvc
+	copySvc                 copy.CopySvc
+	queueSvc                tasks.QueueService
 	limit                   ratelimit.RPM
 	objectLocker            *store.ObjectLocker
 	bucketLocker            *store.BucketLocker
 	replicationstatusLocker *store.ReplicationStatusLocker
-	// locker                  lock.Service
-	conf *Config
-	rclone.CopySvc
+	versionedSvc            *VersionedMigrationSvc
+	conf                    *Config
 }
 
-func New(conf *Config, clients s3client.Service, versionSvc meta.VersionService,
-	policySvc policy.Service, storageSvc storage.Service, rc rclone.Service,
-	taskClient *asynq.Client, limit ratelimit.RPM, objectLocker *store.ObjectLocker,
-	bucketLocker *store.BucketLocker, replicationstatusLocker *store.ReplicationStatusLocker) *svc {
+func New(conf *Config, credsSvc objstore.CredsService, clients objstore.Clients, versionSvc meta.VersionService,
+	copySvc copy.CopySvc, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
+	limit ratelimit.RPM, listStateStore *store.MigrationObjectListStateStore,
+	objectLocker *store.ObjectLocker, bucketLocker *store.BucketLocker,
+	replicationstatusLocker *store.ReplicationStatusLocker, versionedSvc *VersionedMigrationSvc) *svc {
 	return &svc{
 		conf:                    conf,
+		credsSvc:                credsSvc,
 		clients:                 clients,
 		versionSvc:              versionSvc,
-		policySvc:               policySvc,
-		storageSvc:              storageSvc,
-		rc:                      rc,
-		taskClient:              taskClient,
+		listStateStore:          listStateStore,
+		uploadSvc:               uploadSvc,
+		copySvc:                 copySvc,
+		queueSvc:                queueSvc,
 		limit:                   limit,
 		objectLocker:            objectLocker,
 		bucketLocker:            bucketLocker,
+		versionedSvc:            versionedSvc,
 		replicationstatusLocker: replicationstatusLocker,
 	}
 }
 
-func (s *svc) getClients(ctx context.Context, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {
-	fromClient, err = s.clients.GetByName(ctx, fromStorage)
+func (s *svc) getClients(ctx context.Context, user, fromStorage, toStorage string) (fromClient s3client.Client, toClient s3client.Client, err error) {
+	fromClient, err = s.clients.AsS3(ctx, fromStorage, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", fromStorage, err, asynq.SkipRetry)
 	}
 
-	toClient, err = s.clients.GetByName(ctx, toStorage)
+	toClient, err = s.clients.AsS3(ctx, toStorage, user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get %q s3 client: %w: %w", toStorage, err, asynq.SkipRetry)
 	}
 	return
+}
+
+func (s *svc) rateLimit(ctx context.Context, storage string, methods ...s3.Method) error {
+	if len(methods) == 0 {
+		return nil
+	}
+	opts := make([]ratelimit.Opt, 0, len(methods))
+	for _, m := range methods {
+		opts = append(opts, ratelimit.S3Method(m))
+	}
+	return s.limit.StorReqN(ctx, storage, len(methods), opts...)
 }

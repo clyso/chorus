@@ -4,14 +4,20 @@ kind: Service
 metadata:
   name: {{ include "chorus.fullname" . }}-grpc
   labels:
-    app: worker
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.worker.grpcService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  selector:
-    app: worker
-  {{- include "chorus.selectorLabels" . | nindent 4 }}
-  type: {{ .Values.worker.grpcApiService.type }}
+  type: {{ .Values.worker.grpcService.type }}
   ports:
-  - name: grpc
-	{{- .Values.worker.grpcApiService.portGRPC | toYaml | nindent 4 -}}
+    - name: grpc
+      port: {{ .Values.worker.grpcService.port }}
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    {{- include "chorus.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
 {{- end }}

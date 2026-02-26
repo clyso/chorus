@@ -7,6 +7,15 @@
   "tags": [
     {
       "name": "Chorus"
+    },
+    {
+      "name": "Diff"
+    },
+    {
+      "name": "Policy"
+    },
+    {
+      "name": "Webhook"
     }
   ],
   "consumes": [
@@ -16,31 +25,9 @@
     "application/json"
   ],
   "paths": {
-    "/agents": {
-      "get": {
-        "operationId": "Chorus_GetAgents",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/chorusGetAgentsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Chorus"
-        ]
-      }
-    },
     "/consistency/delete": {
       "put": {
-        "operationId": "Chorus_DeleteConsistencyCheckReport",
+        "operationId": "Diff_DeleteReport",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -67,13 +54,13 @@
           }
         ],
         "tags": [
-          "Chorus"
+          "Diff"
         ]
       }
     },
     "/consistency/list": {
       "get": {
-        "operationId": "Chorus_ListConsistencyChecks",
+        "operationId": "Diff_List",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -89,13 +76,13 @@
           }
         },
         "tags": [
-          "Chorus"
+          "Diff"
         ]
       }
     },
     "/consistency/report": {
       "get": {
-        "operationId": "Chorus_GetConsistencyCheckReport",
+        "operationId": "Diff_GetReport",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -111,13 +98,13 @@
           }
         },
         "tags": [
-          "Chorus"
+          "Diff"
         ]
       }
     },
     "/consistency/report-entries": {
       "get": {
-        "operationId": "Chorus_GetConsistencyCheckReportEntries",
+        "operationId": "Diff_GetReportEntries",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -134,28 +121,28 @@
         },
         "parameters": [
           {
-            "name": "Cursor",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "type": "string",
             "format": "uint64"
           },
           {
-            "name": "PageSize",
+            "name": "pageSize",
             "in": "query",
             "required": false,
             "type": "string",
-            "format": "int64"
+            "format": "uint64"
           }
         ],
         "tags": [
-          "Chorus"
+          "Diff"
         ]
       }
     },
     "/consistency/start": {
       "post": {
-        "operationId": "Chorus_StartConsistencyCheck",
+        "operationId": "Diff_Start",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -177,7 +164,41 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusConsistencyCheckRequest"
+              "$ref": "#/definitions/chorusStartConsistencyCheckRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Diff"
+        ]
+      }
+    },
+    "/credentials": {
+      "post": {
+        "summary": "Sets user credentials for a given storage.",
+        "operationId": "Chorus_SetUserCredentials",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSetUserCredentialsRequest"
             }
           }
         ],
@@ -210,9 +231,9 @@
       }
     },
     "/replication": {
-      "get": {
-        "summary": "Lists configured replications with statuses",
-        "operationId": "Chorus_ListReplications",
+      "post": {
+        "summary": "Lists configured replications info.",
+        "operationId": "Policy_ListReplications",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -227,15 +248,26 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Filters replications list.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusListReplicationsRequest"
+            }
+          }
+        ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/add": {
       "post": {
-        "summary": "Configures new replication for user or bucket(-s)",
-        "operationId": "Chorus_AddReplication",
+        "summary": "Configures new bucket-level or user-level replication.",
+        "operationId": "Policy_AddReplication",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -254,6 +286,7 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Configures new user-level or bucket-level replication.",
             "in": "body",
             "required": true,
             "schema": {
@@ -262,47 +295,14 @@
           }
         ],
         "tags": [
-          "Chorus"
-        ]
-      }
-    },
-    "/replication/compare-bucket": {
-      "post": {
-        "summary": "Compares contents of given bucket in given storages",
-        "operationId": "Chorus_CompareBucket",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/chorusCompareBucketResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/chorusCompareBucketRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/delete": {
       "put": {
         "summary": "Deletes given replication",
-        "operationId": "Chorus_DeleteReplication",
+        "operationId": "Policy_DeleteReplication",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -321,21 +321,23 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
+              "$ref": "#/definitions/chorusReplicationID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/get": {
       "post": {
-        "operationId": "Chorus_GetReplication",
+        "summary": "Returns replication info by ID.",
+        "operationId": "Policy_GetReplication",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -353,27 +355,28 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
+              "$ref": "#/definitions/chorusReplicationID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/list-buckets": {
       "post": {
-        "summary": "Returns list of buckets to configure new replication.",
-        "operationId": "Chorus_ListBucketsForReplication",
+        "summary": "Returns list of buckets available for replication.",
+        "operationId": "Policy_AvailableBuckets",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusListBucketsForReplicationResponse"
+              "$ref": "#/definitions/chorusAvailableBucketsResponse"
             }
           },
           "default": {
@@ -386,22 +389,23 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Request list of bucket available for replication for given user and from/to\nstorages.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusListBucketsForReplicationRequest"
+              "$ref": "#/definitions/chorusAvailableBucketsRequest"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/pause": {
       "put": {
         "summary": "Pauses given replication",
-        "operationId": "Chorus_PauseReplication",
+        "operationId": "Policy_PauseReplication",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -420,22 +424,23 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
+              "$ref": "#/definitions/chorusReplicationID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/resume": {
       "put": {
         "summary": "Resumes given replication",
-        "operationId": "Chorus_ResumeReplication",
+        "operationId": "Policy_ResumeReplication",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -454,43 +459,24 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
+              "$ref": "#/definitions/chorusReplicationID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/switch": {
-      "get": {
-        "summary": "returns list of all switches",
-        "operationId": "Chorus_ListReplicationSwitches",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/chorusListSwitchResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Chorus"
-        ]
-      },
       "post": {
-        "summary": "Switch main\u003c-\u003efollower for selected replication with downtime.\nThis method Can also be used to update existing switch if it has not started yet.\nWorkflow: stops write requests to bucket on chorus proxy until all replication tasks will be processed.\nThen it checks if main and follower bucket contents are the same, unblocks writes, and routes all requests to follower bucket. If bucket contents are different, switch will be aborted and writes will be unblocked. Downtime Switch can be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch is in progress - aka writes already blocked. Use DeleteBucketSwitch in this case.\n  - switch is successfully finished\n  - replication is to different bucket name. Will be supported later.",
-        "operationId": "Chorus_SwitchBucket",
+        "summary": "Schedules downtime window to switch source\u003c-\u003edestination replication\ntargets. See SwitchDowntimeOpts for downtime scheduling options.\nCan be edited if downtime window has not started yet.",
+        "description": "During downtime window all requests to replication target are blocked on\nchorus proxy. When all replication tasks are processed, chorus can perform\noptional data equality check and complete the switch. On completion, proxy\nunblocks requests to target and routes all requests to destination target.\n\nUnlike zero-downtime switch, downtime switch can perform optional data\nequality check and rollback to source target without data loss.\nRequirements:\n  - replication must exist\n  - replication must be proxy-based (agent replication is not supported)\n  - for bucket-level replication, from/to bucket names must be the same\n  - switch is not started. Use DeleteBucketSwitch in this case.",
+        "operationId": "Policy_SwitchWithDowntime",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -509,22 +495,24 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Request to configure switch between replication source and destination\nwith downtime window.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusSwitchBucketRequest"
+              "$ref": "#/definitions/chorusSwitchDowntimeRequest"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/switch/delete": {
       "post": {
-        "summary": "Deletes Switch with following implications:\n!!!Use with caution for ZeroDowntime switch.\n- If switch was in not_started, error, or skipped state, it will not be attempted anymore.\n  proxy will route all requests to old bucket.\n- If switch was in progress, it will be aborted. For downtime switch, bucket block will be removed\n  proxy will route all requests to old bucket, no data will be lost.\n  !!!For ZeroDowntime switch, routing will be reverted back to old bucket.\n  Old and new buckets may end up in inconsistent state because all object writes happened\n  since start of no_downtime migration were routed only to new bucket.\n- If switch was done. Only switch metadata will be removed, replication or routing will not be affected.",
-        "operationId": "Chorus_DeleteBucketSwitch",
+        "summary": "Deletes Switch with following implications:\n!!!Use with caution for ZeroDowntime switch.",
+        "description": "- [OK] If switch was in not_started, error, or skipped state, it will not\nbe attempted anymore. Routing will not be affected.\n- If switch was in_progress, it will be aborted:\n     * [OK] For downtime switch, block will be removed and proxy will\n     route all requests to source target, no data will be lost.\n     * [WARN] For ZeroDowntime switch, routing will be reverted back to\n     source target. Meaning that targets may end up in inconsistent state\n     because some writes were already routed to destination target.\n- [OK] If switch was done. Only switch metadata will be removed,\nreplication or routing will not be affected.",
+        "operationId": "Policy_DeleteSwitch",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -543,27 +531,28 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
+              "$ref": "#/definitions/chorusReplicationID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
-    "/replication/switch/status": {
+    "/replication/switch/get": {
       "post": {
         "summary": "Returns Switch status",
-        "operationId": "Chorus_GetBucketSwitchStatus",
+        "operationId": "Policy_GetSwitchStatus",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusGetBucketSwitchStatusResponse"
+              "$ref": "#/definitions/chorusReplicationSwitch"
             }
           },
           "default": {
@@ -576,22 +565,24 @@
         "parameters": [
           {
             "name": "body",
+            "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusReplicationRequest"
+              "$ref": "#/definitions/chorusReplicationID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
     "/replication/switch/zero-downtime": {
       "post": {
-        "summary": "Switch main\u003c-\u003efollower for selected replication without downtime.\nSwitch will be started immediately. It will route all writes to new main bucket and resolve reads to bucket with the latest data without blocking. When all replication tasks will be processed, switch will be completed and all reads and writes will be routed to new bucket. Unlike switch with downtime, switch without downtime is not checking bucket contents on completion and cannot be aborted or reverted without risk of data loss.\nMethod will return error in following cases:\n  - there is no existing bucket replication\n  - there are multiple replications from the same main bucket to multiple followers\n  - switch already exists. Zero downtime switch cannot be updated. Use DeleteBucketSwitch in this case.\n  - replication is to different bucket name. Will be supported later.",
-        "operationId": "Chorus_SwitchBucketZeroDowntime",
+        "summary": "Switches source\u003c-\u003edestination replication targets without downtime.\nZero-downtime switch will take effect immediately on chorus proxy:\n- all writes will be now routed to replication destination\n- all reads will be routed to target with latest data\nWhen all replication tasks will be processed, switch will be completed and\nall reads and writes will be routed to destination target only.",
+        "description": "Unlike switch with downtime, zero-downtime switch is not checking bucket\ncontents on completion and cannot be aborted or reverted without risk of\ndata loss.\nRequirements for zero-downtime switch:\n  - replication must exist\n  - replication must be proxy-based (agent replication is not supported)\n  - for bucket-level replication, from/to bucket names must be the same\n  - no existing switch must exist for given replication. Zero downtime\n  switch cannot be updated. Use DeleteBucketSwitch in this case.",
+        "operationId": "Policy_SwitchWithZeroDowntime",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -613,23 +604,24 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusSwitchBucketZeroDowntimeRequest"
+              "$ref": "#/definitions/chorusSwitchZeroDowntimeRequest"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
-    "/replication/user": {
-      "get": {
-        "operationId": "Chorus_ListUserReplications",
+    "/routing": {
+      "post": {
+        "summary": "Returns configured routing policies for chorus proxy.",
+        "operationId": "Policy_ListRoutings",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusListUserReplicationsResponse"
+              "$ref": "#/definitions/chorusRoutingsResponse"
             }
           },
           "default": {
@@ -639,14 +631,59 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingsRequest"
+            }
+          }
+        ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
-    "/replication/user/delete": {
+    "/routing/add": {
+      "post": {
+        "summary": "Overrides routing destination for given user or user's bucket.",
+        "operationId": "Policy_AddRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusAddRoutingRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/routing/block": {
       "put": {
-        "operationId": "Chorus_DeleteUserReplication",
+        "summary": "Blocks requests on proxy for given user or user's bucket.",
+        "operationId": "Policy_BlockRouting",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -668,12 +705,80 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusDeleteUserReplicationRequest"
+              "$ref": "#/definitions/chorusRoutingID"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
+        ]
+      }
+    },
+    "/routing/delete": {
+      "put": {
+        "summary": "Removes user or bucket routing override.",
+        "operationId": "Policy_DeleteRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingID"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/routing/unblock": {
+      "put": {
+        "summary": "Removes block on requests on proxy for given user or user's bucket.",
+        "operationId": "Policy_UnblockRouting",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusRoutingID"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
         ]
       }
     },
@@ -700,15 +805,15 @@
         ]
       }
     },
-    "/v2/replication/add": {
+    "/test-proxy": {
       "post": {
-        "operationId": "Chorus_AddBucketReplication",
+        "summary": "Returns configured routing and replication for given storage request to\nproxy. Emulates proxy behaviour for given user and bucket.",
+        "operationId": "Policy_TestProxy",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "type": "object",
-              "properties": {}
+              "$ref": "#/definitions/chorusTestProxyResponse"
             }
           },
           "default": {
@@ -724,12 +829,12 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusAddBucketReplicationRequest"
+              "$ref": "#/definitions/chorusTestProxyRequest"
             }
           }
         ],
         "tags": [
-          "Chorus"
+          "Policy"
         ]
       }
     },
@@ -755,166 +860,215 @@
           "Chorus"
         ]
       }
+    },
+    "/webhook/{storage}/s3-notifications": {
+      "post": {
+        "summary": "S3Notifications receives standard AWS S3 notification events and enqueues\nreplication tasks. Compatible with S3 bucket notification push format.\nEvents that cannot be processed are skipped and logged server-side.",
+        "operationId": "Webhook_S3Notifications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "storage",
+            "description": "Chorus storage alias (must be a configured S3 storage). Bound to URL path.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WebhookS3NotificationsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/webhook/{storage}/swift": {
+      "post": {
+        "summary": "SwiftEvents receives a batch of OpenStack Swift events parsed from\naccess logs by an external log exporter (e.g. Fluent Bit, Vector)\nand enqueues replication tasks for events matching active policies.\nEvents that cannot be processed are skipped and logged server-side.",
+        "operationId": "Webhook_SwiftEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "storage",
+            "description": "Chorus storage alias (must be a configured SWIFT storage).",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WebhookSwiftEventsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Webhook"
+        ]
+      }
     }
   },
   "definitions": {
-    "StorageProvider": {
+    "StorageType": {
       "type": "string",
       "enum": [
-        "Other",
-        "Ceph",
-        "Minio",
-        "AWS",
-        "GCS",
-        "Alibaba",
-        "Cloudflare",
-        "DigitalOcean"
+        "S3",
+        "SWIFT"
       ],
-      "default": "Other"
+      "default": "S3"
     },
-    "chorusAddBucketReplicationRequest": {
+    "WebhookS3NotificationsBody": {
       "type": "object",
       "properties": {
-        "user": {
-          "type": "string",
-          "title": "s3 user alias from chorus config"
-        },
-        "fromStorage": {
-          "type": "string",
-          "title": "source storage alias from chorus config"
-        },
-        "fromBucket": {
-          "type": "string",
-          "title": "source bucket name"
-        },
-        "toStorage": {
-          "type": "string",
-          "description": "destination storage name from chorus config. Can be equal to destination storage if destination bucket name is different from source."
-        },
-        "toBucket": {
-          "type": "string",
-          "title": "custom destination bucket name. if not set, destination bucket name will be equal to source bucket"
-        },
-        "agentUrl": {
-          "type": "string",
-          "description": "webhook URL of chorus agent. Required if chorus agent setup is used."
+        "Records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusS3EventRecord"
+          },
+          "description": "Standard AWS S3 notification records.\nEvents are processed independently; a failure in one does not affect others."
+        }
+      }
+    },
+    "WebhookSwiftEventsBody": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusSwiftEvent"
+          },
+          "description": "Events are processed independently; a failure in one does not affect others."
         }
       }
     },
     "chorusAddReplicationRequest": {
       "type": "object",
       "properties": {
+        "id": {
+          "$ref": "#/definitions/chorusReplicationID",
+          "description": "REQUIRED: Specifies replication source and destination."
+        },
+        "opts": {
+          "$ref": "#/definitions/chorusReplicationOpts",
+          "description": "OPTIONAL: Additional replication options."
+        }
+      },
+      "description": "Configures new user-level or bucket-level replication."
+    },
+    "chorusAddRoutingRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "user for whom to override routing destination."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "bucket for which to override routing destination."
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "destination storage name"
+        }
+      }
+    },
+    "chorusAvailableBucketsRequest": {
+      "type": "object",
+      "properties": {
         "user": {
           "type": "string"
         },
-        "from": {
+        "fromStorage": {
           "type": "string"
         },
-        "to": {
+        "toStorage": {
           "type": "string"
         },
+        "showReplicated": {
+          "type": "boolean"
+        }
+      },
+      "description": "Request list of bucket available for replication for given user and from/to\nstorages."
+    },
+    "chorusAvailableBucketsResponse": {
+      "type": "object",
+      "properties": {
         "buckets": {
           "type": "array",
           "items": {
             "type": "string"
           }
         },
-        "isForAllBuckets": {
-          "type": "boolean"
-        },
-        "agentUrl": {
-          "type": "string"
-        },
-        "toBucket": {
-          "type": "string"
+        "replicatedBuckets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
-    "chorusAgent": {
-      "type": "object",
-      "properties": {
-        "storage": {
-          "type": "string"
-        },
-        "url": {
-          "type": "string"
-        }
-      }
-    },
-    "chorusCompareBucketRequest": {
+    "chorusBucketRouting": {
       "type": "object",
       "properties": {
         "user": {
-          "type": "string"
+          "type": "string",
+          "description": "overrides routing destination for given user and bucket."
         },
         "bucket": {
-          "type": "string"
+          "type": "string",
+          "description": "overrides routing destination for given user and bucket."
         },
-        "from": {
-          "type": "string"
+        "toStorage": {
+          "type": "string",
+          "title": "destination storage name\ncan be empty if routing is blocked"
         },
-        "to": {
-          "type": "string"
-        },
-        "showMatch": {
+        "isBlocked": {
           "type": "boolean",
-          "title": "set true to get list of matching files (match) in response"
-        },
-        "toBucket": {
-          "type": "string"
-        }
-      }
-    },
-    "chorusCompareBucketResponse": {
-      "type": "object",
-      "properties": {
-        "isMatch": {
-          "type": "boolean",
-          "title": "true if storage's buckets have the same content"
-        },
-        "missFrom": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of missing files in 'from storage' bucket"
-        },
-        "missTo": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of missing files in 'to storage' bucket"
-        },
-        "differ": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of files with different content"
-        },
-        "error": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "list of errors occurred during comparison"
-        },
-        "match": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "list matched files in storages bucket.\nwill be empty if request parameter show_match set to false."
+          "title": "true if routing is blocked for given user and bucket"
         }
       }
     },
     "chorusConsistencyCheck": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
         "locations": {
           "type": "array",
           "items": {
@@ -935,6 +1089,15 @@
         },
         "consistent": {
           "type": "boolean"
+        },
+        "versioned": {
+          "type": "boolean"
+        },
+        "withSize": {
+          "type": "boolean"
+        },
+        "withEtag": {
+          "type": "boolean"
         }
       }
     },
@@ -944,13 +1107,22 @@
         "object": {
           "type": "string"
         },
+        "versionIdx": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "size": {
+          "type": "string",
+          "format": "uint64"
+        },
         "etag": {
           "type": "string"
         },
-        "storages": {
+        "storageEntries": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "$ref": "#/definitions/chorusConsistencyCheckStorageEntry"
           }
         }
       }
@@ -964,6 +1136,20 @@
             "type": "object",
             "$ref": "#/definitions/chorusMigrateLocation"
           }
+        }
+      }
+    },
+    "chorusConsistencyCheckStorageEntry": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
         }
       }
     },
@@ -981,34 +1167,15 @@
         }
       }
     },
-    "chorusDeleteUserReplicationRequest": {
-      "type": "object",
-      "properties": {
-        "user": {
-          "type": "string"
-        },
-        "from": {
-          "type": "string"
-        },
-        "to": {
-          "type": "string"
-        },
-        "deleteBucketReplications": {
-          "type": "boolean"
-        }
-      }
-    },
-    "chorusGetAgentsResponse": {
-      "type": "object",
-      "properties": {
-        "agents": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/chorusAgent"
-          }
-        }
-      }
+    "chorusEventSource": {
+      "type": "string",
+      "enum": [
+        "EVENT_SOURCE_PROXY",
+        "EVENT_SOURCE_S3_NOTIFICATION",
+        "EVENT_SOURCE_WEBHOOK"
+      ],
+      "default": "EVENT_SOURCE_PROXY",
+      "description": "Determines how ongoing data change events are captured for replication.\n\n - EVENT_SOURCE_PROXY: Default. Events captured by chorus proxy intercepting S3/Swift API calls.\n - EVENT_SOURCE_S3_NOTIFICATION: S3 bucket notifications. Worker creates SNS topic + bucket notification\npointing to its own webhook endpoint. Bucket-level replication only.\n - EVENT_SOURCE_WEBHOOK: External event source (e.g. Swift access log exporter).\nRequires webhook to be enabled in worker config. No automatic setup."
     },
     "chorusGetAppVersionResponse": {
       "type": "object",
@@ -1024,59 +1191,6 @@
         }
       }
     },
-    "chorusGetBucketSwitchStatusResponse": {
-      "type": "object",
-      "properties": {
-        "lastStatus": {
-          "$ref": "#/definitions/chorusGetBucketSwitchStatusResponseStatus",
-          "title": "Current switch status"
-        },
-        "zeroDowntime": {
-          "type": "boolean",
-          "title": "true if switch is zero downtime"
-        },
-        "multipartTtl": {
-          "type": "string",
-          "title": "multipart uploads TTL for zero downtime switch"
-        },
-        "downtimeOpts": {
-          "$ref": "#/definitions/chorusSwitchDowntimeOpts"
-        },
-        "lastStartedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Time of last switch attempt - last time when switch was moved to InProgress status."
-        },
-        "doneAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Time of last switch completion. Set only if switch status is Done."
-        },
-        "history": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "title": "History of switch status changes"
-        },
-        "replicationId": {
-          "$ref": "#/definitions/chorusReplicationRequest"
-        }
-      }
-    },
-    "chorusGetBucketSwitchStatusResponseStatus": {
-      "type": "string",
-      "enum": [
-        "NotStarted",
-        "InProgress",
-        "CheckInProgress",
-        "Error",
-        "Skipped",
-        "Done"
-      ],
-      "default": "NotStarted",
-      "description": " - NotStarted: Switch is not started yet\n - InProgress: Switch is in progress. Draining replication events queue.\nFor switch with downtime, writes to bucket are blocked at this point.\n - CheckInProgress: Switch is in progress. Queue is drained. Checking if main and follower buckets are the same.\nWrites to bucket are still blocked. Used only for switch with downtime.\n - Error: Switch failed to complete in downtime window and was aborted.\nWrites to bucket are unblocked. Used only for switch with downtime.\nIf cron downtime_window is used, switch will be retried on next cron execution.\n - Skipped: Switch was not able to start in given downtime window because conditions were not met.\nUsed only for switch with downtime. If cron downtime_window is used, switch will be retried on next cron execution.\n - Done: Switch was successfully completed.\nAll data was replicated to new main bucket and all read and write requests are now routed to it."
-    },
     "chorusGetConsistencyCheckReportEntriesResponse": {
       "type": "object",
       "properties": {
@@ -1087,7 +1201,7 @@
             "$ref": "#/definitions/chorusConsistencyCheckReportEntry"
           }
         },
-        "Cursor": {
+        "cursor": {
           "type": "string",
           "format": "uint64"
         }
@@ -1128,40 +1242,6 @@
         }
       }
     },
-    "chorusListBucketsForReplicationRequest": {
-      "type": "object",
-      "properties": {
-        "user": {
-          "type": "string"
-        },
-        "from": {
-          "type": "string"
-        },
-        "to": {
-          "type": "string"
-        },
-        "showReplicated": {
-          "type": "boolean"
-        }
-      }
-    },
-    "chorusListBucketsForReplicationResponse": {
-      "type": "object",
-      "properties": {
-        "buckets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "replicatedBuckets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "chorusListConsistencyChecksResponse": {
       "type": "object",
       "properties": {
@@ -1171,6 +1251,73 @@
             "type": "object",
             "$ref": "#/definitions/chorusConsistencyCheck"
           }
+        }
+      }
+    },
+    "chorusListReplicationsRequest": {
+      "type": "object",
+      "properties": {
+        "hideUserReplications": {
+          "type": "boolean",
+          "description": "if true, user-level replications will be excluded from response."
+        },
+        "hideBucketReplications": {
+          "type": "boolean",
+          "description": "if true, bucket-level replications will be excluded from response."
+        },
+        "hideSwitchInfo": {
+          "type": "boolean",
+          "description": "if true, replications will be listed without switch info."
+        },
+        "filter": {
+          "$ref": "#/definitions/chorusListReplicationsRequestFilter",
+          "description": "OPTIONAL: filter to apply to replications list."
+        }
+      },
+      "description": "Filters replications list."
+    },
+    "chorusListReplicationsRequestFilter": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "If set, filters replications by exact user."
+        },
+        "fromStorage": {
+          "type": "string",
+          "description": "If set, filters replications by exact source storage."
+        },
+        "toStorage": {
+          "type": "string",
+          "description": "If set, filters replications by exact destination storage."
+        },
+        "fromBucket": {
+          "type": "string",
+          "description": "If set, filters bucket-level replications by exact source bucket."
+        },
+        "toBucket": {
+          "type": "string",
+          "description": "If set, filters bucket-level replications by exact destination bucket."
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "If set, filters replications by archived status."
+        },
+        "isPaused": {
+          "type": "boolean",
+          "description": "If set, filters replications by paused status."
+        },
+        "isInitDone": {
+          "type": "boolean",
+          "description": "If set, filters replications by completion of initial replication phase."
+        },
+        "hasSwitch": {
+          "type": "boolean",
+          "description": "If set, filters replications that have or not have associated switch."
+        },
+        "eventSource": {
+          "$ref": "#/definitions/chorusEventSource",
+          "description": "Filters replications by event source."
         }
       }
     },
@@ -1186,30 +1333,6 @@
         }
       }
     },
-    "chorusListSwitchResponse": {
-      "type": "object",
-      "properties": {
-        "switches": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/chorusGetBucketSwitchStatusResponse"
-          }
-        }
-      }
-    },
-    "chorusListUserReplicationsResponse": {
-      "type": "object",
-      "properties": {
-        "replications": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/chorusUserReplication"
-          }
-        }
-      }
-    },
     "chorusMigrateLocation": {
       "type": "object",
       "properties": {
@@ -1218,110 +1341,347 @@
         },
         "bucket": {
           "type": "string"
-        },
-        "user": {
-          "type": "string"
         }
       }
     },
     "chorusReplication": {
       "type": "object",
       "properties": {
-        "user": {
-          "type": "string"
+        "id": {
+          "$ref": "#/definitions/chorusReplicationID",
+          "description": "Specifies replication source and destination."
         },
-        "bucket": {
-          "type": "string"
-        },
-        "from": {
-          "type": "string"
-        },
-        "to": {
-          "type": "string"
+        "opts": {
+          "$ref": "#/definitions/chorusReplicationOpts",
+          "description": "Additional replication options."
         },
         "createdAt": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "title": "Replication creation time"
         },
         "isPaused": {
-          "type": "boolean"
+          "type": "boolean",
+          "title": "true if replication is paused"
         },
         "isInitDone": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "true if initial replication phase is done.\nInitial phase copies all data existing in source at the moment of\nreplication creation."
         },
         "initObjListed": {
           "type": "string",
-          "format": "int64"
+          "format": "int64",
+          "description": "Approximate number of objects listed during initial replication.\nCorresponds to total number of tasks created for initial replication queue."
         },
         "initObjDone": {
           "type": "string",
-          "format": "int64"
-        },
-        "initBytesListed": {
-          "type": "string",
-          "format": "int64"
-        },
-        "initBytesDone": {
-          "type": "string",
-          "format": "int64"
+          "format": "int64",
+          "description": "Approximate number of objects processed during initial replication.\nCorresponds to total number of tasks completed from initial replication\nqueue."
         },
         "events": {
           "type": "string",
-          "format": "int64"
+          "format": "int64",
+          "description": "Number of source data change events captured and queued for replication.\nCorresponds to total number of tasks created for event replication queue."
         },
         "eventsDone": {
           "type": "string",
-          "format": "int64"
+          "format": "int64",
+          "description": "Number of source data change events synced to destination.\nCorresponds to total number of tasks completed from event replication\nqueue."
         },
-        "lastEmittedAt": {
+        "eventLag": {
           "type": "string",
-          "format": "date-time"
-        },
-        "lastProcessedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "agentUrl": {
-          "type": "string"
-        },
-        "toBucket": {
-          "type": "string"
-        },
-        "initDoneAt": {
-          "type": "string",
-          "format": "date-time"
+          "description": "Approximate time lag for syncing events to destination.\nCorresponds to age of the oldest unprocessed task in event replication\nqueue (aka replication queue latency)."
         },
         "hasSwitch": {
-          "type": "boolean",
-          "description": "true if given replication has associated replication switch with it."
+          "type": "boolean"
         },
         "isArchived": {
           "type": "boolean",
-          "description": "true if replication is archived. Archived replication will not generate or sync new events.\nThe main purpose of archived replication is to keep replication metadata for future reference.\nArchived replication can be safely deleted."
+          "description": "true if replication is archived. Archived replication will not generate or\nsync new events. The main purpose of archived replication is to keep\nreplication metadata for future reference. Archived replication can be\nsafely deleted."
         },
         "archivedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "switchInfo": {
+          "$ref": "#/definitions/chorusReplicationSwitch",
+          "description": "If replication has associated switch, contains its status info."
+        },
+        "eventSource": {
+          "$ref": "#/definitions/chorusEventSource",
+          "description": "How ongoing data change events are captured for this replication."
+        },
+        "webhookUrl": {
+          "type": "string",
+          "description": "Webhook endpoint URL for this replication (if event source uses webhook).\nRead-only, computed by the server."
         }
-      }
+      },
+      "description": "Represents specification and status of user-level or bucket-level\nreplication."
     },
-    "chorusReplicationRequest": {
+    "chorusReplicationID": {
       "type": "object",
       "properties": {
         "user": {
-          "type": "string"
+          "type": "string",
+          "description": "REQUIRED: Replication user from chorus storage credential config.\nSelected user must be configured for both from/to storages."
         },
-        "bucket": {
-          "type": "string"
+        "fromStorage": {
+          "type": "string",
+          "description": "REQUIRED: source storage name from chorus storage config."
         },
-        "from": {
-          "type": "string"
+        "toStorage": {
+          "type": "string",
+          "description": "REQUIRED: destination storage name from chorus storage config.\nCan be equal to from_storage if both from/to buckets are set and different."
         },
-        "to": {
-          "type": "string"
+        "fromBucket": {
+          "type": "string",
+          "description": "OPTIONAL: source bucket name.\nFor user-level replication, this field must be empty.\nFor bucket-level replication, this field must be set."
         },
         "toBucket": {
+          "type": "string",
+          "description": "OPTIONAL: destination bucket name.\nFor user-level replication, this field must be empty.\nFor bucket-level replication, this field must be set. From/to buckets can\nbe different."
+        }
+      },
+      "description": "Represents user-level and bucket-level replication source and destination\ntargets.\n- User-level replicates all existing and future buckets of the user.\n- Bucket-level  replicates a single bucket."
+    },
+    "chorusReplicationOpts": {
+      "type": "object",
+      "properties": {
+        "eventSource": {
+          "$ref": "#/definitions/chorusEventSource",
+          "description": "Determines how ongoing data change events are captured."
+        }
+      },
+      "description": "Additional replication options for bucket and user-level replications."
+    },
+    "chorusReplicationSwitch": {
+      "type": "object",
+      "properties": {
+        "lastStatus": {
+          "$ref": "#/definitions/chorusReplicationSwitchStatus",
+          "title": "Current switch status"
+        },
+        "zeroDowntime": {
+          "type": "boolean",
+          "title": "true if switch is zero downtime"
+        },
+        "multipartTtl": {
+          "type": "string",
+          "title": "multipart uploads TTL for zero downtime switch"
+        },
+        "downtimeOpts": {
+          "$ref": "#/definitions/chorusSwitchDowntimeOpts"
+        },
+        "lastStartedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time of last switch attempt - last time when switch was moved to InProgress\nstatus."
+        },
+        "doneAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time of last switch completion. Set only if switch status is Done."
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "History of switch status changes"
+        },
+        "replicationId": {
+          "$ref": "#/definitions/chorusReplicationID"
+        }
+      }
+    },
+    "chorusReplicationSwitchStatus": {
+      "type": "string",
+      "enum": [
+        "NOT_STARTED",
+        "IN_PROGRESS",
+        "CHECK_IN_PROGRESS",
+        "ERROR",
+        "SKIPPED",
+        "DONE"
+      ],
+      "default": "NOT_STARTED",
+      "description": " - NOT_STARTED: Switch is not started yet\n - IN_PROGRESS: Switch is in progress. Draining replication events queue.\nFor switch with downtime, requests to target are blocked at this point.\n - CHECK_IN_PROGRESS: Switch is in progress. Queue is drained. Checking if source and\ndestination targets are the same. Requests are still blocked. Used only\nfor switch with downtime with enabled bucket check.\n - ERROR: Switch failed to complete in downtime window and was aborted.\nRequests to target are unblocked. Used only for switch with downtime.\nIf cron downtime_window is used, switch will be retried on next cron\nexecution.\n - SKIPPED: Switch was not able to start in given downtime window because conditions\nwere not met. Used only for switch with downtime. If cron downtime_window\nis used, switch will be retried on next cron execution.\n - DONE: Switch was successfully completed.\nAll data was replicated to replication destination target and all read\nand all requests are now routed to it."
+    },
+    "chorusRoutingID": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "title": "routing policy user"
+        },
+        "bucket": {
+          "type": "string",
+          "title": "routing policy bucket"
+        }
+      }
+    },
+    "chorusRoutingsRequest": {
+      "type": "object",
+      "properties": {
+        "hideUserRoutings": {
+          "type": "boolean",
+          "title": "set true to hide user-level routings from response"
+        },
+        "hideBucketRoutings": {
+          "type": "boolean",
+          "title": "set true to hide bucket-level routings from response"
+        },
+        "filter": {
+          "$ref": "#/definitions/chorusRoutingsRequestFilter",
+          "title": "optional filter to apply to routings list"
+        }
+      }
+    },
+    "chorusRoutingsRequestFilter": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "title": "filter routing policy by user (exact match)"
+        },
+        "bucket": {
+          "type": "string",
+          "title": "filter routing policy by bucket (exact match)"
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "filter routing policy by destination storage (exact match)"
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "title": "filter routing policy by blocked status"
+        }
+      }
+    },
+    "chorusRoutingsResponse": {
+      "type": "object",
+      "properties": {
+        "main": {
+          "type": "string",
+          "description": "name of the main storage - default destination if not overridden by user or\nbucket routing."
+        },
+        "userRoutings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusUserRouting"
+          },
+          "description": "list of user-level routing overrides."
+        },
+        "bucketRoutings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusBucketRouting"
+          },
+          "description": "list of bucket-level routing overrides."
+        }
+      }
+    },
+    "chorusS3BucketInfo": {
+      "type": "object",
+      "properties": {
+        "name": {
           "type": "string"
+        }
+      }
+    },
+    "chorusS3Credential": {
+      "type": "object",
+      "properties": {
+        "accessKey": {
+          "type": "string"
+        },
+        "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusS3EventPayload": {
+      "type": "object",
+      "properties": {
+        "configurationId": {
+          "type": "string",
+          "description": "Encoded chorus notification ID (contains user + bucket)."
+        },
+        "bucket": {
+          "$ref": "#/definitions/chorusS3BucketInfo"
+        },
+        "object": {
+          "$ref": "#/definitions/chorusS3ObjectInfo"
+        }
+      }
+    },
+    "chorusS3EventRecord": {
+      "type": "object",
+      "properties": {
+        "eventName": {
+          "type": "string",
+          "title": "e.g. \"s3:ObjectCreated:Put\", \"s3:ObjectRemoved:Delete\""
+        },
+        "s3": {
+          "$ref": "#/definitions/chorusS3EventPayload"
+        }
+      }
+    },
+    "chorusS3ObjectInfo": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string",
+          "format": "int64"
+        },
+        "eTag": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusSetUserCredentialsRequest": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "s3Cred": {
+          "$ref": "#/definitions/chorusS3Credential"
+        },
+        "swiftCred": {
+          "$ref": "#/definitions/chorusSwiftCredential"
+        }
+      }
+    },
+    "chorusStartConsistencyCheckRequest": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        },
+        "user": {
+          "type": "string"
+        },
+        "checkOnlyLastVersions": {
+          "type": "boolean"
+        },
+        "ignoreEtags": {
+          "type": "boolean"
+        },
+        "ignoreSizes": {
+          "type": "boolean"
         }
       }
     },
@@ -1340,8 +1700,7 @@
           "title": "ex: s3.clyso.com"
         },
         "provider": {
-          "$ref": "#/definitions/StorageProvider",
-          "title": "s3 storage provider \u003cCeph|Minio|AWS|Other\u003e"
+          "$ref": "#/definitions/StorageType"
         },
         "credentials": {
           "type": "array",
@@ -1353,79 +1712,188 @@
         }
       }
     },
-    "chorusSwitchBucketRequest": {
+    "chorusSwiftCredential": {
       "type": "object",
       "properties": {
-        "replicationId": {
-          "$ref": "#/definitions/chorusReplicationRequest",
-          "description": "Id of bucket replication policy to switch source and destination buckets on proxy.\nReplication policy should already exist."
+        "username": {
+          "type": "string"
         },
-        "downtimeOpts": {
-          "$ref": "#/definitions/chorusSwitchDowntimeOpts",
-          "description": "Configures downtime window for switch. During downtime bucket writes will be blocked on proxy.\nIf NOT set, switch will be performed right away and writes will be blocked until it is done."
+        "password": {
+          "type": "string"
+        },
+        "domainName": {
+          "type": "string"
+        },
+        "tenantName": {
+          "type": "string"
         }
       }
     },
-    "chorusSwitchBucketZeroDowntimeRequest": {
+    "chorusSwiftEvent": {
       "type": "object",
       "properties": {
-        "replicationId": {
-          "$ref": "#/definitions/chorusReplicationRequest",
-          "description": "Id of bucket replication policy to switch source and destination buckets on proxy.\nReplication policy should already exist."
-        },
-        "multipartTtl": {
+        "account": {
           "type": "string",
-          "description": "Max Amount of time to wait for uncompleted multipart uploads to finish before switching buckets.\nDefault is 1 hour."
+          "description": "OpenStack project ID (tenant ID). Required."
+        },
+        "container": {
+          "type": "string",
+          "description": "Required for container and object operations."
+        },
+        "object": {
+          "type": "string",
+          "description": "Required for object operations."
+        },
+        "operation": {
+          "$ref": "#/definitions/chorusSwiftOperation"
+        },
+        "etag": {
+          "type": "string",
+          "description": "Optional. Object ETag (MD5)."
+        },
+        "lastModified": {
+          "type": "string",
+          "description": "Optional. Object last modified timestamp."
+        },
+        "versionId": {
+          "type": "string",
+          "description": "Optional. Object version ID."
+        },
+        "date": {
+          "type": "string",
+          "description": "Optional. Server response date, used as reference timestamp when\nSwift does not return Last-Modified (account/container/meta updates)."
+        },
+        "deleteMultipart": {
+          "type": "boolean",
+          "description": "Optional. If true, indicates SLO/DLO multipart manifest deletion."
         }
       }
+    },
+    "chorusSwiftOperation": {
+      "type": "string",
+      "enum": [
+        "SWIFT_OPERATION_UNSPECIFIED",
+        "ACCOUNT_UPDATE",
+        "CONTAINER_UPDATE",
+        "CONTAINER_DELETE",
+        "OBJECT_CREATED",
+        "OBJECT_METADATA_UPDATED",
+        "OBJECT_DELETED"
+      ],
+      "default": "SWIFT_OPERATION_UNSPECIFIED",
+      "description": "SwiftOperation determines which replication task is created.\nTask handlers are idempotent — e.g. CONTAINER_UPDATE and CONTAINER_DELETE\nboth trigger a sync that compares source and destination state."
     },
     "chorusSwitchDowntimeOpts": {
       "type": "object",
       "properties": {
         "startOnInitDone": {
           "type": "boolean",
-          "title": "If true, chorus will perform switch automatically when initial migration will be done.\nInitial migration copies all objects that existed in source bucket before replication started.\ndefault is false"
+          "title": "If true, chorus will perform switch automatically when initial migration\nwill be done. Initial migration copies all objects that existed in source\nbucket before replication started. default is false"
         },
         "cron": {
           "type": "string",
-          "description": "If set, chorus will try or retry to execute switch according to CRON schedule until it will be done.\nBucket check and draining work queue is time consuming operation\nso in most cases it is not makes sense to set cron frequency less than one hour\nor less than max_duration if used.\nEither cron or start_at can be set, but not both. If both are set, an error will be returned."
+          "description": "If set, chorus will try or retry to start downtime window according to CRON\nschedule.\nIt is not makes sense to set cron frequency less than one hour or less than\nmax_duration if used. Either cron or start_at can be set, but not both."
         },
         "startAt": {
           "type": "string",
           "format": "date-time",
-          "description": "If set, switch will be executed at given time.\nIf at this point initial migration will not be done, switch will be marked as failed and not executed.\nEither cron or start_at can be set, but not both. If both are set, an error will be returned."
+          "description": "If set, downtime window will be attempted at given time only once.\nIf at this point initial migration will not be done, switch will be marked\nas failed and not executed. Either cron or start_at can be set, not both."
         },
         "maxDuration": {
           "type": "string",
-          "description": "If set, chorus will abort switch if it will not be able to complete in given time.\nIn this case, chorus will unblock bucket writes and keep old main as main.\nSwitch will be marked as failed and will be retried on next cron execution if set."
+          "description": "If set, chorus will abort downtime window if it will not be able to\ncomplete in given time. In this case, switch will be marked as failed and\nwill be retried on next cron execution if set."
         },
         "maxEventLag": {
           "type": "integer",
           "format": "int64",
-          "description": "If set, switch execution will be skipped if number of unprocessed events is more than max_event_lag.\nSwitch will be marked as failed and will be retried on next cron execution if set."
+          "description": "If set, switch execution will be skipped if number of unprocessed events is\nmore than max_event_lag. Switch will be marked as failed and will be\nretried on next cron execution if set."
         },
         "skipBucketCheck": {
           "type": "boolean",
-          "description": "if true, chorus will not perform equality check of bucket contents before completing switch with downtime.\nMight be useful for buckets with large number of objects. In this case check will consume a lot of time and memory in Redis.\nDefault is false."
+          "description": "if true, chorus will not perform equality check of target contents before\ncompleting switch with downtime. Might be useful for buckets with large\nnumber of objects. In this case check will consume a lot of time and memory\nin Redis. Default is false."
         },
         "continueReplication": {
           "type": "boolean",
-          "description": "Set true to replicate data updates from new main to old main bucket after successful switch\nDefault is false."
+          "description": "Set true to replicate data updates from new main to old main bucket after\nsuccessful switch. Default is false."
         }
       },
       "description": "Defines downtime window for replication switch with downtime.\nAll dates and times depends on local times of machine running chorus worker.\nTime precision is ~1 minute."
     },
-    "chorusUserReplication": {
+    "chorusSwitchDowntimeRequest": {
+      "type": "object",
+      "properties": {
+        "replicationId": {
+          "$ref": "#/definitions/chorusReplicationID",
+          "description": "Id of user- or bucket- level replication policy to switch source and\ndestination targets on proxy. Replication policy should already exist.\nAgent-based replication is not supported.\nBucket-level replication with different from/to bucket names is not\nsupported."
+        },
+        "downtimeOpts": {
+          "$ref": "#/definitions/chorusSwitchDowntimeOpts",
+          "description": "Configures downtime window for switch. During downtime all requests to\ntarget will be blocked on proxy. If options are not set, downtime will be\nstarted right away and will last until all replication tasks are processed."
+        }
+      },
+      "description": "Request to configure switch between replication source and destination\nwith downtime window."
+    },
+    "chorusSwitchZeroDowntimeRequest": {
+      "type": "object",
+      "properties": {
+        "replicationId": {
+          "$ref": "#/definitions/chorusReplicationID",
+          "description": "Id of user- or bucket- level replication policy to switch source and\ndestination targets on proxy. Replication policy should already exist.\nAgent-based replication is not supported.\nBucket-level replication with different from/to bucket names is not\nsupported."
+        },
+        "multipartTtl": {
+          "type": "string",
+          "description": "Max Amount of time to wait for uncompleted multipart uploads to finish\nbefore switching targets. Default is 1 hour."
+        }
+      }
+    },
+    "chorusTestProxyRequest": {
       "type": "object",
       "properties": {
         "user": {
-          "type": "string"
+          "type": "string",
+          "title": "user making requests"
         },
-        "from": {
-          "type": "string"
+        "bucket": {
+          "type": "string",
+          "title": "bucket being accessed"
+        }
+      }
+    },
+    "chorusTestProxyResponse": {
+      "type": "object",
+      "properties": {
+        "routeToStorage": {
+          "type": "string",
+          "description": "destination storage name according to current routing configuration."
         },
-        "to": {
-          "type": "string"
+        "isBlocked": {
+          "type": "boolean",
+          "description": "true if requests are blocked for given user and bucket."
+        },
+        "replications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusReplicationID"
+          },
+          "description": "list of applicable replications for given user and bucket."
+        }
+      }
+    },
+    "chorusUserRouting": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "overrides routing destination for all requests of given user."
+        },
+        "toStorage": {
+          "type": "string",
+          "title": "destination storage name\ncan be empty if routing is blocked"
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "title": "true if routing is blocked for given user"
         }
       }
     },

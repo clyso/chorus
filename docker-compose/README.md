@@ -15,7 +15,6 @@
 **Structure:**
 ```
 ├── docker-compose
-│   ├── agent-conf.yaml       # example config for chorus-agent
 │   ├── docker-compose.yml    # docker-compose file
 │   ├── FakeS3Dockerfile      # Dockerfile for in-memory S3 endpoint
 │   ├── proxy-conf.yaml       # example config for chorus-proxy
@@ -76,6 +75,10 @@ To run chorus with docker compose:
     ```shell
     chorctl repl add -u user1 -b test -f main -t follower
     ```
+    > **Tip**: For user-level replication (all existing and future buckets), omit the `-b` flag:
+    > ```shell
+    > chorctl repl add -u user1 -f main -t follower
+    > ```
 8. Check replication progress with:
     ```shell
     chorctl dash
@@ -86,7 +89,7 @@ To run chorus with docker compose:
     ```
 10. Now do some live changes to bucket using proxy:
     ```shell
-    s3cmd del s3://test/agent-conf.yaml -c ./docker-compose/s3cmd-proxy.conf
+    s3cmd del s3://test/worker-conf.yaml -c ./docker-compose/s3cmd-proxy.conf
     ```
 11. List main and follower contents again to see that the file was removed from both. Feel free to play around with storages using `s3cmd` and preconfigured configs [s3cmd-main.conf](./s3cmd-main.conf) [s3cmd-follower.conf](./s3cmd-follower.conf) [s3cmd-proxy.conf](./s3cmd-proxy.conf).
 
@@ -115,14 +118,7 @@ Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) with yo
 docker-compose -f ./docker-compose/docker-compose.yml --profile proxy up
 ```
 
-Or try a setup with [chorus-agent](../service/agent) instead of proxy. Unlike `chorus-proxy`, `chorus-agent` don't need to intercept S3 requests to propagate a new changes. Instead, it is capturing changes from [S3 bucket notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html)
-```shell
-docker-compose -f ./docker-compose/docker-compose.yml --profile agent up
-```
-> [!NOTE]  
-> Chorus agent will not work with fake S3 backend because bucket notifications are not supported by fake S3 backend.
-
-Explore more features with [chorctl](../tools/chorctl) and [WebUI](../ui).
+Explore more features with [chorctl](../tools/chorctl) (`chorctl --help`) and [WebUI](../ui).
 
 ## How-to
 To tear-down:
@@ -152,5 +148,5 @@ to:
   worker:
     image: "harbor.clyso.com/chorus/worker:latest" 
 ```
-And similar for `agent`, `web-ui`, and `proxy`.
+And similar for `web-ui` and `proxy`.
 

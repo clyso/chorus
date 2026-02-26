@@ -22,9 +22,13 @@ import (
 	"io/fs"
 
 	"github.com/clyso/chorus/pkg/config"
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 	"github.com/clyso/chorus/service/proxy/auth"
 	"github.com/clyso/chorus/service/proxy/cors"
+	"github.com/clyso/chorus/service/proxy/router"
 )
 
 //go:embed config.yaml
@@ -38,60 +42,62 @@ func defaultConfig() fs.File {
 	return defaultFile
 }
 
+type Storages = objstore.StoragesConfig[*s3.Storage, *router.SwiftStorage]
+type Storage = objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]
+
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
 
-	Storage *s3.StorageConfig `yaml:"storage,omitempty"`
-	Auth    *auth.Config      `yaml:"auth,omitempty"`
-	Port    int               `yaml:"port"`
-	Address string            `yaml:"address"`
-	Cors    *cors.Config      `yaml:"cors"`
+	Storage Storages     `yaml:"storage,omitempty"`
+	Auth    *auth.Config `yaml:"auth,omitempty"`
+	Port    int          `yaml:"port"`
+	Address string       `yaml:"address"`
+	Cors    *cors.Config `yaml:"cors"`
 }
 
 func (c *Config) Validate() error {
 	if err := c.Common.Validate(); err != nil {
 		return err
 	}
-	if c.Storage == nil {
-		return fmt.Errorf("app config: empty storages config")
-	}
-	if err := c.Storage.Init(); err != nil {
+	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
-	if c.Auth == nil {
-		return fmt.Errorf("proxy config: empty Auth config")
-	}
-	if c.Auth.UseStorage != "" {
-		if _, ok := c.Storage.Storages[c.Auth.UseStorage]; !ok {
-			return fmt.Errorf("proxy config: auth UseStorage points to unknown storage")
-		}
-	}
-	if len(c.Auth.Custom) != 0 {
-		var storCreds map[string]s3.CredentialsV4
-		for _, storage := range c.Storage.Storages {
-			storCreds = storage.Credentials
-			break
-		}
-		for user := range c.Auth.Custom {
-			if _, ok := storCreds[user]; !ok {
-				return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
-			}
-		}
-	}
-	if c.Auth.UseStorage == "" && len(c.Auth.Custom) == 0 {
-		return fmt.Errorf("proxy config: auth credentials enabled but not set")
-	}
-
-	if c.Port <= 0 {
-		return fmt.Errorf("proxy config: Port must be positive: %d", c.Port)
+	if err := ValidateAuth(c.Storage, c.Auth); err != nil {
+		return err
 	}
 	return nil
 }
 
-func GetConfig(src ...config.Src) (*Config, error) {
+func ValidateAuth(storage Storages, auth *auth.Config) error {
+	if len(storage.S3Storages()) == 0 {
+		return nil
+	}
+	// S3 storages set: validate auth config
+	if auth == nil {
+		return fmt.Errorf("proxy config: empty Auth config")
+	}
+	if auth.UseStorage != "" {
+		if _, ok := storage.Storages[auth.UseStorage]; !ok {
+			return fmt.Errorf("proxy config: auth UseStorage points to unknown storage")
+		}
+	}
+	if len(auth.Custom) != 0 {
+		for user := range auth.Custom {
+			if err := storage.Exists(storage.Main, user); err != nil {
+				return fmt.Errorf("proxy config: auth custom credentials unknown user %q", user)
+			}
+		}
+	}
+	if auth.UseStorage == "" && len(auth.Custom) == 0 {
+		return fmt.Errorf("proxy config: auth credentials enabled but not set")
+	}
+	return nil
+}
+
+func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Src{config.Reader(dc, "proxy_default_cfg")}
+	cfgSource := []config.Opt{config.Reader(dc, "proxy_default_cfg")}
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()
@@ -99,4 +105,28 @@ func GetConfig(src ...config.Src) (*Config, error) {
 		return nil, err
 	}
 	return &conf, err
+}
+
+func ProxyToCredsConf(in Storages) (objstore.Config, error) {
+	res := objstore.Config{
+		Storages:           map[string]objstore.GenericStorage[*s3.Storage, *swift.Storage]{},
+		Main:               in.Main,
+		DynamicCredentials: in.DynamicCredentials,
+	}
+
+	for name, val := range in.Storages {
+		switch val.Type {
+		case dom.S3:
+			c := *val.S3
+			res.Storages[name] = objstore.Storage{
+				S3:           &c,
+				CommonConfig: val.CommonConfig,
+			}
+		case dom.Swift:
+		// ignore - swift proxy conf does not contains credentials
+		default:
+			return objstore.Config{}, fmt.Errorf("unsupported storage type %q for storage %q", val.Type, name)
+		}
+	}
+	return res, nil
 }

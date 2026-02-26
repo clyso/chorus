@@ -63,3 +63,8 @@ func ErrContains(err error, text ...string) bool {
 	}
 	return false
 }
+
+func IsErrRateLimitExceeded(err error) bool {
+	var rateErr *ErrRateLimitExceeded
+	return errors.As(err, &rateErr)
+}

@@ -1,5 +1,5 @@
 <!--
-  - Copyright © 2025 Clyso GmbH
+  - Copyright © 2026 Clyso GmbH
   -
   -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
   -  you may not use this file except in compliance with the License.
@@ -31,14 +31,8 @@
   );
 
   const STORAGE_PROVIDER_ICON_MAP = {
-    [StorageProvider.AWS]: IconName.PROVIDER_AWS,
-    [StorageProvider.Other]: IconName.PROVIDER_OTHER,
-    [StorageProvider.Ceph]: IconName.PROVIDER_CEPH,
-    [StorageProvider.Minio]: IconName.PROVIDER_MINIO,
-    [StorageProvider.GCS]: IconName.PROVIDER_GOOGLE,
-    [StorageProvider.Alibaba]: IconName.PROVIDER_ALIBABA,
-    [StorageProvider.Cloudflare]: IconName.PROVIDER_CLOUDFLARE,
-    [StorageProvider.DigitalOcean]: IconName.PROVIDER_DIGITALOCEAN,
+    [StorageProvider.S3]: IconName.PROVIDER_OTHER,
+    [StorageProvider.SWIFT]: IconName.PROVIDER_OTHER,
   };
 
   const storageProviderIconName = computed(
@@ -52,10 +46,6 @@
       <template #trigger>
         <CIcon
           class="chorus-storage-provider__icon"
-          :class="{
-            'chorus-storage-provider__icon--other':
-              storageProvider === StorageProvider.Other,
-          }"
           :name="storageProviderIconName"
           tabindex="-1"
           :is-inline="true"
@@ -81,10 +71,7 @@
     &__icon {
       width: 24px;
       height: 24px;
-
-      &--other {
-        color: var(--primary-color);
-      }
+      color: var(--primary-color);
     }
   }
 </style>

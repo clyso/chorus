@@ -1,5 +1,5 @@
 /*
- * Copyright © 2025 Clyso GmbH
+ * Copyright © 2026 Clyso GmbH
  *
  *  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ export default <I18nMessages>{
     statusBehind: 'events behind',
     statusUptodate: 'Up to date',
     labelEvents: 'Events',
-    labelLastEmitted: 'Last Emitted At',
+    labelReplicationLatency: 'Replication Latency',
     labelLastProcessed: 'Last Processed At',
     actionViewDetails: 'View Details',
     actionResume: 'Resume',
@@ -143,6 +143,12 @@ export default <I18nMessages>{
     filterStatusLiveBehind: 'Live Replication: Behind',
     filterByCreatedAtStartPlaceholder: 'Filter by',
     filterByCreatedAtEndPlaceholder: 'Created At',
+    userReplication: 'User Replication',
+    userReplicationDescription:
+      'Replicates all current and future buckets for the user.',
+    filterTypeBucket: 'Bucket replication',
+    filterTypeUser: 'User replication',
+    filterByTypePlaceholder: 'Filter by Type',
   },
   [I18nLocale.DE]: {
     replicationsTitle: 'Replikation',
@@ -178,7 +184,7 @@ export default <I18nMessages>{
     statusBehind: 'hinterher',
     statusUptodate: 'Aktuell',
     labelEvents: 'Ereignisse',
-    labelLastEmitted: 'Letztes Ereignis',
+    labelReplicationLatency: 'Replikationslatenz',
     labelLastProcessed: 'Letzte Verarbeitung',
     actionViewDetails: 'Details ansehen',
     actionResume: 'Fortsetzen',
@@ -274,5 +280,11 @@ export default <I18nMessages>{
     filterStatusLiveBehind: 'Live-Replikation: Hinterher',
     filterByCreatedAtStartPlaceholder: 'Filtern nach',
     filterByCreatedAtEndPlaceholder: 'Erstellt am',
+    userReplication: 'Benutzer-Replikation',
+    userReplicationDescription:
+      'Repliziert alle aktuellen und zukünftigen Buckets dieses Nutzers.',
+    filterTypeBucket: 'Bucket-Replikation',
+    filterTypeUser: 'Benutzer-Replikation',
+    filterByTypePlaceholder: 'Nach Typ filtern',
   },
 };

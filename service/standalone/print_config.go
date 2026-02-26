@@ -24,7 +24,7 @@ import (
 	"github.com/clyso/chorus/pkg/config"
 )
 
-func PrintConfig(src ...config.Src) error {
+func PrintConfig(src ...config.Opt) error {
 	conf, err := GetConfig(src...)
 	if err != nil {
 		return err

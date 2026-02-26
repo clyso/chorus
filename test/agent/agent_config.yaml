@@ -1,5 +1,0 @@
-port: 9673
-url: "https://31f7-94-43-143-191.ngrok.io"
-fromStorage: "one"
-redis:
-  address: "127.0.0.1:51114"

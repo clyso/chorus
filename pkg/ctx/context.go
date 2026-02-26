@@ -21,16 +21,24 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/swift"
 )
 
 type methodKey struct{}
+type storTypeKey struct{}
 type objectKey struct{}
+type objectVerKey struct{}
 type bucketKey struct{}
 type storageKey struct{}
 type flowKey struct{}
 type traceKey struct{}
 type userKey struct{}
+type routingPolicyKey struct{}
+type replicationsKey struct{}
+type inProgressZeroDowntimeKey struct{}
 
 type Flow string
 
@@ -46,6 +54,24 @@ func SetMethod(ctx context.Context, in s3.Method) context.Context {
 
 func GetMethod(ctx context.Context) s3.Method {
 	res, _ := ctx.Value(methodKey{}).(s3.Method)
+	return res
+}
+
+func SetSwiftMethod(ctx context.Context, in swift.Method) context.Context {
+	return context.WithValue(ctx, methodKey{}, in)
+}
+
+func GetSwiftMethod(ctx context.Context) swift.Method {
+	res, _ := ctx.Value(methodKey{}).(swift.Method)
+	return res
+}
+
+func SetStorType(ctx context.Context, in dom.StorageType) context.Context {
+	return context.WithValue(ctx, storTypeKey{}, in)
+}
+
+func GetStorType(ctx context.Context) dom.StorageType {
+	res, _ := ctx.Value(storTypeKey{}).(dom.StorageType)
 	return res
 }
 
@@ -66,12 +92,28 @@ func GetObject(ctx context.Context) string {
 	return res
 }
 
+func SetObjectVer(ctx context.Context, in string) context.Context {
+	if in == "" {
+		return ctx
+	}
+	if prev := GetObjectVer(ctx); prev != "" {
+		zerolog.Ctx(ctx).Warn().Msgf("cannot set object version %s, ctx already contains version %s", in, prev)
+		return ctx
+	}
+	return context.WithValue(ctx, objectVerKey{}, in)
+}
+
+func GetObjectVer(ctx context.Context) string {
+	res, _ := ctx.Value(objectVerKey{}).(string)
+	return res
+}
+
 func SetBucket(ctx context.Context, in string) context.Context {
 	if in == "" {
 		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty bucket to ctx")
 		return ctx
 	}
-	if prev := GetBucket(ctx); prev != "" {
+	if prev := GetBucket(ctx); prev != "" && prev != in {
 		zerolog.Ctx(ctx).Warn().Msgf("cannot set bucket %s, ctx already contains bucket %s", in, prev)
 		return ctx
 	}
@@ -123,7 +165,7 @@ func SetUser(ctx context.Context, u string) context.Context {
 		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty user to ctx")
 		return ctx
 	}
-	if prev := GetUser(ctx); prev != "" {
+	if prev := GetUser(ctx); prev != "" && prev != u {
 		zerolog.Ctx(ctx).Warn().Msgf("cannot set user %s, ctx already contains user %s", u, prev)
 		return ctx
 	}
@@ -133,4 +175,46 @@ func SetUser(ctx context.Context, u string) context.Context {
 func GetUser(ctx context.Context) string {
 	k, _ := ctx.Value(userKey{}).(string)
 	return k
+}
+
+func GetRoutingPolicy(ctx context.Context) string {
+	p, _ := ctx.Value(routingPolicyKey{}).(string)
+	if p == "" {
+		// should never happen. Panic to catch in e2e tests
+		panic("policy is not set in context")
+	}
+	return p
+}
+
+func SetRoutingPolicy(ctx context.Context, p string) context.Context {
+	if p == "" {
+		// should never happen. Panic to catch in e2e tests
+		panic("cannot set empty RouteToStorage to ctx")
+	}
+	if prev, _ := ctx.Value(routingPolicyKey{}).(string); prev != "" {
+		// should never happen
+		zerolog.Ctx(ctx).Error().Msgf("overwrite ctx routing policy with %s, ctx already contains policy %s", p, prev)
+	}
+	return context.WithValue(ctx, routingPolicyKey{}, p)
+}
+
+func GetReplications(ctx context.Context) []entity.UniversalReplicationID {
+	r, _ := ctx.Value(replicationsKey{}).([]entity.UniversalReplicationID)
+	return r
+}
+
+func SetReplications(ctx context.Context, r []entity.UniversalReplicationID) context.Context {
+	return context.WithValue(ctx, replicationsKey{}, r)
+}
+
+func GetInProgressZeroDowntime(ctx context.Context) *entity.ReplicationSwitchInfo {
+	r, _ := ctx.Value(inProgressZeroDowntimeKey{}).(*entity.ReplicationSwitchInfo)
+	return r
+}
+
+func SetInProgressZeroDowntime(ctx context.Context, r entity.ReplicationSwitchInfo) context.Context {
+	if r.MultipartTTL == 0 {
+		panic("cannot set empty in progress zero downtime switch info to ctx")
+	}
+	return context.WithValue(ctx, inProgressZeroDowntimeKey{}, &r)
 }

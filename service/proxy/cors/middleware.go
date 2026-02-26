@@ -22,27 +22,29 @@ import (
 	"github.com/rs/cors"
 )
 
-func HttpMiddleware(conf *Config, next http.Handler) http.Handler {
-	if !conf.Enabled {
-		return next
-	}
+func HttpMiddleware(conf *Config) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if !conf.Enabled {
+			return next
+		}
 
-	if conf.AllowAll {
-		conf.Whitelist = []string{"*"}
-	}
+		if conf.AllowAll {
+			conf.Whitelist = []string{"*"}
+		}
 
-	return cors.New(cors.Options{
-		AllowedOrigins: conf.Whitelist,
-		AllowedMethods: []string{
-			http.MethodHead,
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodDelete,
-		},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: false,
-		// response headers required for multipart upload
-		ExposedHeaders: []string{"*"},
-	}).Handler(next)
+		return cors.New(cors.Options{
+			AllowedOrigins: conf.Whitelist,
+			AllowedMethods: []string{
+				http.MethodHead,
+				http.MethodGet,
+				http.MethodPost,
+				http.MethodPut,
+				http.MethodDelete,
+			},
+			AllowedHeaders:   []string{"*"},
+			AllowCredentials: false,
+			// response headers required for multipart upload
+			ExposedHeaders: []string{"*"},
+		}).Handler(next)
+	}
 }

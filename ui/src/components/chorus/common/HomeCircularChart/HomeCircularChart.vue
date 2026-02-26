@@ -1,5 +1,5 @@
 <!--
-  - Copyright © 2025 Clyso GmbH
+  - Copyright © 2026 Clyso GmbH
   -
   -  Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
   -  you may not use this file except in compliance with the License.
@@ -141,9 +141,14 @@
           { intersect: true },
           false,
         );
-        const { index } = elements[0];
 
-        emit('clickElement', index);
+        const element = elements[0];
+
+        if (!element) {
+          return;
+        }
+
+        emit('clickElement', element.index);
       },
       plugins: {
         tooltip: {

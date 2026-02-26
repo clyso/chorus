@@ -110,8 +110,9 @@ const _Method_name = "UndefinedMethodCreateBucketDeleteBucketHeadBucketListBucke
 var _Method_index = [...]uint16{0, 15, 27, 39, 49, 60, 77, 93, 109, 128, 146, 167, 185, 200, 215, 233, 254, 266, 278, 297, 316, 332, 348, 367, 387, 407, 430, 451, 475, 496, 515, 534, 556, 579, 602, 631, 661, 690, 722, 753, 785, 816, 850, 890, 931, 971, 1014, 1045, 1077, 1108, 1142, 1174, 1206, 1222, 1238, 1264, 1290, 1319, 1332, 1345, 1361, 1370, 1380, 1389, 1401, 1414, 1425, 1438, 1457, 1467, 1485, 1498, 1517, 1539, 1560, 1570, 1593, 1613, 1633, 1642, 1656, 1672, 1688, 1707, 1719, 1731, 1751, 1771, 1794, 1812, 1830, 1848, 1866, 1892, 1918, 1934}
 
 func (i Method) String() string {
-	if i >= Method(len(_Method_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_Method_index)-1 {
 		return "Method(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _Method_name[_Method_index[i]:_Method_index[i+1]]
+	return _Method_name[_Method_index[idx]:_Method_index[idx+1]]
 }

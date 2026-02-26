@@ -20,20 +20,25 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog"
+
+	xctx "github.com/clyso/chorus/pkg/ctx"
 )
 
-func HttpMiddleware(cfg *Config, app, appID string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		l := CreateLogger(cfg, app, appID)
-		builder := l.With()
-		if zerolog.GlobalLevel() < zerolog.InfoLevel {
-			builder = builder.Str(httpMethod, r.Method).
-				Str(httpPath, r.URL.Path).
-				Str(httpQuery, r.URL.RawQuery)
-		}
-		newLogger := builder.Logger()
+func HttpMiddleware(cfg *Config, app, appID string, flow xctx.Flow) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l := CreateLogger(cfg, app, appID)
+			builder := l.With()
+			if zerolog.GlobalLevel() < zerolog.InfoLevel {
+				builder = builder.Str(httpMethod, r.Method).
+					Str(httpPath, r.URL.Path).
+					Str(httpQuery, r.URL.RawQuery)
+			}
+			newLogger := builder.Logger()
 
-		ctx := newLogger.WithContext(r.Context())
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			ctx := newLogger.WithContext(r.Context())
+			ctx = WithFlow(ctx, flow)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

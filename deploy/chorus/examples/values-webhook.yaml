@@ -1,0 +1,100 @@
+# Example: Webhook-Based Replication (without Proxy)
+# Use webhooks instead of Proxy when:
+# - You cannot deploy a proxy in front of your storage
+# - You want to capture changes without intercepting traffic
+#
+# The worker exposes webhook endpoints for two event sources:
+#
+# 1. S3 bucket notifications (Ceph RGW):
+#    Chorus automatically creates topics and registers bucket notifications.
+#    Endpoint: /webhook/<storage>/s3-notifications
+#
+# 2. Swift events (OpenStack Swift):
+#    Requires an external log parser (e.g. Fluent Bit) to tail Swift proxy logs
+#    and forward parsed events to the webhook endpoint.
+#    Endpoint: /webhook/<storage>/swift
+#    See docs/swift-agent/design.md for architecture and setup details.
+
+# Disable proxy — using webhooks instead
+proxy:
+  enabled: false
+
+# Enable webhook on the worker
+worker:
+  replicas: 2
+  config:
+    concurrency: 10
+    api:
+      enabled: true
+      grpcPort: 9670
+      httpPort: 9671
+
+      webhook:
+        enabled: true
+        # Leave baseUrl empty to auto-generate from Kubernetes service URL.
+        # Set explicitly when the storage pushes from outside the cluster:
+        # baseUrl: "https://chorus-webhook.example.com"
+
+        # Optional: run webhook on separate ports (both must be set, or both 0)
+        # grpcPort: 9680
+        # httpPort: 9681
+
+# Uncomment to expose webhook externally via ingress:
+# ingress:
+#   webhook:
+#     enabled: true
+#     className: nginx
+#     annotations:
+#       nginx.ingress.kubernetes.io/proxy-body-size: "0"
+#     hosts:
+#       - host: chorus-webhook.example.com
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#     tls:
+#       - secretName: chorus-webhook-tls
+#         hosts:
+#           - chorus-webhook.example.com
+
+# Storage configuration
+storage:
+  main: main
+
+  storages:
+    main:
+      type: S3
+      address: s3.example.com
+      provider: Other # Other, Ceph, or Minio
+      isSecure: true
+
+    backup:
+      type: S3
+      address: s3-backup.example.com
+      provider: Ceph
+      isSecure: true
+
+credentials:
+  storages:
+    main:
+      app-user:
+        accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+    backup:
+      app-user:
+        accessKeyID: "BKIAIOSFODNN7EXAMPLE"
+        secretAccessKey: "xJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+# After deployment (S3 / Ceph RGW):
+# 1. Create replication with webhook event source:
+#    chorctl repl add -u app-user -b mybucket -f main -t backup \
+#      --event-source s3-notification
+# 2. Chorus automatically creates the topic and registers bucket notifications.
+#    No manual configuration needed.
+#
+# After deployment (OpenStack Swift):
+# 1. Deploy a log parser (e.g. Fluent Bit sidecar) that tails Swift proxy logs
+#    and sends parsed events to: <baseUrl>/webhook/<storage>/swift
+#    See docs/swift-agent/design.md for Fluent Bit config and Lua script.
+# 2. Create replication with webhook event source:
+#    chorctl repl add -u app-user -b mybucket -f main -t backup \
+#      --event-source webhook

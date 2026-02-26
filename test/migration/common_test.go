@@ -17,14 +17,15 @@
 package migration
 
 import (
-	"encoding/base64"
-	"fmt"
+	"context"
 	"math/rand"
 	"strings"
+	"testing"
 
+	pb "github.com/clyso/chorus/proto/gen/go/chorus"
+	"github.com/clyso/chorus/test/app"
 	mclient "github.com/minio/minio-go/v7"
-
-	"github.com/clyso/chorus/pkg/s3"
+	"github.com/stretchr/testify/require"
 )
 
 type testObj struct {
@@ -48,7 +49,7 @@ func getTestObj(name, bucket string) testObj {
 
 func listObjects(c *mclient.Client, bucket string, prefix string) ([]string, error) {
 	var res []string
-	objCh := c.ListObjects(tstCtx, bucket, mclient.ListObjectsOptions{Prefix: prefix, Recursive: true})
+	objCh := c.ListObjects(context.Background(), bucket, mclient.ListObjectsOptions{Prefix: prefix, Recursive: true})
 	for obj := range objCh {
 		if obj.Err != nil {
 			return nil, obj.Err
@@ -66,101 +67,107 @@ func listObjects(c *mclient.Client, bucket string, prefix string) ([]string, err
 	return res, nil
 }
 
-//func startMigration(from, to string) error {
-//	task, err := tasks.NewTask(tasks.MigrationStartPayload{
-//		FromStorage: from,
-//		ToStorage:   to,
-//	})
-//	if err != nil {
-//		return err
-//	}
-//	_, err = taskClient.EnqueueContext(tstCtx, task)
-//	return err
-//}
-
-func generateCredentials() s3.CredentialsV4 {
-	res := s3.CredentialsV4{}
-	const (
-		// Minimum length for MinIO access key.
-		accessKeyMinLen = 3
-
-		// Maximum length for MinIO access key.
-		// There is no max length enforcement for access keys
-		accessKeyMaxLen = 20
-
-		// Minimum length for MinIO secret key for both server
-		secretKeyMinLen = 8
-
-		// Maximum secret key length for MinIO, this
-		// is used when autogenerating new credentials.
-		// There is no max length enforcement for secret keys
-		secretKeyMaxLen = 40
-
-		// Alpha numeric table used for generating access keys.
-		alphaNumericTable = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-		// Total length of the alpha numeric table.
-		alphaNumericTableLen = byte(len(alphaNumericTable))
-	)
-	readBytes := func(size int) (data []byte, err error) {
-		data = make([]byte, size)
-		var n int
-		if n, err = rand.Read(data); err != nil {
-			return nil, err
-		} else if n != size {
-			panic(fmt.Errorf("Not enough data. Expected to read: %v bytes, got: %v bytes", size, n))
-		}
-		return data, nil
-	}
-
-	// Generate access key.
-	keyBytes, err := readBytes(accessKeyMaxLen)
-	if err != nil {
-		panic(err)
-	}
-	for i := 0; i < accessKeyMaxLen; i++ {
-		keyBytes[i] = alphaNumericTable[keyBytes[i]%alphaNumericTableLen]
-	}
-	res.AccessKeyID = string(keyBytes)
-
-	// Generate secret key.
-	keyBytes, err = readBytes(secretKeyMaxLen)
-	if err != nil {
-		panic(err)
-	}
-
-	res.SecretAccessKey = strings.ReplaceAll(string([]byte(base64.StdEncoding.EncodeToString(keyBytes))[:secretKeyMaxLen]),
-		"/", "+")
-
-	return res
-}
-
-func cleanup(buckets ...string) {
-	for _, bucket := range buckets {
-		objCh, _ := listObjects(mainClient, bucket, "")
-		for _, obj := range objCh {
-			_ = mainClient.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
-		}
-		_ = mainClient.RemoveBucket(tstCtx, bucket)
-
-		objCh, _ = listObjects(f1Client, bucket, "")
-		for _, obj := range objCh {
-			_ = f1Client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
-		}
-		_ = f1Client.RemoveBucket(tstCtx, bucket)
-
-		objCh, _ = listObjects(f2Client, bucket, "")
-		for _, obj := range objCh {
-			_ = f2Client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
-		}
-		_ = f2Client.RemoveBucket(tstCtx, bucket)
-	}
-}
-
 func rmBucket(client *mclient.Client, bucket string) error {
 	objs, _ := listObjects(client, bucket, "")
 	for _, obj := range objs {
-		_ = client.RemoveObject(tstCtx, bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
+		_ = client.RemoveObject(context.Background(), bucket, obj, mclient.RemoveObjectOptions{ForceDelete: true})
 	}
-	return client.RemoveBucket(tstCtx, bucket)
+	return client.RemoveBucket(context.Background(), bucket)
+}
+
+type ReplicationDiffResponse struct {
+	IsMatch  bool
+	MissFrom []string
+	MissTo   []string
+	Differ   []string
+}
+
+func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) ReplicationDiffResponse {
+	t.Helper()
+	r := require.New(t)
+	r.NotNil(id.FromBucket)
+	r.NotNil(id.ToBucket)
+	loc := []*pb.MigrateLocation{
+		{Bucket: *id.FromBucket, Storage: id.FromStorage},
+		{Bucket: *id.ToBucket, Storage: id.ToStorage},
+	}
+	// delete any existing diff
+	_, err := e.DiffClient.DeleteReport(t.Context(), &pb.ConsistencyCheckRequest{
+		Locations: loc,
+	})
+	r.NoError(err)
+
+	// create diff
+	_, err = e.DiffClient.Start(t.Context(), &pb.StartConsistencyCheckRequest{
+		Locations:             loc,
+		User:                  id.User,
+		CheckOnlyLastVersions: true,
+	})
+	r.NoError(err)
+
+	var res *pb.GetConsistencyCheckReportResponse
+	r.Eventually(func() bool {
+		//poll until ready
+		res, err = e.DiffClient.GetReport(t.Context(), &pb.ConsistencyCheckRequest{
+			Locations: loc,
+		})
+		r.NoError(err)
+		return res.Check.Ready
+	}, e.WaitLong, e.RetryShort)
+	r.True(res.Check.Ready)
+
+	if res.Check.Consistent {
+		// match
+		return ReplicationDiffResponse{IsMatch: true}
+	}
+	fromMap := make(map[string]struct{})
+	toMap := make(map[string]struct{})
+	// not match, request diff entries
+	diff := ReplicationDiffResponse{IsMatch: false}
+	cursor := uint64(0)
+	for {
+		batch, err := e.DiffClient.GetReportEntries(t.Context(), &pb.GetConsistencyCheckReportEntriesRequest{
+			Locations: loc,
+			Cursor:    0,
+			PageSize:  100,
+		})
+		r.NoError(err)
+		cursor = batch.Cursor
+		for _, entry := range batch.Entries {
+			if len(entry.StorageEntries) == 1 {
+				stor := entry.StorageEntries[0]
+				if strings.HasSuffix(entry.Object, "/") {
+					//TODO: fix consistency check to
+					// skip folder placehoders
+					continue
+				}
+				if stor.Storage == id.FromStorage && stor.Bucket == *id.FromBucket {
+					fromMap[entry.Object] = struct{}{}
+				} else if stor.Storage == id.ToStorage && stor.Bucket == *id.ToBucket {
+					toMap[entry.Object] = struct{}{}
+				} else {
+					r.Fail("entry with unexpected location found")
+				}
+			} else {
+				r.Fail("entry with unexpected number of locations found")
+			}
+		}
+		if cursor == 0 {
+			break
+		}
+	}
+
+	// find missing objects
+	for fromObj := range fromMap {
+		if _, found := toMap[fromObj]; !found {
+			diff.MissTo = append(diff.MissTo, fromObj)
+		} else {
+			delete(toMap, fromObj)
+			diff.Differ = append(diff.Differ, fromObj)
+		}
+	}
+	for toObj := range toMap {
+		diff.MissFrom = append(diff.MissFrom, toObj)
+	}
+	return diff
 }

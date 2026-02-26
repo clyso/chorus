@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -27,87 +28,85 @@ import (
 )
 
 var (
-	raFrom     string
-	raTo       string
-	raUser     string
-	raAgentURL string
-	raBucket   string
-	raToBucket string
+	raFrom        string
+	raTo          string
+	raUser        string
+	raEventSource string
+	raFromBucket  string
+	raToBucket    string
 )
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:   "add",
-	Short: "adds new bucket replication rule",
-	Long: `Example:
-chorctl repl add -f main -t follower -u admin -b bucket1
-  - will replicate bucket "bucket1" from storage "main" to storage "follower"
+	Short: "create replication policy",
+	Long: `Create replication policy.
 
-chorctl repl add -f main -t follower -u admin -b src-bucket --to-buckt=dest-bucket
-  - will replicate bucket "src-bucket" from storage "main" to bucket "dest-bucket" in storage "follower"`,
+User-level replication (all existing and future buckets for a user):
+  chorctl repl add --from main --to follower --user admin
+
+Bucket-level replication (single bucket, same name on both storages):
+  chorctl repl add --from main --to follower --user admin --from-bucket bucket1
+
+Bucket-level replication (different destination bucket name):
+  chorctl repl add --from main --to follower --user admin --from-bucket src-bucket --to-bucket dest-bucket
+
+S3 notification event source (worker creates SNS topic + bucket notification):
+  chorctl repl add --from main --to follower --user admin --from-bucket bucket1 --event-source s3-notification
+
+External webhook event source (e.g. Swift access log exporter):
+  chorctl repl add --from main --to follower --user admin --event-source webhook`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if raToBucket != "" && raFromBucket == "" {
+			return fmt.Errorf("--to-bucket must be set when --from-bucket is set")
+		}
+		if raEventSource != "" && raEventSource != "proxy" && raEventSource != "s3-notification" && raEventSource != "webhook" {
+			return fmt.Errorf("--event-source must be one of: proxy, s3-notification, webhook")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
-		}
+
+		conn, client := newPolicyClient(ctx)
 		defer conn.Close()
-		client := pb.NewChorusClient(conn)
 
-		req := &pb.AddBucketReplicationRequest{
-			User:        raUser,
-			FromStorage: raFrom,
-			ToStorage:   raTo,
-			FromBucket:  raBucket,
-			ToBucket:    raToBucket,
-		}
-		if raAgentURL != "" {
-			req.AgentUrl = &raAgentURL
-		}
-		if raToBucket == "" {
-			req.ToBucket = raBucket
+		id := buildReplicationID(raUser, raFrom, raTo, raFromBucket, raToBucket)
+		req := &pb.AddReplicationRequest{Id: id}
+		if raEventSource != "" && raEventSource != "proxy" {
+			req.Opts = &pb.ReplicationOpts{}
+			switch raEventSource {
+			case "s3-notification":
+				req.Opts.EventSource = pb.EventSource_EVENT_SOURCE_S3_NOTIFICATION
+			case "webhook":
+				req.Opts.EventSource = pb.EventSource_EVENT_SOURCE_WEBHOOK
+			}
 		}
 
-		_, err = client.AddBucketReplication(ctx, req)
+		_, err := client.AddReplication(ctx, req)
 		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to add replication")
+			api.PrintGrpcError(err)
 		}
 	},
 }
 
 func init() {
 	replCmd.AddCommand(addCmd)
-	addCmd.Flags().StringVarP(&raFrom, "from", "f", "", "from storage")
-	addCmd.Flags().StringVarP(&raTo, "to", "t", "", "to storage")
-	addCmd.Flags().StringVarP(&raUser, "user", "u", "", "storage user")
-	addCmd.Flags().StringVar(&raAgentURL, "agent-url", "", "notifications agent url")
-	addCmd.Flags().StringVarP(&raBucket, "bucket", "b", "", "bucket name to replicate")
-	addCmd.Flags().StringVar(&raToBucket, "to-bucket", "", "custom destinatin bucket name. Set if destination bucket should have different name from source bucket")
-	err := addCmd.MarkFlagRequired("from")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = addCmd.MarkFlagRequired("to")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = addCmd.MarkFlagRequired("user")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = addCmd.MarkFlagRequired("bucket")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
+	addCmd.Flags().StringVarP(&raFrom, "from", "f", "", "source storage name")
+	addCmd.Flags().StringVarP(&raTo, "to", "t", "", "destination storage name")
+	addCmd.Flags().StringVarP(&raUser, "user", "u", "", "replication user")
+	addCmd.Flags().StringVar(&raEventSource, "event-source", "", "event source: proxy, s3-notification, webhook")
+	addCmd.Flags().StringVarP(&raFromBucket, "from-bucket", "b", "", "source bucket name; omit for user-level policies")
+	addCmd.Flags().StringVar(&raToBucket, "to-bucket", "", "destination bucket name; defaults to from-bucket for bucket-level policies")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// addCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// addCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	if err := addCmd.MarkFlagRequired("from"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err := addCmd.MarkFlagRequired("to"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err := addCmd.MarkFlagRequired("user"); err != nil {
+		logrus.WithError(err).Fatal()
+	}
 }

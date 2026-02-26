@@ -41,22 +41,22 @@ func Benchmark(ctx context.Context, conf *config.Config, kv *db.DB, main, proxy 
 		listProxyCh := make(chan int64, 1)
 		defer close(listProxyCh)
 		g.Go(func() error {
-			return listenListBenchmark(ctx, conf, proxy, listProxyCh)
+			return listenListBenchmark(ctx, "proxy", conf, proxy, listProxyCh)
 		})
 		listMainCh := make(chan int64, 1)
 		defer close(listMainCh)
 		g.Go(func() error {
-			return listenListBenchmark(ctx, conf, main, listMainCh)
+			return listenListBenchmark(ctx, "main", conf, main, listMainCh)
 		})
 		getProxyCh := make(chan int64, 1)
 		defer close(getProxyCh)
 		g.Go(func() error {
-			return listenGetBenchmark(ctx, conf, proxy, getProxyCh)
+			return listenGetBenchmark(ctx, "proxy", conf, proxy, getProxyCh)
 		})
 		getMainCh := make(chan int64, 1)
 		defer close(getMainCh)
 		g.Go(func() error {
-			return listenGetBenchmark(ctx, conf, main, getMainCh)
+			return listenGetBenchmark(ctx, "main", conf, main, getMainCh)
 		})
 
 		for {
@@ -89,10 +89,10 @@ func Benchmark(ctx context.Context, conf *config.Config, kv *db.DB, main, proxy 
 	return done
 }
 
-func listenListBenchmark(ctx context.Context, conf *config.Config, client s3client.Client, listen <-chan int64) error {
+func listenListBenchmark(ctx context.Context, name string, conf *config.Config, client s3client.Client, listen <-chan int64) error {
 	writeFileCh := make(chan dump.BenchEvent)
 	defer close(writeFileCh)
-	writeFileDone := dump.ToCSVNonBlocking(conf, benchFileName(client.Name()+"_LIST", conf), []string{"COUNT", "LIST_COUNT", "START_TS_US", "END_TS_US", "DURATION_US", "EVENTS", "EVENTS_DONE", "EVENTS_LAG"}, writeFileCh)
+	writeFileDone := dump.ToCSVNonBlocking(conf, benchFileName(name+"_LIST", conf), []string{"COUNT", "LIST_COUNT", "START_TS_US", "END_TS_US", "DURATION_US", "EVENTS", "EVENTS_DONE", "EVENTS_LAG"}, writeFileCh)
 	for {
 		select {
 		case writeErr := <-writeFileDone:
@@ -128,10 +128,10 @@ func listenListBenchmark(ctx context.Context, conf *config.Config, client s3clie
 	}
 }
 
-func listenGetBenchmark(ctx context.Context, conf *config.Config, client s3client.Client, listen <-chan int64) error {
+func listenGetBenchmark(ctx context.Context, name string, conf *config.Config, client s3client.Client, listen <-chan int64) error {
 	writeFileCh := make(chan dump.BenchEvent)
 	defer close(writeFileCh)
-	writeFileDone := dump.ToCSVNonBlocking(conf, benchFileName(client.Name()+"_GET", conf), []string{"COUNT", "START_TS_US", "END_TS_US", "DURATION_US", "EVENTS", "EVENTS_DONE", "EVENTS_LAG"}, writeFileCh)
+	writeFileDone := dump.ToCSVNonBlocking(conf, benchFileName(name+"_GET", conf), []string{"COUNT", "START_TS_US", "END_TS_US", "DURATION_US", "EVENTS", "EVENTS_DONE", "EVENTS_LAG"}, writeFileCh)
 
 	for {
 		select {

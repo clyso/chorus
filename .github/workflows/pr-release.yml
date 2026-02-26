@@ -17,9 +17,6 @@ jobs:
           - context: .
             dockerfile: Dockerfile
             name: proxy
-          - context: .
-            dockerfile: Dockerfile
-            name: agent
           - context: ./ui
             dockerfile: ./ui/Dockerfile
             name: web-ui

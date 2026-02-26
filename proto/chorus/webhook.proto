@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package chorus;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/clyso/chorus/proto/chorus;pb";
+
+// Webhook service receives storage events and enqueues replication tasks.
+// Returns non-200 only on transient errors (context cancelled, Redis
+// unavailable) where a retry may succeed. Permanent errors (unknown storage,
+// invalid events, no replication policy) are logged server-side and return 200.
+service Webhook {
+  // SwiftEvents receives a batch of OpenStack Swift events parsed from
+  // access logs by an external log exporter (e.g. Fluent Bit, Vector)
+  // and enqueues replication tasks for events matching active policies.
+  // Events that cannot be processed are skipped and logged server-side.
+  rpc SwiftEvents(SwiftEventsRequest) returns (google.protobuf.Empty);
+
+  // S3Notifications receives standard AWS S3 notification events and enqueues
+  // replication tasks. Compatible with S3 bucket notification push format.
+  // Events that cannot be processed are skipped and logged server-side.
+  rpc S3Notifications(S3NotificationRequest) returns (google.protobuf.Empty);
+}
+
+message SwiftEventsRequest {
+  // Chorus storage alias (must be a configured SWIFT storage).
+  string storage = 1;
+  // Events are processed independently; a failure in one does not affect others.
+  repeated SwiftEvent events = 2;
+}
+
+message SwiftEvent {
+  // OpenStack project ID (tenant ID). Required.
+  string account = 1;
+  // Required for container and object operations.
+  string container = 2;
+  // Required for object operations.
+  string object = 3;
+  SwiftOperation operation = 4;
+  // Optional. Object ETag (MD5).
+  string etag = 5;
+  // Optional. Object last modified timestamp.
+  string last_modified = 6;
+  // Optional. Object version ID.
+  string version_id = 7;
+  // Optional. Server response date, used as reference timestamp when
+  // Swift does not return Last-Modified (account/container/meta updates).
+  string date = 8;
+  // Optional. If true, indicates SLO/DLO multipart manifest deletion.
+  bool delete_multipart = 9;
+}
+
+// SwiftOperation determines which replication task is created.
+// Task handlers are idempotent — e.g. CONTAINER_UPDATE and CONTAINER_DELETE
+// both trigger a sync that compares source and destination state.
+enum SwiftOperation {
+  SWIFT_OPERATION_UNSPECIFIED = 0;
+  ACCOUNT_UPDATE = 1;
+  CONTAINER_UPDATE = 2;
+  CONTAINER_DELETE = 3;
+  OBJECT_CREATED = 4;
+  OBJECT_METADATA_UPDATED = 5;
+  OBJECT_DELETED = 6;
+}
+
+message S3NotificationRequest {
+  // Chorus storage alias (must be a configured S3 storage). Bound to URL path.
+  string storage = 1;
+  // Standard AWS S3 notification records.
+  // Events are processed independently; a failure in one does not affect others.
+  repeated S3EventRecord records = 2 [json_name = "Records"];
+}
+
+message S3EventRecord {
+  // e.g. "s3:ObjectCreated:Put", "s3:ObjectRemoved:Delete"
+  string event_name = 1;
+  S3EventPayload s3 = 2;
+}
+
+message S3EventPayload {
+  // Encoded chorus notification ID (contains user + bucket).
+  string configuration_id = 1;
+  S3BucketInfo bucket = 2;
+  S3ObjectInfo object = 3;
+}
+
+message S3BucketInfo {
+  string name = 1;
+}
+
+message S3ObjectInfo {
+  string key = 1;
+  int64 size = 2;
+  string e_tag = 3;
+}

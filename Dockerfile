@@ -1,4 +1,4 @@
-FROM golang:1.24 as builder
+FROM golang:1.25.7 AS builder
 ARG GIT_COMMIT='not set'
 ARG GIT_TAG=development
 ENV GIT_COMMIT=$GIT_COMMIT
@@ -16,7 +16,7 @@ COPY . .
 ARG GOOS=linux
 # amd64| arm64
 # ARG GOARCH=amd64 
-# worker|proxy|agent
+# worker|proxy
 ARG SERVICE=worker
 
 RUN CGO_ENABLED=0 GO111MODULE=on GOOS=$GOOS GOARCH=${TARGETARCH} go build -ldflags="-X 'main.date=$BUILD_DATE' -X 'main.version=$GIT_TAG' -X 'main.commit=$GIT_COMMIT'" -o chorus ./cmd/${SERVICE}
