@@ -32,6 +32,13 @@ export default <I18nMessages>{
     routingPolicyStorage:
       'The storage the routing policy configuration is related to',
     allBuckets: 'All Buckets',
+    filterByUserPlaceholder: 'Filter by User',
+    filterByBucketPlaceholder: 'Search by Bucket',
+    filterByStoragePlaceholder: 'Filter by Storage',
+    filterByStorageNoResult: 'No storage matches your search criteria',
+    filterStatusAllowed: 'Allowed',
+    filterStatusBlocked: 'Blocked',
+    filterByStatusPlaceholder: 'Filter by Status',
   },
   [I18nLocale.DE]: {
     routingPoliciesTitle: 'Routing-Richtlinien',
@@ -48,5 +55,12 @@ export default <I18nMessages>{
     routingPolicyStorage:
       'Der Storage, auf den sich die Routing-Richtlinie bezieht',
     allBuckets: 'Alle Buckets',
+    filterByUserPlaceholder: 'Nach Benutzer filtern',
+    filterByBucketPlaceholder: 'Nach Bucket suchen',
+    filterByStoragePlaceholder: 'Nach Speicherort filtern',
+    filterByStorageNoResult: 'Kein Speicher entspricht Ihren Suchkriterien',
+    filterStatusAllowed: 'Zugelassen',
+    filterStatusBlocked: 'Blockiert',
+    filterByStatusPlaceholder: 'Nach Status filtern',
   },
 };

@@ -14,11 +14,13 @@
  *  limitations under the License.
  */
 
+import { type DataTablePaginationObject } from '@clyso/clyso-ui-kit';
 import type { DataTableSortState } from 'naive-ui';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { GeneralHelper } from '@/utils/helpers/GeneralHelper';
 import {
+  RoutingPolicyStatusFilter,
   RoutingPolicyTypes,
   type RoutingPolicyListRequest,
   type RoutingPolicy,
@@ -38,6 +40,11 @@ interface ChorusRoutingPoliciesState {
   selectedRoutingPolicyIds: string[];
 
   routingPoliciesRequestOptions: RoutingPolicyListRequest | null;
+
+  filterUsers: string[];
+  filterBucket: string;
+  filterStorages: string[];
+  filterStatus: RoutingPolicyStatusFilter | null;
 }
 
 const PAGE_SIZES = [10, 20, 30, 50, 100] as const;
@@ -55,6 +62,11 @@ function getInitialState(): ChorusRoutingPoliciesState {
     selectedRoutingPolicyIds: [],
 
     routingPoliciesRequestOptions: null,
+
+    filterUsers: [],
+    filterBucket: '',
+    filterStorages: [],
+    filterStatus: null,
   };
 }
 
@@ -63,14 +75,43 @@ export const useChorusRoutingPoliciesStore = defineStore(
   () => {
     const state = reactive<ChorusRoutingPoliciesState>(getInitialState());
 
+    const filteredRoutingPolicies = computed<RoutingPolicy[]>(() =>
+      state.routingPolicies.filter((routingPolicy) => {
+        const isUserMatched =
+          !state.filterUsers.length ||
+          state.filterUsers.includes(routingPolicy.user);
+        const isStorageMatched =
+          !state.filterStorages.length ||
+          state.filterStorages.includes(routingPolicy.toStorage);
+        const isStatusMatched =
+          state.filterStatus === null ||
+          (state.filterStatus === RoutingPolicyStatusFilter.BLOCKED) ===
+            routingPolicy.isBlocked;
+        const isBucketMatched =
+          !state.filterBucket ||
+          !routingPolicy.bucket ||
+          routingPolicy.bucket
+            .toLocaleLowerCase()
+            .trim()
+            .includes(state.filterBucket?.toLowerCase().trim());
+
+        return (
+          isUserMatched &&
+          isStorageMatched &&
+          isStatusMatched &&
+          isBucketMatched
+        );
+      }),
+    );
+
     const computedRoutingPolicies = computed<RoutingPolicy[]>(() => {
       const pageRoutingPolicies = state.sorter
         ? GeneralHelper.orderBy(
-            state.routingPolicies,
+            filteredRoutingPolicies.value,
             [state.sorter.columnKey, 'id'],
             [state.sorter.order === 'ascend' ? 'asc' : 'desc'],
           )
-        : GeneralHelper.orderBy(state.routingPolicies, ['id'], ['asc']);
+        : GeneralHelper.orderBy(filteredRoutingPolicies.value, ['id'], ['asc']);
 
       const start = (state.page - 1) * state.pageSize;
       const end = state.page * state.pageSize;
@@ -81,6 +122,21 @@ export const useChorusRoutingPoliciesStore = defineStore(
     const hasNoData = computed<boolean>(
       () => state.routingPolicies.length === 0,
     );
+
+    const isFiltered = computed<boolean>(
+      () =>
+        state.filterUsers.length !== 0 ||
+        state.filterBucket !== '' ||
+        state.filterStorages.length !== 0 ||
+        state.filterStatus !== null,
+    );
+
+    function clearFilters() {
+      state.filterUsers = [];
+      state.filterBucket = '';
+      state.filterStorages = [];
+      state.filterStatus = null;
+    }
 
     async function getRoutingPolicies() {
       state.routingPoliciesRequestOptions = {
@@ -164,6 +220,29 @@ export const useChorusRoutingPoliciesStore = defineStore(
         state.isLoading = false;
       }
     }
+
+    const pagination = computed<DataTablePaginationObject>(() => ({
+      page: state.page,
+      pageSize: state.pageSize,
+      showSizePicker: true,
+      pageSizes: [...PAGE_SIZES],
+      pageCount: Math.ceil(
+        filteredRoutingPolicies.value.length / state.pageSize,
+      ),
+      itemCount: filteredRoutingPolicies.value.length,
+      prefix({ itemCount }) {
+        if (state.isLoading || state.hasError) {
+          return '';
+        }
+
+        if (isFiltered.value) {
+          return `Filtered: ${filteredRoutingPolicies.value.length} / Total: ${state.routingPolicies.length}`;
+        }
+
+        return `Total: ${itemCount}`;
+      },
+    }));
+
     const selectedRoutingPoliciesCount = computed(
       () => state.selectedRoutingPolicyIds.length,
     );
@@ -189,11 +268,14 @@ export const useChorusRoutingPoliciesStore = defineStore(
     return {
       ...toRefs(state),
       hasNoData,
+      pagination,
       computedRoutingPolicies,
       initRoutingPoliciesPage,
       selectedRoutingPoliciesCount,
       isAnyRoutingPolicySelected,
       selectedRoutingPolicies,
+      isFiltered,
+      clearFilters,
       $reset,
     };
   },
