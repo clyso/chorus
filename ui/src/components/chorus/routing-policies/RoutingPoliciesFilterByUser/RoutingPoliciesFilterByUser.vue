@@ -16,22 +16,22 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { computed } from 'vue';
   import { storeToRefs } from 'pinia';
-  import i18nReplications from '@/components/chorus/replications/i18nReplications';
-  import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
+  import { computed } from 'vue';
+  import i18nRoutingPolicies from '../i18nRoutingPolicies';
+  import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
   import ChorusUserFilter from '@/components/chorus/common/ChorusUserFilter/ChorusUserFilter.vue';
 
   const { t } = useI18n({
-    messages: i18nReplications,
+    messages: i18nRoutingPolicies,
   });
 
-  const { replications, filterUsers, page } = storeToRefs(
-    useChorusReplicationsStore(),
+  const { routingPolicies, filterUsers, page } = storeToRefs(
+    useChorusRoutingPoliciesStore(),
   );
 
   const users = computed(() =>
-    replications.value.map((replication) => replication.id.user),
+    routingPolicies.value.map((routingPolicy) => routingPolicy.user),
   );
 </script>
 

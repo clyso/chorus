@@ -16,30 +16,30 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { computed } from 'vue';
   import { storeToRefs } from 'pinia';
-  import i18nReplications from '@/components/chorus/replications/i18nReplications';
-  import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
-  import ChorusUserFilter from '@/components/chorus/common/ChorusUserFilter/ChorusUserFilter.vue';
+  import { computed } from 'vue';
+  import i18nRoutingPolicies from '../i18nRoutingPolicies';
+  import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
+  import ChorusStorageFilter from '@/components/chorus/common/ChorusStorageFilter/ChorusStorageFilter.vue';
 
   const { t } = useI18n({
-    messages: i18nReplications,
+    messages: i18nRoutingPolicies,
   });
 
-  const { replications, filterUsers, page } = storeToRefs(
-    useChorusReplicationsStore(),
+  const { routingPolicies, filterStorages, page } = storeToRefs(
+    useChorusRoutingPoliciesStore(),
   );
 
-  const users = computed(() =>
-    replications.value.map((replication) => replication.id.user),
+  const storages = computed(() =>
+    routingPolicies.value.map((routingPolicy) => routingPolicy.toStorage),
   );
 </script>
 
 <template>
-  <ChorusUserFilter
-    v-model:filterValue="filterUsers"
-    :users="users"
-    :placeholder="t('filterByUserPlaceholder')"
-    @update:filter-value="page = 1"
+  <ChorusStorageFilter
+    v-model:filterValue="filterStorages"
+    :storages="storages"
+    :placeholder="t('filterByStoragePlaceholder')"
+    @update:value="page = 1"
   />
 </template>

@@ -43,6 +43,7 @@
     sorter,
     page,
     pageSize,
+    pagination,
   } = storeToRefs(useChorusRoutingPoliciesStore());
 
   const { initRoutingPoliciesPage } = useChorusRoutingPoliciesStore();
@@ -110,6 +111,7 @@
         :is-controlled="true"
         :is-loading="isLoading"
         :has-error="hasError"
+        :pagination="pagination"
         :bordered="false"
         :sorter="sorter"
         :row-key="rowKey"
