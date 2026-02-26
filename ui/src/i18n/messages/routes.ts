@@ -30,6 +30,7 @@ const routes: I18nMessages<Routes> = {
     [RouteName.CHORUS_REPLICATION]: 'Replication',
     [RouteName.CHORUS_ADD_REPLICATION]: 'Add Replication',
     [RouteName.CHORUS_MONITORING]: 'Monitoring',
+    [RouteName.CHORUS_ROUTING_POLICIES]: 'Routing Policies',
   },
   [I18nLocale.DE]: {
     [RouteName.LOGIN]: 'Login',
@@ -39,6 +40,7 @@ const routes: I18nMessages<Routes> = {
     [RouteName.CHORUS_REPLICATION]: 'Replikation',
     [RouteName.CHORUS_ADD_REPLICATION]: 'Replikation hinzufügen',
     [RouteName.CHORUS_MONITORING]: 'Monitoring',
+    [RouteName.CHORUS_ROUTING_POLICIES]: 'Routing-Richtlinien',
   },
 };
 
