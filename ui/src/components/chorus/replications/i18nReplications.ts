@@ -130,7 +130,6 @@ export default <I18nMessages>{
     deleteSelectedErrorContent:
       'And error occurred while deleting the following {total} replications:',
     filterByUserPlaceholder: 'Filter by User',
-    filterByUserNoResult: 'No user matches your search criteria.',
     filterByBucketPlaceholder: 'Search by Bucket',
     filterByToPlaceholder: 'Filter by Direction (To)',
     filterByToNoResult: 'No storage matches your search criteria.',
@@ -267,7 +266,6 @@ export default <I18nMessages>{
     deleteSelectedErrorContent:
       'Es ist ein Fehler beim Löschen der folgenden {total} Replikationen aufgetreten:',
     filterByUserPlaceholder: 'Nach Benutzer filtern',
-    filterByUserNoResult: 'Kein Benutzer entspricht Ihren Suchkriterien.',
     filterByBucketPlaceholder: 'Nach Bucket suchen',
     filterByToPlaceholder: 'Nach Richtung (Zu) filtern',
     filterByToNoResult: 'Kein Speicher entspricht Ihren Suchkriterien.',

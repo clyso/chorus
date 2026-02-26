@@ -19,6 +19,7 @@
   import { useI18n } from 'vue-i18n';
   import i18nRoutingPolicies from '../i18nRoutingPolicies';
   import RoutingPoliciesList from '../RoutingPoliciesList/RoutingPoliciesList.vue';
+  import RoutingPoliciesFilters from '../RoutingPoliciesFilters/RoutingPoliciesFilters.vue';
 
   const { t } = useI18n({
     messages: i18nRoutingPolicies,
@@ -31,6 +32,8 @@
       {{ t('routingPoliciesTitle') }}
     </template>
 
+    <RoutingPoliciesFilters class="routing-policies-tile__filters" />
+
     <RoutingPoliciesList class="routing-policies-tile__routing-policies" />
   </CTile>
 </template>
@@ -39,6 +42,10 @@
   @use '@/styles/utils' as utils;
 
   .routing-policies-tile {
+    &__filters {
+      margin-bottom: utils.unit(6);
+    }
+
     &__tags {
       margin-bottom: utils.unit(4);
     }

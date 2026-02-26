@@ -256,3 +256,8 @@ export interface RoutingPolicyListResponse {
   userRoutings: UserRoutingPolicy[];
   bucketRoutings: BucketRoutingPolicy[];
 }
+
+export enum RoutingPolicyStatusFilter {
+  ALLOWED = 0,
+  BLOCKED = 1,
+}
