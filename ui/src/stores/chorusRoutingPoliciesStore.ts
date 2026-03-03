@@ -25,7 +25,7 @@ import {
   RoutingPolicyTypes,
   type RoutingPolicyListRequest,
   type RoutingPolicy,
-  type RoutingPolicyDeleteRequest,
+  type RoutingPolicyEditRequest,
 } from '@/utils/types/chorus';
 import { ChorusService } from '@/services/ChorusService';
 import { ErrorHelper } from '@/utils/helpers/ErrorHelper';
@@ -253,7 +253,7 @@ export const useChorusRoutingPoliciesStore = defineStore(
     }));
 
     async function deleteRoutingPolicy(routingPolicy: RoutingPolicy) {
-      const deleteRequestData: RoutingPolicyDeleteRequest = {
+      const deleteRequestData: RoutingPolicyEditRequest = {
         user: routingPolicy.user,
         bucket: routingPolicy.bucket === '*' ? undefined : routingPolicy.bucket,
       };
@@ -318,6 +318,82 @@ export const useChorusRoutingPoliciesStore = defineStore(
       return { successList, errorList };
     }
 
+    async function setRoutingPolicyBlock(
+      routingPolicy: RoutingPolicy,
+      setBlock: boolean,
+    ) {
+      const routingPolicyIndex = state.routingPolicies.findIndex(
+        ({ id }) => routingPolicy.id === id,
+      );
+
+      if (routingPolicyIndex === -1) {
+        return;
+      }
+
+      const blockRequestData: RoutingPolicyEditRequest = {
+        user: routingPolicy.user,
+        ...(routingPolicy.bucket !== '*' && { bucket: routingPolicy.bucket }),
+      };
+
+      await stopRoutingPoliciesPolling();
+
+      try {
+        await (
+          setBlock
+            ? ChorusService.blockRoutingPolicy
+            : ChorusService.unblockRoutingPolicy
+        )(blockRequestData);
+      } catch (error: unknown) {
+        const reason =
+          ErrorHelper.getReason(error) || t('deleteRoutingPolicyErrorUnknown');
+
+        throw new Error(reason);
+      }
+
+      state.routingPolicies.splice(routingPolicyIndex, 1, {
+        ...routingPolicy,
+        isBlocked: setBlock,
+      });
+
+      startRoutingPoliciesPolling();
+    }
+
+    async function setRoutingPoliciesBlock(
+      routingPolicies: RoutingPolicy[],
+      setBlock: boolean,
+    ): Promise<{
+      successList: RoutingPolicy[];
+      errorList: [RoutingPolicy, string][];
+    }> {
+      const successList: RoutingPolicy[] = [];
+      const errorList: [RoutingPolicy, string][] = [];
+      const promises: Promise<void>[] = [];
+
+      await stopRoutingPoliciesPolling();
+
+      for (const routingPolicy of routingPolicies) {
+        promises.push(
+          (async () => {
+            try {
+              await setRoutingPolicyBlock(routingPolicy, setBlock);
+              successList.push(routingPolicy);
+            } catch (error: unknown) {
+              errorList.push([
+                routingPolicy,
+                error instanceof Error ? error.message : String(error),
+              ]);
+            }
+          })(),
+        );
+      }
+
+      await Promise.all(promises);
+
+      startRoutingPoliciesPolling();
+
+      return { successList, errorList };
+    }
+
     const selectedRoutingPoliciesCount = computed(
       () => state.selectedRoutingPolicyIds.length,
     );
@@ -346,6 +422,8 @@ export const useChorusRoutingPoliciesStore = defineStore(
       pagination,
       deleteRoutingPolicy,
       deleteRoutingPolicies,
+      setRoutingPolicyBlock,
+      setRoutingPoliciesBlock,
       computedRoutingPolicies,
       initRoutingPoliciesPage,
       selectedRoutingPoliciesCount,

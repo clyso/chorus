@@ -24,6 +24,7 @@
   import type { RoutingPolicy } from '@/utils/types/chorus';
   import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
   import { useChorusNotification } from '@/utils/composables/useChorusNotification';
+  import { IconName } from '@/utils/types/icon';
 
   const { t } = useI18n({
     messages: i18nRoutingPolicies,
@@ -33,8 +34,10 @@
     routingPolicy: RoutingPolicy;
   }>();
 
-  const { deleteRoutingPolicy: storeDeleteRoutingPolicy } =
-    useChorusRoutingPoliciesStore();
+  const {
+    deleteRoutingPolicy: storeDeleteRoutingPolicy,
+    setRoutingPolicyBlock: storeSetRoutingPolicyBlock,
+  } = useChorusRoutingPoliciesStore();
 
   const { page, pagination, selectedRoutingPolicyIds } = storeToRefs(
     useChorusRoutingPoliciesStore(),
@@ -45,6 +48,7 @@
   const { createDialog } = useDialog();
 
   const isDeleteLoading = ref(false);
+  const isBlockLoading = ref(false);
 
   async function deleteRoutingPolicy() {
     isDeleteLoading.value = true;
@@ -98,7 +102,7 @@
   function handleRoutingPolicyDelete() {
     createDialog({
       type: 'error',
-      iconName: 'base-trash',
+      iconName: IconName.BASE_TRASH,
       title: t('routingPolicyDeletionConfirmTitle'),
       content: () => [
         h(
@@ -118,11 +122,102 @@
       positiveHandler: () => deleteRoutingPolicy(),
     });
   }
+
+  async function setRoutingPolicyBlocked(setBlock: boolean) {
+    isBlockLoading.value = true;
+
+    try {
+      await storeSetRoutingPolicyBlock(routingPolicy, setBlock);
+
+      addNotification({
+        type: 'success',
+        title: setBlock ? t('blockSuccessTitle') : t('unblockSuccessTitle'),
+        duration: 4000,
+        content: () =>
+          h('div', [
+            setBlock ? t('blockSuccessContent') : t('unblockSuccessContent'),
+            h(RoutingPoliciesShortList, {
+              routingPolicies: [routingPolicy],
+            }),
+          ]),
+      });
+    } catch (error: unknown) {
+      addNotification({
+        type: 'error',
+        title: setBlock ? t('blockErrorTitle') : t('unblockErrorTitle'),
+        positiveText: setBlock
+          ? t('blockErrorAction')
+          : t('unblockErrorAction'),
+        positiveHandler: () => {
+          setRoutingPolicyBlocked(setBlock);
+        },
+        content: () =>
+          h('div', [
+            setBlock ? t('blockErrorContent') : t('unblockErrorContent'),
+            h(RoutingPoliciesShortList, {
+              routingPolicies: [[routingPolicy, error as string]],
+            }),
+          ]),
+      });
+    } finally {
+      isBlockLoading.value = false;
+    }
+  }
 </script>
 
 <template>
-  <div class="routing-policy-actions">
+  <div class="routing-policy-actions-cell">
     <div class="routing-policy-actions__list">
+      <div
+        class="routing-policy-action__item routing-policy-action__item--block"
+      >
+        <CTooltip
+          v-if="routingPolicy.isBlocked"
+          :delay="1000"
+        >
+          <template #trigger>
+            <CButton
+              secondary
+              size="tiny"
+              type="success"
+              :loading="isBlockLoading"
+              @click="() => setRoutingPolicyBlocked(false)"
+            >
+              <template #icon>
+                <CIcon
+                  :is-inline="true"
+                  :name="IconName.BASE_LOCK_OPEN"
+                />
+              </template>
+            </CButton>
+          </template>
+          {{ t('actionUnblock') }}
+        </CTooltip>
+
+        <CTooltip
+          v-else
+          :delay="1000"
+        >
+          <template #trigger>
+            <CButton
+              secondary
+              size="tiny"
+              type="warning"
+              :loading="isBlockLoading"
+              @click="() => setRoutingPolicyBlocked(true)"
+            >
+              <template #icon>
+                <CIcon
+                  :is-inline="true"
+                  :name="IconName.BASE_LOCK_CLOSED"
+                />
+              </template>
+            </CButton>
+          </template>
+          {{ t('actionBlock') }}
+        </CTooltip>
+      </div>
+
       <div
         class="routing-policy-action__item routing-policy-action__item--delete"
       >
@@ -138,7 +233,7 @@
               <template #icon>
                 <CIcon
                   :is-inline="true"
-                  name="base-trash"
+                  :name="IconName.BASE_TRASH"
                 />
               </template>
             </CButton>
@@ -149,3 +244,14 @@
     </div>
   </div>
 </template>
+
+<style lang="scss" scoped>
+  @use '@/styles/utils' as utils;
+
+  .routing-policy-actions-cell {
+    .routing-policy-actions__list {
+      display: flex;
+      gap: utils.unit(1);
+    }
+  }
+</style>

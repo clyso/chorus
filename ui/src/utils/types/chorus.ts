@@ -262,7 +262,7 @@ export enum RoutingPolicyStatusFilter {
   BLOCKED = 1,
 }
 
-export interface RoutingPolicyDeleteRequest {
+export interface RoutingPolicyEditRequest {
   user: string;
   bucket?: string;
 }
