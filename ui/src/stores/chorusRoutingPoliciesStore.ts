@@ -255,7 +255,7 @@ export const useChorusRoutingPoliciesStore = defineStore(
     async function deleteRoutingPolicy(routingPolicy: RoutingPolicy) {
       const deleteRequestData: RoutingPolicyEditRequest = {
         user: routingPolicy.user,
-        bucket: routingPolicy.bucket === '*' ? undefined : routingPolicy.bucket,
+        bucket: routingPolicy.bucket === '*' ? null : routingPolicy.bucket,
       };
 
       state.isDeleteSelectedProcessing = true;
@@ -332,7 +332,7 @@ export const useChorusRoutingPoliciesStore = defineStore(
 
       const blockRequestData: RoutingPolicyEditRequest = {
         user: routingPolicy.user,
-        ...(routingPolicy.bucket !== '*' && { bucket: routingPolicy.bucket }),
+        bucket: routingPolicy.bucket === '*' ? null : routingPolicy.bucket,
       };
 
       await stopRoutingPoliciesPolling();

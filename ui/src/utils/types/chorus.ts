@@ -264,5 +264,11 @@ export enum RoutingPolicyStatusFilter {
 
 export interface RoutingPolicyEditRequest {
   user: string;
-  bucket?: string;
+  bucket: string | null;
+}
+
+export interface RoutingPolicyAddRequest {
+  user: string;
+  toStorage: string | null;
+  bucket: string | null;
 }

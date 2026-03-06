@@ -31,6 +31,7 @@
   import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
   import { useChorusNotification } from '@/utils/composables/useChorusNotification';
   import type { RoutingPolicy } from '@/utils/types/chorus';
+  import { RouteName } from '@/utils/types/router';
 
   const { createDialog } = useDialog();
 
@@ -56,6 +57,7 @@
       (routingPolicy) => !routingPolicy.isBlocked,
     ),
   );
+
   const selectedRoutingPoliciesForBlock = computed(() =>
     selectedRoutingPolicies.value.filter(
       (routingPolicy) => !routingPolicy.isBlocked,
@@ -252,6 +254,27 @@
 
 <template>
   <div class="routing-policies-list-actions">
+    <div class="routing-policies-list-actions__creation">
+      <RouterLink :to="{ name: RouteName.CHORUS_ADD_ROUTING_POLICY }">
+        <CButton
+          type="primary"
+          size="medium"
+          ghost
+          class="add-replication-button"
+          tag="div"
+        >
+          <template #icon>
+            <CIcon
+              :is-inline="true"
+              :name="IconName.BASE_ADD"
+            />
+          </template>
+
+          {{ t('actionAddRoutingPolicy') }}
+        </CButton>
+      </RouterLink>
+    </div>
+
     <div class="routing-policies-list-actions__selection-actions">
       <CTooltip :delay="1000">
         <template #trigger>
@@ -339,9 +362,19 @@
   @use '@/styles/utils' as utils;
 
   .routing-policies-list-actions {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    gap: utils.unit(2);
+
     &__selection-actions {
-      display: flex;
-      gap: utils.unit(2);
+      display: inline-flex;
+      align-items: center;
+      gap: utils.unit(3);
+
+      ::v-deep(.c-badge-sup) {
+        pointer-events: none;
+      }
     }
   }
 </style>

@@ -52,6 +52,13 @@
 
   const selectedTab = computed<RouteName>(() => {
     const matchedTab = tabs.value.find((tab) => {
+      if (tab.name === RouteName.CHORUS_ROUTING_POLICIES) {
+        return (
+          routeName.value === RouteName.CHORUS_ROUTING_POLICIES ||
+          routeName.value === RouteName.CHORUS_ADD_ROUTING_POLICY
+        );
+      }
+
       if (tab.name === RouteName.CHORUS_REPLICATION) {
         return (
           routeName.value === RouteName.CHORUS_REPLICATION ||
