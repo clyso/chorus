@@ -24,6 +24,7 @@ import ChorusReplicationPage from '@/pages/ChorusReplicationPage/ChorusReplicati
 import ChorusAddReplicationPage from '@/pages/ChorusAddReplicationPage/ChorusAddReplicationPage.vue';
 import ChorusStorageDetailsPage from '@/pages/ChorusStorageDetailsPage/ChorusStorageDetailsPage.vue';
 import ChorusRoutingPoliciesPage from '@/pages/ChorusRoutingPoliciesPage/ChorusRoutingPoliciesPage.vue';
+import ChorusAddRoutingPolicyPage from '@/pages/ChorusAddRoutingPolicyPage/ChorusAddRoutingPolicyPage.vue';
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -63,9 +64,14 @@ export const routes: RouteRecordRaw[] = [
         component: ChorusMonitoringPage,
       },
       {
-        path: 'routing',
+        path: 'routing-policies',
         name: RouteName.CHORUS_ROUTING_POLICIES,
         component: ChorusRoutingPoliciesPage,
+      },
+      {
+        path: 'routing-policies/add',
+        name: RouteName.CHORUS_ADD_ROUTING_POLICY,
+        component: ChorusAddRoutingPolicyPage,
       },
     ],
   },

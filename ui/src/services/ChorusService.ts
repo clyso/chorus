@@ -29,6 +29,7 @@ import type {
   RoutingPolicyListResponse,
   ChorusStorageListResponse,
   RoutingPolicyEditRequest,
+  RoutingPolicyAddRequest,
 } from '@/utils/types/chorus';
 
 export abstract class ChorusService {
@@ -143,5 +144,11 @@ export abstract class ChorusService {
     payload: RoutingPolicyEditRequest,
   ): Promise<void> {
     await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/unblock'), payload);
+  }
+
+  static async addRoutingPolicy(
+    payload: RoutingPolicyAddRequest,
+  ): Promise<void> {
+    await apiClient.post(ApiHelper.getChorusAPIUrl('/routing/add'), payload);
   }
 }

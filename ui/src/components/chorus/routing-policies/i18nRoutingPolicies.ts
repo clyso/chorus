@@ -95,6 +95,7 @@ export default <I18nMessages>{
       'The following {total} routing policies have been allowed:',
     unblockSelectedErrorContent:
       'An error occurred while allowing the following {total} routing policies:',
+    actionAddRoutingPolicy: 'Add Routing Policy',
   },
   [I18nLocale.DE]: {
     routingPoliciesTitle: 'Routing-Richtlinien',
@@ -174,5 +175,6 @@ export default <I18nMessages>{
       'Die folgenden {total} Routing-Richtlinien wurden entsperrt:',
     unblockSelectedErrorContent:
       'Es ist ein Fehler beim Entsperren der folgenden {total} Routing-Richtlinien aufgetreten:',
+    actionAddRoutingPolicy: 'Routing-Richtlinie Hinzufügen',
   },
 };
