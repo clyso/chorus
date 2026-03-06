@@ -16,12 +16,11 @@
 
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
-  import { CAvatar } from '@clyso/clyso-ui-kit';
   import { computed } from 'vue';
   import { useI18n } from 'vue-i18n';
+  import ChorusUserCardList from '../../common/ChorusUserCardList/ChorusUserCardList.vue';
   import { useChorusAddReplicationStore } from '@/stores/chorusAddReplicationStore';
   import i18nAddReplication from '@/components/chorus/add-replication/i18nAddReplication';
-  import ChorusUserCard from '@/components/chorus/common/ChorusUserCard/ChorusUserCard.vue';
 
   const { selectedFromStorage, selectedUser } = storeToRefs(
     useChorusAddReplicationStore(),
@@ -43,26 +42,10 @@
       {{ t('userStepTitle') }}
     </p>
 
-    <div class="user-list">
-      <ChorusUserCard
-        v-for="user in userOptions"
-        :key="user"
-        :user="user"
-        :is-selectable="true"
-        :is-selected="user === selectedUser"
-        @select="selectedUser = user"
-      >
-        <div class="user-list__option-inner">
-          <CAvatar
-            round
-            :name="user"
-            class="user-list__option-avatar"
-          />
-
-          <span class="user-list__option-name">{{ user }}</span>
-        </div>
-      </ChorusUserCard>
-    </div>
+    <ChorusUserCardList
+      v-model="selectedUser"
+      :users="userOptions"
+    />
   </div>
 </template>
 
@@ -73,11 +56,5 @@
     &__title {
       margin-bottom: utils.unit(2);
     }
-  }
-
-  .user-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: utils.unit(3);
   }
 </style>
