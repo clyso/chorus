@@ -14,14 +14,17 @@
  *  limitations under the License.
  */
 
-export enum RouteName {
-  LOGIN = 'LOGIN',
-  CHORUS_HOME = 'CHORUS_HOME',
-  CHORUS_REPLICATION = 'CHORUS_REPLICATION',
-  CHORUS_ADD_REPLICATION = 'CHORUS_ADD_REPLICATION',
-  CHORUS_STORAGES = 'CHORUS_STORAGES',
-  CHORUS_STORAGE_DETAILS = 'CHORUS_STORAGE_DETAILS',
-  CHORUS_MONITORING = 'CHORUS_MONITORING',
-  CHORUS_ROUTING_POLICIES = 'CHORUS_ROUTING_POLICIES',
-  CHORUS_ADD_ROUTING_POLICY = 'CHORUS_ADD_ROUTING_POLICY',
-}
+import { I18nLocale, type I18nMessages } from '@clyso/clyso-ui-kit';
+
+export default <I18nMessages>{
+  [I18nLocale.EN]: {
+    addRoutingPolicyTitle: 'Add Routing Policy',
+    addRoutingPolicyHeader:
+      'Create a new routing policy to control traffic direction within the proxy.',
+  },
+  [I18nLocale.DE]: {
+    addRoutingPolicyTitle: 'Routing-Richtlinie Hinzufügen',
+    addRoutingPolicyHeader:
+      'Neue Routing-Richtlinie erstellen, um den Datenverkehr im Proxy zu steuern.',
+  },
+};

@@ -25,12 +25,14 @@
   import { storeToRefs } from 'pinia';
   import { computed, h } from 'vue';
   import { useI18n } from 'vue-i18n';
+  import { useRouter } from 'vue-router';
   import RoutingPoliciesShortList from '../RoutingPoliciesShortList/RoutingPoliciesShortList.vue';
   import i18nRoutingPolicies from '../i18nRoutingPolicies';
   import { IconName } from '@/utils/types/icon';
   import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
   import { useChorusNotification } from '@/utils/composables/useChorusNotification';
   import type { RoutingPolicy } from '@/utils/types/chorus';
+  import { RouteName } from '@/utils/types/router';
 
   const { createDialog } = useDialog();
 
@@ -50,6 +52,8 @@
   const { t } = useI18n({
     messages: i18nRoutingPolicies,
   });
+
+  const router = useRouter();
 
   const selectedRoutingPoliciesForBlock = computed(() =>
     selectedRoutingPolicies.value.filter(
@@ -239,10 +243,33 @@
         updateRoutingPoliciesBlocked(routingPolicies, setBlock),
     });
   }
+
+  function goToAddRoutingPolicy() {
+    router.push({ name: RouteName.CHORUS_ADD_ROUTING_POLICY });
+  }
 </script>
 
 <template>
   <div class="routing-policies-list-actions">
+    <div class="routing-policies-list-actions__creation">
+      <CButton
+        size="medium"
+        type="primary"
+        ghost
+        class="add-routing-policy-button"
+        @click="goToAddRoutingPolicy"
+        tag="div"
+      >
+        <template #icon>
+          <CIcon
+            :is-inline="true"
+            :name="IconName.BASE_ADD"
+          />
+        </template>
+        {{ t('actionAddRoutingPolicy') }}
+      </CButton>
+    </div>
+
     <div class="routing-policies-list-actions__selection-actions">
       <CTooltip :delay="1000">
         <template #trigger>
@@ -330,6 +357,11 @@
   @use '@/styles/utils' as utils;
 
   .routing-policies-list-actions {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    gap: utils.unit(2);
+
     .routing-policies-list-actions__selection-actions {
       display: flex;
       gap: utils.unit(2);
