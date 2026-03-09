@@ -18,6 +18,7 @@
   import { CTile } from '@clyso/clyso-ui-kit';
   import { useI18n } from 'vue-i18n';
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
+  import UserSelection from '../UserSelection/UserSelection.vue';
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
@@ -32,16 +33,12 @@
     <template #header>
       {{ t('addRoutingPolicyHeader') }}
     </template>
-    <div class="add-routing-policy-tile__content"></div>
+    <div class="add-routing-policy-tile__content">
+      <UserSelection />
+    </div>
   </CTile>
 </template>
 
 <style lang="scss" scoped>
   @use '@/styles/utils' as utils;
-
-  .add-routing-policy-tile__content {
-    display: flex;
-    flex-direction: column;
-    gap: utils.unit(8);
-  }
 </style>

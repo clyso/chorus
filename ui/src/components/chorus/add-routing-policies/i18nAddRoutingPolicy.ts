@@ -23,6 +23,8 @@ export default <I18nMessages>{
     addRoutingPolicyTitle: 'Add Routing Policy',
     addRoutingPolicyHeader:
       'Create a new routing policy to control traffic direction within the proxy.',
+    userSelectionTitle: 'User',
+    userSelectionDescription: 'Select a user:',
   },
   [I18nLocale.DE]: {
     breadcrumbRoutingPolicies: 'Routing-Richtlinien',
@@ -30,5 +32,7 @@ export default <I18nMessages>{
     addRoutingPolicyTitle: 'Routing-Richtlinie Hinzufügen',
     addRoutingPolicyHeader:
       'Neue Routing-Richtlinie erstellen, um den Datenverkehr im Proxy zu steuern.',
+    userSelectionTitle: 'Benutzer',
+    userSelectionDescription: 'Benutzer für die Routing-Richtlinie auswählen:',
   },
 };
