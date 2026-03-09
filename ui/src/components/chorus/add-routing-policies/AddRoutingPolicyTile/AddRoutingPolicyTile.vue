@@ -19,6 +19,7 @@
   import { useI18n } from 'vue-i18n';
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
   import UserSelection from '../UserSelection/UserSelection.vue';
+  import BucketSelection from '../BucketSelection/BucketSelection.vue';
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
@@ -35,10 +36,17 @@
     </template>
     <div class="add-routing-policy-tile__content">
       <UserSelection />
+      <BucketSelection />
     </div>
   </CTile>
 </template>
 
 <style lang="scss" scoped>
   @use '@/styles/utils' as utils;
+
+  .add-routing-policy-tile__content {
+    margin-left: utils.unit(1);
+    display: grid;
+    gap: utils.unit(5);
+  }
 </style>

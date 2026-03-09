@@ -22,13 +22,54 @@ export default <I18nMessages>{
     addRoutingPolicyHeader:
       'Create a new routing policy to control traffic direction within the proxy.',
     userSelectionTitle: 'User',
-    userSelectionDescription: 'Select a user:',
+    userSelectionDescription:
+      'Select a user:',
+    bucketSelectionTitle: 'Bucket Name',
+    bucketSelectionDescription: 'Narrow down a policy to a specific bucket:',
+    bucketSelectionAll: 'Apply to all buckets (including future ones)',
+    bucketSelectionPlaceholder: 'Enter bucket name',
+    bucketSelectionInputLabel: 'Bucket Name',
+    bucketNameRequired: 'Please enter a bucket name.',
+    bucketNameInvalid:
+      'Invalid bucket name. Use 3-63 lowercase letters, numbers, hyphens, or dots.',
+    bucketErrLength: 'Bucket name must be between 3 and 63 characters long.',
+    bucketErrChars:
+      'Bucket name can only contain lowercase letters, numbers, dots, and hyphens.',
+    bucketErrStartEnd:
+      'Bucket name must begin and end with a letter or number.',
+    bucketErrAdjacentPeriods:
+      'Bucket name must not contain two adjacent periods.',
+    bucketErrIpAddress: 'Bucket name must not be formatted as an IP address.',
+    bucketErrPrefixSuffix:
+      'Bucket name contains a restricted AWS prefix or suffix.',
   },
   [I18nLocale.DE]: {
     addRoutingPolicyTitle: 'Routing-Richtlinie Hinzufügen',
     addRoutingPolicyHeader:
       'Neue Routing-Richtlinie erstellen, um den Datenverkehr im Proxy zu steuern.',
     userSelectionTitle: 'Benutzer',
-    userSelectionDescription: 'Benutzer für die Routing-Richtlinie auswählen:',
+    userSelectionDescription:
+      'Benutzer für die Routing-Richtlinie auswählen:',
+    bucketSelectionTitle: 'Bucket Name',
+    bucketSelectionDescription:
+      'Richtlinie auf einen speziellen Bucket anwenden:',
+    bucketSelectionAll: 'Apply to all buckets',
+    bucketSelectionPlaceholder: 'Bucket Namen eingeben',
+    bucketSelectionInputLabel: 'Bucket-Name',
+    bucketNameRequired: 'Bitte geben Sie einen Bucket-Namen ein.',
+    bucketNameInvalid:
+      'Ungültiger Bucket-Name. Erlaubt sind 3-63 Kleinbuchstaben, Zahlen, Bindestriche oder Punkte.',
+    bucketErrLength:
+      'Der Bucket-Name muss zwischen 3 und 63 Zeichen lang sein.',
+    bucketErrChars:
+      'Der Bucket-Name darf nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche enthalten.',
+    bucketErrStartEnd:
+      'Der Bucket-Name muss mit einem Buchstaben oder einer Zahl beginnen und enden.',
+    bucketErrAdjacentPeriods:
+      'Der Bucket-Name darf keine zwei aufeinanderfolgenden Punkte enthalten.',
+    bucketErrIpAddress:
+      'Der Bucket-Name darf nicht als IP-Adresse formatiert sein.',
+    bucketErrPrefixSuffix:
+      'Der Bucket-Name enthält ein unzulässiges AWS-Präfix oder -Suffix.',
   },
 };
