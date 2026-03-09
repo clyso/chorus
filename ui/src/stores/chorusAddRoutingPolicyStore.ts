@@ -17,8 +17,18 @@
 import useVuelidate from '@vuelidate/core';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
+import { helpers } from '@vuelidate/validators';
 import type { ChorusStorage } from '@/utils/types/chorus';
 import { ChorusService } from '@/services/ChorusService';
+import {
+  hasNoAdjacentPeriods,
+  hasValidChars,
+  hasValidPrefixSuffix,
+  hasValidStartEnd,
+  isNotIpAddress,
+  isRequired,
+  isValidLength,
+} from '@/utils/validators/s3BucketNameValidator';
 
 interface ChorusAddRoutingPolicyState {
   isLoading: boolean;
@@ -76,24 +86,44 @@ export const useChorusAddRoutingPolicyStore = defineStore(
       }
     }
 
-    const validator = useVuelidate(
-      {
-        state: {
-          selectedBucket: {
-            required: () => {
-              if (state.isForAllBuckets) {
-                return true;
-              }
+    const validationRules = computed(() => ({
+      bucketName: {
+        required: helpers.withMessage(
+          'bucketNameRequired',
+          (value: string | null) => isRequired(state.isForAllBuckets, value),
+        ),
+        validLength: helpers.withMessage(
+          'bucketErrLength',
+          (value: string | null) => isValidLength(state.isForAllBuckets, value),
+        ),
+        validChars: helpers.withMessage(
+          'bucketErrChars',
+          (value: string | null) => hasValidChars(state.isForAllBuckets, value),
+        ),
+        validStartEnd: helpers.withMessage(
+          'bucketErrStartEnd',
+          (value: string | null) =>
+            hasValidStartEnd(state.isForAllBuckets, value),
+        ),
+        noAdjacentPeriods: helpers.withMessage(
+          'bucketErrAdjacentPeriods',
+          (value: string | null) =>
+            hasNoAdjacentPeriods(state.isForAllBuckets, value),
+        ),
+        notIpAddress: helpers.withMessage(
+          'bucketErrIpAddress',
+          (value: string | null) =>
+            isNotIpAddress(state.isForAllBuckets, value),
+        ),
+        validPrefixSuffix: helpers.withMessage(
+          'bucketErrPrefixSuffix',
+          (value: string | null) =>
+            hasValidPrefixSuffix(state.isForAllBuckets, value),
+        ),
+      },
+    }));
 
-              return state.bucketName !== null;
-            },
-          },
-        },
-      },
-      {
-        state,
-      },
-    );
+    const validator = useVuelidate(validationRules, state);
 
     async function $reset() {
       Object.assign(state, getInitialState());
@@ -104,6 +134,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
       ...toRefs(state),
       initAddRoutingPolicyPage,
       users,
+      validator,
       $reset,
     };
   },
