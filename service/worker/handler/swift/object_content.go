@@ -153,7 +153,7 @@ func (s *svc) ObjectUpdate(ctx context.Context, p tasks.SwiftObjectUpdatePayload
 		if !isSlo {
 			toReq.NoETag = false
 			toReq.ETag = res.ETag
-			toReq.IfNoneMatch = res.ETag
+			// toReq.IfNoneMatch = "*"
 		}
 	}
 	// upload to destination

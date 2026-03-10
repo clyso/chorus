@@ -30,26 +30,26 @@ import (
 )
 
 var (
-	consistencyCheckUser  string
+	diffCheckUser         string
 	ignoreEtags           bool
 	ignoreSizes           bool
 	checkOnlyLastVersions bool
 )
 
-var consistencyCheckCmd = &cobra.Command{
+var diffCheckCmd = &cobra.Command{
 	Use:   "check",
-	Short: "start consistency check",
-	Long: `Start consistency check against 2 or more buckets.
+	Short: "start diff check",
+	Long: `Start diff check against 2 or more buckets.
 
 Example:
 # Check bucket contents by matching etag
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username
+chorctl diff check storage1:bucket1 storage2:bucket2 --user username
 # Check bucket contents by matching sizes
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --ignore-etags
+chorctl diff check storage1:bucket1 storage2:bucket2 --user username --ignore-etags
 # Check bucket contents by matching object list
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --ignore-sizes
+chorctl diff check storage1:bucket1 storage2:bucket2 --user username --ignore-sizes
 # Check bucket contents by matching last versions of object
-chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --last-versions-only`,
+chorctl diff check storage1:bucket1 storage2:bucket2 --user username --last-versions-only`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -71,9 +71,9 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --la
 			ignoreEtags = true
 		}
 
-		request := &pb.StartConsistencyCheckRequest{
+		request := &pb.StartDiffCheckRequest{
 			Locations:             locations,
-			User:                  consistencyCheckUser,
+			User:                  diffCheckUser,
 			IgnoreEtags:           ignoreEtags,
 			IgnoreSizes:           ignoreSizes,
 			CheckOnlyLastVersions: checkOnlyLastVersions,
@@ -89,17 +89,17 @@ chorctl consistency check storage1:bucket1 storage2:bucket2 --user username --la
 		if _, err = client.Start(ctx, request); err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
 		}
-		fmt.Println("Consistency check has been created.")
+		fmt.Println("Diff check has been created.")
 	},
 }
 
 func init() {
-	consistencyCmd.AddCommand(consistencyCheckCmd)
-	consistencyCheckCmd.Flags().StringVarP(&consistencyCheckUser, "user", "u", "", "storage user")
-	consistencyCheckCmd.Flags().BoolVarP(&ignoreEtags, "ignore-etags", "e", false, "do not perform etag check")
-	consistencyCheckCmd.Flags().BoolVarP(&ignoreSizes, "ignore-sizes", "s", false, "do not perform etag and size check")
-	consistencyCheckCmd.Flags().BoolVarP(&checkOnlyLastVersions, "last-versions-only", "l", false, "check only last versions")
-	err := consistencyCheckCmd.MarkFlagRequired("user")
+	diffCmd.AddCommand(diffCheckCmd)
+	diffCheckCmd.Flags().StringVarP(&diffCheckUser, "user", "u", "", "storage user")
+	diffCheckCmd.Flags().BoolVarP(&ignoreEtags, "ignore-etags", "e", false, "do not perform etag check")
+	diffCheckCmd.Flags().BoolVarP(&ignoreSizes, "ignore-sizes", "s", false, "do not perform etag and size check")
+	diffCheckCmd.Flags().BoolVarP(&checkOnlyLastVersions, "last-versions-only", "l", false, "check only last versions")
+	err := diffCheckCmd.MarkFlagRequired("user")
 	if err != nil {
 		logrus.WithError(err).Fatal()
 	}

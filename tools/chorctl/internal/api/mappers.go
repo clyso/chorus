@@ -174,30 +174,71 @@ func DurationToStr(age time.Duration) string {
 	return fmt.Sprintf("%dd", int(age.Hours()/24))
 }
 
-func ConsistencyCheckHeader() string {
-	return "READY\tQUEUED\tCOMPLETED\tCONSISTENT\tVERSIONED\tWITH SIZE\tWITH ETAG\tSTORAGES"
+func DiffHeader() string {
+	return "STORAGES\tSTATUS\tSTATS"
 }
 
-func ConsistencyCheckRow(in *pb.ConsistencyCheck) string {
+func DiffRow(in *pb.DiffCheck) string {
 	storageLocations := make([]string, 0, len(in.Locations))
 	for _, location := range in.Locations {
 		storageLocations = append(storageLocations, fmt.Sprintf("%s:%s", location.Storage, location.Bucket))
 	}
-	return fmt.Sprintf("%t\t%d\t%d\t%s", in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.WithSize, in.WithEtag, strings.Join(storageLocations, ", "))
+
+	status, stats := diffStatusAndStats(in)
+
+	return fmt.Sprintf("%s\t%s\t%s", strings.Join(storageLocations, ", "), status, stats)
 }
 
-func ConsistencyCheckReportBrief(in *pb.ConsistencyCheck) string {
-	briefTable := `READY:	%t
+func diffStatusAndStats(in *pb.DiffCheck) (string, string) {
+	// display check status if fix not started or if consistent
+	// display fix status otherwise
+	var status string
+	if in.Consistent || in.FixQueued == 0 {
+		stats := fmt.Sprintf("%d/%d", in.Completed, in.Queued)
+		var status string
+		if !in.Ready {
+			status = "check in progress"
+		} else if !in.Consistent {
+			status = "not consistent"
+		} else {
+			status = "consistent"
+		}
+
+		return status, stats
+	}
+
+	stats := fmt.Sprintf("%d/%d", in.FixCompleted, in.FixQueued)
+	if !in.FixReady {
+		status = "fix in progress"
+	}
+	status = "fixed"
+
+	return status, stats
+}
+
+func DiffReportBrief(in *pb.DiffCheck) string {
+	briefTable := `CHECK
+READY:	%t
 QUEUED:	%d
 COMPLETED:	%d
 CONSISTENT:	%t
 VERSIONED:	%t
-WITH SIZE:	%t
-WITH ETAG:	%T`
-	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.WithSize, in.WithEtag)
+IGNORE SIZES:	%t
+IGNORE ETAGS:	%T`
+	if in.FixQueued == 0 {
+		return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.IgnoreSizes, in.IgnoreEtags)
+	}
+	briefTable += `
+
+FIX
+READY: %t
+QUEUED: %d
+COMPLETED: %d`
+
+	return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.IgnoreSizes, in.IgnoreEtags, in.FixReady, in.FixQueued, in.FixCompleted)
 }
 
-func ConsistencyCheckReportHeader(storages []string, versioned bool, withSize bool, withEtag bool) string {
+func DiffReportHeader(storages []string, versioned bool, withSize bool, withEtag bool) string {
 	columns := []string{"PATH"}
 	if versioned {
 		columns = append(columns, "VERSION IDX")
@@ -212,7 +253,7 @@ func ConsistencyCheckReportHeader(storages []string, versioned bool, withSize bo
 	return strings.Join(columns, "\t")
 }
 
-func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckReportEntry, versioned bool, withSize bool, withEtag bool) string {
+func DiffReportRow(storages []string, entry *pb.DiffCheckReportEntry, versioned bool, withSize bool, withEtag bool) string {
 	columns := []string{}
 	if versioned {
 		columns = append(columns, strconv.FormatUint(entry.VersionIdx, 10))
@@ -224,7 +265,7 @@ func ConsistencyCheckReportRow(storages []string, entry *pb.ConsistencyCheckRepo
 		columns = append(columns, entry.Etag)
 	}
 	for _, storage := range storages {
-		if slices.ContainsFunc(entry.StorageEntries, func(e *pb.ConsistencyCheckStorageEntry) bool {
+		if slices.ContainsFunc(entry.StorageEntries, func(e *pb.DiffCheckStorageEntry) bool {
 			return e.Storage == storage
 		}) {
 			columns = append(columns, "✓")

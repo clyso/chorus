@@ -216,7 +216,7 @@ func (p BucketReplicationPolicy) Validate() error {
 	return nil
 }
 
-func NewBucketRepliationPolicy(user string, fromStorage string, fromBucket string, toStorage string, toBucket string) BucketReplicationPolicy {
+func NewBucketReplicationPolicy(user string, fromStorage string, fromBucket string, toStorage string, toBucket string) BucketReplicationPolicy {
 	return BucketReplicationPolicy{
 		User:        user,
 		FromStorage: fromStorage,

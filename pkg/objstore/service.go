@@ -41,6 +41,11 @@ var (
 type Config = StoragesConfig[*s3.Storage, *swift.Storage]
 type Storage = GenericStorage[*s3.Storage, *swift.Storage]
 
+type NameAndVersion struct {
+	Name    string
+	Version string
+}
+
 type CommonObjectInfo struct {
 	LastModified time.Time
 	Key          string
@@ -53,6 +58,7 @@ type commonListOptions struct {
 	prefix    string
 	after     string
 	versioned bool
+	limit     uint32
 }
 
 func (r *commonListOptions) toSwiftListOptions() objects.ListOpts {
@@ -60,6 +66,7 @@ func (r *commonListOptions) toSwiftListOptions() objects.ListOpts {
 		Prefix:   r.prefix,
 		Marker:   r.after,
 		Versions: r.versioned,
+		Limit:    int(r.limit),
 	}
 }
 
@@ -68,6 +75,7 @@ func (r *commonListOptions) toMinioListOptions() minio.ListObjectsOptions {
 		Prefix:       r.prefix,
 		StartAfter:   r.after,
 		WithVersions: r.versioned,
+		MaxKeys:      int(r.limit),
 	}
 }
 
@@ -86,6 +94,12 @@ func WithPrefix(prefix string) func(o *commonListOptions) {
 func WithAfter(after string) func(o *commonListOptions) {
 	return func(o *commonListOptions) {
 		o.after = after
+	}
+}
+
+func WithLimit(limit uint32) func(o *commonListOptions) {
+	return func(o *commonListOptions) {
+		o.limit = limit
 	}
 }
 
@@ -117,11 +131,14 @@ type Common interface {
 	CreateBucket(ctx context.Context, bucket string) error
 	RemoveBucket(ctx context.Context, bucket string) error
 	EnableBucketVersioning(ctx context.Context, bucket string) error
+	GetObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (io.Reader, error)
 	PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error
 	ObjectInfo(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (*CommonObjectInfo, error)
 	ObjectExists(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (bool, error)
 	RemoveObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) error
-	RemoveObjects(ctx context.Context, bucket string, names []string) error
+	RemoveObjects(ctx context.Context, bucket string, names []string) iter.Seq[error]
+	RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error
+	RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) iter.Seq[error]
 	ListObjects(ctx context.Context, bucket string, opts ...func(o *commonListOptions)) iter.Seq2[CommonObjectInfo, error]
 }
 

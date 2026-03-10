@@ -38,7 +38,7 @@ var (
 
 func request_Diff_Start_0(ctx context.Context, marshaler runtime.Marshaler, client DiffClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq StartConsistencyCheckRequest
+		protoReq StartDiffCheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -53,7 +53,7 @@ func request_Diff_Start_0(ctx context.Context, marshaler runtime.Marshaler, clie
 
 func local_request_Diff_Start_0(ctx context.Context, marshaler runtime.Marshaler, server DiffServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq StartConsistencyCheckRequest
+		protoReq StartDiffCheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -88,7 +88,7 @@ var filter_Diff_GetReport_0 = &utilities.DoubleArray{Encoding: map[string]int{},
 
 func request_Diff_GetReport_0(ctx context.Context, marshaler runtime.Marshaler, client DiffClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq ConsistencyCheckRequest
+		protoReq DiffCheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if req.Body != nil {
@@ -106,7 +106,7 @@ func request_Diff_GetReport_0(ctx context.Context, marshaler runtime.Marshaler, 
 
 func local_request_Diff_GetReport_0(ctx context.Context, marshaler runtime.Marshaler, server DiffServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq ConsistencyCheckRequest
+		protoReq DiffCheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := req.ParseForm(); err != nil {
@@ -123,7 +123,7 @@ var filter_Diff_GetReportEntries_0 = &utilities.DoubleArray{Encoding: map[string
 
 func request_Diff_GetReportEntries_0(ctx context.Context, marshaler runtime.Marshaler, client DiffClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq GetConsistencyCheckReportEntriesRequest
+		protoReq GetDiffCheckReportEntriesRequest
 		metadata runtime.ServerMetadata
 	)
 	if req.Body != nil {
@@ -141,7 +141,7 @@ func request_Diff_GetReportEntries_0(ctx context.Context, marshaler runtime.Mars
 
 func local_request_Diff_GetReportEntries_0(ctx context.Context, marshaler runtime.Marshaler, server DiffServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq GetConsistencyCheckReportEntriesRequest
+		protoReq GetDiffCheckReportEntriesRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := req.ParseForm(); err != nil {
@@ -156,7 +156,7 @@ func local_request_Diff_GetReportEntries_0(ctx context.Context, marshaler runtim
 
 func request_Diff_DeleteReport_0(ctx context.Context, marshaler runtime.Marshaler, client DiffClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq ConsistencyCheckRequest
+		protoReq DiffCheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -171,13 +171,67 @@ func request_Diff_DeleteReport_0(ctx context.Context, marshaler runtime.Marshale
 
 func local_request_Diff_DeleteReport_0(ctx context.Context, marshaler runtime.Marshaler, server DiffServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq ConsistencyCheckRequest
+		protoReq DiffCheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.DeleteReport(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_Diff_Fix_0(ctx context.Context, marshaler runtime.Marshaler, client DiffClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq StartDiffFixRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.Fix(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Diff_Fix_0(ctx context.Context, marshaler runtime.Marshaler, server DiffServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq StartDiffFixRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.Fix(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_Diff_Restart_0(ctx context.Context, marshaler runtime.Marshaler, client DiffClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq DiffCheckRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.Restart(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Diff_Restart_0(ctx context.Context, marshaler runtime.Marshaler, server DiffServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq DiffCheckRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.Restart(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -193,7 +247,7 @@ func RegisterDiffHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/Start", runtime.WithHTTPPathPattern("/consistency/start"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/Start", runtime.WithHTTPPathPattern("/diff/start"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -213,7 +267,7 @@ func RegisterDiffHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/List", runtime.WithHTTPPathPattern("/consistency/list"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/List", runtime.WithHTTPPathPattern("/diff/list"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -233,7 +287,7 @@ func RegisterDiffHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/GetReport", runtime.WithHTTPPathPattern("/consistency/report"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/GetReport", runtime.WithHTTPPathPattern("/diff/report"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -253,7 +307,7 @@ func RegisterDiffHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/GetReportEntries", runtime.WithHTTPPathPattern("/consistency/report-entries"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/GetReportEntries", runtime.WithHTTPPathPattern("/diff/report-entries"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -273,7 +327,7 @@ func RegisterDiffHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/DeleteReport", runtime.WithHTTPPathPattern("/consistency/delete"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/DeleteReport", runtime.WithHTTPPathPattern("/diff/delete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -286,6 +340,46 @@ func RegisterDiffHandlerServer(ctx context.Context, mux *runtime.ServeMux, serve
 			return
 		}
 		forward_Diff_DeleteReport_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_Diff_Fix_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/Fix", runtime.WithHTTPPathPattern("/diff/fix"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Diff_Fix_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Diff_Fix_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_Diff_Restart_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Diff/Restart", runtime.WithHTTPPathPattern("/diff/restart"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Diff_Restart_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Diff_Restart_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -331,7 +425,7 @@ func RegisterDiffHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/Start", runtime.WithHTTPPathPattern("/consistency/start"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/Start", runtime.WithHTTPPathPattern("/diff/start"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -348,7 +442,7 @@ func RegisterDiffHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/List", runtime.WithHTTPPathPattern("/consistency/list"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/List", runtime.WithHTTPPathPattern("/diff/list"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -365,7 +459,7 @@ func RegisterDiffHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/GetReport", runtime.WithHTTPPathPattern("/consistency/report"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/GetReport", runtime.WithHTTPPathPattern("/diff/report"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -382,7 +476,7 @@ func RegisterDiffHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/GetReportEntries", runtime.WithHTTPPathPattern("/consistency/report-entries"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/GetReportEntries", runtime.WithHTTPPathPattern("/diff/report-entries"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -399,7 +493,7 @@ func RegisterDiffHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/DeleteReport", runtime.WithHTTPPathPattern("/consistency/delete"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/DeleteReport", runtime.WithHTTPPathPattern("/diff/delete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -412,15 +506,51 @@ func RegisterDiffHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 		}
 		forward_Diff_DeleteReport_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Diff_Fix_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/Fix", runtime.WithHTTPPathPattern("/diff/fix"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Diff_Fix_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Diff_Fix_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_Diff_Restart_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Diff/Restart", runtime.WithHTTPPathPattern("/diff/restart"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Diff_Restart_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Diff_Restart_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_Diff_Start_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "start"}, ""))
-	pattern_Diff_List_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "list"}, ""))
-	pattern_Diff_GetReport_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "report"}, ""))
-	pattern_Diff_GetReportEntries_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "report-entries"}, ""))
-	pattern_Diff_DeleteReport_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"consistency", "delete"}, ""))
+	pattern_Diff_Start_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "start"}, ""))
+	pattern_Diff_List_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "list"}, ""))
+	pattern_Diff_GetReport_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "report"}, ""))
+	pattern_Diff_GetReportEntries_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "report-entries"}, ""))
+	pattern_Diff_DeleteReport_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "delete"}, ""))
+	pattern_Diff_Fix_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "fix"}, ""))
+	pattern_Diff_Restart_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"diff", "restart"}, ""))
 )
 
 var (
@@ -429,4 +559,6 @@ var (
 	forward_Diff_GetReport_0        = runtime.ForwardResponseMessage
 	forward_Diff_GetReportEntries_0 = runtime.ForwardResponseMessage
 	forward_Diff_DeleteReport_0     = runtime.ForwardResponseMessage
+	forward_Diff_Fix_0              = runtime.ForwardResponseMessage
+	forward_Diff_Restart_0          = runtime.ForwardResponseMessage
 )

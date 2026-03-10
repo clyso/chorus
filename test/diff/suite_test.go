@@ -592,23 +592,23 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			AfterEach(func() {
-				_, err := diffClient.DeleteReport(ctx, &pb.ConsistencyCheckRequest{
+				_, err := diffClient.DeleteReport(ctx, &pb.DiffCheckRequest{
 					Locations: locations,
 				})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Should succeed", func() {
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err := diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -616,16 +616,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should succeed, check only sizes", func() {
@@ -648,7 +654,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations:   locations,
 					User:        CSyncUserKey,
 					IgnoreEtags: true,
@@ -656,9 +662,9 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -666,16 +672,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should succeed, check only list", func() {
@@ -698,7 +710,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations:   locations,
 					User:        CSyncUserKey,
 					IgnoreSizes: true,
@@ -706,9 +718,9 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -716,16 +728,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
-				Expect(getCheckResponse.Check.WithSize).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeTrue())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should fail, no object", func() {
@@ -747,16 +765,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeFalse())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -764,14 +782,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -796,6 +814,45 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.VersionId).To(BeEmpty())
 					}
 				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, leafPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 			})
 
 			It("Should fail, no directory", func() {
@@ -814,7 +871,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				err := storeClient.RemoveObjects(ctx, bucket2Name, objectNamesToRemove)
+				err := storeClient.RemoveObjectsSingleErr(ctx, bucket2Name, objectNamesToRemove)
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
@@ -823,16 +880,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeFalse())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -840,14 +897,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -876,6 +933,45 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.Storage).To(Equal(CStorage1Key))
 					}
 				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, jointPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 			})
 
 			It("Should fail, no empty dir", func() {
@@ -893,16 +989,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -910,14 +1006,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -941,6 +1037,45 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.Storage).To(Equal(CStorage1Key))
 					}
 				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, emptyDirPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 			})
 
 			It("Should fail, wrong etag", func() {
@@ -963,16 +1098,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -980,14 +1115,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -1012,6 +1147,45 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.VersionId).To(BeEmpty())
 					}
 				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, objectPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 			})
 		})
 
@@ -1051,23 +1225,23 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			AfterEach(func() {
-				_, err := diffClient.DeleteReport(ctx, &pb.ConsistencyCheckRequest{
+				_, err := diffClient.DeleteReport(ctx, &pb.DiffCheckRequest{
 					Locations: locations,
 				})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("Should succeed", func() {
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err := diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1075,16 +1249,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should succeed, check only sizes", func() {
@@ -1105,7 +1285,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(stat2.Size).To(BeNumerically("==", 4))
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations:   locations,
 					User:        CSyncUserKey,
 					IgnoreEtags: true,
@@ -1113,9 +1293,9 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1123,16 +1303,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should succeed, check only list", func() {
@@ -1153,7 +1339,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(stat2.Size).To(BeNumerically("==", 5))
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations:   locations,
 					User:        CSyncUserKey,
 					IgnoreSizes: true,
@@ -1161,9 +1347,9 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1171,16 +1357,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeFalse())
-				Expect(getCheckResponse.Check.WithSize).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeTrue())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should succeed, check only last version", func() {
@@ -1215,7 +1407,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeFalse())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations:             locations,
 					User:                  CSyncUserKey,
 					CheckOnlyLastVersions: true,
@@ -1223,9 +1415,9 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1233,16 +1425,22 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeFalse())
 
-				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 					Locations: locations,
 					PageSize:  10,
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(checkEntries.Entries).To(HaveLen(0))
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("Should fail, no object", func() {
@@ -1258,16 +1456,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeFalse())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1275,14 +1473,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -1313,6 +1511,50 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.VersionId).NotTo(BeEmpty())
 					}
 				}
+
+				// Swift versioned bucket migration is not supported
+				if testStorageBackend == CSwiftTestStorageBackend {
+					return
+				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, leafPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 			})
 
 			It("Should fail, no directory", func() {
@@ -1325,7 +1567,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				jointPath := objectNamesToRemove[0]
 				slices.Reverse(objectNamesToRemove)
 
-				err := storeClient.RemoveObjects(ctx, bucket2Name, objectNamesToRemove)
+				err := storeClient.RemoveObjectsSingleErr(ctx, bucket2Name, objectNamesToRemove)
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
@@ -1334,16 +1576,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeFalse())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1351,14 +1593,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -1391,6 +1633,50 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.Storage).To(Equal(CStorage1Key))
 					}
 				}
+
+				// Swift versioned bucket migration is not supported
+				if testStorageBackend == CSwiftTestStorageBackend {
+					return
+				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, jointPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 			})
 
 			It("Should fail, no empty dir", func() {
@@ -1408,16 +1694,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1425,14 +1711,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -1456,6 +1742,50 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.Storage).To(Equal(CStorage1Key))
 					}
 				}
+
+				// Swift versioned bucket migration is not supported
+				if testStorageBackend == CSwiftTestStorageBackend {
+					return
+				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, emptyDirPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 			})
 
 			It("Should fail, wrong etag", func() {
@@ -1478,16 +1808,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeTrue())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1495,14 +1825,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -1527,6 +1857,50 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.VersionId).NotTo(BeEmpty())
 					}
 				}
+
+				// Swift versioned bucket migration is not supported
+				if testStorageBackend == CSwiftTestStorageBackend {
+					return
+				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, objectPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 			})
 
 			It("Should fail, wrong version count", func() {
@@ -1561,16 +1935,16 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 					g.Expect(exists).To(BeFalse())
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
-				checkRequest := &pb.StartConsistencyCheckRequest{
+				checkRequest := &pb.StartDiffCheckRequest{
 					Locations: locations,
 					User:      CSyncUserKey,
 				}
 				_, err = diffClient.Start(ctx, checkRequest)
 				Expect(err).NotTo(HaveOccurred())
 
-				var getCheckResponse *pb.GetConsistencyCheckReportResponse
+				var getCheckResponse *pb.GetDiffCheckReportResponse
 				Eventually(func(g Gomega) {
-					getCheckResponse, err = diffClient.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(getCheckResponse).NotTo(BeNil())
 					g.Expect(getCheckResponse.Check).NotTo(BeNil())
@@ -1578,14 +1952,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
 
 				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
-				Expect(getCheckResponse.Check.WithEtag).To(BeTrue())
-				Expect(getCheckResponse.Check.WithSize).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 
-				var entries []*pb.ConsistencyCheckReportEntry
+				var entries []*pb.DiffCheckReportEntry
 				var cursor uint64
 				for {
-					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+					checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 						Locations: locations,
 						PageSize:  1000,
 						Cursor:    cursor,
@@ -1621,6 +1995,50 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 						Expect(storageEntry.VersionId).NotTo(BeEmpty())
 					}
 				}
+
+				// Swift versioned bucket migration is not supported
+				if testStorageBackend == CSwiftTestStorageBackend {
+					return
+				}
+
+				_, err = diffClient.Fix(ctx, &pb.StartDiffFixRequest{
+					Locations:   locations,
+					SourceIndex: 0,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+					g.Expect(getCheckResponse.Check.FixReady).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					exists, err := storeClient.ObjectExists(ctx, bucket2Name, leafPath)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(exists).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				_, err = diffClient.Restart(ctx, &pb.DiffCheckRequest{
+					Locations: locations,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+
+				Expect(getCheckResponse.Check.Consistent).To(BeTrue())
+				Expect(getCheckResponse.Check.IgnoreEtags).To(BeFalse())
+				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
+				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 			})
 		})
 	}

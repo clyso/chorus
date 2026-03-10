@@ -16,15 +16,19 @@ package objstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"net/http"
+	"slices"
 
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
 	"github.com/gophercloud/gophercloud/v2/pagination"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 func WrapSwiftCommon(client *gophercloud.ServiceClient) Common {
@@ -161,6 +165,23 @@ func (s *swiftCommonClient) ListObjects(ctx context.Context, bucket string, opts
 	}
 }
 
+func (s *swiftCommonClient) GetObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (io.Reader, error) {
+	commonOpts := &commonObjectOptions{}
+
+	for _, opt := range opts {
+		opt(commonOpts)
+	}
+
+	response := objects.Download(ctx, s.client, bucket, name, objects.DownloadOpts{
+		ObjectVersionID: commonOpts.versionID,
+	})
+	if err := response.Err; err != nil {
+		return nil, fmt.Errorf("unable to get object: %w", err)
+	}
+
+	return response.Body, nil
+}
+
 func (s *swiftCommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error {
 	if _, err := objects.Create(ctx, s.client, bucket, name, objects.CreateOpts{
 		Content:       reader,
@@ -227,13 +248,42 @@ func (s *swiftCommonClient) RemoveObject(ctx context.Context, bucket string, nam
 	return nil
 }
 
-func (s *swiftCommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) error {
+func (s *swiftCommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) iter.Seq[error] {
 	resp, err := objects.BulkDelete(ctx, s.client, bucket, names).Extract()
-	if err != nil {
-		return fmt.Errorf("unable remove objects: %w", err)
+	return func(yield func(error) bool) {
+		if err != nil {
+			yield(fmt.Errorf("unable to delete objects: %w", err))
+			return
+		}
+		for _, errorParts := range resp.Errors {
+			if len(errorParts) == 0 {
+				continue
+			}
+			if !yield(fmt.Errorf("unable to delete object %+v", errorParts)) {
+				return
+			}
+		}
 	}
-	if len(resp.Errors) > 0 {
-		return fmt.Errorf("unable to delete objects: %+v", resp.Errors)
+}
+
+func (s *swiftCommonClient) RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error {
+	errIter := s.RemoveObjects(ctx, bucket, names)
+	removeErrs := slices.Collect(errIter)
+	if len(removeErrs) > 0 {
+		return fmt.Errorf("unable to do bulk delete: %w", errors.Join(removeErrs...))
 	}
 	return nil
+}
+
+func (s *swiftCommonClient) RemoveVersionedObjects(ctx context.Context, bucket string, names []NameAndVersion) iter.Seq[error] {
+	// TODO bulk delete for versioned swift objects is not documented, but probably exists
+	// there's a loop for now
+	for _, name := range names {
+		objects.Delete(ctx, s.client, bucket, name.Name, objects.DeleteOpts{
+			ObjectVersionID: name.Version,
+		})
+	}
+	return func(yield func(error) bool) {
+		yield(dom.ErrNotImplemented)
+	}
 }

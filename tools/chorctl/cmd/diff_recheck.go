@@ -1,5 +1,5 @@
 /*
- * Copyright © 2025 Clyso GmbH
+ * Copyright © 2026 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var consistencyPurgeCmd = &cobra.Command{
-	Use:   "purge",
-	Short: "delete result of consistency check",
-	Long: `Remove all stored data related to consistency check.
+var diffRecheckCmd = &cobra.Command{
+	Use:   "recheck",
+	Short: "rerun diff check",
+	Long: `Remove all stored data related to diff check and restart diff check with same settings.
 
 Example:
-chorctl consistency purge oldstorage:bucket newstorage:altbucket`,
+chorctl diff recheck oldstorage:bucket newstorage:altbucket`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -61,17 +61,16 @@ chorctl consistency purge oldstorage:bucket newstorage:altbucket`,
 
 		client := pb.NewDiffClient(conn)
 		for _, id := range args {
-			_, err := client.DeleteReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+			_, err := client.DeleteReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 			if err != nil {
-				logrus.WithError(err).WithField("address", address).Fatal("unable to delete consistency check", id)
+				logrus.WithError(err).WithField("address", address).Fatal("unable to delete diff check", id)
 			} else {
-				fmt.Println("Consistency check", id, "scheduled for deletion.")
-				fmt.Println("Deletion will be completed asynchronously.")
+				fmt.Println("Diff check", id, "deleted.")
 			}
 		}
 	},
 }
 
 func init() {
-	consistencyCmd.AddCommand(consistencyPurgeCmd)
+	diffCmd.AddCommand(diffPurgeCmd)
 }

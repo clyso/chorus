@@ -31,13 +31,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var consistencyReportCmd = &cobra.Command{
+var (
+	diffBriefReport bool
+)
+
+var diffReportCmd = &cobra.Command{
 	Use:   "report",
-	Short: "display consistency check report",
-	Long: `Get a detailed report on consistency check done between 2 or more storages.
+	Short: "display diff check report",
+	Long: `Get a detailed report on diff check done between 2 or more storages.
 	
 Example:
-chorctl consistency report oldstorage:bucket newstorage:altbucket`,
+chorctl diff report oldstorage:bucket newstorage:altbucket`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -62,9 +66,9 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 		defer conn.Close()
 
 		client := pb.NewDiffClient(conn)
-		res, err := client.GetReport(ctx, &pb.ConsistencyCheckRequest{Locations: locations})
+		res, err := client.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
 		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency check report")
+			logrus.WithError(err).WithField("address", address).Fatal("unable to get diff check report")
 		}
 
 		storages := make([]string, 0, len(res.Check.Locations))
@@ -74,34 +78,37 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 
 		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 1, ' ', 0)
-		fmt.Fprintln(w, api.ConsistencyCheckReportBrief(res.Check))
+		fmt.Fprintln(w, api.DiffReportBrief(res.Check))
 		w.Flush()
 
-		if res.Check.Consistent {
+		if res.Check.Consistent || diffBriefReport {
 			return
 		}
 
 		fmt.Fprintln(w)
 		w.Flush()
 
+		withSizes := !res.Check.IgnoreSizes
+		withEtags := !res.Check.IgnoreEtags && !res.Check.IgnoreSizes
+
 		w = tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, api.ConsistencyCheckReportHeader(storages, res.Check.Versioned, res.Check.WithSize, res.Check.WithEtag))
+		fmt.Fprintln(w, api.DiffReportHeader(storages, res.Check.Versioned, withSizes, withEtags))
 
 		pageSize := uint64(10)
 		cursor := uint64(0)
 
 		for {
-			page, err := client.GetReportEntries(ctx, &pb.GetConsistencyCheckReportEntriesRequest{
+			page, err := client.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
 				Locations: locations,
 				Cursor:    cursor,
 				PageSize:  pageSize,
 			})
 			if err != nil {
-				logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency check report entries")
+				logrus.WithError(err).WithField("address", address).Fatal("unable to get diff report entries")
 			}
 
 			for _, entry := range page.Entries {
-				fmt.Fprintln(w, api.ConsistencyCheckReportRow(storages, entry, res.Check.Versioned, res.Check.WithSize, res.Check.WithEtag))
+				fmt.Fprintln(w, api.DiffReportRow(storages, entry, res.Check.Versioned, withSizes, withEtags))
 			}
 
 			if page.Cursor == 0 {
@@ -116,5 +123,6 @@ chorctl consistency report oldstorage:bucket newstorage:altbucket`,
 }
 
 func init() {
-	consistencyCmd.AddCommand(consistencyReportCmd)
+	diffCmd.AddCommand(diffReportCmd)
+	diffCheckCmd.Flags().BoolVarP(&diffBriefReport, "brief", "b", false, "display only status without printing entries")
 }

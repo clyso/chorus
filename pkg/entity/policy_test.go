@@ -275,7 +275,7 @@ func TestNewBucketRepliationPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewBucketRepliationPolicy(tt.args.user, tt.args.fromStorage, tt.args.fromBucket, tt.args.toStorage, tt.args.toBucket); !reflect.DeepEqual(got, tt.want) {
+			if got := NewBucketReplicationPolicy(tt.args.user, tt.args.fromStorage, tt.args.fromBucket, tt.args.toStorage, tt.args.toBucket); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewBucketRepliationPolicy() = %v, want %v", got, tt.want)
 			}
 		})

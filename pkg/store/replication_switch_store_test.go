@@ -363,7 +363,7 @@ func TestBucketReplicationSwitchStore(t *testing.T) {
 	store := NewBucketReplicationSwitchStore(c)
 
 	user, bucket := "test_user", "test_bucket"
-	policy := entity.NewBucketRepliationPolicy(user, "from_storage", bucket, "to_storage", bucket)
+	policy := entity.NewBucketReplicationPolicy(user, "from_storage", bucket, "to_storage", bucket)
 	policyID := entity.BucketReplicationPolicyID{User: user, FromBucket: bucket}
 
 	// not found
@@ -444,7 +444,7 @@ func TestBucketReplicationSwitchStore(t *testing.T) {
 
 	// create zero downtime switch
 	bucket2 := "test_bucket2"
-	policy2 := entity.NewBucketRepliationPolicy(user, "from_storage", bucket2, "to_storage", bucket2)
+	policy2 := entity.NewBucketReplicationPolicy(user, "from_storage", bucket2, "to_storage", bucket2)
 	policyID2 := entity.BucketReplicationPolicyID{User: user, FromBucket: bucket2}
 
 	// not found
@@ -593,7 +593,7 @@ func TestBucketReplicationSwitchStore_Status(t *testing.T) {
 	store := NewBucketReplicationSwitchStore(c)
 
 	user, bucket := "test_user", "test_bucket"
-	policy := entity.NewBucketRepliationPolicy(user, "from_storage", bucket, "to_storage", bucket)
+	policy := entity.NewBucketReplicationPolicy(user, "from_storage", bucket, "to_storage", bucket)
 
 	// create with valid status
 	dtSwitch := entity.ReplicationSwitchInfo{

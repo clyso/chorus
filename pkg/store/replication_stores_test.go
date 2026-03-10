@@ -272,7 +272,7 @@ func TestNewBucketReplicationPolicyStore(t *testing.T) {
 	s1, s2 := "storage_1", "storage_2"
 	user1 := "user1"
 	bucket1 := "bucket1"
-	policy1 := entity.NewBucketRepliationPolicy(user1, s1, bucket1, s2, bucket1)
+	policy1 := entity.NewBucketReplicationPolicy(user1, s1, bucket1, s2, bucket1)
 	r.Equal(user1, policy1.User)
 	r.Equal(bucket1, policy1.FromBucket)
 	r.Equal(s1, policy1.FromStorage)
@@ -333,7 +333,7 @@ func TestNewBucketReplicationPolicyStore(t *testing.T) {
 
 	// add a second policy for the same user/bucket but different toStorage
 	s3 := "storage_3"
-	policy2 := entity.NewBucketRepliationPolicy(user1, s1, bucket1, s3, bucket1)
+	policy2 := entity.NewBucketReplicationPolicy(user1, s1, bucket1, s3, bucket1)
 
 	destInUse, err = store.IsDestinationInUse(ctx, policy2)
 	r.NoError(err)
@@ -363,7 +363,7 @@ func TestNewBucketReplicationPolicyStore(t *testing.T) {
 
 	// add a policy for the same storage but different toBucket
 	bucket2 := "bucket2"
-	policy3 := entity.NewBucketRepliationPolicy(user1, s1, bucket1, s2, bucket2)
+	policy3 := entity.NewBucketReplicationPolicy(user1, s1, bucket1, s2, bucket2)
 
 	destInUse, err = store.IsDestinationInUse(ctx, policy3)
 	r.NoError(err)
@@ -403,7 +403,7 @@ func TestNewBucketReplicationPolicyStore(t *testing.T) {
 	_, err = store.GetOp(ctx, entity.BucketReplicationPolicyID{User: user2, FromBucket: bucket1}).Get()
 	r.ErrorIs(err, dom.ErrNotFound)
 	// add policy for user2
-	policy4 := entity.NewBucketRepliationPolicy(user2, s1, bucket1, s2, bucket1)
+	policy4 := entity.NewBucketReplicationPolicy(user2, s1, bucket1, s2, bucket1)
 	destInUse, err = store.IsDestinationInUse(ctx, policy4)
 	r.NoError(err)
 	r.False(destInUse)
@@ -448,7 +448,7 @@ func TestNewBucketReplicationPolicyStore(t *testing.T) {
 	_, err = store.GetOp(ctx, entity.BucketReplicationPolicyID{User: user1, FromBucket: bucket2}).Get()
 	r.ErrorIs(err, dom.ErrNotFound)
 	// add policy for bucket2
-	policy5 := entity.NewBucketRepliationPolicy(user1, s1, bucket2, s2, bucket2)
+	policy5 := entity.NewBucketReplicationPolicy(user1, s1, bucket2, s2, bucket2)
 	err = store.AddOp(ctx, policy5).Get()
 	r.NoError(err)
 
@@ -697,21 +697,21 @@ func TestNewBucketReplicationPolicyStoreRemove(t *testing.T) {
 
 	store := NewBucketReplicationPolicyStore(c)
 
-	policyU1B1_1 := entity.NewBucketRepliationPolicy("u1", "s1", "b1", "s2", "b1") //same bucket
-	policyU1B1_2 := entity.NewBucketRepliationPolicy("u1", "s1", "b1", "s1", "b2") //same storage, bucket different
-	policyU1B1_3 := entity.NewBucketRepliationPolicy("u1", "s1", "b1", "s3", "b2") //storage and bucket different
+	policyU1B1_1 := entity.NewBucketReplicationPolicy("u1", "s1", "b1", "s2", "b1") //same bucket
+	policyU1B1_2 := entity.NewBucketReplicationPolicy("u1", "s1", "b1", "s1", "b2") //same storage, bucket different
+	policyU1B1_3 := entity.NewBucketReplicationPolicy("u1", "s1", "b1", "s3", "b2") //storage and bucket different
 
-	policyU2B1_1 := entity.NewBucketRepliationPolicy("u2", "s1", "b1", "s2", "b1") //same bucket
-	policyU2B1_2 := entity.NewBucketRepliationPolicy("u2", "s1", "b1", "s1", "b2") //same storage, bucket different
-	policyU2B1_3 := entity.NewBucketRepliationPolicy("u2", "s1", "b1", "s3", "b2") //storage and bucket different
+	policyU2B1_1 := entity.NewBucketReplicationPolicy("u2", "s1", "b1", "s2", "b1") //same bucket
+	policyU2B1_2 := entity.NewBucketReplicationPolicy("u2", "s1", "b1", "s1", "b2") //same storage, bucket different
+	policyU2B1_3 := entity.NewBucketReplicationPolicy("u2", "s1", "b1", "s3", "b2") //storage and bucket different
 
-	policyU1B2_1 := entity.NewBucketRepliationPolicy("u1", "s1", "b2", "s2", "b1") //same bucket
-	policyU1B2_2 := entity.NewBucketRepliationPolicy("u1", "s1", "b2", "s1", "b1") //same storage, bucket different
-	policyU1B2_3 := entity.NewBucketRepliationPolicy("u1", "s1", "b2", "s3", "b2") //storage and bucket different
+	policyU1B2_1 := entity.NewBucketReplicationPolicy("u1", "s1", "b2", "s2", "b1") //same bucket
+	policyU1B2_2 := entity.NewBucketReplicationPolicy("u1", "s1", "b2", "s1", "b1") //same storage, bucket different
+	policyU1B2_3 := entity.NewBucketReplicationPolicy("u1", "s1", "b2", "s3", "b2") //storage and bucket different
 
-	policyU2B2_1 := entity.NewBucketRepliationPolicy("u2", "s2", "b2", "s2", "b1") //same bucket
-	policyU2B2_2 := entity.NewBucketRepliationPolicy("u2", "s2", "b2", "s1", "b2") //same storage, bucket different
-	policyU2B2_3 := entity.NewBucketRepliationPolicy("u2", "s2", "b2", "s3", "b2") //storage and bucket different
+	policyU2B2_1 := entity.NewBucketReplicationPolicy("u2", "s2", "b2", "s2", "b1") //same bucket
+	policyU2B2_2 := entity.NewBucketReplicationPolicy("u2", "s2", "b2", "s1", "b2") //same storage, bucket different
+	policyU2B2_3 := entity.NewBucketReplicationPolicy("u2", "s2", "b2", "s3", "b2") //storage and bucket different
 
 	// add all policies
 	allPolicies := []entity.BucketReplicationPolicy{
@@ -794,13 +794,13 @@ func TestNewBucketReplicationPolicyStore_WithExec(t *testing.T) {
 	storeTx := store.WithExecutor(tx)
 
 	// create replication
-	policy := entity.NewBucketRepliationPolicy("user1", "s1", "b1", "s2", "b2")
+	policy := entity.NewBucketReplicationPolicy("user1", "s1", "b1", "s2", "b2")
 	err := store.AddOp(ctx, policy).Get()
 	r.NoError(err)
 
 	getExistingResult := storeTx.GetOp(ctx, entity.BucketReplicationPolicyID{User: "user1", FromBucket: "b1"})
 	getNonExistingResult := storeTx.GetOp(ctx, entity.BucketReplicationPolicyID{User: "non_exist_user", FromBucket: "b1"})
-	policy2 := entity.NewBucketRepliationPolicy("non_exist_user", "s1", "b1", "s2", "b2")
+	policy2 := entity.NewBucketReplicationPolicy("non_exist_user", "s1", "b1", "s2", "b2")
 	addNonExistingResult := storeTx.AddOp(ctx, policy2)
 	getCreatedResult := storeTx.GetOp(ctx, entity.BucketReplicationPolicyID{User: "non_exist_user", FromBucket: "b1"})
 
