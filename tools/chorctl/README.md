@@ -63,9 +63,9 @@ chorctl repl switch --help
 chorctl route --help
 ```
 
-### Consistency Check
+### Diff
 ```shell
-chorctl consistency --help
+chorctl diff --help
 ```
 
 ### Dynamic Credentials

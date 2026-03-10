@@ -11,7 +11,7 @@ import (
 	"github.com/clyso/chorus/pkg/entity"
 )
 
-var _ = Describe("Consistency checker stores", func() {
+var _ = Describe("Diff stores", func() {
 
 	const (
 		CMinSize = 0
@@ -39,30 +39,30 @@ var _ = Describe("Consistency checker stores", func() {
 	It("Should remove all matching records", func() {
 		ctx := context.WithoutCancel(testCtx)
 
-		store := NewConsistencyCheckSetStore(testRedisClient)
+		store := NewDiffSetStore(testRedisClient)
 
 		locationCount := testRnd.Int64InRange(CMinLocationCount, CMaxLocationCount)
-		locations := make([]entity.ConsistencyCheckLocation, 0, locationCount)
+		locations := make([]entity.DiffLocation, 0, locationCount)
 		for i := int64(0); i < locationCount; i++ {
 			storage := testRnd.VarLengthStringFromAlphabet(CGenAlphabet, CMinStringLength, CMaxStringLength)
 			bucket := testRnd.VarLengthStringFromAlphabet(CGenAlphabet, CMinStringLength, CMaxStringLength)
-			locations = append(locations, entity.NewConsistencyCheckLocation(storage, bucket))
+			locations = append(locations, entity.NewDiffLocation(storage, bucket))
 		}
-		checkID := entity.NewConsistencyCheckID(locations...)
+		diffID := entity.NewDiffID(locations...)
 
 		keyCount := testRnd.Int64InRange(CMinKeyCount, CMaxKeyCount)
-		ids := make([]entity.ConsistencyCheckSetID, 0, keyCount)
+		ids := make([]entity.DiffSetID, 0, keyCount)
 		for i := int64(0); i < keyCount; i++ {
 			object := testRnd.VarLengthStringFromAlphabet(CGenAlphabet, CMinStringLength, CMaxStringLength)
 			etag := testRnd.VarLengthStringFromAlphabet(CGenAlphabet, CMinStringLength, CMaxStringLength)
 			size := uint64(testRnd.Int64InRange(CMinSize, CMaxSize))
-			ids = append(ids, entity.NewEtagConsistencyCheckSetID(checkID, object, size, etag))
+			ids = append(ids, entity.NewEtagDiffSetID(diffID, object, size, etag))
 		}
 
 		for i := 0; i < int(locationCount)-1; i++ {
 			location := locations[i]
 			for _, key := range ids {
-				err := store.Add(ctx, key, entity.NewConsistencyCheckSetEntry(location), uint8(locationCount))
+				err := store.Add(ctx, key, entity.NewDiffSetEntry(location, false), uint8(locationCount))
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -73,7 +73,7 @@ var _ = Describe("Consistency checker stores", func() {
 
 		lastLocation := locations[locationCount-1]
 		for idx, key := range ids {
-			err := store.Add(ctx, key, entity.NewConsistencyCheckSetEntry(lastLocation), uint8(locationCount))
+			err := store.Add(ctx, key, entity.NewDiffSetEntry(lastLocation, false), uint8(locationCount))
 			Expect(err).NotTo(HaveOccurred())
 			keys, err := testRedisClient.Keys(ctx, "*").Result()
 			Expect(keys).To(HaveLen(int(keyCount) - idx - 1))
@@ -81,18 +81,18 @@ var _ = Describe("Consistency checker stores", func() {
 	})
 })
 
-func TestConsistencyCheckIDToTokensConverter(t *testing.T) {
+func TestDiffIDToTokensConverter(t *testing.T) {
 	type args struct {
 	}
 	tests := []struct {
 		name    string
-		id      entity.ConsistencyCheckID
+		id      entity.DiffID
 		wantErr bool
 	}{
 		{
 			name: "buffer error case",
-			id: entity.ConsistencyCheckID{
-				Locations: []entity.ConsistencyCheckLocation{
+			id: entity.DiffID{
+				Locations: []entity.DiffLocation{
 					{Storage: "f1", Bucket: "restart1"},
 					{Storage: "main", Bucket: "restart1"},
 				},
@@ -103,13 +103,13 @@ func TestConsistencyCheckIDToTokensConverter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := require.New(t)
-			got, err := ConsistencyCheckIDToTokensConverter(tt.id)
+			got, err := DiffIDToTokensConverter(tt.id)
 			if tt.wantErr {
 				r.Error(err)
 				return
 			}
 			r.NoError(err)
-			gotID, err := TokensToConsistencyCheckIDConverter(got)
+			gotID, err := TokensToDiffIDConverter(got)
 			r.NoError(err)
 			r.EqualValues(tt.id, gotID)
 		})

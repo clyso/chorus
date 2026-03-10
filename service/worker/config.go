@@ -86,7 +86,8 @@ func (c *Config) Validate() error {
 func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Opt{config.Reader(dc, "worker_default_cfg")}
+	cfgSource := make([]config.Opt, 0, 1+len(src))
+	cfgSource = append(cfgSource, config.Reader(dc, "worker_default_cfg"))
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

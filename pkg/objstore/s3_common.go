@@ -135,6 +135,22 @@ func (s *s3CommonClient) ListObjects(ctx context.Context, bucket string, opts ..
 	}
 }
 
+func (s *s3CommonClient) GetObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (io.Reader, error) {
+	commonOpts := &commonObjectOptions{}
+
+	for _, opt := range opts {
+		opt(commonOpts)
+	}
+
+	object, err := s.client.S3().GetObject(ctx, bucket, name, minio.GetObjectOptions{
+		VersionID: commonOpts.versionID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to get object: %w", err)
+	}
+	return object, nil
+}
+
 func (s *s3CommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error {
 	if _, err := s.client.S3().PutObject(ctx, bucket, name, reader, int64(len), minio.PutObjectOptions{}); err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
@@ -179,24 +195,53 @@ func (s *s3CommonClient) RemoveObject(ctx context.Context, bucket string, name s
 	return nil
 }
 
-func (s *s3CommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) error {
+func (s *s3CommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) iter.Seq[error] {
 	objectInfos := make([]minio.ObjectInfo, 0, len(names))
 	for _, name := range names {
 		objectInfos = append(objectInfos, minio.ObjectInfo{
 			Key: name,
 		})
 	}
-	infoIter := slices.Values(objectInfos)
-	resultIter, err := s.client.S3().RemoveObjectsWithIter(ctx, bucket, infoIter, minio.RemoveObjectsOptions{})
-	if err != nil {
-		return fmt.Errorf("unable delete objects: %w", err)
-	}
-	for result := range resultIter {
-		if result.Err != nil {
-			return fmt.Errorf("unable delete object %s: %w", result.ObjectName, err)
-		}
+	return s.removeObjects(ctx, bucket, objectInfos)
+}
+
+func (s *s3CommonClient) RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error {
+	errIter := s.RemoveObjects(ctx, bucket, names)
+	removeErrs := slices.Collect(errIter)
+	if len(removeErrs) > 0 {
+		return fmt.Errorf("unable to do bulk delete: %w", errors.Join(removeErrs...))
 	}
 	return nil
+}
+
+func (s *s3CommonClient) RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) iter.Seq[error] {
+	objectInfos := make([]minio.ObjectInfo, 0, len(objects))
+	for _, object := range objects {
+		objectInfos = append(objectInfos, minio.ObjectInfo{
+			Key:       object.Name,
+			VersionID: object.Version,
+		})
+	}
+	return s.removeObjects(ctx, bucket, objectInfos)
+}
+
+func (s *s3CommonClient) removeObjects(ctx context.Context, bucket string, objectInfos []minio.ObjectInfo) iter.Seq[error] {
+	infoIter := slices.Values(objectInfos)
+	resultIter, err := s.client.S3().RemoveObjectsWithIter(ctx, bucket, infoIter, minio.RemoveObjectsOptions{})
+	return func(yield func(error) bool) {
+		if err != nil {
+			yield(fmt.Errorf("unable to delete objects: %w", err))
+			return
+		}
+		for result := range resultIter {
+			if result.Err == nil {
+				continue
+			}
+			if !yield(fmt.Errorf("unable to delete object %s: %w", result.ObjectName, err)) {
+				return
+			}
+		}
+	}
 }
 
 func (s *s3CommonClient) ObjectInfo(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (*CommonObjectInfo, error) {
@@ -210,7 +255,7 @@ func (s *s3CommonClient) ObjectInfo(ctx context.Context, bucket string, name str
 		VersionID: commonOpts.versionID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unabe to stat object: %w", err)
+		return nil, fmt.Errorf("unable to stat object: %w", err)
 	}
 	return &CommonObjectInfo{
 		LastModified: stat.LastModified,

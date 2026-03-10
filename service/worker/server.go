@@ -127,14 +127,16 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	objectVersionInfoStore := store.NewObjectVersionInfoStore(confRedis)
 	copySvc := copy.NewS3CopySvc(credsSvc, clientRegistry, metricsSvc)
-	versionedMigrationSvc := handler.NewVersionedMigrationSvc(policySvc, copySvc, objectVersionInfoStore, objectLocker, conf.Worker.PauseRetryInterval)
+	versionedMigrationSvc := handler.NewVersionedMigrationSvc(copySvc, objectVersionInfoStore, objectLocker)
 
-	consistencyCheckIDStore := store.NewConsistencyCheckIDStore(confRedis)
-	consistencyCheckSettingsStore := store.NewConsistencyCheckSettingsStore(confRedis)
-	consistencyCheckListStateStore := store.NewConsistencyCheckListStateStore(confRedis)
-	consistencyCheckSetStore := store.NewConsistencyCheckSetStore(confRedis)
-	checkSvc := handler.NewConsistencyCheckSvc(consistencyCheckIDStore, consistencyCheckSettingsStore, consistencyCheckListStateStore, consistencyCheckSetStore, clientRegistry, queueSvc)
-	checkCtrl := handler.NewConsistencyCheckCtrl(checkSvc, queueSvc)
+	diffIDStore := store.NewDiffIDStore(confRedis)
+	diffSettingsStore := store.NewDiffSettingsStore(confRedis)
+	diffListStateStore := store.NewDiffListStateStore(confRedis)
+	diffSetStore := store.NewDiffSetStore(confRedis)
+	fixCopySetStore := store.NewDiffFixCopySetStore(confRedis)
+	fixRemoveSetStore := store.NewDiffFixRemoveSetStore(confRedis)
+	checkSvc := handler.NewDiffSvc(diffIDStore, diffSettingsStore, diffListStateStore, diffSetStore, fixCopySetStore, fixRemoveSetStore, clientRegistry, queueSvc)
+	checkCtrl := handler.NewDiffCtrl(checkSvc, queueSvc)
 
 	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
 
@@ -211,6 +213,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		mux.HandleFunc(tasks.TypeMigrateObjectListVersions, workerSvc.HandleObjectVersionList)
 		mux.HandleFunc(tasks.TypeMigrateVersionedObject, workerSvc.HandleVersionedObjectMigration)
 		logger.Info().Msg("registered S3 versioned workers")
+
+		mux.HandleFunc(tasks.TypeDiffFixCopyS3, workerSvc.HandleMigrationObjCopy)
+		mux.HandleFunc(tasks.TypeDiffFixS3ListVersions, workerSvc.HandleObjectVersionList)
+		logger.Info().Msg("registered diff fix s3 workers")
 	} else {
 		logger.Info().Msg("s3 workers not registered: no s3 storage configured")
 	}
@@ -228,14 +234,24 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		mux.HandleFunc(tasks.TypeSwiftContainerMigration, swiftWorkerSvc.HandleSwiftContainerMigration)
 		mux.HandleFunc(tasks.TypeSwiftObjectMigration, swiftWorkerSvc.HandleSwiftObjectMigration)
 		logger.Info().Msg("registered swift workers")
+
+		mux.HandleFunc(tasks.TypeDiffFixCopySwift, swiftWorkerSvc.HandleSwiftObjectMigration)
+		logger.Info().Msg("registered diff fix swift workers")
 	} else {
 		logger.Info().Msg("swift workers not registered: no swift storage configured")
 	}
 
-	mux.HandleFunc(tasks.TypeConsistencyCheck, checkCtrl.HandleConsistencyCheck)
-	mux.HandleFunc(tasks.TypeConsistencyCheckListObjects, checkCtrl.HandleConsistencyCheckList)
-	mux.HandleFunc(tasks.TypeConsistencyCheckListVersions, checkCtrl.HandleConsistencyCheckListVersions)
-	logger.Info().Msg("registered consistency check workers")
+	// diff check
+	mux.HandleFunc(tasks.TypeDiff, checkCtrl.HandleDiff)
+	mux.HandleFunc(tasks.TypeDiffListObjects, checkCtrl.HandleDiffList)
+	mux.HandleFunc(tasks.TypeDiffListVersions, checkCtrl.HandleDiffListVersions)
+	logger.Info().Msg("registered diff workers")
+
+	// diff fix
+	mux.HandleFunc(tasks.TypeDiffFixCollectObjects, checkCtrl.HandleDiffCollectObjects)
+	mux.HandleFunc(tasks.TypeDiffFixRemoveObjects, checkCtrl.HandleDiffRemoveObjects)
+	mux.HandleFunc(tasks.TypeDiffFixEnsureRemove, checkCtrl.HandleDiffEnsureObjectsRemoved)
+	logger.Info().Msg("registered diff fix workers")
 
 	server := util.NewServer()
 	err = server.Add("queue_workers", func(ctx context.Context) error {
@@ -256,7 +272,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	if conf.Api.Enabled {
 		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), &app)
-		diffHandler := api.DiffHandlers(credsSvc, queueSvc, checkSvc)
+		diffHandler := api.DiffHandlers(credsSvc, checkSvc)
 		var webhookConf *api.WebhookConfig
 		if conf.Api.Webhook.Enabled {
 			webhookConf = &conf.Api.Webhook

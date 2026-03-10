@@ -25,7 +25,41 @@
     "application/json"
   ],
   "paths": {
-    "/consistency/delete": {
+    "/credentials": {
+      "post": {
+        "summary": "Sets user credentials for a given storage.",
+        "operationId": "Chorus_SetUserCredentials",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googleRpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusSetUserCredentialsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/diff/delete": {
       "put": {
         "operationId": "Diff_DeleteReport",
         "responses": {
@@ -39,7 +73,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -49,7 +83,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusConsistencyCheckRequest"
+              "$ref": "#/definitions/chorusDiffCheckRequest"
             }
           }
         ],
@@ -58,20 +92,53 @@
         ]
       }
     },
-    "/consistency/list": {
+    "/diff/fix": {
+      "post": {
+        "operationId": "Diff_Fix",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googleRpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusStartDiffFixRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Diff"
+        ]
+      }
+    },
+    "/diff/list": {
       "get": {
         "operationId": "Diff_List",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusListConsistencyChecksResponse"
+              "$ref": "#/definitions/chorusListDiffChecksResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -80,20 +147,20 @@
         ]
       }
     },
-    "/consistency/report": {
+    "/diff/report": {
       "get": {
         "operationId": "Diff_GetReport",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusGetConsistencyCheckReportResponse"
+              "$ref": "#/definitions/chorusGetDiffCheckReportResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -102,20 +169,20 @@
         ]
       }
     },
-    "/consistency/report-entries": {
+    "/diff/report-entries": {
       "get": {
         "operationId": "Diff_GetReportEntries",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/chorusGetConsistencyCheckReportEntriesResponse"
+              "$ref": "#/definitions/chorusGetDiffCheckReportEntriesResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -140,7 +207,40 @@
         ]
       }
     },
-    "/consistency/start": {
+    "/diff/restart": {
+      "put": {
+        "operationId": "Diff_Restart",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googleRpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusDiffCheckRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Diff"
+        ]
+      }
+    },
+    "/diff/start": {
       "post": {
         "operationId": "Diff_Start",
         "responses": {
@@ -154,7 +254,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -164,46 +264,12 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/chorusStartConsistencyCheckRequest"
+              "$ref": "#/definitions/chorusStartDiffCheckRequest"
             }
           }
         ],
         "tags": [
           "Diff"
-        ]
-      }
-    },
-    "/credentials": {
-      "post": {
-        "summary": "Sets user credentials for a given storage.",
-        "operationId": "Chorus_SetUserCredentials",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "type": "object",
-              "properties": {}
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/chorusSetUserCredentialsRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Chorus"
         ]
       }
     },
@@ -221,7 +287,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -244,7 +310,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -279,7 +345,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -314,7 +380,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -348,7 +414,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -382,7 +448,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -417,7 +483,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -452,7 +518,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -488,7 +554,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -524,7 +590,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -558,7 +624,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -594,7 +660,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -627,7 +693,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -661,7 +727,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -695,7 +761,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -729,7 +795,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -763,7 +829,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -796,7 +862,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -819,7 +885,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -852,7 +918,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -876,7 +942,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -917,7 +983,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
+              "$ref": "#/definitions/googleRpcStatus"
             }
           }
         },
@@ -1066,7 +1132,21 @@
         }
       }
     },
-    "chorusConsistencyCheck": {
+    "chorusCredential": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "accessKey": {
+          "type": "string"
+        },
+        "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "chorusDiffCheck": {
       "type": "object",
       "properties": {
         "locations": {
@@ -1093,15 +1173,26 @@
         "versioned": {
           "type": "boolean"
         },
-        "withSize": {
+        "ignoreSizes": {
           "type": "boolean"
         },
-        "withEtag": {
+        "ignoreEtags": {
+          "type": "boolean"
+        },
+        "fixQueued": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "fixCompleted": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "fixReady": {
           "type": "boolean"
         }
       }
     },
-    "chorusConsistencyCheckReportEntry": {
+    "chorusDiffCheckReportEntry": {
       "type": "object",
       "properties": {
         "object": {
@@ -1122,12 +1213,12 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/chorusConsistencyCheckStorageEntry"
+            "$ref": "#/definitions/chorusDiffCheckStorageEntry"
           }
         }
       }
     },
-    "chorusConsistencyCheckRequest": {
+    "chorusDiffCheckRequest": {
       "type": "object",
       "properties": {
         "locations": {
@@ -1139,7 +1230,7 @@
         }
       }
     },
-    "chorusConsistencyCheckStorageEntry": {
+    "chorusDiffCheckStorageEntry": {
       "type": "object",
       "properties": {
         "storage": {
@@ -1149,20 +1240,6 @@
           "type": "string"
         },
         "bucket": {
-          "type": "string"
-        }
-      }
-    },
-    "chorusCredential": {
-      "type": "object",
-      "properties": {
-        "alias": {
-          "type": "string"
-        },
-        "accessKey": {
-          "type": "string"
-        },
-        "secretKey": {
           "type": "string"
         }
       }
@@ -1191,14 +1268,14 @@
         }
       }
     },
-    "chorusGetConsistencyCheckReportEntriesResponse": {
+    "chorusGetDiffCheckReportEntriesResponse": {
       "type": "object",
       "properties": {
         "entries": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/chorusConsistencyCheckReportEntry"
+            "$ref": "#/definitions/chorusDiffCheckReportEntry"
           }
         },
         "cursor": {
@@ -1207,11 +1284,11 @@
         }
       }
     },
-    "chorusGetConsistencyCheckReportResponse": {
+    "chorusGetDiffCheckReportResponse": {
       "type": "object",
       "properties": {
         "check": {
-          "$ref": "#/definitions/chorusConsistencyCheck"
+          "$ref": "#/definitions/chorusDiffCheck"
         }
       }
     },
@@ -1242,14 +1319,14 @@
         }
       }
     },
-    "chorusListConsistencyChecksResponse": {
+    "chorusListDiffChecksResponse": {
       "type": "object",
       "properties": {
         "checks": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/chorusConsistencyCheck"
+            "$ref": "#/definitions/chorusDiffCheck"
           }
         }
       }
@@ -1661,7 +1738,7 @@
         }
       }
     },
-    "chorusStartConsistencyCheckRequest": {
+    "chorusStartDiffCheckRequest": {
       "type": "object",
       "properties": {
         "locations": {
@@ -1682,6 +1759,22 @@
         },
         "ignoreSizes": {
           "type": "boolean"
+        }
+      }
+    },
+    "chorusStartDiffFixRequest": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        },
+        "sourceIndex": {
+          "type": "string",
+          "format": "uint64"
         }
       }
     },
@@ -1897,7 +1990,7 @@
         }
       }
     },
-    "googlerpcStatus": {
+    "googleRpcStatus": {
       "type": "object",
       "properties": {
         "code": {

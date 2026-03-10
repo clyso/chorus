@@ -296,7 +296,6 @@ func dereferStr(s *string) string {
 }
 
 func toUserRoutingsPb(filter *pb.RoutingsRequest_Filter, routings map[string]string, blocks map[string]bool) []*pb.UserRouting {
-	//nolint:prealloc // cannot preallocate because of the filtering
 	var res []*pb.UserRouting
 	for user, toStorage := range routings {
 		if filter != nil && filter.User != nil && *filter.User != "" && user != *filter.User {
@@ -337,7 +336,6 @@ func toUserRoutingsPb(filter *pb.RoutingsRequest_Filter, routings map[string]str
 }
 
 func toBucketRoutingsPb(filter *pb.RoutingsRequest_Filter, user string, routings map[string]string, blocks map[string]bool) []*pb.BucketRouting {
-	//nolint:prealloc // cannot preallocate because of the filtering
 	var res []*pb.BucketRouting
 	for bucket, toStorage := range routings {
 		if filter != nil && filter.Bucket != nil && *filter.Bucket != "" && bucket != *filter.Bucket {

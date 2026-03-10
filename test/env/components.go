@@ -100,6 +100,9 @@ const (
 	CMinioS3Port         = 9000
 	CMinioManagementPort = 9001
 
+	// TODO replace with quay.io/benjamin_holmes/ceph-aio image?
+	// It has v18, v19 and v20 tags. Can be forked and self built
+	// https://github.com/benemon/ceph-aio
 	CCephX8664Image            = "quay.io/ceph/demo:main-985bb830-main-centos-stream8-x86_64"
 	CCephARM64Image            = "quay.io/ceph/demo:main-985bb83-main-centos-arm64-stream8-aarch64"
 	CCephPublicNetwork         = "127.0.0.1/32"

@@ -19,11 +19,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"text/tabwriter"
+	"strings"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
@@ -31,16 +29,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var consistencyCmd = &cobra.Command{
-	Use:   "consistency",
-	Short: "list consistency checks",
-	Long: `Get a list of consistency checks run by chorus instance.
-	
+var diffPurgeCmd = &cobra.Command{
+	Use:   "purge",
+	Short: "delete result of diff check",
+	Long: `Remove all stored data related to diff check.
+
 Example:
-chorctl consistency`,
+chorctl diff purge oldstorage:bucket newstorage:altbucket`,
+	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		locations := make([]*pb.MigrateLocation, 0, len(args))
+		for _, arg := range args {
+			storage, bucket, found := strings.Cut(arg, ":")
+			if !found {
+				logrus.WithField("arg", arg).Fatal("unable to get storage and bucket parts")
+			}
+			locations = append(locations, &pb.MigrateLocation{
+				Storage: storage,
+				Bucket:  bucket,
+			})
+		}
 
 		conn, err := api.Connect(ctx, address)
 		if err != nil {
@@ -49,21 +60,17 @@ chorctl consistency`,
 		defer conn.Close()
 
 		client := pb.NewDiffClient(conn)
-		res, err := client.List(ctx, &emptypb.Empty{})
-		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency checks")
+		for _, id := range args {
+			_, err := client.DeleteReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+			if err != nil {
+				logrus.WithError(err).WithField("address", address).Fatal("unable to delete diff check", id)
+			} else {
+				fmt.Println("Diff check", id, "deleted.")
+			}
 		}
-
-		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
-		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, api.ConsistencyCheckHeader())
-		for _, check := range res.Checks {
-			fmt.Fprintln(w, api.ConsistencyCheckRow(check))
-		}
-		w.Flush()
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(consistencyCmd)
+	diffCmd.AddCommand(diffPurgeCmd)
 }

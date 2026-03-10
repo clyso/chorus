@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
@@ -94,7 +95,7 @@ type ObjectInfo struct {
 
 type CopySvc interface {
 	GetVersionInfo(ctx context.Context, user string, to File) ([]entity.ObjectVersionInfo, error)
-	DeleteDestinationObject(ctx context.Context, user string, to File) error
+	ClearDestination(ctx context.Context, user string, to File, versioned bool) error
 	GetLastMigratedVersionInfo(ctx context.Context, user string, to File) (entity.ObjectVersionInfo, error)
 	CopyObject(ctx context.Context, user string, from File, to File) error
 	CopyACLs(ctx context.Context, user string, from File, to File) error
@@ -117,20 +118,16 @@ func NewS3CopySvc(credsSvc objstore.CredsService, clientRegistry objstore.Client
 }
 
 func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([]entity.ObjectVersionInfo, error) {
-	storageClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
+	storageClient, err := r.clientRegistry.AsCommon(ctx, to.Storage, user)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get %s storage client: %w", to.Storage, err)
 	}
-
-	objects := storageClient.S3().ListObjects(ctx, to.Bucket, minio.ListObjectsOptions{
-		WithVersions: true,
-		Prefix:       to.Name,
-	})
+	objects := storageClient.ListObjects(ctx, to.Bucket, objstore.WithPrefix(to.Name), objstore.WithVersions())
 
 	result := []entity.ObjectVersionInfo{}
-	for object := range objects {
-		if object.Err != nil {
-			return nil, fmt.Errorf("unable to list versions: %w", object.Err)
+	for object, err := range objects {
+		if err != nil {
+			return nil, fmt.Errorf("unable to list versions: %w", err)
 		}
 
 		info := entity.ObjectVersionInfo{
@@ -149,7 +146,6 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string,
 	if err != nil {
 		return entity.ObjectVersionInfo{}, fmt.Errorf("unable to get to client: %w", err)
 	}
-
 	objectStat, err := toClient.S3().StatObject(ctx, to.Bucket, to.Name, minio.StatObjectOptions{})
 	if err != nil {
 		var errorResp minio.ErrorResponse
@@ -157,9 +153,45 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string,
 		if !ok {
 			return entity.ObjectVersionInfo{}, fmt.Errorf("unable to cast error to s3 error %w", err)
 		}
-		if errorResp.StatusCode == http.StatusNotFound {
+
+		if errorResp.StatusCode != http.StatusNotFound {
+			return entity.ObjectVersionInfo{}, fmt.Errorf("unexpected s3 error %w", err)
+		}
+
+		// Ceph has a bug, not returning delete marker header, check with list as last resort
+		toStorage, err := r.credsSvc.GetS3Address(to.Storage)
+		if err != nil {
+			return entity.ObjectVersionInfo{}, fmt.Errorf("unable to get to storage address: %w", err)
+		}
+		if !objectStat.IsDeleteMarker && toStorage.Provider == s3.ProviderCeph {
+			objectIter := toClient.S3().ListObjectsIter(ctx, to.Bucket, minio.ListObjectsOptions{
+				Prefix:       to.Name,
+				WithVersions: true,
+				MaxKeys:      1,
+			})
+
+			objects := slices.Collect(objectIter)
+			if len(objects) == 0 {
+				return entity.ObjectVersionInfo{}, dom.ErrNotFound
+			}
+
+			return entity.ObjectVersionInfo{
+				DeleteMarker: true,
+				// TODO address after Ceph fix
+				// Version: objects[0].VersionID,
+				// Size: uint64(objects[0].Size),
+			}, nil
+		}
+
+		if !objectStat.IsDeleteMarker {
 			return entity.ObjectVersionInfo{}, dom.ErrNotFound
 		}
+
+		return entity.ObjectVersionInfo{
+			DeleteMarker: true,
+			// TODO address after Ceph fix
+			// Version: objectStat.VersionID,
+		}, nil
 	}
 
 	sourceVersionID := objectStat.Metadata.Get(CChorusSourceVersionIDMetaHeader)
@@ -174,15 +206,44 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string,
 	}, nil
 }
 
-func (r *S3CopySvc) DeleteDestinationObject(ctx context.Context, user string, to File) error {
-	toClient, err := r.clientRegistry.AsS3(ctx, to.Storage, user)
+// TODO this potentially can be a part of common client or its common application
+// also, maybe split common client interface into client base (provider specific methods) and common client
+// (implementing same logic with the use of base methods)
+func (r *S3CopySvc) ClearDestination(ctx context.Context, user string, to File, versioned bool) error {
+	toClient, err := r.clientRegistry.AsCommon(ctx, to.Storage, user)
 	if err != nil {
-		return fmt.Errorf("unable to get to client: %w", err)
+		return fmt.Errorf("unable to get common to client: %w", err)
 	}
 
-	if err := toClient.S3().RemoveObject(ctx, to.Bucket, to.Name, minio.RemoveObjectOptions{}); err != nil {
-		return fmt.Errorf("unable to remove object: %w", err)
+	if !versioned {
+		if err := toClient.RemoveObject(ctx, to.Bucket, to.Name); err != nil {
+			return fmt.Errorf("unable to remove object: %w", err)
+		}
+		return nil
 	}
+
+	objectIter := toClient.ListObjects(ctx, to.Bucket, objstore.WithPrefix(to.Name), objstore.WithVersions())
+
+	listErrs := []error{}
+	namesAndVersions := []objstore.NameAndVersion{}
+	for object, err := range objectIter {
+		if err != nil {
+			listErrs = append(listErrs, fmt.Errorf("unable to list version: %w", err))
+		}
+		namesAndVersions = append(namesAndVersions, objstore.NameAndVersion{
+			Name:    object.Key,
+			Version: object.VersionID,
+		})
+	}
+
+	removeErrIter := toClient.RemoveVersionedObjects(ctx, to.Bucket, namesAndVersions)
+	removeErrs := slices.Collect(removeErrIter)
+
+	if len(listErrs) > 0 || len(removeErrs) > 0 {
+		joinErr := errors.Join(errors.Join(listErrs...), errors.Join(removeErrs...))
+		return fmt.Errorf("unable to delete object versions: %w", joinErr)
+	}
+
 	return nil
 }
 
@@ -208,7 +269,9 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		if errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound {
 			return dom.ErrNotFound
 		}
-		return fmt.Errorf("unable to get from object stat: %w", err)
+		if !fromObjectStat.IsDeleteMarker {
+			return fmt.Errorf("unable to get from object stat: %w", err)
+		}
 	}
 
 	toObjectPresent := true
@@ -229,6 +292,13 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 
 	if toObjectPresent && fromObjectStat.ETag == toObjectStat.ETag && fromObjectStat.Size == toObjectStat.Size {
+		return nil
+	}
+
+	if fromObjectStat.IsDeleteMarker {
+		if err := toClient.S3().RemoveObject(ctx, to.Bucket, to.Name, minio.RemoveObjectOptions{}); err != nil {
+			return fmt.Errorf("unable to replicate delete marker: %w", err)
+		}
 		return nil
 	}
 
@@ -309,14 +379,6 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	if features.ACL(ctx) {
 		if err := r.CopyACLs(ctx, user, from, to); err != nil {
 			return fmt.Errorf("unable to copy acl %w", err)
-		}
-	}
-
-	if fromObjectStat.IsDeleteMarker {
-		if err := toClient.S3().RemoveObject(ctx, to.Bucket, to.Name, minio.RemoveObjectOptions{
-			VersionID: to.Version,
-		}); err != nil {
-			return fmt.Errorf("unable to replicate delete marker: %w", err)
 		}
 	}
 
