@@ -136,9 +136,9 @@ type Common interface {
 	ObjectInfo(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (*CommonObjectInfo, error)
 	ObjectExists(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (bool, error)
 	RemoveObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) error
-	RemoveObjects(ctx context.Context, bucket string, names []string) iter.Seq[error]
+	RemoveObjects(ctx context.Context, bucket string, names []string) []error
 	RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error
-	RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) iter.Seq[error]
+	RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) []error
 	ListObjects(ctx context.Context, bucket string, opts ...func(o *commonListOptions)) iter.Seq2[CommonObjectInfo, error]
 }
 

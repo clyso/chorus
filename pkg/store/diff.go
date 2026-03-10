@@ -48,7 +48,7 @@ func StringToDiffIDConverter(value string) (entity.DiffID, error) {
 	var result entity.DiffID
 	if err := json.Unmarshal([]byte(value), &result); err != nil {
 		var noVal entity.DiffID
-		return noVal, fmt.Errorf("unable to deserialize bucket replication policy: %w", err)
+		return noVal, fmt.Errorf("unable to deserialize diff id: %w", err)
 	}
 	return result, nil
 }

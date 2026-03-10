@@ -195,7 +195,6 @@ func diffStatusAndStats(in *pb.DiffCheck) (string, string) {
 	var status string
 	if in.Consistent || in.FixQueued == 0 {
 		stats := fmt.Sprintf("%d/%d", in.Completed, in.Queued)
-		var status string
 		if !in.Ready {
 			status = "check in progress"
 		} else if !in.Consistent {
@@ -210,8 +209,9 @@ func diffStatusAndStats(in *pb.DiffCheck) (string, string) {
 	stats := fmt.Sprintf("%d/%d", in.FixCompleted, in.FixQueued)
 	if !in.FixReady {
 		status = "fix in progress"
+	} else {
+		status = "fixed"
 	}
-	status = "fixed"
 
 	return status, stats
 }
@@ -224,7 +224,7 @@ COMPLETED:	%d
 CONSISTENT:	%t
 VERSIONED:	%t
 IGNORE SIZES:	%t
-IGNORE ETAGS:	%T`
+IGNORE ETAGS:	%t`
 	if in.FixQueued == 0 {
 		return fmt.Sprintf(briefTable, in.Ready, in.Queued, in.Completed, in.Consistent, in.Versioned, in.IgnoreSizes, in.IgnoreEtags)
 	}
@@ -254,7 +254,7 @@ func DiffReportHeader(storages []string, versioned bool, withSize bool, withEtag
 }
 
 func DiffReportRow(storages []string, entry *pb.DiffCheckReportEntry, versioned bool, withSize bool, withEtag bool) string {
-	columns := []string{}
+	columns := []string{entry.Object}
 	if versioned {
 		columns = append(columns, strconv.FormatUint(entry.VersionIdx, 10))
 	}

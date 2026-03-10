@@ -129,13 +129,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	copySvc := copy.NewS3CopySvc(credsSvc, clientRegistry, metricsSvc)
 	versionedMigrationSvc := handler.NewVersionedMigrationSvc(copySvc, objectVersionInfoStore, objectLocker)
 
-	diffIDStore := store.NewDiffIDStore(confRedis)
-	diffSettingsStore := store.NewDiffSettingsStore(confRedis)
-	diffListStateStore := store.NewDiffListStateStore(confRedis)
-	diffSetStore := store.NewDiffSetStore(confRedis)
-	fixCopySetStore := store.NewDiffFixCopySetStore(confRedis)
-	fixRemoveSetStore := store.NewDiffFixRemoveSetStore(confRedis)
-	checkSvc := handler.NewDiffSvc(diffIDStore, diffSettingsStore, diffListStateStore, diffSetStore, fixCopySetStore, fixRemoveSetStore, clientRegistry, queueSvc)
+	checkSvc := handler.NewDiffSvc(confRedis, clientRegistry, queueSvc)
 	checkCtrl := handler.NewDiffCtrl(checkSvc, queueSvc)
 
 	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)

@@ -60,13 +60,11 @@ chorctl diff purge oldstorage:bucket newstorage:altbucket`,
 		defer conn.Close()
 
 		client := pb.NewDiffClient(conn)
-		for _, id := range args {
-			_, err := client.DeleteReport(ctx, &pb.DiffCheckRequest{Locations: locations})
-			if err != nil {
-				logrus.WithError(err).WithField("address", address).Fatal("unable to delete diff check", id)
-			} else {
-				fmt.Println("Diff check", id, "deleted.")
-			}
+		_, err = client.DeleteReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+		if err != nil {
+			logrus.WithError(err).WithField("address", address).Fatal("unable to delete diff check", args)
+		} else {
+			fmt.Println("Diff check", args, "deleted.")
 		}
 	},
 }

@@ -99,8 +99,7 @@ func init() {
 	diffCheckCmd.Flags().BoolVarP(&ignoreEtags, "ignore-etags", "e", false, "do not perform etag check")
 	diffCheckCmd.Flags().BoolVarP(&ignoreSizes, "ignore-sizes", "s", false, "do not perform etag and size check")
 	diffCheckCmd.Flags().BoolVarP(&checkOnlyLastVersions, "last-versions-only", "l", false, "check only last versions")
-	err := diffCheckCmd.MarkFlagRequired("user")
-	if err != nil {
+	if err := diffCheckCmd.MarkFlagRequired("user"); err != nil {
 		logrus.WithError(err).Fatal()
 	}
 }
