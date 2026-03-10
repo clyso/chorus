@@ -19,10 +19,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
@@ -47,7 +47,7 @@ func NewDiffCtrl(svc *DiffSvc, queueSvc tasks.QueueService) *DiffCtrl {
 func (r *DiffCtrl) HandleDiff(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
 	for idx := range payload.Locations {
@@ -69,16 +69,10 @@ func (r *DiffCtrl) HandleDiff(ctx context.Context, t *asynq.Task) error {
 func (r *DiffCtrl) HandleDiffList(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffListObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	locationCount := len(payload.Locations)
-	locations := make([]entity.DiffLocation, 0, locationCount)
-	for _, payloadLocation := range payload.Locations {
-		locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
-	}
-
-	diffID := entity.NewDiffID(locations...)
+	diffID := r.diffIDFromMigrateLocations(payload.Locations)
 	settings := entity.NewDiffSettings(payload.User, payload.Versioned, payload.IgnoreSizes, payload.IgnoreEtags)
 	location := entity.NewDiffLocation(payload.Locations[payload.Index].Storage, payload.Locations[payload.Index].Bucket)
 
@@ -87,12 +81,12 @@ func (r *DiffCtrl) HandleDiffList(ctx context.Context, t *asynq.Task) error {
 
 	payloadMaker := func(prefix string) tasks.DiffListVersionsPayload {
 		return tasks.DiffListVersionsPayload{
-			Locations:    payload.Locations,
-			User:         payload.User,
-			Index:        payload.Index,
-			Prefix:       prefix,
-			IgonoreEtags: payload.IgnoreEtags,
-			IgnoreSizes:  payload.IgnoreSizes,
+			Locations:   payload.Locations,
+			User:        payload.User,
+			Index:       payload.Index,
+			Prefix:      prefix,
+			IgnoreEtags: payload.IgnoreEtags,
+			IgnoreSizes: payload.IgnoreSizes,
 		}
 	}
 
@@ -106,22 +100,15 @@ func (r *DiffCtrl) HandleDiffList(ctx context.Context, t *asynq.Task) error {
 func (r *DiffCtrl) HandleDiffListVersions(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffListVersionsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	locationCount := len(payload.Locations)
-	locations := make([]entity.DiffLocation, 0, locationCount)
-	for _, payloadLocation := range payload.Locations {
-		locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
-	}
-
-	diffID := entity.NewDiffID(locations...)
-
+	diffID := r.diffIDFromMigrateLocations(payload.Locations)
 	storage := payload.Locations[payload.Index].Storage
 	bucket := payload.Locations[payload.Index].Bucket
 
 	if err := r.diffSvc.AccountObjectVersions(ctx, diffID, payload.User,
-		entity.NewDiffLocation(storage, bucket), payload.Prefix, payload.IgonoreEtags, payload.IgnoreSizes); err != nil {
+		entity.NewDiffLocation(storage, bucket), payload.Prefix, payload.IgnoreEtags, payload.IgnoreSizes); err != nil {
 		return fmt.Errorf("unable to account object versions: %w", err)
 	}
 
@@ -131,17 +118,10 @@ func (r *DiffCtrl) HandleDiffListVersions(ctx context.Context, t *asynq.Task) er
 func (r *DiffCtrl) HandleDiffCollectObjects(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffFixCollectObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	locationCount := len(payload.Locations)
-	locations := make([]entity.DiffLocation, 0, locationCount)
-	for _, payloadLocation := range payload.Locations {
-		locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
-	}
-
-	diffID := entity.NewDiffID(locations...)
-
+	diffID := r.diffIDFromMigrateLocations(payload.Locations)
 	sourceStorage := payload.Locations[payload.SourceIndex].Storage
 	for idx := range payload.Locations {
 		if idx == payload.SourceIndex {
@@ -151,7 +131,7 @@ func (r *DiffCtrl) HandleDiffCollectObjects(ctx context.Context, t *asynq.Task) 
 		destinationStorage := payload.Locations[idx].Storage
 		diffFixID := entity.NewDiffFixID(diffID, destinationStorage)
 		if err := r.diffSvc.CollectObjectsToFix(ctx, diffFixID, sourceStorage, payload.Versioned); err != nil {
-			return fmt.Errorf("unable to collect objects to fix")
+			return fmt.Errorf("unable to collect objects to fix: %w", err)
 		}
 
 		if err := r.queueSvc.EnqueueTask(ctx, tasks.DiffFixRemoveObjectsPayload{
@@ -172,16 +152,10 @@ func (r *DiffCtrl) HandleDiffCollectObjects(ctx context.Context, t *asynq.Task) 
 func (r *DiffCtrl) HandleDiffRemoveObjects(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffFixRemoveObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	locationCount := len(payload.Locations)
-	locations := make([]entity.DiffLocation, 0, locationCount)
-	for _, payloadLocation := range payload.Locations {
-		locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
-	}
-
-	diffID := entity.NewDiffID(locations...)
+	diffID := r.diffIDFromMigrateLocations(payload.Locations)
 	toLocation := entity.NewDiffLocation(payload.Locations[payload.RemoveIndex].Storage, payload.Locations[payload.RemoveIndex].Bucket)
 	diffFixID := entity.NewDiffFixID(diffID, toLocation.Storage)
 	if err := r.diffSvc.RemoveDiffObjects(ctx, diffFixID, toLocation, payload.User, payload.Versioned); err != nil {
@@ -198,16 +172,10 @@ func (r *DiffCtrl) HandleDiffRemoveObjects(ctx context.Context, t *asynq.Task) e
 func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffFixEnsureObjectsRemovedPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal paylaod: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
 
-	locationCount := len(payload.Locations)
-	locations := make([]entity.DiffLocation, 0, locationCount)
-	for _, payloadLocation := range payload.Locations {
-		locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
-	}
-
-	diffID := entity.NewDiffID(locations...)
+	diffID := r.diffIDFromMigrateLocations(payload.Locations)
 	fromLocation := entity.NewDiffLocation(payload.Locations[payload.SourceIndex].Storage, payload.Locations[payload.SourceIndex].Bucket)
 	toLocation := entity.NewDiffLocation(payload.Locations[payload.RemoveIndex].Storage, payload.Locations[payload.RemoveIndex].Bucket)
 	bucketReplID := entity.NewBucketReplicationPolicy(payload.User, fromLocation.Storage, fromLocation.Bucket, toLocation.Storage, toLocation.Bucket)
@@ -223,7 +191,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 			task := tasks.DiffFixSwiftCopyPayload{
 				Locations: payload.Locations,
 				SwiftObjectMigrationPayload: tasks.SwiftObjectMigrationPayload{
-					Bucket:  toLocation.Bucket,
+					Bucket:  fromLocation.Bucket,
 					ObjName: object,
 				},
 			}
@@ -244,7 +212,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 			task := tasks.DiffFixS3CopyPayload{
 				Locations: payload.Locations,
 				MigrateObjCopyPayload: tasks.MigrateObjCopyPayload{
-					Bucket: toLocation.Bucket,
+					Bucket: fromLocation.Bucket,
 					Obj: tasks.ObjPayload{
 						Name: object,
 					},
@@ -264,6 +232,16 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 	return nil
 }
 
+func (r *DiffCtrl) diffIDFromMigrateLocations(migrateLocations []tasks.MigrateLocation) entity.DiffID {
+	locationCount := len(migrateLocations)
+	locations := make([]entity.DiffLocation, 0, locationCount)
+	for _, payloadLocation := range migrateLocations {
+		locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+	}
+
+	return entity.NewDiffID(locations...)
+}
+
 type DiffSvc struct {
 	idStore           *store.DiffIDStore
 	settingsStore     *store.DiffSettingsStore
@@ -275,14 +253,14 @@ type DiffSvc struct {
 	queueSvc          tasks.QueueService
 }
 
-func NewDiffSvc(idStore *store.DiffIDStore, settingsStore *store.DiffSettingsStore, listStateStore *store.DiffListStateStore, setStore *store.DiffSetStore, fixCopySetStore *store.DiffFixCopySetStore, fixRemoveSetStore *store.DiffFixRemoveSetStore, clients objstore.Clients, queueSvc tasks.QueueService) *DiffSvc {
+func NewDiffSvc(redisClient redis.Cmdable, clients objstore.Clients, queueSvc tasks.QueueService) *DiffSvc {
 	return &DiffSvc{
-		idStore:           idStore,
-		settingsStore:     settingsStore,
-		listStateStore:    listStateStore,
-		setStore:          setStore,
-		fixCopySetStore:   fixCopySetStore,
-		fixRemoveSetStore: fixRemoveSetStore,
+		idStore:           store.NewDiffIDStore(redisClient),
+		settingsStore:     store.NewDiffSettingsStore(redisClient),
+		listStateStore:    store.NewDiffListStateStore(redisClient),
+		setStore:          store.NewDiffSetStore(redisClient),
+		fixCopySetStore:   store.NewDiffFixCopySetStore(redisClient),
+		fixRemoveSetStore: store.NewDiffFixRemoveSetStore(redisClient),
 		clients:           clients,
 		queueSvc:          queueSvc,
 	}
@@ -482,7 +460,7 @@ func (r *DiffSvc) GetDiffStatus(ctx context.Context, id entity.DiffID) (entity.D
 
 	diffQueueStats, err := r.queueSvc.Stats(ctx, diffQueue)
 	if err != nil {
-		return entity.DiffStatus{}, fmt.Errorf("unable to get queue stats: %w", err)
+		return entity.DiffStatus{}, fmt.Errorf("unable to get diff queue stats: %w", err)
 	}
 
 	ready := diffQueueStats.Unprocessed == 0
@@ -508,18 +486,21 @@ func (r *DiffSvc) GetDiffStatus(ctx context.Context, id entity.DiffID) (entity.D
 		return entity.DiffStatus{}, fmt.Errorf("unable to make tokens out of diff id: %w", err)
 	}
 
-	notCosistent, err := r.setStore.HasIDs(ctx, tokens...)
+	notConsistent, err := r.setStore.HasIDs(ctx, tokens...)
 	if err != nil {
 		return entity.DiffStatus{}, fmt.Errorf("unable to check if there are inconsistencies: %w", err)
 	}
 
-	status.Check.Consistent = !notCosistent
+	status.Check.Consistent = !notConsistent
 
 	fixQueue := tasks.DiffFixQueue(id)
 	fixQueueStats, err := r.queueSvc.Stats(ctx, fixQueue)
 	if errors.Is(err, dom.ErrNotFound) {
 		// if fix queue is not found, then returning collected diff stats
 		return status, nil
+	}
+	if err != nil {
+		return entity.DiffStatus{}, fmt.Errorf("unable to get diff fix queue stats: %w", err)
 	}
 
 	status.FixQueue = &entity.DiffQueueStatus{
@@ -767,7 +748,7 @@ func (r *DiffSvc) CollectObjectsToFix(ctx context.Context, diffFixID entity.Diff
 func (r *DiffSvc) RemoveDiffObjects(ctx context.Context, id entity.DiffFixID, location entity.DiffLocation, user string, versioned bool) error {
 	objectNames, err := r.fixRemoveSetStore.Get(ctx, id)
 	if err != nil {
-		return fmt.Errorf("unable to get obejcts to remove")
+		return fmt.Errorf("unable to get objects to remove: %w", err)
 	}
 
 	if len(objectNames) == 0 {
@@ -780,10 +761,10 @@ func (r *DiffSvc) RemoveDiffObjects(ctx context.Context, id entity.DiffFixID, lo
 	}
 
 	if !versioned {
-		errIter := client.RemoveObjects(ctx, location.Bucket, objectNames)
-		for err := range errIter {
+		removeErrs := client.RemoveObjects(ctx, location.Bucket, objectNames)
+		for _, err := range removeErrs {
 			if !errors.Is(err, dom.ErrNotFound) {
-				return fmt.Errorf("unable to remove diff obejcts: %w", err)
+				return fmt.Errorf("unable to remove diff objects: %w", err)
 			}
 		}
 		return nil
@@ -797,6 +778,7 @@ func (r *DiffSvc) RemoveDiffObjects(ctx context.Context, id entity.DiffFixID, lo
 		for versionInfo, err := range versionIter {
 			if err != nil {
 				listErrs = append(listErrs, fmt.Errorf("unable to list version: %w", err))
+				continue
 			}
 			namesAndVersions = append(namesAndVersions, objstore.NameAndVersion{
 				Name:    objectName,
@@ -805,8 +787,7 @@ func (r *DiffSvc) RemoveDiffObjects(ctx context.Context, id entity.DiffFixID, lo
 		}
 	}
 
-	removeErrIter := client.RemoveVersionedObjects(ctx, location.Bucket, namesAndVersions)
-	removeErrs := slices.Collect(removeErrIter)
+	removeErrs := client.RemoveVersionedObjects(ctx, location.Bucket, namesAndVersions)
 
 	if len(listErrs) > 0 || len(removeErrs) > 0 {
 		joinErr := errors.Join(errors.Join(listErrs...), errors.Join(removeErrs...))
@@ -819,7 +800,7 @@ func (r *DiffSvc) RemoveDiffObjects(ctx context.Context, id entity.DiffFixID, lo
 func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID, location entity.DiffLocation, user string, versioned bool, makePayload func(object string, isDir bool) (any, error)) error {
 	objectsToRemove, err := r.fixRemoveSetStore.Get(ctx, id)
 	if err != nil {
-		return fmt.Errorf("unable to get obejcts to remove: %w", err)
+		return fmt.Errorf("unable to get objects to remove: %w", err)
 	}
 
 	client, err := r.clients.AsCommon(ctx, location.Storage, user)
@@ -849,7 +830,7 @@ func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID,
 
 	objectsToCopy, err := r.fixCopySetStore.Get(ctx, id)
 	if err != nil {
-		return fmt.Errorf("unable to get obejcts to copy: %w", err)
+		return fmt.Errorf("unable to get objects to copy: %w", err)
 	}
 
 	for _, object := range objectsToCopy {
@@ -858,12 +839,12 @@ func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID,
 			return fmt.Errorf("unable to make payload: %w", err)
 		}
 		if err := r.queueSvc.EnqueueTask(ctx, payload); err != nil {
-			return fmt.Errorf("unable to enqueue diff list task: %w", err)
+			return fmt.Errorf("unable to enqueue diff copy task: %w", err)
 		}
 	}
 
 	if _, err := r.fixRemoveSetStore.Drop(ctx, id); err != nil {
-		return fmt.Errorf("unable to clean fix set store")
+		return fmt.Errorf("unable to clean fix set store: %w", err)
 	}
 
 	return nil

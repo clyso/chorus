@@ -1,11 +1,9 @@
-FROM golang:1.25 as builder
+FROM golang:1.26 as builder
 ARG GIT_COMMIT='not set'
 
 ENV PATH=$PATH:$GOPATH/bin
 ENV GO111MODULE=on
 
-
 RUN go install github.com/johannesboyne/gofakes3/cmd/...@1.0.0
-
 
 CMD ["gofakes3", "-backend", "memory"]

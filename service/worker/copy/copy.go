@@ -236,8 +236,7 @@ func (r *S3CopySvc) ClearDestination(ctx context.Context, user string, to File, 
 		})
 	}
 
-	removeErrIter := toClient.RemoveVersionedObjects(ctx, to.Bucket, namesAndVersions)
-	removeErrs := slices.Collect(removeErrIter)
+	removeErrs := toClient.RemoveVersionedObjects(ctx, to.Bucket, namesAndVersions)
 
 	if len(listErrs) > 0 || len(removeErrs) > 0 {
 		joinErr := errors.Join(errors.Join(listErrs...), errors.Join(removeErrs...))

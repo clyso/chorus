@@ -243,12 +243,12 @@ type DiffListObjectsPayload struct {
 }
 
 type DiffListVersionsPayload struct {
-	User         string
-	Prefix       string
-	Locations    []MigrateLocation
-	Index        int
-	IgonoreEtags bool
-	IgnoreSizes  bool
+	User        string
+	Prefix      string
+	Locations   []MigrateLocation
+	Index       int
+	IgnoreEtags bool
+	IgnoreSizes bool
 }
 
 type DiffFixCollectObjectsPayload struct {
@@ -289,11 +289,6 @@ type DiffFixS3CopyPayload struct {
 
 type DiffFixS3ListVersionsPayload struct {
 	ListObjectVersionsPayload
-	Locations []MigrateLocation
-}
-
-type DiffFixS3CopyVersionsPayload struct {
-	MigrateVersionedObjectPayload
 	Locations []MigrateLocation
 }
 

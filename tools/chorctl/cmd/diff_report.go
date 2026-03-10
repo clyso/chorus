@@ -81,7 +81,7 @@ chorctl diff report oldstorage:bucket newstorage:altbucket`,
 		fmt.Fprintln(w, api.DiffReportBrief(res.Check))
 		w.Flush()
 
-		if res.Check.Consistent || diffBriefReport {
+		if res.Check.Consistent || !res.Check.Ready || diffBriefReport {
 			return
 		}
 
@@ -124,5 +124,5 @@ chorctl diff report oldstorage:bucket newstorage:altbucket`,
 
 func init() {
 	diffCmd.AddCommand(diffReportCmd)
-	diffCheckCmd.Flags().BoolVarP(&diffBriefReport, "brief", "b", false, "display only status without printing entries")
+	diffReportCmd.Flags().BoolVarP(&diffBriefReport, "brief", "b", false, "display only status without printing entries")
 }

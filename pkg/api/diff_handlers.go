@@ -149,7 +149,7 @@ func (h *diffHandlers) DeleteReport(ctx context.Context, req *pb.DiffCheckReques
 		return nil, fmt.Errorf("unable to delete diff check: %w", err)
 	}
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (h *diffHandlers) Fix(ctx context.Context, req *pb.StartDiffFixRequest) (*emptypb.Empty, error) {
@@ -157,14 +157,19 @@ func (h *diffHandlers) Fix(ctx context.Context, req *pb.StartDiffFixRequest) (*e
 		return nil, fmt.Errorf("unable to validate storage locations: %w", err)
 	}
 
+	locationCount := len(req.Locations)
+	if int(req.SourceIndex) >= locationCount {
+		return nil, fmt.Errorf("source index %d is out of bound of location count %d", req.SourceIndex, locationCount)
+	}
+
 	diffID := pbToDiffID(req.Locations)
 	source := entity.NewDiffLocation(req.Locations[req.SourceIndex].Storage, req.Locations[req.SourceIndex].Bucket)
-	storageType := h.credsSvc.Storages()[req.Locations[0].Storage]
+	storageType := h.credsSvc.Storages()[req.Locations[req.SourceIndex].Storage]
 	if err := h.diffSvc.FixDiff(ctx, diffID, source, storageType); err != nil {
 		return nil, fmt.Errorf("unable to fix diff: %w", err)
 	}
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (h *diffHandlers) Restart(ctx context.Context, req *pb.DiffCheckRequest) (*emptypb.Empty, error) {
@@ -177,7 +182,7 @@ func (h *diffHandlers) Restart(ctx context.Context, req *pb.DiffCheckRequest) (*
 		return nil, fmt.Errorf("unable to restart diff check: %w", err)
 	}
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 var ccSupportedStorTypes = map[dom.StorageType]bool{
@@ -247,47 +252,4 @@ func (h *diffHandlers) validateStorageLocationsWithUser(locations []*pb.MigrateL
 	}
 
 	return nil
-}
-
-func pbToDiffID(in []*pb.MigrateLocation) entity.DiffID {
-	if in == nil {
-		return entity.NewDiffID()
-	}
-	diffLocations := make([]entity.DiffLocation, 0, len(in))
-	for _, reqLocation := range in {
-		diffLocations = append(diffLocations, entity.NewDiffLocation(reqLocation.Storage, reqLocation.Bucket))
-	}
-	return entity.NewDiffID(diffLocations...)
-}
-
-func diffLocationsToPB(in []entity.DiffLocation) []*pb.MigrateLocation {
-	locations := make([]*pb.MigrateLocation, 0, len(in))
-	for _, diffLocation := range in {
-		locations = append(locations, &pb.MigrateLocation{
-			Storage: diffLocation.Storage,
-			Bucket:  diffLocation.Bucket,
-		})
-	}
-	return locations
-}
-
-func diffStatusToPB(in entity.DiffStatus) *pb.DiffCheck {
-	status := &pb.DiffCheck{
-		Locations:   diffLocationsToPB(in.Locations),
-		Queued:      in.Check.Queue.Queued,
-		Completed:   in.Check.Queue.Completed,
-		Ready:       in.Check.Queue.Ready,
-		Consistent:  in.Check.Consistent,
-		Versioned:   in.Check.Settings.Versioned,
-		IgnoreSizes: in.Check.Settings.IgnoreSizes,
-		IgnoreEtags: in.Check.Settings.IgnoreEtags,
-	}
-
-	if in.FixQueue != nil {
-		status.FixQueued = in.FixQueue.Queued
-		status.FixCompleted = in.FixQueue.Completed
-		status.FixReady = in.FixQueue.Ready
-	}
-
-	return status
 }

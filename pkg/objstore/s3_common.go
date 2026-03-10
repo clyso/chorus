@@ -195,7 +195,7 @@ func (s *s3CommonClient) RemoveObject(ctx context.Context, bucket string, name s
 	return nil
 }
 
-func (s *s3CommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) iter.Seq[error] {
+func (s *s3CommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) []error {
 	objectInfos := make([]minio.ObjectInfo, 0, len(names))
 	for _, name := range names {
 		objectInfos = append(objectInfos, minio.ObjectInfo{
@@ -206,15 +206,14 @@ func (s *s3CommonClient) RemoveObjects(ctx context.Context, bucket string, names
 }
 
 func (s *s3CommonClient) RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error {
-	errIter := s.RemoveObjects(ctx, bucket, names)
-	removeErrs := slices.Collect(errIter)
+	removeErrs := s.RemoveObjects(ctx, bucket, names)
 	if len(removeErrs) > 0 {
 		return fmt.Errorf("unable to do bulk delete: %w", errors.Join(removeErrs...))
 	}
 	return nil
 }
 
-func (s *s3CommonClient) RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) iter.Seq[error] {
+func (s *s3CommonClient) RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) []error {
 	objectInfos := make([]minio.ObjectInfo, 0, len(objects))
 	for _, object := range objects {
 		objectInfos = append(objectInfos, minio.ObjectInfo{
@@ -225,23 +224,20 @@ func (s *s3CommonClient) RemoveVersionedObjects(ctx context.Context, bucket stri
 	return s.removeObjects(ctx, bucket, objectInfos)
 }
 
-func (s *s3CommonClient) removeObjects(ctx context.Context, bucket string, objectInfos []minio.ObjectInfo) iter.Seq[error] {
+func (s *s3CommonClient) removeObjects(ctx context.Context, bucket string, objectInfos []minio.ObjectInfo) []error {
 	infoIter := slices.Values(objectInfos)
 	resultIter, err := s.client.S3().RemoveObjectsWithIter(ctx, bucket, infoIter, minio.RemoveObjectsOptions{})
-	return func(yield func(error) bool) {
-		if err != nil {
-			yield(fmt.Errorf("unable to delete objects: %w", err))
-			return
+	removeErrs := []error{}
+	for result := range resultIter {
+		if result.Err == nil {
+			continue
 		}
-		for result := range resultIter {
-			if result.Err == nil {
-				continue
-			}
-			if !yield(fmt.Errorf("unable to delete object %s: %w", result.ObjectName, err)) {
-				return
-			}
-		}
+		removeErrs = append(removeErrs, fmt.Errorf("unable to delete object %s: %w", result.ObjectName, err))
 	}
+	if len(removeErrs) > 0 {
+		return removeErrs
+	}
+	return nil
 }
 
 func (s *s3CommonClient) ObjectInfo(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (*CommonObjectInfo, error) {

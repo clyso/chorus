@@ -375,3 +375,46 @@ func toBucketRoutingsPb(filter *pb.RoutingsRequest_Filter, user string, routings
 	}
 	return res
 }
+
+func pbToDiffID(in []*pb.MigrateLocation) entity.DiffID {
+	if in == nil {
+		return entity.NewDiffID()
+	}
+	diffLocations := make([]entity.DiffLocation, 0, len(in))
+	for _, reqLocation := range in {
+		diffLocations = append(diffLocations, entity.NewDiffLocation(reqLocation.Storage, reqLocation.Bucket))
+	}
+	return entity.NewDiffID(diffLocations...)
+}
+
+func diffLocationsToPB(in []entity.DiffLocation) []*pb.MigrateLocation {
+	locations := make([]*pb.MigrateLocation, 0, len(in))
+	for _, diffLocation := range in {
+		locations = append(locations, &pb.MigrateLocation{
+			Storage: diffLocation.Storage,
+			Bucket:  diffLocation.Bucket,
+		})
+	}
+	return locations
+}
+
+func diffStatusToPB(in entity.DiffStatus) *pb.DiffCheck {
+	status := &pb.DiffCheck{
+		Locations:   diffLocationsToPB(in.Locations),
+		Queued:      in.Check.Queue.Queued,
+		Completed:   in.Check.Queue.Completed,
+		Ready:       in.Check.Queue.Ready,
+		Consistent:  in.Check.Consistent,
+		Versioned:   in.Check.Settings.Versioned,
+		IgnoreSizes: in.Check.Settings.IgnoreSizes,
+		IgnoreEtags: in.Check.Settings.IgnoreEtags,
+	}
+
+	if in.FixQueue != nil {
+		status.FixQueued = in.FixQueue.Queued
+		status.FixCompleted = in.FixQueue.Completed
+		status.FixReady = in.FixQueue.Ready
+	}
+
+	return status
+}

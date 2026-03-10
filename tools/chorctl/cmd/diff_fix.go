@@ -30,7 +30,6 @@ import (
 )
 
 var (
-	diffFixUser         string
 	sourceStorageBucket string
 )
 
@@ -41,8 +40,8 @@ var diffFixCmd = &cobra.Command{
 
 Example:
 # Fix bucket contents, while using storage1 storage as a source of truth
-chorctl diff fix --user username --source storage1:bucket1 storage2:bucket2 `,
-	Args: cobra.MinimumNArgs(2),
+chorctl diff fix --source storage1:bucket1 storage2:bucket2 `,
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -51,7 +50,7 @@ chorctl diff fix --user username --source storage1:bucket1 storage2:bucket2 `,
 
 		storage, bucket, found := strings.Cut(sourceStorageBucket, ":")
 		if !found {
-			logrus.WithField("arg", sourceStorageBucket).Fatal("unable to get storage and bucket parts")
+			logrus.WithField("source", sourceStorageBucket).Fatal("unable to get storage and bucket parts")
 		}
 
 		locations = append(locations, &pb.MigrateLocation{
@@ -83,22 +82,16 @@ chorctl diff fix --user username --source storage1:bucket1 storage2:bucket2 `,
 
 		client := pb.NewDiffClient(conn)
 		if _, err = client.Fix(ctx, request); err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get replications")
+			logrus.WithError(err).WithField("address", address).Fatal("unable to start diff fix")
 		}
-		fmt.Println("Diff check has been created.")
+		fmt.Println("Diff fix has been created.")
 	},
 }
 
 func init() {
 	diffCmd.AddCommand(diffFixCmd)
-	diffCheckCmd.Flags().StringVarP(&diffFixUser, "user", "u", "", "storage user")
-	diffCheckCmd.Flags().StringVarP(&sourceStorageBucket, "source", "s", "", "source storage and bucket")
-	err := diffCheckCmd.MarkFlagRequired("user")
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	err = diffCheckCmd.MarkFlagRequired("source")
-	if err != nil {
+	diffFixCmd.Flags().StringVarP(&sourceStorageBucket, "source", "s", "", "source storage and bucket")
+	if err := diffFixCmd.MarkFlagRequired("source"); err != nil {
 		logrus.WithError(err).Fatal()
 	}
 }

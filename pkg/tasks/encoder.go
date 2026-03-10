@@ -460,7 +460,7 @@ var (
 	}
 	diffFixSwiftCopy = encoder[DiffFixSwiftCopyPayload]{
 		taskID: func(p DiffFixSwiftCopyPayload) string {
-			return toTaskID("diff:fixcopys3", p.ID.AsString(), p.Bucket, p.ObjName, p.ObjVersion)
+			return toTaskID("diff:fixcopyswift", p.ID.AsString(), p.Bucket, p.ObjName, p.ObjVersion)
 		},
 		queue: func(p DiffFixSwiftCopyPayload) string {
 			locations := make([]entity.DiffLocation, 0, len(p.Locations))
@@ -474,7 +474,7 @@ var (
 	}
 	diffFixS3ListVersions = encoder[DiffFixS3ListVersionsPayload]{
 		taskID: func(p DiffFixS3ListVersionsPayload) string {
-			return toTaskID("diff:fixcopys3", p.ID.AsString(), p.Bucket, p.Prefix)
+			return toTaskID("diff:fixlistversionss3", p.ID.AsString(), p.Bucket, p.Prefix)
 		},
 		queue: func(p DiffFixS3ListVersionsPayload) string {
 			locations := make([]entity.DiffLocation, 0, len(p.Locations))
