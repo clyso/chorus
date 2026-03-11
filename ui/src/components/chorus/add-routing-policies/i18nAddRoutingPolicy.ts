@@ -43,6 +43,9 @@ export default <I18nMessages>{
     bucketErrIpAddress: 'Bucket name must not be formatted as an IP address.',
     bucketErrPrefixSuffix:
       'Bucket name contains a restricted AWS prefix or suffix.',
+    storageSelectionTitle: 'Storage',
+    storageSelectionDescription: 'Select a destination storage:',
+    unknownValidationError: 'Unknown validation error',
   },
   [I18nLocale.DE]: {
     breadcrumbRoutingPolicies: 'Routing-Richtlinien',
@@ -74,5 +77,8 @@ export default <I18nMessages>{
       'Der Bucket-Name darf nicht als IP-Adresse formatiert sein.',
     bucketErrPrefixSuffix:
       'Der Bucket-Name enthält ein unzulässiges AWS-Präfix oder -Suffix.',
+    storageSelectionTitle: 'Speicher',
+    storageSelectionDescription: 'Wählen Sie einen Zielspeicher:',
+    unknownValidationError: 'Unbekannter Fehler beim Validieren der Eingabe',
   },
 };
