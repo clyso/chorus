@@ -22,8 +22,7 @@ export default <I18nMessages>{
     addRoutingPolicyHeader:
       'Create a new routing policy to control traffic direction within the proxy.',
     userSelectionTitle: 'User',
-    userSelectionDescription:
-      'Select a user:',
+    userSelectionDescription: 'Select a user:',
     bucketSelectionTitle: 'Bucket Name',
     bucketSelectionDescription: 'Narrow down a policy to a specific bucket:',
     bucketSelectionAll: 'Apply to all buckets (including future ones)',
@@ -42,14 +41,16 @@ export default <I18nMessages>{
     bucketErrIpAddress: 'Bucket name must not be formatted as an IP address.',
     bucketErrPrefixSuffix:
       'Bucket name contains a restricted AWS prefix or suffix.',
+    storageSelectionTitle: 'Storage',
+    storageSelectionDescription: 'Select a destination storage:',
+    unknownValidationError: 'Unknown validation error',
   },
   [I18nLocale.DE]: {
     addRoutingPolicyTitle: 'Routing-Richtlinie Hinzufügen',
     addRoutingPolicyHeader:
       'Neue Routing-Richtlinie erstellen, um den Datenverkehr im Proxy zu steuern.',
     userSelectionTitle: 'Benutzer',
-    userSelectionDescription:
-      'Benutzer für die Routing-Richtlinie auswählen:',
+    userSelectionDescription: 'Benutzer für die Routing-Richtlinie auswählen:',
     bucketSelectionTitle: 'Bucket Name',
     bucketSelectionDescription:
       'Richtlinie auf einen speziellen Bucket anwenden:',
@@ -71,5 +72,8 @@ export default <I18nMessages>{
       'Der Bucket-Name darf nicht als IP-Adresse formatiert sein.',
     bucketErrPrefixSuffix:
       'Der Bucket-Name enthält ein unzulässiges AWS-Präfix oder -Suffix.',
+    storageSelectionTitle: 'Speicher',
+    storageSelectionDescription: 'Wählen Sie einen Zielspeicher:',
+    unknownValidationError: 'Unbekannter Fehler beim Validieren der Eingabe',
   },
 };
