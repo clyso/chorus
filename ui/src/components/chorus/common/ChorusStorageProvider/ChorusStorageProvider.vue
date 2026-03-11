@@ -26,6 +26,7 @@
       hasTooltip?: boolean;
     }>(),
     {
+      storageProvider: StorageProvider.S3,
       hasTooltip: true,
     },
   );
