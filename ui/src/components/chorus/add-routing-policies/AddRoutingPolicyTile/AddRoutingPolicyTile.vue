@@ -20,6 +20,7 @@
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
   import UserSelection from '../UserSelection/UserSelection.vue';
   import BucketSelection from '../BucketSelection/BucketSelection.vue';
+  import StorageSelection from '../StorageSelection/StorageSelection.vue';
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
@@ -36,6 +37,7 @@
     </template>
     <div class="add-routing-policy-tile__content">
       <UserSelection />
+      <StorageSelection />
       <BucketSelection />
     </div>
   </CTile>
