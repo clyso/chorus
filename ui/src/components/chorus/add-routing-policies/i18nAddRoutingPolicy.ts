@@ -44,6 +44,11 @@ export default <I18nMessages>{
     storageSelectionTitle: 'Storage',
     storageSelectionDescription: 'Select a destination storage:',
     unknownValidationError: 'Unknown validation error',
+    statusSelectionTitle: 'Blocked Status',
+    statusSelectionDescription:
+      'Determine whether this routing policy should be actively allowed or explicitly blocked.',
+    statusSelectionAllowed: 'Allowed',
+    statusSelectionBlocked: 'Blocked',
   },
   [I18nLocale.DE]: {
     addRoutingPolicyTitle: 'Routing-Richtlinie Hinzufügen',
@@ -75,5 +80,10 @@ export default <I18nMessages>{
     storageSelectionTitle: 'Speicher',
     storageSelectionDescription: 'Wählen Sie einen Zielspeicher:',
     unknownValidationError: 'Unbekannter Fehler beim Validieren der Eingabe',
+    statusSelectionTitle: 'Blockiert-Status',
+    statusSelectionDescription:
+      'Legen Sie fest, ob diese Routing-Policy zugelassen oder explizit blockiert werden soll.',
+    statusSelectionAllowed: 'Zugelassen',
+    statusSelectionBlocked: 'Blockiert',
   },
 };
