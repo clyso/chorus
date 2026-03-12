@@ -17,14 +17,25 @@
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
   import { useI18n } from 'vue-i18n';
+  import { computed, unref } from 'vue';
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
   import ChorusUserCardList from '../../common/ChorusUserCardList/ChorusUserCardList.vue';
   import { useChorusAddRoutingPolicyStore } from '@/stores/chorusAddRoutingPolicyStore';
 
-  const { selectedUser, users } = storeToRefs(useChorusAddRoutingPolicyStore());
+  const { selectedUser, users, validator } = storeToRefs(
+    useChorusAddRoutingPolicyStore(),
+  );
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
+  });
+
+  const userSelectionErrorMessage = computed(() => {
+    const errors = validator.value.selectedUser.$errors;
+
+    if (!errors || errors.length === 0) return '';
+
+    return t(unref(errors[0]?.$message) || 'unknownValidationError');
   });
 </script>
 
@@ -44,6 +55,12 @@
           :users="users"
         />
       </div>
+      <span
+        v-if="validator.selectedUser.$error"
+        class="user-selection__error-text"
+      >
+        {{ userSelectionErrorMessage }}
+      </span>
     </div>
   </div>
 </template>
@@ -55,6 +72,11 @@
     &__title,
     &__description {
       margin-bottom: utils.unit(1);
+    }
+
+    &__error-text {
+      color: var(--error-color);
+      font-size: 12px;
     }
   }
 </style>
