@@ -49,6 +49,31 @@ export default <I18nMessages>{
       'Determine whether this routing policy should be actively allowed or explicitly blocked.',
     statusSelectionAllowed: 'Allowed',
     statusSelectionBlocked: 'Blocked',
+    actionAddRoutingPolicy: 'Add Routing Policy',
+    userSelectionRequired: 'Please select a user.',
+    addRoutingPolicyConfirmTitle: 'Confirm Routing Policy Creation',
+    confirmRoutingPolicyDescription:
+      'You are about to create the following routing policy:',
+    confirmRoutingPolicyPositive: 'Create Routing Policy',
+    confirmRoutingPolicyNegative: 'Cancel',
+    summaryColumnUser: 'User',
+    summaryColumnStorage: 'Storage',
+    summaryNoStoragePlaceholder: 'No storage selected',
+    summaryColumnBucket: 'Bucket',
+    summaryColumnStatus: 'Blocked Status',
+    summaryStatusBlocked: 'Blocked',
+    summaryStatusAllowed: 'Allowed',
+    addRoutingPolicySuccessTitle: 'Routing Policy created!',
+    addRoutingPolicySuccessContent:
+      'Routing Policy has been created successfully.',
+    addRoutingPolicyErrorTitle: 'Routing Policy not created!',
+    addRoutingPolicyErrorContent:
+      'An error occurred while creating the routing policy.',
+    addErrorAction: 'Retry',
+    addRoutingPolicyErrorUnknown:
+      'An unknown error occurred while creating the routing policy.',
+    addRoutingPolicyBlockErrorUnknown:
+      'An unknown error occurred while blocking the newly created routing policy. The creation of the routing policy has been rolled back. You may want to try creating the routing policy first and blocking it in a separate step.',
   },
   [I18nLocale.DE]: {
     addRoutingPolicyTitle: 'Routing-Richtlinie Hinzufügen',
@@ -85,5 +110,30 @@ export default <I18nMessages>{
       'Legen Sie fest, ob diese Routing-Policy zugelassen oder explizit blockiert werden soll.',
     statusSelectionAllowed: 'Zugelassen',
     statusSelectionBlocked: 'Blockiert',
+    actionAddRoutingPolicy: 'Routing-Richtlinie hinzufügen',
+    userSelectionRequired: 'Bitte wählen Sie einen Benutzer aus.',
+    addRoutingPolicyConfirmTitle: 'Anlegen der Routing-Richtlinie bestätigen',
+    confirmRoutingPolicyDescription:
+      'Sie erstellen folgende Routing-Richtlinie:',
+    confirmRoutingPolicyPositive: 'Routing-Richtlinie erstellen',
+    confirmRoutingPolicyNegative: 'Abbrechen',
+    summaryColumnUser: 'Benutzer',
+    summaryColumnStorage: 'Speicher',
+    summaryNoStoragePlaceholder: 'Kein Speicher gewählt',
+    summaryColumnBucket: 'Bucket',
+    summaryColumnStatus: 'Blockiert-Status',
+    summaryStatusBlocked: 'Blockiert',
+    summaryStatusAllowed: 'Zugelassen',
+    addRoutingPolicySuccessTitle: 'Routing-Richtlinie erstellt!',
+    addRoutingPolicySuccessContent:
+      'Routing-Richtlinie wurde erfoldgreich erstellt.',
+    addRoutingPolicyErrorTitle: 'Routing-Richtlinie nicht erstellt!',
+    addRoutingPolicyErrorContent:
+      'Beim Erstellen der Routing-Richtlinie ist ein Fehler aufgetreten.',
+    addErrorAction: 'Erneut versuchen',
+    addRoutingPolicyErrorUnknown:
+      'Beim Erstellen der Routing-Richtlinie ist ein unbekannter Fehler aufgetreten.',
+    addRoutingPolicyBlockErrorUnknown:
+      'Beim Blockieren der neu erstellten Routing-Richtlinie ist ein unbekannter Fehler aufgetreten. Die Erstellung der Routing-Richtlinie wurde rückgängig gemacht. Sie können versuchen, die Routing-Richtlinie zunächst nur zu erstellen und sie in einem zweiten Schritt zu blockieren.',
   },
 };

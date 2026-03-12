@@ -18,7 +18,12 @@ import useVuelidate from '@vuelidate/core';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { helpers } from '@vuelidate/validators';
-import type { ChorusStorage } from '@/utils/types/chorus';
+import { useI18n } from 'vue-i18n';
+import type {
+  ChorusStorage,
+  RoutingPolicyAddRequest,
+  RoutingPolicyEditRequest,
+} from '@/utils/types/chorus';
 import { ChorusService } from '@/services/ChorusService';
 import {
   hasNoAdjacentPeriods,
@@ -29,6 +34,8 @@ import {
   isRequired,
   isValidLength,
 } from '@/utils/validators/s3BucketNameValidator';
+import { ErrorHelper } from '@/utils/helpers/ErrorHelper';
+import i18nAddRoutingPolicy from '@/components/chorus/add-routing-policies/i18nAddRoutingPolicy';
 
 interface ChorusAddRoutingPolicyState {
   isLoading: boolean;
@@ -39,6 +46,7 @@ interface ChorusAddRoutingPolicyState {
   bucketName: string | null;
   isForAllBuckets: boolean;
   isBlocked: boolean;
+  isConfirmDialogOpen: boolean;
 }
 
 function getInitialState(): ChorusAddRoutingPolicyState {
@@ -51,6 +59,7 @@ function getInitialState(): ChorusAddRoutingPolicyState {
     bucketName: null,
     isForAllBuckets: false,
     isBlocked: false,
+    isConfirmDialogOpen: false,
   };
 }
 
@@ -58,6 +67,10 @@ export const useChorusAddRoutingPolicyStore = defineStore(
   'chorusAddRoutingPolicy',
   () => {
     const state = reactive<ChorusAddRoutingPolicyState>(getInitialState());
+
+    const { t } = useI18n({
+      messages: i18nAddRoutingPolicy,
+    });
 
     const users = computed<string[]>(() => {
       const usersSet = new Set<string>();
@@ -87,6 +100,12 @@ export const useChorusAddRoutingPolicyStore = defineStore(
     }
 
     const validationRules = computed(() => ({
+      selectedUser: {
+        required: helpers.withMessage(
+          'userSelectionRequired',
+          (value: string | null) => !!value,
+        ),
+      },
       bucketName: {
         required: helpers.withMessage(
           'bucketNameRequired',
@@ -125,6 +144,53 @@ export const useChorusAddRoutingPolicyStore = defineStore(
 
     const validator = useVuelidate(validationRules, state);
 
+    async function addRoutingPolicy() {
+      const {
+        selectedToStorage,
+        selectedUser,
+        bucketName,
+        isForAllBuckets,
+        isBlocked,
+      } = state;
+
+      if (!selectedUser || (!bucketName && !isForAllBuckets)) {
+        return;
+      }
+
+      const addPolicyRequestData: RoutingPolicyAddRequest = {
+        user: selectedUser,
+        bucket: isForAllBuckets ? null : bucketName,
+        toStorage: selectedToStorage?.name ?? null,
+      };
+
+      try {
+        await ChorusService.addRoutingPolicy(addPolicyRequestData);
+      } catch (addError: unknown) {
+        const addReason =
+          ErrorHelper.getReason(addError) || t('addRoutingPolicyErrorUnknown');
+
+        throw new Error(addReason);
+      }
+
+      if (isBlocked) {
+        const editPolicyRequestData: RoutingPolicyEditRequest = {
+          user: selectedUser,
+          bucket: isForAllBuckets ? null : bucketName,
+        };
+
+        try {
+          await ChorusService.blockRoutingPolicy(editPolicyRequestData);
+        } catch (blockError: unknown) {
+          await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
+          const blockReason =
+            ErrorHelper.getReason(blockError) ||
+            t('addRoutingPolicyBlockErrorUnknown');
+
+          throw new Error(blockReason);
+        }
+      }
+    }
+
     async function $reset() {
       Object.assign(state, getInitialState());
       validator.value.$reset();
@@ -133,6 +199,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
     return {
       ...toRefs(state),
       initAddRoutingPolicyPage,
+      addRoutingPolicy,
       users,
       validator,
       $reset,
