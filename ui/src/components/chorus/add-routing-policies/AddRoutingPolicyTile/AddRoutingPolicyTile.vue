@@ -21,6 +21,7 @@
   import UserSelection from '../UserSelection/UserSelection.vue';
   import BucketSelection from '../BucketSelection/BucketSelection.vue';
   import StorageSelection from '../StorageSelection/StorageSelection.vue';
+  import StatusSelection from '../StatusSelection/StatusSelection.vue';
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
@@ -39,6 +40,7 @@
       <UserSelection />
       <StorageSelection />
       <BucketSelection />
+      <StatusSelection />
     </div>
   </CTile>
 </template>
