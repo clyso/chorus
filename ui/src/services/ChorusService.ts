@@ -25,7 +25,11 @@ import type {
   ChorusProxyCredentials,
   ChorusReplicationId,
   ChorusReplicationListResponse,
+  RoutingPolicyListRequest,
+  RoutingPolicyListResponse,
   ChorusStorageListResponse,
+  RoutingPolicyEditRequest,
+  RoutingPolicyAddRequest,
 } from '@/utils/types/chorus';
 
 export abstract class ChorusService {
@@ -107,5 +111,40 @@ export abstract class ChorusService {
     );
 
     return data;
+  }
+
+  static async getRoutingPolicies(
+    payload: RoutingPolicyListRequest,
+  ): Promise<RoutingPolicyListResponse> {
+    const { data } = await apiClient.post<RoutingPolicyListResponse>(
+      ApiHelper.getChorusAPIUrl('/routing'),
+      payload,
+    );
+
+    return data;
+  }
+
+  static async deleteRoutingPolicy(
+    payload: RoutingPolicyEditRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/delete'), payload);
+  }
+
+  static async blockRoutingPolicy(
+    payload: RoutingPolicyEditRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/block'), payload);
+  }
+
+  static async unblockRoutingPolicy(
+    payload: RoutingPolicyEditRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/routing/unblock'), payload);
+  }
+
+  static async addRoutingPolicy(
+    payload: RoutingPolicyAddRequest,
+  ): Promise<void> {
+    await apiClient.post(ApiHelper.getChorusAPIUrl('/routing/add'), payload);
   }
 }
