@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"runtime"
 	"strconv"
 	"strings"
 	"text/template"
@@ -100,16 +99,8 @@ const (
 	CMinioS3Port         = 9000
 	CMinioManagementPort = 9001
 
-	// TODO replace with quay.io/benjamin_holmes/ceph-aio image?
-	// It has v18, v19 and v20 tags. Can be forked and self built
-	// https://github.com/benemon/ceph-aio
-	CCephX8664Image            = "quay.io/ceph/demo:main-985bb830-main-centos-stream8-x86_64"
-	CCephARM64Image            = "quay.io/ceph/demo:main-985bb83-main-centos-arm64-stream8-aarch64"
-	CCephPublicNetwork         = "127.0.0.1/32"
-	CCephMonIP                 = "127.0.0.1"
-	CCephDomainName            = "localhost"
+	CCephImage                 = "ghcr.io/arttor/ceph-test:v19"
 	CCephDemoUID               = "cephuid"
-	CCephOSDDirectoryMode      = "directory"
 	CCephSystemUserUID         = "superuser"
 	CCephSystemUserDisplayName = "superuser"
 	CCephSystemUserAccessToken = "superuser"
@@ -124,8 +115,8 @@ const (
 var (
 	//go:embed proxy-server.conf
 	proxyServerConf string
-	//go:embed ceph-entrypoint.sh
-	cephEntrypointSh string
+	//go:embed ceph-keystone.conf
+	cephKeystoneConf string
 )
 
 // ComponentOption interface to support Functional options for test-containers.
@@ -1168,54 +1159,32 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		ResellerRole:     resellerRole.Name,
 	}
 
-	cephRGWConfigTemplate, err := template.New("ceph-entrypoint.sh").Parse(cephEntrypointSh)
+	cephKeystoneTemplate, err := template.New("ceph-keystone.conf").Parse(cephKeystoneConf)
 	if err != nil {
-		return fmt.Errorf("unable to create ceph proxy config template: %w", err)
+		return fmt.Errorf("unable to create ceph keystone config template: %w", err)
 	}
 
 	templateBuffer := &bytes.Buffer{}
 
-	if err := cephRGWConfigTemplate.Execute(templateBuffer, &cephRGWConfig); err != nil {
-		return fmt.Errorf("unable to create proxy config out of template: %w", err)
-	}
-
-	var imageName string
-	switch runtime.GOARCH {
-	case "amd64":
-		imageName = CCephX8664Image
-	case "arm64":
-		imageName = CCephARM64Image
-	default:
-		return fmt.Errorf("platform %s not supported for ceph image", runtime.GOARCH)
+	if err := cephKeystoneTemplate.Execute(templateBuffer, &cephRGWConfig); err != nil {
+		return fmt.Errorf("unable to create keystone config out of template: %w", err)
 	}
 
 	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
 	apiNatPort := nat.Port(apiNatPortString)
 	req := testcontainers.ContainerRequest{
-		Image:      imageName,
+		Image:      CCephImage,
 		WaitingFor: wait.ForHTTP("/").WithStartupTimeout(5 * time.Minute).WithPort(apiNatPort),
 		Env: map[string]string{
-			"RGW_NAME":            CCephDomainName,
-			"CEPH_PUBLIC_NETWORK": CCephPublicNetwork,
-			"MON_IP":              CCephMonIP,
-			"CEPH_DEMO_UID":       CCephDemoUID,
-			"OSD_TYPE":            CCephOSDDirectoryMode,
+			"CEPH_DEMO_UID":   CCephDemoUID,
+			"CEPH_EXTRA_CONF": templateBuffer.String(),
 		},
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
 		},
-		Entrypoint:      []string{"/bin/bash", "/entrypoint.sh"},
-		Cmd:             []string{"/bin/bash", "/opt/ceph-container/bin/demo"},
 		HostAccessPorts: []int{CCephAPIPort},
 		ExposedPorts:    []string{apiNatPortString},
 		Networks:        []string{env.network.Name},
-		Files: []testcontainers.ContainerFile{
-			{
-				Reader:            templateBuffer,
-				ContainerFilePath: "/entrypoint.sh",
-				FileMode:          0o777,
-			},
-		},
 		LogConsumerCfg: &testcontainers.LogConsumerConfig{
 			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
 			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
@@ -1327,27 +1296,14 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 }
 
 func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
-	var imageName string
-	switch runtime.GOARCH {
-	case "amd64":
-		imageName = CCephX8664Image
-	case "arm64":
-		imageName = CCephARM64Image
-	default:
-		return fmt.Errorf("platform %s not supported for ceph image", runtime.GOARCH)
-	}
-
 	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
 	apiNatPort := nat.Port(apiNatPortString)
 	req := testcontainers.ContainerRequest{
-		Image:      imageName,
+		Image:      CCephImage,
 		WaitingFor: wait.ForHTTP("/").WithStartupTimeout(5 * time.Minute).WithPort(apiNatPort),
 		Env: map[string]string{
-			"RGW_NAME":            CCephDomainName,
-			"CEPH_PUBLIC_NETWORK": CCephPublicNetwork,
-			"MON_IP":              CCephMonIP,
-			"CEPH_DEMO_UID":       CCephDemoUID,
-			"OSD_TYPE":            CCephOSDDirectoryMode,
+			"CEPH_DEMO_UID":   CCephDemoUID,
+			"CEPH_EXTRA_CONF": "[client.rgw.demo]\nrgw dns name = localhost",
 		},
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
