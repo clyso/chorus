@@ -1270,6 +1270,24 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		return fmt.Errorf("unable to create public ceph endpoint: %w", err)
 	}
 
+	// Wait for RGW→Keystone connectivity. The fast Ceph image starts before
+	// Keystone is fully warmed up; probe the Swift endpoint until RGW can
+	// reach Keystone (any non-503 response means Keystone is reachable).
+	swiftProbeURL := fmt.Sprintf("http://%s:%d/swift/v1", containerHost, apiForwardedPort.Int())
+	if err := retryOnTransient(ctx, 30, time.Second, func() error {
+		resp, err := http.Get(swiftProbeURL)
+		if err != nil {
+			return fmt.Errorf("swift probe request failed: %w", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusServiceUnavailable {
+			return fmt.Errorf("swift probe returned 503: Keystone not ready")
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("RGW Keystone connectivity check failed: %w", err)
+	}
+
 	env.accessConfigs[componentName] = CephAccessConfig{
 		Port: ContainerPort{
 			Exposed:   CCephAPIPort,
