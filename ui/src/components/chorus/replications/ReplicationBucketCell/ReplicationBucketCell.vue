@@ -49,7 +49,7 @@
             {{ t('userReplication') }}
           </CTag>
         </template>
-        <span class="replicatio-bucket-cell__user-replication-tooltip">
+        <span class="replication-bucket-cell__user-replication-tooltip">
           {{ t('userReplicationDescription') }}
         </span>
       </CTooltip>
