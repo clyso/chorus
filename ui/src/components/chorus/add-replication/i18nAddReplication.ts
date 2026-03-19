@@ -18,6 +18,8 @@ import { I18nLocale, type I18nMessages } from '@clyso/clyso-ui-kit';
 
 export default <I18nMessages>{
   [I18nLocale.EN]: {
+    breadcrumbReplication: 'Replication',
+    breadcrumbAddReplication: 'Add Replication',
     addReplicationTitle: 'Add Replication',
     step1Title: 'Source Storage',
     step1Description: 'Select storage to replicate from',
@@ -71,6 +73,8 @@ export default <I18nMessages>{
     createReplicationErrorUnknown: 'Unknown Error',
   },
   [I18nLocale.DE]: {
+    breadcrumbReplication: 'Replikation',
+    breadcrumbAddReplication: 'Replikation hinzufügen',
     addReplicationTitle: 'Replikation hinzufügen',
     step1Title: 'Quellspeicher',
     step1Description:
