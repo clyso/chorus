@@ -15,7 +15,11 @@
   -->
 
 <script setup lang="ts">
-  import { CBreadcrumb, CBreadcrumbItem } from '@clyso/clyso-ui-kit';
+  import {
+    CBreadcrumb,
+    CBreadcrumbItem,
+    CDashboardPage,
+  } from '@clyso/clyso-ui-kit';
   import { onBeforeMount, onUnmounted } from 'vue';
   import { useI18n } from 'vue-i18n';
   import { RouteName } from '@/utils/types/router';
@@ -36,26 +40,18 @@
 </script>
 
 <template>
-  <div class="chorus-add-replication-page">
-    <CBreadcrumb class="chorus-add-replication-page__breadcrumb">
-      <CBreadcrumbItem :to="{ name: RouteName.CHORUS_REPLICATION }">
-        {{ t('breadcrumbReplication') }}
-      </CBreadcrumbItem>
-      <CBreadcrumbItem :is-active="true">
-        {{ t('breadcrumbAddReplication') }}
-      </CBreadcrumbItem>
-    </CBreadcrumb>
+  <CDashboardPage class="chorus-add-replication-page">
+    <template #breadcrumbs>
+      <CBreadcrumb>
+        <CBreadcrumbItem :to="{ name: RouteName.CHORUS_REPLICATION }">
+          {{ t('breadcrumbReplication') }}
+        </CBreadcrumbItem>
+        <CBreadcrumbItem :is-active="true">
+          {{ t('breadcrumbAddReplication') }}
+        </CBreadcrumbItem>
+      </CBreadcrumb>
+    </template>
 
     <AddReplicationTile />
-  </div>
+  </CDashboardPage>
 </template>
-
-<style lang="scss" scoped>
-  @use '@/styles/utils' as utils;
-
-  .chorus-add-replication-page {
-    &__breadcrumb {
-      margin-bottom: utils.unit(2);
-    }
-  }
-</style>
