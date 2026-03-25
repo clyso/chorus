@@ -260,7 +260,7 @@
           type="primary"
           size="medium"
           ghost
-          class="add-replication-button"
+          class="add-routing-policies-button"
           tag="div"
         >
           <template #icon>
