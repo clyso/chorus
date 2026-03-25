@@ -78,13 +78,13 @@
       return;
     }
 
-    if (props.isSelected) {
+    if (!props.isSelected) {
       emit('select');
 
       return;
     }
 
-    if (props.isDeselectable) {
+    if (props.isSelected && props.isDeselectable) {
       emit('deselect');
     }
   }
