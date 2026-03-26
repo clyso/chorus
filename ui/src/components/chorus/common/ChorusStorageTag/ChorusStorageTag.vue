@@ -15,7 +15,7 @@
   -->
 
 <script setup lang="ts">
-  import { CTag, CTooltip } from '@clyso/clyso-ui-kit';
+  import { CIcon, CTag, CTooltip } from '@clyso/clyso-ui-kit';
 
   type CTagProps = InstanceType<typeof CTag>['$props'];
 
@@ -25,11 +25,13 @@
       tooltip?: string;
       size?: CTagProps['size'];
       type?: CTagProps['type'];
+      iconName?: string;
     }>(),
     {
       size: 'small',
       type: 'success',
       tooltip: undefined,
+      icon: undefined,
     },
   );
 </script>
@@ -48,6 +50,15 @@
           :size="props.size"
           :type="props.type"
         >
+          <template
+            #icon
+            v-if="props.iconName"
+          >
+            <CIcon
+              :is-inline="true"
+              :name="props.iconName"
+            />
+          </template>
           {{ props.storageName }}
         </CTag>
       </template>
