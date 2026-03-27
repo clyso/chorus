@@ -16,6 +16,7 @@ package objstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -161,6 +162,23 @@ func (s *swiftCommonClient) ListObjects(ctx context.Context, bucket string, opts
 	}
 }
 
+func (s *swiftCommonClient) GetObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (io.Reader, error) {
+	commonOpts := &commonObjectOptions{}
+
+	for _, opt := range opts {
+		opt(commonOpts)
+	}
+
+	response := objects.Download(ctx, s.client, bucket, name, objects.DownloadOpts{
+		ObjectVersionID: commonOpts.versionID,
+	})
+	if err := response.Err; err != nil {
+		return nil, fmt.Errorf("unable to get object: %w", err)
+	}
+
+	return response.Body, nil
+}
+
 func (s *swiftCommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error {
 	if _, err := objects.Create(ctx, s.client, bucket, name, objects.CreateOpts{
 		Content:       reader,
@@ -227,13 +245,42 @@ func (s *swiftCommonClient) RemoveObject(ctx context.Context, bucket string, nam
 	return nil
 }
 
-func (s *swiftCommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) error {
+func (s *swiftCommonClient) RemoveObjects(ctx context.Context, bucket string, names []string) []error {
 	resp, err := objects.BulkDelete(ctx, s.client, bucket, names).Extract()
 	if err != nil {
-		return fmt.Errorf("unable remove objects: %w", err)
+		return []error{fmt.Errorf("unable to delete objects: %w", err)}
 	}
-	if len(resp.Errors) > 0 {
-		return fmt.Errorf("unable to delete objects: %+v", resp.Errors)
+	removeErrs := []error{}
+	for _, errorParts := range resp.Errors {
+		if len(errorParts) == 0 {
+			continue
+		}
+		removeErrs = append(removeErrs, fmt.Errorf("unable to delete object %+v", errorParts))
+	}
+	if len(removeErrs) > 0 {
+		return removeErrs
 	}
 	return nil
+}
+
+func (s *swiftCommonClient) RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error {
+	removeErrs := s.RemoveObjects(ctx, bucket, names)
+	if len(removeErrs) > 0 {
+		return fmt.Errorf("unable to do bulk delete: %w", errors.Join(removeErrs...))
+	}
+	return nil
+}
+
+func (s *swiftCommonClient) RemoveVersionedObjects(ctx context.Context, bucket string, names []NameAndVersion) []error {
+	// TODO bulk delete for versioned swift objects is not documented, but probably exists
+	// there's a loop for now
+	removeErrs := []error{}
+	for _, name := range names {
+		if _, err := objects.Delete(ctx, s.client, bucket, name.Name, objects.DeleteOpts{
+			ObjectVersionID: name.Version,
+		}).Extract(); err != nil {
+			removeErrs = append(removeErrs, fmt.Errorf("unable to delete object: %w", err))
+		}
+	}
+	return removeErrs
 }

@@ -212,7 +212,7 @@ export const useChorusReplicationsStore = defineStore(
     async function getReplications() {
       const res = await ChorusService.getReplications();
 
-      state.replications = res.replications.map((replication) => ({
+      state.replications = (res.replications ?? []).map((replication) => ({
         ...replication,
         idStr: getChorusReplicationId(replication.id),
         replicationType: getReplicationType(replication.id),

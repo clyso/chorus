@@ -27,7 +27,6 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/log"
-	"github.com/clyso/chorus/pkg/policy"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/service/worker/copy"
@@ -47,14 +46,13 @@ func (s *svc) HandleObjectVersionList(ctx context.Context, t *asynq.Task) error 
 	fromBucket, toBucket := listVersionsPayload.ID.FromToBuckets(listVersionsPayload.Bucket)
 
 	objectVersionID := entity.NewVersionedObjectID(listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.Prefix)
-	replicationID := entity.NewBucketRepliationPolicy(user, listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.ID.ToStorage(), toBucket)
+	replicationID := entity.NewBucketReplicationPolicy(user, listVersionsPayload.ID.FromStorage(), fromBucket, listVersionsPayload.ID.ToStorage(), toBucket)
 
 	if err := s.versionedSvc.ListVersions(ctx, objectVersionID, replicationID); err != nil {
 		return fmt.Errorf("unable to list obejct versions: %w", err)
 	}
 
 	migratePayload := tasks.MigrateVersionedObjectPayload(listVersionsPayload)
-
 	err := s.queueSvc.EnqueueTask(ctx, migratePayload)
 	if err != nil {
 		return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
@@ -81,7 +79,7 @@ func (s *svc) HandleVersionedObjectMigration(ctx context.Context, t *asynq.Task)
 
 	user := migratePayload.ID.User()
 	fromBucket, toBucket := migratePayload.ID.FromToBuckets(migratePayload.Bucket)
-	replicationID := entity.NewBucketRepliationPolicy(user, migratePayload.ID.FromStorage(), fromBucket, migratePayload.ID.ToStorage(), toBucket)
+	replicationID := entity.NewBucketReplicationPolicy(user, migratePayload.ID.FromStorage(), fromBucket, migratePayload.ID.ToStorage(), toBucket)
 
 	if err := s.versionedSvc.MigrateVersions(ctx, replicationID, migratePayload.Prefix); err != nil {
 		return fmt.Errorf("unable to migrate object version: %w", err)
@@ -91,25 +89,17 @@ func (s *svc) HandleVersionedObjectMigration(ctx context.Context, t *asynq.Task)
 }
 
 type VersionedMigrationSvc struct {
-	policySvc policy.Service
-	copySvc   copy.CopySvc
-
+	copySvc                copy.CopySvc
 	objectVersionInfoStore *store.ObjectVersionInfoStore
-
-	objectLocker *store.ObjectLocker
-
-	pauseRetryInterval time.Duration
+	objectLocker           *store.ObjectLocker
 }
 
-func NewVersionedMigrationSvc(policySvc policy.Service, copySvc copy.CopySvc,
-	objectVersionInfoStore *store.ObjectVersionInfoStore, objectLocker *store.ObjectLocker,
-	pauseRetryInterval time.Duration) *VersionedMigrationSvc {
+func NewVersionedMigrationSvc(copySvc copy.CopySvc,
+	objectVersionInfoStore *store.ObjectVersionInfoStore, objectLocker *store.ObjectLocker) *VersionedMigrationSvc {
 	return &VersionedMigrationSvc{
-		policySvc:              policySvc,
 		copySvc:                copySvc,
 		objectVersionInfoStore: objectVersionInfoStore,
 		objectLocker:           objectLocker,
-		pauseRetryInterval:     pauseRetryInterval,
 	}
 }
 
@@ -184,7 +174,7 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 	}
 
 	if shouldClearDestination {
-		if err := r.copySvc.DeleteDestinationObject(ctx, replicationID.User, toFile); err != nil {
+		if err := r.copySvc.ClearDestination(ctx, replicationID.User, toFile, true); err != nil {
 			return fmt.Errorf("unable to delete destination object: %w", err)
 		}
 	}

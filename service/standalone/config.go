@@ -113,11 +113,14 @@ func (c *Config) Validate() error {
 func GetConfig(src ...config.Opt) (*Config, error) {
 	dc := defaultConfig()
 	var conf Config
-	cfgSource := []config.Opt{config.Reader(dc, "chorus_default_cfg")}
-	if len(src) == 0 {
+
+	srcLen := len(src)
+	if srcLen == 0 {
+		srcLen = 1
 		src = []config.Opt{config.Reader(testConfig(), "chorus_test_cfg")}
 	}
-
+	cfgSource := make([]config.Opt, 0, 1+srcLen)
+	cfgSource = append(cfgSource, config.Reader(dc, "chorus_default_cfg"))
 	cfgSource = append(cfgSource, src...)
 	err := config.Get(&conf, cfgSource...)
 	_ = dc.Close()

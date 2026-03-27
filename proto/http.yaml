@@ -5,16 +5,22 @@ http:
   rules:
     # Diff service:
     - selector: chorus.Diff.Start
-      post: /consistency/start
+      post: /diff/start
       body: "*"
     - selector: chorus.Diff.List
-      get: /consistency/list
+      get: /diff/list
     - selector: chorus.Diff.GetReport
-      get: /consistency/report
+      get: /diff/report
     - selector: chorus.Diff.GetReportEntries
-      get: /consistency/report-entries
+      get: /diff/report-entries
     - selector: chorus.Diff.DeleteReport
-      put: /consistency/delete
+      put: /diff/delete
+      body: "*"
+    - selector: chorus.Diff.Fix
+      post: /diff/fix
+      body: "*"
+    - selector: chorus.Diff.Restart
+      put: /diff/restart
       body: "*"
       # Chorus service:
     - selector: chorus.Chorus.GetAppVersion

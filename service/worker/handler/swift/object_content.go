@@ -153,7 +153,11 @@ func (s *svc) ObjectUpdate(ctx context.Context, p tasks.SwiftObjectUpdatePayload
 		if !isSlo {
 			toReq.NoETag = false
 			toReq.ETag = res.ETag
-			toReq.IfNoneMatch = res.ETag
+			// The only value that IfNoneMatch header can accept is *
+			// However, object is not being uploaded if there is another object with same etag
+			// Failure can be observed in diff test suite.
+			// To be more precise, in diff fix process for swift.
+			// toReq.IfNoneMatch = "*"
 		}
 	}
 	// upload to destination

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2025 Clyso GmbH
+ * Copyright © 2026 Clyso GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"text/tabwriter"
+	"strings"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
@@ -31,16 +29,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var consistencyCmd = &cobra.Command{
-	Use:   "consistency",
-	Short: "list consistency checks",
-	Long: `Get a list of consistency checks run by chorus instance.
-	
+var diffRecheckCmd = &cobra.Command{
+	Use:   "recheck",
+	Short: "rerun diff check",
+	Long: `Remove all stored data related to diff check and restart diff check with same settings.
+
 Example:
-chorctl consistency`,
+chorctl diff recheck oldstorage:bucket newstorage:altbucket`,
+	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		locations := make([]*pb.MigrateLocation, 0, len(args))
+		for _, arg := range args {
+			storage, bucket, found := strings.Cut(arg, ":")
+			if !found {
+				logrus.WithField("arg", arg).Fatal("unable to get storage and bucket parts")
+			}
+			locations = append(locations, &pb.MigrateLocation{
+				Storage: storage,
+				Bucket:  bucket,
+			})
+		}
 
 		conn, err := api.Connect(ctx, address)
 		if err != nil {
@@ -49,21 +60,15 @@ chorctl consistency`,
 		defer conn.Close()
 
 		client := pb.NewDiffClient(conn)
-		res, err := client.List(ctx, &emptypb.Empty{})
+		_, err = client.Restart(ctx, &pb.DiffCheckRequest{Locations: locations})
 		if err != nil {
-			logrus.WithError(err).WithField("address", address).Fatal("unable to get consistency checks")
+			logrus.WithError(err).WithField("address", address).Fatal("unable to delete diff check", args)
+		} else {
+			fmt.Println("Diff check", args, "restarted.")
 		}
-
-		// io.Writer, minwidth, tabwidth, padding int, padchar byte, flags uint
-		w := tabwriter.NewWriter(os.Stdout, 10, 1, 5, ' ', 0)
-		fmt.Fprintln(w, api.ConsistencyCheckHeader())
-		for _, check := range res.Checks {
-			fmt.Fprintln(w, api.ConsistencyCheckRow(check))
-		}
-		w.Flush()
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(consistencyCmd)
+	diffCmd.AddCommand(diffRecheckCmd)
 }

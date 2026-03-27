@@ -92,23 +92,23 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 		{Bucket: *id.ToBucket, Storage: id.ToStorage},
 	}
 	// delete any existing diff
-	_, err := e.DiffClient.DeleteReport(t.Context(), &pb.ConsistencyCheckRequest{
+	_, err := e.DiffClient.DeleteReport(t.Context(), &pb.DiffCheckRequest{
 		Locations: loc,
 	})
 	r.NoError(err)
 
 	// create diff
-	_, err = e.DiffClient.Start(t.Context(), &pb.StartConsistencyCheckRequest{
+	_, err = e.DiffClient.Start(t.Context(), &pb.StartDiffCheckRequest{
 		Locations:             loc,
 		User:                  id.User,
 		CheckOnlyLastVersions: true,
 	})
 	r.NoError(err)
 
-	var res *pb.GetConsistencyCheckReportResponse
+	var res *pb.GetDiffCheckReportResponse
 	r.Eventually(func() bool {
 		//poll until ready
-		res, err = e.DiffClient.GetReport(t.Context(), &pb.ConsistencyCheckRequest{
+		res, err = e.DiffClient.GetReport(t.Context(), &pb.DiffCheckRequest{
 			Locations: loc,
 		})
 		r.NoError(err)
@@ -126,7 +126,7 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 	diff := ReplicationDiffResponse{IsMatch: false}
 	cursor := uint64(0)
 	for {
-		batch, err := e.DiffClient.GetReportEntries(t.Context(), &pb.GetConsistencyCheckReportEntriesRequest{
+		batch, err := e.DiffClient.GetReportEntries(t.Context(), &pb.GetDiffCheckReportEntriesRequest{
 			Locations: loc,
 			Cursor:    0,
 			PageSize:  100,

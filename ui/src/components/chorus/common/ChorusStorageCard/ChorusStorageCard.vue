@@ -34,6 +34,7 @@
       isSelected?: boolean;
       isDisabled?: boolean;
       size?: 'medium' | 'small';
+      isDeselectable?: boolean;
     }>(),
     {
       type: 'warning',
@@ -42,6 +43,7 @@
       isDisabled: false,
       to: undefined,
       size: 'medium',
+      isDeselectable: false,
     },
   );
 
@@ -52,31 +54,39 @@
       'chorus-storage-card--link': !!props.to,
       'chorus-storage-card--selectable': props.isSelectable && !props.to,
       'chorus-storage-card--selected': props.isSelected && !props.to,
+      'chorus-storage-card--deselectable': props.isDeselectable && !props.to,
       'chorus-storage-card--disabled': props.isDisabled && !props.to,
     },
   ]);
 
   const tabindex = computed<number | undefined>(() =>
-    !!props.to || (props.isSelectable && !props.isSelected && !props.isDisabled)
+    !!props.to ||
+    (props.isSelectable &&
+      (!props.isSelected || props.isDeselectable) &&
+      !props.isDisabled)
       ? 0
       : undefined,
   );
 
   const emit = defineEmits<{
     (e: 'select'): void;
+    (e: 'deselect'): void;
   }>();
 
   function handleClick() {
-    if (
-      !!props.to ||
-      !props.isSelectable ||
-      props.isSelected ||
-      props.isDisabled
-    ) {
+    if (props.to || !props.isSelectable || props.isDisabled) {
       return;
     }
 
-    emit('select');
+    if (!props.isSelected) {
+      emit('select');
+
+      return;
+    }
+
+    if (props.isSelected && props.isDeselectable) {
+      emit('deselect');
+    }
   }
 </script>
 
@@ -214,6 +224,22 @@
     &--selected {
       outline-color: var(--primary-color);
       cursor: default;
+
+      &.chorus-storage-card--deselectable {
+        cursor: pointer;
+
+        &:hover {
+          &::before {
+            opacity: 0.15;
+          }
+        }
+
+        &:active {
+          &::before {
+            opacity: 0.25;
+          }
+        }
+      }
     }
 
     &--disabled {

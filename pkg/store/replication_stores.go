@@ -299,7 +299,7 @@ func (r *BucketReplicationPolicyStore) GetOp(ctx context.Context, id entity.Buck
 		}
 		policies := make([]entity.BucketReplicationPolicy, 0, len(toStorages))
 		for _, toStorage := range toStorages {
-			policy := entity.NewBucketRepliationPolicy(id.User, fromStorage, id.FromBucket, toStorage.ToStorage, toStorage.ToBucket)
+			policy := entity.NewBucketReplicationPolicy(id.User, fromStorage, id.FromBucket, toStorage.ToStorage, toStorage.ToBucket)
 			if err := policy.Validate(); err != nil {
 				return nil, fmt.Errorf("invalid bucket replication policy found in store: %w", err)
 			}

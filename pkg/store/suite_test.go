@@ -26,7 +26,7 @@ var (
 
 func TestEnv(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Consistency Checker Suite")
+	RunSpecs(t, "Diff Store Suite")
 }
 
 var _ = BeforeSuite(func() {

@@ -39,8 +39,9 @@ type Queue string
 const (
 	QueueAPI                      Queue = "api"
 	QueueMigrateListObjectsPrefix Queue = "migr_list_obj"
-	QueueConsistencyCheck         Queue = "consistency_check"
 	QueueMigrateCopyObjectPrefix  Queue = "migr_copy_obj"
+	QueueDiff                     Queue = "diff"
+	QueueDiffFix                  Queue = "diff_fix"
 	QueueEventsPrefix             Queue = "event"
 )
 
@@ -48,7 +49,8 @@ const (
 var Priority = map[string]int{
 	string(QueueAPI): 200, // highest priority
 	string(QueueMigrateListObjectsPrefix) + ":*": 100,
-	string(QueueConsistencyCheck) + ":*":         50,
+	string(QueueDiff) + ":*":                     50,
+	string(QueueDiffFix) + ":*":                  50,
 	string(QueueMigrateCopyObjectPrefix) + ":*":  10,
 	string(QueueEventsPrefix) + ":*":             5, // lowest priority
 	"*":                                          1, // fallback for legacy queues
@@ -85,15 +87,29 @@ func AllReplicationQueues(id entity.UniversalReplicationID) []string {
 	}
 }
 
-func ConsistencyCheckQueue(id entity.ConsistencyCheckID) string {
+func DiffQueue(id entity.DiffID) string {
+	return diffQueueName(QueueDiff, id)
+}
+
+func DiffFixQueue(id entity.DiffID) string {
+	return diffQueueName(QueueDiffFix, id)
+}
+
+func diffQueueName(queuePrefix Queue, id entity.DiffID) string {
+	switch queuePrefix {
+	case QueueDiff, QueueDiffFix:
+	default:
+		panic(fmt.Sprintf("%s is not a diff queue prefix", queuePrefix))
+	}
+
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
 	if err := json.NewEncoder(encoder).Encode(&id); err != nil {
-		panic(fmt.Errorf("unable to encode consistency check id: %w", err))
+		panic(fmt.Errorf("unable to encode diff id: %w", err))
 	}
 	if err := encoder.Close(); err != nil {
-		panic(fmt.Errorf("unable to finalize encoding of consistency check id: %w", err))
+		panic(fmt.Errorf("unable to finalize encoding of diff id: %w", err))
 	}
-	// add prefix
-	return fmt.Sprintf("%s:%s", QueueConsistencyCheck, buf.String())
+
+	return fmt.Sprintf("%s:%s", queuePrefix, buf.String())
 }

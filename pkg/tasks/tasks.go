@@ -38,9 +38,16 @@ const (
 	TypeMigrateObjectListVersions = "migrate:object:list_versions"
 	TypeMigrateVersionedObject    = "migrate:object:copy_versioned"
 
-	TypeConsistencyCheck             = "consistency"
-	TypeConsistencyCheckListObjects  = "consistency:list_objects"
-	TypeConsistencyCheckListVersions = "consistency:list_versions"
+	TypeDiff             = "diff"
+	TypeDiffListObjects  = "diff:list_objects"
+	TypeDiffListVersions = "diff:list_versions"
+
+	TypeDiffFixCollectObjects = "diff:fix:collect_objects"
+	TypeDiffFixRemoveObjects  = "diff:fix:remove_objects"
+	TypeDiffFixEnsureRemove   = "diff:fix:ensure_remove"
+	TypeDiffFixCopyS3         = "diff:fix:copy:s3"
+	TypeDiffFixCopySwift      = "diff:fix:copy:swift"
+	TypeDiffFixS3ListVersions = "diff:fix:list_versions"
 
 	TypeApiZeroDowntimeSwitch = "api:switch_zero_downtime"
 	TypeApiSwitchWithDowntime = "api:switch_w_downtime"
@@ -79,18 +86,27 @@ type TaskPayload interface {
 		SwiftAccountMigrationPayload |
 		SwiftContainerMigrationPayload |
 		SwiftObjectMigrationPayload |
-		ConsistencyCheckPayload |
-		ConsistencyCheckListObjectsPayload |
-		ConsistencyCheckListVersionsPayload
+		DiffPayload |
+		DiffListObjectsPayload |
+		DiffListVersionsPayload |
+		DiffFixCollectObjectsPayload |
+		DiffFixRemoveObjectsPayload |
+		DiffFixEnsureObjectsRemovedPayload |
+		DiffFixSwiftCopyPayload |
+		DiffFixS3CopyPayload |
+		DiffFixS3ListVersionsPayload
 }
 
 type ReplicationTask interface {
 	SetReplicationID(id entity.UniversalReplicationID)
 	GetReplicationID() entity.UniversalReplicationID
+	SetInheritableQueue(queue string)
+	GetInheritableQueue() string
 }
 
 type replicationID struct {
-	ID entity.UniversalReplicationID
+	ID    entity.UniversalReplicationID
+	Queue string
 }
 
 func (r *replicationID) GetReplicationID() entity.UniversalReplicationID {
@@ -99,6 +115,14 @@ func (r *replicationID) GetReplicationID() entity.UniversalReplicationID {
 
 func (r *replicationID) SetReplicationID(id entity.UniversalReplicationID) {
 	r.ID = id
+}
+
+func (r *replicationID) SetInheritableQueue(queue string) {
+	r.Queue = queue
+}
+
+func (r *replicationID) GetInheritableQueue() string {
+	return r.Queue
 }
 
 var _ ReplicationTask = (*replicationID)(nil)
@@ -200,7 +224,7 @@ type MigrateLocation struct {
 	Bucket  string
 }
 
-type ConsistencyCheckPayload struct {
+type DiffPayload struct {
 	User        string
 	Locations   []MigrateLocation
 	Versioned   bool
@@ -208,7 +232,7 @@ type ConsistencyCheckPayload struct {
 	IgnoreSizes bool
 }
 
-type ConsistencyCheckListObjectsPayload struct {
+type DiffListObjectsPayload struct {
 	User        string
 	Prefix      string
 	Locations   []MigrateLocation
@@ -218,13 +242,54 @@ type ConsistencyCheckListObjectsPayload struct {
 	IgnoreSizes bool
 }
 
-type ConsistencyCheckListVersionsPayload struct {
-	User         string
-	Prefix       string
-	Locations    []MigrateLocation
-	Index        int
-	IgonoreEtags bool
-	IgnoreSizes  bool
+type DiffListVersionsPayload struct {
+	User        string
+	Prefix      string
+	Locations   []MigrateLocation
+	Index       int
+	IgnoreEtags bool
+	IgnoreSizes bool
+}
+
+type DiffFixCollectObjectsPayload struct {
+	StorageType dom.StorageType
+	User        string
+	Locations   []MigrateLocation
+	SourceIndex int
+	Versioned   bool
+}
+
+type DiffFixRemoveObjectsPayload struct {
+	StorageType dom.StorageType
+	User        string
+	Locations   []MigrateLocation
+	SourceIndex int
+	RemoveIndex int
+	Versioned   bool
+}
+
+type DiffFixEnsureObjectsRemovedPayload struct {
+	StorageType dom.StorageType
+	User        string
+	Locations   []MigrateLocation
+	SourceIndex int
+	RemoveIndex int
+	Versioned   bool
+}
+
+type DiffFixSwiftCopyPayload struct {
+	SwiftObjectMigrationPayload
+	Locations []MigrateLocation
+}
+
+type DiffFixS3CopyPayload struct {
+	MigrateObjCopyPayload
+	Locations []MigrateLocation
+}
+
+type DiffFixS3ListVersionsPayload struct {
+	ListObjectVersionsPayload
+	Locations []MigrateLocation
 }
 
 type SwiftAccountUpdatePayload struct {

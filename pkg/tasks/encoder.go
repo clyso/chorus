@@ -42,21 +42,29 @@ type encoder[T TaskPayload] struct {
 	queue func(p T) string
 	// Uniq
 	taskType string
+	// Identifies that all eligible child tasks should inherit queue
+	inheritableQueue bool
 }
 
 func (e encoder[T]) Encode(ctx context.Context, payload T) (*asynq.Task, error) {
 	// Ensure that replication ID is set for replication tasks.
+	queue := e.queue(payload)
 	if replTask, ok := any(&payload).(ReplicationTask); ok {
 		id := replTask.GetReplicationID()
 		if id.IsEmpty() {
 			return nil, fmt.Errorf("%w: replicationID is not set to replication task: %#v. Use task.SetReplicationID() method", dom.ErrInternal, payload)
+		}
+		inheritableQueue := replTask.GetInheritableQueue()
+		if inheritableQueue != "" {
+			queue = inheritableQueue
+		} else if e.inheritableQueue {
+			replTask.SetInheritableQueue(queue)
 		}
 	}
 	bytes, err := json.Marshal(&payload)
 	if err != nil {
 		return nil, err
 	}
-	queue := e.queue(payload)
 	optionList := []asynq.Option{asynq.Queue(queue), asynq.Timeout(taskTimeout)}
 	if e.taskID != nil {
 		id := e.taskID(payload)
@@ -139,18 +147,42 @@ func enqueueAny(ctx context.Context, taskClient *asynq.Client, payload any) erro
 		return switchWithDowntime.Enqueue(ctx, taskClient, *p)
 	case SwitchWithDowntimePayload:
 		return switchWithDowntime.Enqueue(ctx, taskClient, p)
-	case *ConsistencyCheckPayload:
-		return consistencyCheck.Enqueue(ctx, taskClient, *p)
-	case ConsistencyCheckPayload:
-		return consistencyCheck.Enqueue(ctx, taskClient, p)
-	case *ConsistencyCheckListObjectsPayload:
-		return consistencyCheckListObjects.Enqueue(ctx, taskClient, *p)
-	case ConsistencyCheckListObjectsPayload:
-		return consistencyCheckListObjects.Enqueue(ctx, taskClient, p)
-	case *ConsistencyCheckListVersionsPayload:
-		return consistencyCheckListVersions.Enqueue(ctx, taskClient, *p)
-	case ConsistencyCheckListVersionsPayload:
-		return consistencyCheckListVersions.Enqueue(ctx, taskClient, p)
+	case *DiffPayload:
+		return diff.Enqueue(ctx, taskClient, *p)
+	case DiffPayload:
+		return diff.Enqueue(ctx, taskClient, p)
+	case *DiffListObjectsPayload:
+		return diffListObjects.Enqueue(ctx, taskClient, *p)
+	case DiffListObjectsPayload:
+		return diffListObjects.Enqueue(ctx, taskClient, p)
+	case *DiffListVersionsPayload:
+		return diffListVersions.Enqueue(ctx, taskClient, *p)
+	case DiffListVersionsPayload:
+		return diffListVersions.Enqueue(ctx, taskClient, p)
+	case *DiffFixCollectObjectsPayload:
+		return diffFixCollectObjectsPayload.Enqueue(ctx, taskClient, *p)
+	case DiffFixCollectObjectsPayload:
+		return diffFixCollectObjectsPayload.Enqueue(ctx, taskClient, p)
+	case *DiffFixRemoveObjectsPayload:
+		return diffFixRemoveObjects.Enqueue(ctx, taskClient, *p)
+	case DiffFixRemoveObjectsPayload:
+		return diffFixRemoveObjects.Enqueue(ctx, taskClient, p)
+	case *DiffFixEnsureObjectsRemovedPayload:
+		return diffFixEnsureObjectsRemoved.Enqueue(ctx, taskClient, *p)
+	case DiffFixEnsureObjectsRemovedPayload:
+		return diffFixEnsureObjectsRemoved.Enqueue(ctx, taskClient, p)
+	case *DiffFixS3CopyPayload:
+		return diffFixS3Copy.Enqueue(ctx, taskClient, *p)
+	case DiffFixS3CopyPayload:
+		return diffFixS3Copy.Enqueue(ctx, taskClient, p)
+	case *DiffFixSwiftCopyPayload:
+		return diffFixSwiftCopy.Enqueue(ctx, taskClient, *p)
+	case DiffFixSwiftCopyPayload:
+		return diffFixSwiftCopy.Enqueue(ctx, taskClient, p)
+	case *DiffFixS3ListVersionsPayload:
+		return diffFixS3ListVersions.Enqueue(ctx, taskClient, *p)
+	case DiffFixS3ListVersionsPayload:
+		return diffFixS3ListVersions.Enqueue(ctx, taskClient, p)
 	case *SwiftAccountUpdatePayload:
 		return swiftAccountUpdate.Enqueue(ctx, taskClient, *p)
 	case SwiftAccountUpdatePayload:
@@ -304,62 +336,156 @@ var (
 		},
 		taskType: TypeApiSwitchWithDowntime,
 	}
-	consistencyCheck = encoder[ConsistencyCheckPayload]{
-		taskID: func(p ConsistencyCheckPayload) string {
-			locationTokens := make([]string, 0, len(p.Locations))
+	diff = encoder[DiffPayload]{
+		taskID: func(p DiffPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations)*2)
 			for _, location := range p.Locations {
 				locationTokens = append(locationTokens, location.Storage, location.Bucket)
 			}
-			return toTaskID(append([]string{"cc:root"}, locationTokens...)...)
+			return toTaskID(append([]string{"diff:check"}, locationTokens...)...)
 		},
-		queue: func(p ConsistencyCheckPayload) string {
-			locations := make([]entity.ConsistencyCheckLocation, 0, len(p.Locations))
+		queue: func(p DiffPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
 			for _, payloadLocation := range p.Locations {
-				locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
 			}
-
-			checkID := entity.NewConsistencyCheckID(locations...)
-			return ConsistencyCheckQueue(checkID)
+			diffID := entity.NewDiffID(locations...)
+			return DiffQueue(diffID)
 		},
-		taskType: TypeConsistencyCheck,
+		taskType: TypeDiff,
 	}
-	consistencyCheckListObjects = encoder[ConsistencyCheckListObjectsPayload]{
-		taskID: func(p ConsistencyCheckListObjectsPayload) string {
-			locationTokens := make([]string, 0, len(p.Locations))
+	diffListObjects = encoder[DiffListObjectsPayload]{
+		taskID: func(p DiffListObjectsPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations)*2)
 			for _, location := range p.Locations {
 				locationTokens = append(locationTokens, location.Storage, location.Bucket)
 			}
-			return toTaskID(append(append([]string{"cc:lo"}, locationTokens...), strconv.Itoa(p.Index), p.Prefix)...)
+			return toTaskID(append(append([]string{"diff:lo"}, locationTokens...), strconv.Itoa(p.Index), p.Prefix)...)
 		},
-		queue: func(p ConsistencyCheckListObjectsPayload) string {
-			locations := make([]entity.ConsistencyCheckLocation, 0, len(p.Locations))
+		queue: func(p DiffListObjectsPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
 			for _, payloadLocation := range p.Locations {
-				locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
 			}
-
-			checkID := entity.NewConsistencyCheckID(locations...)
-			return ConsistencyCheckQueue(checkID)
+			diffID := entity.NewDiffID(locations...)
+			return DiffQueue(diffID)
 		},
-		taskType: TypeConsistencyCheckListObjects,
+		taskType: TypeDiffListObjects,
 	}
-	consistencyCheckListVersions = encoder[ConsistencyCheckListVersionsPayload]{
-		taskID: func(p ConsistencyCheckListVersionsPayload) string {
-			locationTokens := make([]string, 0, len(p.Locations))
+	diffListVersions = encoder[DiffListVersionsPayload]{
+		taskID: func(p DiffListVersionsPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations)*2)
 			for _, location := range p.Locations {
 				locationTokens = append(locationTokens, location.Storage, location.Bucket)
 			}
-			return toTaskID(append(append([]string{"cc:lo"}, locationTokens...), strconv.Itoa(p.Index), p.Prefix)...)
+			return toTaskID(append(append([]string{"diff:lv"}, locationTokens...), strconv.Itoa(p.Index), p.Prefix)...)
 		},
-		queue: func(p ConsistencyCheckListVersionsPayload) string {
-			locations := make([]entity.ConsistencyCheckLocation, 0, len(p.Locations))
+		queue: func(p DiffListVersionsPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
 			for _, payloadLocation := range p.Locations {
-				locations = append(locations, entity.NewConsistencyCheckLocation(payloadLocation.Storage, payloadLocation.Bucket))
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
 			}
-
-			checkID := entity.NewConsistencyCheckID(locations...)
-			return ConsistencyCheckQueue(checkID)
+			diffID := entity.NewDiffID(locations...)
+			return DiffQueue(diffID)
 		},
-		taskType: TypeConsistencyCheckListVersions,
+		taskType: TypeDiffListVersions,
+	}
+	diffFixCollectObjectsPayload = encoder[DiffFixCollectObjectsPayload]{
+		taskID: func(p DiffFixCollectObjectsPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations)*2)
+			for _, location := range p.Locations {
+				locationTokens = append(locationTokens, location.Storage, location.Bucket)
+			}
+			return toTaskID(append([]string{"diff:fixcollect"}, locationTokens...)...)
+		},
+		queue: func(p DiffFixCollectObjectsPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+			diffID := entity.NewDiffID(locations...)
+			return DiffFixQueue(diffID)
+		},
+		taskType: TypeDiffFixCollectObjects,
+	}
+	diffFixRemoveObjects = encoder[DiffFixRemoveObjectsPayload]{
+		taskID: func(p DiffFixRemoveObjectsPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations)*2)
+			for _, location := range p.Locations {
+				locationTokens = append(locationTokens, location.Storage, location.Bucket)
+			}
+			return toTaskID(append([]string{"diff:fixremove"}, locationTokens...)...)
+		},
+		queue: func(p DiffFixRemoveObjectsPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+			diffID := entity.NewDiffID(locations...)
+			return DiffFixQueue(diffID)
+		},
+		taskType: TypeDiffFixRemoveObjects,
+	}
+	diffFixEnsureObjectsRemoved = encoder[DiffFixEnsureObjectsRemovedPayload]{
+		taskID: func(p DiffFixEnsureObjectsRemovedPayload) string {
+			locationTokens := make([]string, 0, len(p.Locations)*2)
+			for _, location := range p.Locations {
+				locationTokens = append(locationTokens, location.Storage, location.Bucket)
+			}
+			return toTaskID(append([]string{"diff:fixensure"}, locationTokens...)...)
+		},
+		queue: func(p DiffFixEnsureObjectsRemovedPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+			diffID := entity.NewDiffID(locations...)
+			return DiffFixQueue(diffID)
+		},
+		taskType: TypeDiffFixEnsureRemove,
+	}
+	diffFixS3Copy = encoder[DiffFixS3CopyPayload]{
+		taskID: func(p DiffFixS3CopyPayload) string {
+			return toTaskID("diff:fixcopys3", p.ID.AsString(), p.Bucket, p.Obj.Name)
+		},
+		queue: func(p DiffFixS3CopyPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+			diffID := entity.NewDiffID(locations...)
+			return DiffFixQueue(diffID)
+		},
+		taskType: TypeDiffFixCopyS3,
+	}
+	diffFixSwiftCopy = encoder[DiffFixSwiftCopyPayload]{
+		taskID: func(p DiffFixSwiftCopyPayload) string {
+			return toTaskID("diff:fixcopyswift", p.ID.AsString(), p.Bucket, p.ObjName, p.ObjVersion)
+		},
+		queue: func(p DiffFixSwiftCopyPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+			diffID := entity.NewDiffID(locations...)
+			return DiffFixQueue(diffID)
+		},
+		taskType: TypeDiffFixCopySwift,
+	}
+	diffFixS3ListVersions = encoder[DiffFixS3ListVersionsPayload]{
+		taskID: func(p DiffFixS3ListVersionsPayload) string {
+			return toTaskID("diff:fixlistversionss3", p.ID.AsString(), p.Bucket, p.Prefix)
+		},
+		queue: func(p DiffFixS3ListVersionsPayload) string {
+			locations := make([]entity.DiffLocation, 0, len(p.Locations))
+			for _, payloadLocation := range p.Locations {
+				locations = append(locations, entity.NewDiffLocation(payloadLocation.Storage, payloadLocation.Bucket))
+			}
+			diffID := entity.NewDiffID(locations...)
+			return DiffFixQueue(diffID)
+		},
+		inheritableQueue: true,
+		taskType:         TypeDiffFixS3ListVersions,
 	}
 	swiftAccountUpdate = encoder[SwiftAccountUpdatePayload]{
 		taskID: nil,

@@ -7,17 +7,21 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/clyso/chorus/proto/chorus;pb";
 
 service Diff {
-  rpc Start(StartConsistencyCheckRequest) returns (google.protobuf.Empty);
+  rpc Start(StartDiffCheckRequest) returns (google.protobuf.Empty);
 
-  rpc List(google.protobuf.Empty) returns (ListConsistencyChecksResponse);
+  rpc List(google.protobuf.Empty) returns (ListDiffChecksResponse);
 
-  rpc GetReport(ConsistencyCheckRequest)
-      returns (GetConsistencyCheckReportResponse);
+  rpc GetReport(DiffCheckRequest)
+      returns (GetDiffCheckReportResponse);
 
-  rpc GetReportEntries(GetConsistencyCheckReportEntriesRequest)
-      returns (GetConsistencyCheckReportEntriesResponse);
+  rpc GetReportEntries(GetDiffCheckReportEntriesRequest)
+      returns (GetDiffCheckReportEntriesResponse);
 
-  rpc DeleteReport(ConsistencyCheckRequest) returns (google.protobuf.Empty);
+  rpc DeleteReport(DiffCheckRequest) returns (google.protobuf.Empty);
+
+  rpc Fix(StartDiffFixRequest) returns (google.protobuf.Empty);
+
+  rpc Restart(DiffCheckRequest) returns (google.protobuf.Empty);
 }
 
 message MigrateLocation {
@@ -25,7 +29,7 @@ message MigrateLocation {
   string bucket = 2;
 }
 
-message StartConsistencyCheckRequest {
+message StartDiffCheckRequest {
   repeated MigrateLocation locations = 1;
   string user = 2;
   bool check_only_last_versions = 3;
@@ -33,48 +37,56 @@ message StartConsistencyCheckRequest {
   bool ignore_sizes = 5;
 }
 
-message ConsistencyCheckRequest { repeated MigrateLocation locations = 1; }
-
-message ConsistencyCheck {
-  repeated MigrateLocation locations = 2;
-  uint64 queued = 3;
-  uint64 completed = 4;
-  bool ready = 5;
-  bool consistent = 6;
-  bool versioned = 7;
-  bool with_size = 8;
-  bool with_etag = 9;
+message StartDiffFixRequest { 
+  repeated MigrateLocation locations = 1;
+  uint64 sourceIndex = 2;
 }
 
-message ListConsistencyChecksResponse { repeated ConsistencyCheck checks = 1; }
+message DiffCheckRequest { repeated MigrateLocation locations = 1; }
 
-message GetConsistencyCheckReportRequest {
+message DiffCheck {
+  repeated MigrateLocation locations = 1;
+  uint64 queued = 2;
+  uint64 completed = 3;
+  bool ready = 4;
+  bool consistent = 5;
+  bool versioned = 6;
+  bool ignore_sizes = 7;
+  bool ignore_etags = 8;
+  uint64 fix_queued = 9;
+  uint64 fix_completed = 10;
+  bool fix_ready = 11;
+}
+
+message ListDiffChecksResponse { repeated DiffCheck checks = 1; }
+
+message GetDiffCheckReportRequest {
   repeated MigrateLocation locations = 1;
 }
 
-message GetConsistencyCheckReportResponse { ConsistencyCheck check = 1; }
+message GetDiffCheckReportResponse { DiffCheck check = 1; }
 
-message ConsistencyCheckStorageEntry {
+message DiffCheckStorageEntry {
   string storage = 1;
   string version_id = 2;
   string bucket = 3;
 }
 
-message ConsistencyCheckReportEntry {
+message DiffCheckReportEntry {
   string object = 1;
   uint64 version_idx = 2;
   uint64 size = 3;
   string etag = 4;
-  repeated ConsistencyCheckStorageEntry storage_entries = 5;
+  repeated DiffCheckStorageEntry storage_entries = 5;
 }
 
-message GetConsistencyCheckReportEntriesRequest {
+message GetDiffCheckReportEntriesRequest {
   repeated MigrateLocation locations = 1;
   uint64 cursor = 2;
   uint64 pageSize = 3;
 }
 
-message GetConsistencyCheckReportEntriesResponse {
-  repeated ConsistencyCheckReportEntry entries = 1;
+message GetDiffCheckReportEntriesResponse {
+  repeated DiffCheckReportEntry entries = 1;
   uint64 cursor = 2;
 }
