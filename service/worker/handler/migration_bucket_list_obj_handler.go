@@ -29,6 +29,7 @@ import (
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/features"
 	"github.com/clyso/chorus/pkg/log"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/tasks"
@@ -76,6 +77,34 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		isDir := object.Size == 0 && strings.HasSuffix(object.Key, "/")
 		logger.Debug().Str(log.Object, object.Key).Str("obj_version_id", object.VersionID).Bool("is_dir", isDir).Msg("migration bucket list obj: start processing object from the list")
 		if isDir {
+			if features.DirectoryMarkers(ctx) {
+				if p.Versioned {
+					task := tasks.ListObjectVersionsPayload{
+						Bucket: p.Bucket,
+						Prefix: object.Key,
+					}
+					task.SetReplicationID(replicationID)
+					if err = s.queueSvc.EnqueueTask(ctx, task); err != nil {
+						return fmt.Errorf("unable to create list object versions task for directory marker: %w", err)
+					}
+				} else {
+					task := tasks.MigrateObjCopyPayload{
+						Bucket: p.Bucket,
+						Obj: tasks.ObjPayload{
+							Name:        object.Key,
+							VersionID:   object.VersionID,
+							ETag:        object.ETag,
+							Size:        object.Size,
+							ContentType: object.ContentType,
+						},
+					}
+					task.SetReplicationID(replicationID)
+					if err = s.queueSvc.EnqueueTask(ctx, task); err != nil {
+						return fmt.Errorf("migration bucket list obj: unable to create copy task for directory marker: %w", err)
+					}
+				}
+			}
+
 			subP := p
 			subP.Prefix = object.Key
 			if err = s.queueSvc.EnqueueTask(ctx, subP); err != nil {

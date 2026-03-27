@@ -25,6 +25,7 @@ type Config struct {
 	Lifecycle         bool `yaml:"lifecycle"`
 	Policy            bool `yaml:"policy"`
 	PreserveACLGrants bool `yaml:"preserveACLGrants"`
+	DirectoryMarkers  bool `yaml:"directoryMarkers"`
 }
 
 var val *Config
@@ -55,4 +56,8 @@ func Policy(_ context.Context) bool {
 
 func PreserveACLGrants(_ context.Context) bool {
 	return val.PreserveACLGrants
+}
+
+func DirectoryMarkers(_ context.Context) bool {
+	return val.DirectoryMarkers
 }

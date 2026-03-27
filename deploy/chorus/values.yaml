@@ -109,6 +109,7 @@ existingCredentialsSecret: ""
 features:
   tagging: true
   acl: true
+  directoryMarkers: false
 
 # =============================================================================
 # REDIS CONFIGURATION
