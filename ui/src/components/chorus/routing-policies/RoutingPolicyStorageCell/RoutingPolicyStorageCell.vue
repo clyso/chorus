@@ -33,6 +33,7 @@
 <template>
   <div class="routing-policy-storage-cell">
     <ChorusStorageTag
+      v-if="routingPolicy.toStorage"
       :storage-name="routingPolicy.toStorage"
       :tooltip="t('routingPolicyStorage')"
       type="primary"
