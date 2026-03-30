@@ -32,7 +32,7 @@
   });
 
   const storageOptions = computed(() =>
-    GeneralHelper.orderBy(storages.value, 'isMain', 'desc'),
+    GeneralHelper.orderBy(storages.value, 'isMain', 'asc'),
   );
 
   function selectStorage(storage: ChorusStorage) {
