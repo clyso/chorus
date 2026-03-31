@@ -45,6 +45,9 @@ export default <I18nMessages>{
       'Bucket name contains a restricted AWS prefix or suffix.',
     storageSelectionTitle: 'Storage',
     storageSelectionDescription: 'Select a destination storage:',
+    storageSelectionRequired: 'Please select a destination storage.',
+    storageSelectionBlockedOnlyHint:
+      'No storage selected: a blocked-only policy without routing will be created.',
     unknownValidationError: 'Unknown validation error',
     statusSelectionTitle: 'Blocked Status',
     statusSelectionDescription:
@@ -74,6 +77,8 @@ export default <I18nMessages>{
     addErrorAction: 'Retry',
     addRoutingPolicyErrorUnknown:
       'An unknown error occurred while creating the routing policy.',
+    addBlockErrorUnknown:
+      'An unknown error occurred while creating a blocked policy',
     addRoutingPolicyBlockErrorUnknown:
       'An unknown error occurred while blocking the newly created routing policy. The creation of the routing policy has been rolled back. You may want to try creating the routing policy first and blocking it in a separate step.',
   },
@@ -109,6 +114,9 @@ export default <I18nMessages>{
       'Der Bucket-Name enthält ein unzulässiges AWS-Präfix oder -Suffix.',
     storageSelectionTitle: 'Speicher',
     storageSelectionDescription: 'Wählen Sie einen Zielspeicher:',
+    storageSelectionRequired: 'Bitte wählen Sie einen Zielspeicher aus.',
+    storageSelectionBlockedOnlyHint:
+      'Kein Speicher ausgewählt: es wird nur eine blockierte Richtlinie erstellt.',
     unknownValidationError: 'Unbekannter Fehler beim Validieren der Eingabe',
     statusSelectionTitle: 'Blockiert-Status',
     statusSelectionDescription:
@@ -138,6 +146,8 @@ export default <I18nMessages>{
     addErrorAction: 'Erneut versuchen',
     addRoutingPolicyErrorUnknown:
       'Beim Erstellen der Routing-Richtlinie ist ein unbekannter Fehler aufgetreten.',
+    addBlockErrorUnknown:
+      'Beim Erstellen einer Blockierung ist ein unbekannter Fehler aufgetreten.',
     addRoutingPolicyBlockErrorUnknown:
       'Beim Blockieren der neu erstellten Routing-Richtlinie ist ein unbekannter Fehler aufgetreten. Die Erstellung der Routing-Richtlinie wurde rückgängig gemacht. Sie können versuchen, die Routing-Richtlinie zunächst nur zu erstellen und sie in einem zweiten Schritt zu blockieren.',
   },
