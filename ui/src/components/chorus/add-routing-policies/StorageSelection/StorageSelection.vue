@@ -25,7 +25,8 @@
   import type { ChorusStorage } from '@/utils/types/chorus';
 
   const store = useChorusAddRoutingPolicyStore();
-  const { selectedToStorage, storages } = storeToRefs(store);
+  const { selectedToStorage, storages, isBlockOnly, validator } =
+    storeToRefs(store);
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
@@ -68,6 +69,18 @@
         @deselect="selectStorage(storage)"
       />
     </div>
+    <span
+      v-if="validator.selectedToStorage.$error"
+      class="storage-selection__error-text"
+    >
+      {{ t('storageSelectionRequired') }}
+    </span>
+    <span
+      v-if="isBlockOnly"
+      class="storage-selection__hint-text"
+    >
+      {{ t('storageSelectionBlockedOnlyHint') }}
+    </span>
   </div>
 </template>
 
@@ -83,6 +96,16 @@
     &__content {
       display: flex;
       gap: utils.unit(2);
+    }
+
+    &__error-text {
+      color: var(--error-color);
+      font-size: 12px;
+    }
+
+    &__hint-text {
+      color: var(--warning-color);
+      font-size: 12px;
     }
   }
 </style>

@@ -84,6 +84,10 @@ export const useChorusAddRoutingPolicyStore = defineStore(
       return Array.from(usersSet).sort();
     });
 
+    const isBlockOnly = computed(
+      () => state.isBlocked && !state.selectedToStorage,
+    );
+
     async function initAddRoutingPolicyPage() {
       state.isLoading = true;
       state.hasError = false;
@@ -104,6 +108,12 @@ export const useChorusAddRoutingPolicyStore = defineStore(
         required: helpers.withMessage(
           'userSelectionRequired',
           (value: string | null) => !!value,
+        ),
+      },
+      selectedToStorage: {
+        required: helpers.withMessage(
+          'storageSelectionRequired',
+          (value: ChorusStorage | null) => state.isBlocked || !!value,
         ),
       },
       bucketName: {
@@ -144,6 +154,23 @@ export const useChorusAddRoutingPolicyStore = defineStore(
 
     const validator = useVuelidate(validationRules, state);
 
+    /*
+     * There are three different situations possible when creating a routing
+     * policy.
+     *
+     * 1. Routing policy only: it will be sent to '/routing/add'
+     * (addRoutingPolicy).
+     * Required properties: storage and user, optional: bucket.
+     *
+     * 2. Routing policy + blocked route: it will be sent to '/routing/add'
+     * (addRoutingPolicy) for creation and to '/routing/block'
+     * (blockRoutingPolicy) for blocking it.
+     * Creation, required properties: storage and user, optional: bucket.
+     * Block, required properties: user, optional: bucket.
+     *
+     * 3. Block only: it will be sent to '/routing/block' (blockRoutingPolicy).
+     * Required properties: user, optional: bucket.
+     */
     async function addRoutingPolicy() {
       const {
         selectedToStorage,
@@ -153,14 +180,27 @@ export const useChorusAddRoutingPolicyStore = defineStore(
         isBlocked,
       } = state;
 
-      if (!selectedUser || (!bucketName && !isForAllBuckets)) {
+      // User selection required in all three cases
+      if (!selectedUser) return;
+
+      // Bucket selection is optional in all three cases
+      const bucket = isForAllBuckets ? null : bucketName;
+
+      // Use case 3: Blocked policy
+      if (isBlockOnly.value) {
+        await addBlock(selectedUser, bucket, false);
+
         return;
       }
 
+      // Use case 1: Routing policy
+      // Storage selection is required in case 1 + 2
+      if (!selectedToStorage) return;
+
       const addPolicyRequestData: RoutingPolicyAddRequest = {
         user: selectedUser,
-        bucket: isForAllBuckets ? null : bucketName,
-        toStorage: selectedToStorage?.name ?? null,
+        bucket,
+        toStorage: selectedToStorage.name,
       };
 
       try {
@@ -172,22 +212,36 @@ export const useChorusAddRoutingPolicyStore = defineStore(
         throw new Error(addReason);
       }
 
+      // Use case 2: Routing policy + block
       if (isBlocked) {
-        const editPolicyRequestData: RoutingPolicyEditRequest = {
-          user: selectedUser,
-          bucket: isForAllBuckets ? null : bucketName,
-        };
+        await addBlock(selectedUser, bucket, true);
+      }
+    }
 
-        try {
-          await ChorusService.blockRoutingPolicy(editPolicyRequestData);
-        } catch (blockError: unknown) {
+    async function addBlock(
+      user: string,
+      bucket: string | null,
+      rollbackCreation: boolean,
+    ) {
+      const editPolicyRequestData: RoutingPolicyEditRequest = {
+        user: user,
+        bucket: bucket,
+      };
+
+      const customErrorMsg = rollbackCreation
+        ? t('addRoutingPolicyBlockErrorUnknown')
+        : t('addBlockErrorUnknown');
+
+      try {
+        await ChorusService.blockRoutingPolicy(editPolicyRequestData);
+      } catch (blockError: unknown) {
+        if (rollbackCreation) {
           await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
-          const blockReason =
-            ErrorHelper.getReason(blockError) ||
-            t('addRoutingPolicyBlockErrorUnknown');
-
-          throw new Error(blockReason);
         }
+
+        const blockReason = ErrorHelper.getReason(blockError) || customErrorMsg;
+
+        throw new Error(blockReason);
       }
     }
 
@@ -201,6 +255,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
       initAddRoutingPolicyPage,
       addRoutingPolicy,
       users,
+      isBlockOnly,
       validator,
       $reset,
     };
