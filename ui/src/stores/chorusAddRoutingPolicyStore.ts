@@ -223,10 +223,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
       bucket: string | null,
       rollbackCreation: boolean,
     ) {
-      const editPolicyRequestData: RoutingPolicyEditRequest = {
-        user: user,
-        bucket: bucket,
-      };
+      const editPolicyRequestData: RoutingPolicyEditRequest = { user, bucket };
 
       const customErrorMsg = rollbackCreation
         ? t('addRoutingPolicyBlockErrorUnknown')
