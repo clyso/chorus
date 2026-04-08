@@ -188,9 +188,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
 
       // Use case 3: Blocked policy
       if (isBlockOnly.value) {
-        await addBlock(selectedUser, bucket, false);
-
-        return;
+        return addBlock(selectedUser, bucket, false);
       }
 
       // Use case 1: Routing policy
@@ -214,7 +212,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
 
       // Use case 2: Routing policy + block
       if (isBlocked) {
-        await addBlock(selectedUser, bucket, true);
+        return addBlock(selectedUser, bucket, true);
       }
     }
 
