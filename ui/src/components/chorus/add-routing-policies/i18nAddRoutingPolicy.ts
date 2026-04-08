@@ -81,6 +81,8 @@ export default <I18nMessages>{
       'An unknown error occurred while creating a blocked policy',
     addRoutingPolicyBlockErrorUnknown:
       'An unknown error occurred while blocking the newly created routing policy. The creation of the routing policy has been rolled back. You may want to try creating the routing policy first and blocking it in a separate step.',
+    addRoutingPolicyRollbackErrorUnknown:
+      'An unknown error occurred while rolling back the routing policy creation.',
   },
   [I18nLocale.DE]: {
     breadcrumbRoutingPolicies: 'Routing-Richtlinien',
@@ -150,5 +152,7 @@ export default <I18nMessages>{
       'Beim Erstellen einer Blockierung ist ein unbekannter Fehler aufgetreten.',
     addRoutingPolicyBlockErrorUnknown:
       'Beim Blockieren der neu erstellten Routing-Richtlinie ist ein unbekannter Fehler aufgetreten. Die Erstellung der Routing-Richtlinie wurde rückgängig gemacht. Sie können versuchen, die Routing-Richtlinie zunächst nur zu erstellen und sie in einem zweiten Schritt zu blockieren.',
+    addRoutingPolicyRollbackErrorUnknown:
+      'Beim Rückgängigmachen der erstellten Routing-Richtlinie ist ein unbekannter Fehler aufgetreten.',
   },
 };
