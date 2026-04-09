@@ -17,7 +17,7 @@
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
   import { storeToRefs } from 'pinia';
-  import { computed, unref } from 'vue';
+  import { computed } from 'vue';
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
   import { useChorusAddRoutingPolicyStore } from '@/stores/chorusAddRoutingPolicyStore';
   import ChorusStorageCard from '@/components/chorus/common/ChorusStorageCard/ChorusStorageCard.vue';
@@ -41,7 +41,7 @@
 
     if (!errors || errors.length === 0) return '';
 
-    return t(unref(errors[0]?.$message) || 'unknownValidationError');
+    return errors[0]?.$message || t('unknownValidationError');
   });
 
   function selectStorage(storage: ChorusStorage) {

@@ -23,7 +23,7 @@
     CSwitch,
     CFormField,
   } from '@clyso/clyso-ui-kit';
-  import { computed, unref } from 'vue';
+  import { computed } from 'vue';
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
   import { useChorusAddRoutingPolicyStore } from '@/stores/chorusAddRoutingPolicyStore';
 
@@ -48,7 +48,7 @@
 
     if (!errors || errors.length === 0) return '';
 
-    return t(unref(errors[0]?.$message) || 'bucketNameInvalid');
+    return errors[0]?.$message || t('bucketNameInvalid');
   });
 </script>
 
