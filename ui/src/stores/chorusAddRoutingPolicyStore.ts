@@ -227,14 +227,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
         await ChorusService.blockRoutingPolicy(editPolicyRequestData);
       } catch (blockError: unknown) {
         if (hasCreationRollback) {
-          try {
-            await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
-          } catch (deleteError: unknown) {
-            throw new Error(
-              ErrorHelper.getReason(deleteError) ||
-                t('addRoutingPolicyRollbackErrorUnknown'),
-            );
-          }
+          return handleCreationRollback(editPolicyRequestData);
         }
 
         const customBlockMsg = hasCreationRollback
@@ -242,6 +235,19 @@ export const useChorusAddRoutingPolicyStore = defineStore(
           : t('addBlockErrorUnknown');
 
         throw new Error(ErrorHelper.getReason(blockError) || customBlockMsg);
+      }
+    }
+
+    async function handleCreationRollback(
+      editPolicyRequestData: RoutingPolicyEditRequest,
+    ) {
+      try {
+        await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
+      } catch (deleteError: unknown) {
+        throw new Error(
+          ErrorHelper.getReason(deleteError) ||
+            t('addRoutingPolicyRollbackErrorUnknown'),
+        );
       }
     }
 
