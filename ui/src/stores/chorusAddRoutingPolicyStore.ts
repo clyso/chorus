@@ -219,14 +219,14 @@ export const useChorusAddRoutingPolicyStore = defineStore(
     async function addBlock(
       user: string,
       bucket: string | null,
-      rollbackCreation: boolean,
+      hasCreationRollback: boolean,
     ) {
       const editPolicyRequestData: RoutingPolicyEditRequest = { user, bucket };
 
       try {
         await ChorusService.blockRoutingPolicy(editPolicyRequestData);
       } catch (blockError: unknown) {
-        if (rollbackCreation) {
+        if (hasCreationRollback) {
           try {
             await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
           } catch (deleteError: unknown) {
@@ -237,7 +237,7 @@ export const useChorusAddRoutingPolicyStore = defineStore(
           }
         }
 
-        const customBlockMsg = rollbackCreation
+        const customBlockMsg = hasCreationRollback
           ? t('addBlockRollbackErrorUnknown')
           : t('addBlockErrorUnknown');
 
