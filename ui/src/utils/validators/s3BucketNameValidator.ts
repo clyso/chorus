@@ -16,73 +16,50 @@
 
 // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html#general-purpose-bucket-names
 // Field must be filled out
-export function isRequired(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets) return true;
-
+export function isRequired(val: string | null): boolean {
   if (!val) return false;
 
   return val.trim() !== '';
 }
 
 // Length must be between 3 and 63 characters
-export function isValidLength(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets || !val) return true;
+export function isValidLength(val: string | null): boolean {
+  if (!val) return true;
 
   return val.length >= 3 && val.length <= 63;
 }
 
 // Can only contain lowercase letters, numbers, dots, and hyphens
-export function hasValidChars(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets || !val) return true;
+export function hasValidChars(val: string | null): boolean {
+  if (!val) return true;
 
   return /^[a-z0-9.-]+$/.test(val);
 }
 
 // Must begin and end with a letter or number
-export function hasValidStartEnd(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets || !val) return true;
+export function hasValidStartEnd(val: string | null): boolean {
+  if (!val) return true;
 
   return /^[a-z0-9]/.test(val) && /[a-z0-9]$/.test(val);
 }
 
 // Must not contain two adjacent periods
-export function hasNoAdjacentPeriods(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets || !val) return true;
+export function hasNoAdjacentPeriods(val: string | null): boolean {
+  if (!val) return true;
 
   return !/\.\./.test(val);
 }
 
 // Must not be formatted as an IP address (e.g., 192.168.5.4)
-export function isNotIpAddress(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets || !val) return true;
+export function isNotIpAddress(val: string | null): boolean {
+  if (!val) return true;
 
   return !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(val);
 }
 
 // AWS specific prefix/suffix restrictions
-export function hasValidPrefixSuffix(
-  isForAllBuckets: boolean,
-  val: string | null,
-): boolean {
-  if (isForAllBuckets || !val) return true;
+export function hasValidPrefixSuffix(val: string | null): boolean {
+  if (!val) return true;
 
   if (
     val.startsWith('xn--') ||

@@ -119,35 +119,37 @@ export const useChorusAddRoutingPolicyStore = defineStore(
       bucketName: {
         required: helpers.withMessage(
           'bucketNameRequired',
-          (value: string | null) => isRequired(state.isForAllBuckets, value),
+          (value: string | null) => state.isForAllBuckets || isRequired(value),
         ),
         validLength: helpers.withMessage(
           'bucketErrLength',
-          (value: string | null) => isValidLength(state.isForAllBuckets, value),
+          (value: string | null) =>
+            state.isForAllBuckets || isValidLength(value),
         ),
         validChars: helpers.withMessage(
           'bucketErrChars',
-          (value: string | null) => hasValidChars(state.isForAllBuckets, value),
+          (value: string | null) =>
+            state.isForAllBuckets || hasValidChars(value),
         ),
         validStartEnd: helpers.withMessage(
           'bucketErrStartEnd',
           (value: string | null) =>
-            hasValidStartEnd(state.isForAllBuckets, value),
+            state.isForAllBuckets || hasValidStartEnd(value),
         ),
         noAdjacentPeriods: helpers.withMessage(
           'bucketErrAdjacentPeriods',
           (value: string | null) =>
-            hasNoAdjacentPeriods(state.isForAllBuckets, value),
+            state.isForAllBuckets || hasNoAdjacentPeriods(value),
         ),
         notIpAddress: helpers.withMessage(
           'bucketErrIpAddress',
           (value: string | null) =>
-            isNotIpAddress(state.isForAllBuckets, value),
+            state.isForAllBuckets || isNotIpAddress(value),
         ),
         validPrefixSuffix: helpers.withMessage(
           'bucketErrPrefixSuffix',
           (value: string | null) =>
-            hasValidPrefixSuffix(state.isForAllBuckets, value),
+            state.isForAllBuckets || hasValidPrefixSuffix(value),
         ),
       },
     }));
