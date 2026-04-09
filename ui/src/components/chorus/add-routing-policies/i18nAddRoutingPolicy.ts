@@ -73,16 +73,16 @@ export default <I18nMessages>{
       'Routing Policy has been created successfully.',
     addRoutingPolicyErrorTitle: 'Routing Policy not created!',
     addRoutingPolicyErrorContent:
-      'An error occurred while creating the routing policy.',
+      'An error occurred while creating the routing policy:',
     addErrorAction: 'Retry',
     addRoutingPolicyErrorUnknown:
       'An unknown error occurred while creating the routing policy.',
     addBlockErrorUnknown:
       'An unknown error occurred while creating a blocked policy',
-    addRoutingPolicyBlockErrorUnknown:
-      'An unknown error occurred while blocking the newly created routing policy. The creation of the routing policy has been rolled back. You may want to try creating the routing policy first and blocking it in a separate step.',
+    addBlockRollbackErrorUnknown:
+      'Blocking the newly created routing policy failed. The routing policy creation has been rolled back. You can retry, or create the routing policy without blocking and block it separately afterwards.',
     addRoutingPolicyRollbackErrorUnknown:
-      'An unknown error occurred while rolling back the routing policy creation.',
+      'Blocking the newly created routing policy failed, and rolling back the creation also failed. The routing policy was created but is not blocked. Please block it manually.',
   },
   [I18nLocale.DE]: {
     breadcrumbRoutingPolicies: 'Routing-Richtlinien',
@@ -141,18 +141,18 @@ export default <I18nMessages>{
     summaryStatusAllowed: 'Zugelassen',
     addRoutingPolicySuccessTitle: 'Routing-Richtlinie erstellt!',
     addRoutingPolicySuccessContent:
-      'Routing-Richtlinie wurde erfoldgreich erstellt.',
+      'Routing-Richtlinie wurde erfolgreich erstellt.',
     addRoutingPolicyErrorTitle: 'Routing-Richtlinie nicht erstellt!',
     addRoutingPolicyErrorContent:
-      'Beim Erstellen der Routing-Richtlinie ist ein Fehler aufgetreten.',
+      'Beim Erstellen der Routing-Richtlinie ist ein Fehler aufgetreten:',
     addErrorAction: 'Erneut versuchen',
     addRoutingPolicyErrorUnknown:
       'Beim Erstellen der Routing-Richtlinie ist ein unbekannter Fehler aufgetreten.',
     addBlockErrorUnknown:
       'Beim Erstellen einer Blockierung ist ein unbekannter Fehler aufgetreten.',
-    addRoutingPolicyBlockErrorUnknown:
-      'Beim Blockieren der neu erstellten Routing-Richtlinie ist ein unbekannter Fehler aufgetreten. Die Erstellung der Routing-Richtlinie wurde rückgängig gemacht. Sie können versuchen, die Routing-Richtlinie zunächst nur zu erstellen und sie in einem zweiten Schritt zu blockieren.',
+    addBlockRollbackErrorUnknown:
+      'Das Blockieren der neu erstellten Routing-Richtlinie ist fehlgeschlagen. Die Erstellung der Routing-Richtlinie wurde rückgängig gemacht. Sie können den Vorgang wiederholen oder die Routing-Richtlinie zunächst ohne Blockierung erstellen und sie anschließend separat blockieren.',
     addRoutingPolicyRollbackErrorUnknown:
-      'Beim Rückgängigmachen der erstellten Routing-Richtlinie ist ein unbekannter Fehler aufgetreten.',
+      'Das Blockieren der neu erstellten Routing-Richtlinie ist fehlgeschlagen, und das Rückgängigmachen der Erstellung ist ebenfalls fehlgeschlagen. Die Routing-Richtlinie wurde erstellt, ist jedoch nicht blockiert. Bitte blockieren Sie sie manuell.',
   },
 };
