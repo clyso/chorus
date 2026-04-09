@@ -106,48 +106,48 @@ export const useChorusAddRoutingPolicyStore = defineStore(
     const validationRules = computed(() => ({
       selectedUser: {
         required: helpers.withMessage(
-          'userSelectionRequired',
+          t('userSelectionRequired'),
           (value: string | null) => !!value,
         ),
       },
       selectedToStorage: {
         required: helpers.withMessage(
-          'storageSelectionRequired',
+          t('storageSelectionRequired'),
           (value: ChorusStorage | null) => state.isBlocked || !!value,
         ),
       },
       bucketName: {
         required: helpers.withMessage(
-          'bucketNameRequired',
+          t('bucketNameRequired'),
           (value: string | null) => state.isForAllBuckets || isRequired(value),
         ),
         validLength: helpers.withMessage(
-          'bucketErrLength',
+          t('bucketErrLength'),
           (value: string | null) =>
             state.isForAllBuckets || isValidLength(value),
         ),
         validChars: helpers.withMessage(
-          'bucketErrChars',
+          t('bucketErrChars'),
           (value: string | null) =>
             state.isForAllBuckets || hasValidChars(value),
         ),
         validStartEnd: helpers.withMessage(
-          'bucketErrStartEnd',
+          t('bucketErrStartEnd'),
           (value: string | null) =>
             state.isForAllBuckets || hasValidStartEnd(value),
         ),
         noAdjacentPeriods: helpers.withMessage(
-          'bucketErrAdjacentPeriods',
+          t('bucketErrAdjacentPeriods'),
           (value: string | null) =>
             state.isForAllBuckets || hasNoAdjacentPeriods(value),
         ),
         notIpAddress: helpers.withMessage(
-          'bucketErrIpAddress',
+          t('bucketErrIpAddress'),
           (value: string | null) =>
             state.isForAllBuckets || isNotIpAddress(value),
         ),
         validPrefixSuffix: helpers.withMessage(
-          'bucketErrPrefixSuffix',
+          t('bucketErrPrefixSuffix'),
           (value: string | null) =>
             state.isForAllBuckets || hasValidPrefixSuffix(value),
         ),
