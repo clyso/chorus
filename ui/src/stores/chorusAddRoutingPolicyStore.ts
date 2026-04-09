@@ -223,20 +223,25 @@ export const useChorusAddRoutingPolicyStore = defineStore(
     ) {
       const editPolicyRequestData: RoutingPolicyEditRequest = { user, bucket };
 
-      const customErrorMsg = rollbackCreation
-        ? t('addRoutingPolicyBlockErrorUnknown')
-        : t('addBlockErrorUnknown');
-
       try {
         await ChorusService.blockRoutingPolicy(editPolicyRequestData);
       } catch (blockError: unknown) {
         if (rollbackCreation) {
-          await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
+          try {
+            await ChorusService.deleteRoutingPolicy(editPolicyRequestData);
+          } catch (deleteError: unknown) {
+            throw new Error(
+              ErrorHelper.getReason(deleteError) ||
+                t('addRoutingPolicyRollbackErrorUnknown'),
+            );
+          }
         }
 
-        const blockReason = ErrorHelper.getReason(blockError) || customErrorMsg;
+        const customBlockMsg = rollbackCreation
+          ? t('addBlockRollbackErrorUnknown')
+          : t('addBlockErrorUnknown');
 
-        throw new Error(blockReason);
+        throw new Error(ErrorHelper.getReason(blockError) || customBlockMsg);
       }
     }
 

@@ -64,8 +64,13 @@
         content: () =>
           h('div', [
             t('addRoutingPolicyErrorContent'),
-            ' -> ',
-            error as string,
+            h('br'),
+            h('br'),
+            h(
+              'span',
+              { style: 'white-space: pre-wrap' },
+              error instanceof Error ? error.message : String(error),
+            ),
           ]),
       });
     }
