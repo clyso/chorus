@@ -40,40 +40,47 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
+// Proxy HTTP metrics are registered at package init so ProxyMiddleware
+// can be applied more than once — once per configured storage type
+// (S3, Swift, …). Registering inside the closure panicked with
+// "duplicate metrics collector registration attempted" the second time
+// the middleware was wired up.
+var (
+	proxyTotalRequests = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "proxy_requests_total",
+			Help: "Number of requests to chorus s3 proxy.",
+		},
+		[]string{"method"},
+	)
+
+	proxyResponseStatus = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "proxy_response_status",
+			Help: "Status of chorus s3 proxy response.",
+		},
+		[]string{"status"},
+	)
+
+	proxyHTTPDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "proxy_response_time_seconds",
+		Help:    "Duration of chorus s3 proxy requests.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"method"})
+)
+
 func ProxyMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		var totalRequests = promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "proxy_requests_total",
-				Help: "Number of requests to chorus s3 proxy.",
-			},
-			[]string{"method"},
-		)
-
-		var responseStatus = promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "proxy_response_status",
-				Help: "Status of chorus s3 proxy response.",
-			},
-			[]string{"status"},
-		)
-
-		var httpDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "proxy_response_time_seconds",
-			Help:    "Duration of chorus s3 proxy requests.",
-			Buckets: prometheus.DefBuckets,
-		}, []string{"method"})
-
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			method := xctx.GetMethod(r.Context())
 
-			timer := prometheus.NewTimer(httpDuration.WithLabelValues(method.String()))
+			timer := prometheus.NewTimer(proxyHTTPDuration.WithLabelValues(method.String()))
 			rw := NewResponseWriter(w)
 			next.ServeHTTP(rw, r)
 			statusCode := rw.statusCode
 
-			responseStatus.WithLabelValues(strconv.Itoa(statusCode)).Inc()
-			totalRequests.WithLabelValues(method.String()).Inc()
+			proxyResponseStatus.WithLabelValues(strconv.Itoa(statusCode)).Inc()
+			proxyTotalRequests.WithLabelValues(method.String()).Inc()
 			timer.ObserveDuration()
 		})
 	}
