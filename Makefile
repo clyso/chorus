@@ -45,7 +45,7 @@ lint:
 
 .PHONY: vuln
 vuln:
-	go tool govulncheck ./...
+	./scripts/vuln-check.sh
 
 .PHONY: license-check
 license-check:

@@ -1,8 +1,9 @@
 package migration
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
-	"net/http/httputil"
 	"testing"
 
 	mclient "github.com/minio/minio-go/v7"
@@ -20,13 +21,29 @@ func Test_api_storages(t *testing.T) {
 	res, err := e.ChorusClient.GetStorages(tstCtx, &emptypb.Empty{})
 	r.NoError(err)
 	r.Len(res.Storages, 3)
+	r.EqualValues(pb.Storage_S3, res.Storages[0].Provider)
 	resp, err := http.Get(e.UrlHttpApi + "/storage")
 	r.NoError(err)
+	defer resp.Body.Close()
 	r.EqualValues(http.StatusOK, resp.StatusCode)
 	r.Positive(resp.ContentLength)
 
-	_, err = httputil.DumpResponse(resp, true)
+	body, err := io.ReadAll(resp.Body)
 	r.NoError(err)
+	t.Log(string(body))
+
+	var httpRes struct {
+		Storages []struct {
+			Name     string  `json:"name"`
+			Provider *string `json:"provider"`
+		} `json:"storages"`
+	}
+	r.NoError(json.Unmarshal(body, &httpRes))
+	r.Len(httpRes.Storages, 3)
+	for _, s := range httpRes.Storages {
+		r.NotNil(s.Provider, "provider field missing in HTTP JSON for storage %q — protojson omits zero-valued enums unless EmitUnpopulated is set", s.Name)
+		r.EqualValues("S3", *s.Provider)
+	}
 }
 
 func Test_api_proxy_creds(t *testing.T) {
