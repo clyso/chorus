@@ -30,6 +30,7 @@
   import i18nStorageDetails from '@/components/chorus/storage-details/i18nStorageDetails';
   import StorageGeneral from '@/components/chorus/storage-details/StorageGeneral/StorageGeneral.vue';
   import ChorusStorageProvider from '@/components/chorus/common/ChorusStorageProvider/ChorusStorageProvider.vue';
+  import CredentialsTile from '@/components/chorus/credentials/CredentialsTile/CredentialsTile.vue';
 
   const props = defineProps<{
     storageName: string;
@@ -113,6 +114,7 @@
       class="storage-details-page__content"
     >
       <StorageGeneral class="storage-details-page__general" />
+      <CredentialsTile class="storage-details-page__credentials" />
     </div>
   </CDashboardPage>
 </template>
