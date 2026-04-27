@@ -36,7 +36,7 @@
       class="replications-filters__list"
     >
       <CSkeleton
-        v-for="(_, index) in Array(5)"
+        v-for="(_, index) in Array(6)"
         :key="index"
         :height="34"
         :border-radius="4"
@@ -57,7 +57,7 @@
 
       <ReplicationsFilterByToStorage class="replications-filters__to-storage" />
 
-      <ReplicationsFilterByStatus class="replications-filters__bucket" />
+      <ReplicationsFilterByStatus class="replications-filters__status" />
     </div>
   </div>
 </template>
