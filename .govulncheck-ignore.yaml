@@ -1,0 +1,21 @@
+# Allowlist for `make vuln` (consumed by scripts/vuln-check.sh).
+#
+# Schema: bare YAML list. Each entry is required to have all three fields
+# below; key order within an entry is free.
+#
+#   id:     The Go vulnerability ID (GO-YYYY-NNNN).
+#   module: The exact module path the advisory targets. The scanner's
+#           "Found in:" must match this value — pinning the ID to a specific
+#           module prevents the entry from silently masking the same advisory
+#           if it ever surfaces against a different dependency.
+#   reason: Why we accept the vuln. Should usually start with
+#           "No fix available". When upstream ships a fix, the scanner stops
+#           reporting the ID and the wrapper flags this entry as stale,
+#           failing `make vuln` until it is removed.
+
+- id: GO-2026-4887
+  module: github.com/docker/docker
+  reason: "No fix available — Moby AuthZ plugin bypass on oversized request bodies. Pulled in only via testcontainers-go from test/env/components.go (test infra); not linked into product binaries."
+- id: GO-2026-4883
+  module: github.com/docker/docker
+  reason: "No fix available — Moby off-by-one error in plugin privilege validation. Pulled in only via testcontainers-go from test/env/components.go (test infra); not linked into product binaries."
