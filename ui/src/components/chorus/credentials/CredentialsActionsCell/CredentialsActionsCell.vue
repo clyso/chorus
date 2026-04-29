@@ -17,15 +17,20 @@
 <script setup lang="ts">
   import { CButton, CTooltip, CIcon } from '@clyso/clyso-ui-kit';
   import { useI18n } from 'vue-i18n';
+  import { storeToRefs } from 'pinia';
   import i18nCredentials from '../i18nCredentials';
+  import { RouteName } from '@/utils/types/router';
   import { IconName } from '@/utils/types/icon';
   import type { ChorusCredential } from '@/utils/types/chorus';
+  import { useChorusStorageDetailsStore } from '@/stores/chorusStorageDetailsStore';
 
   const { t } = useI18n({
     messages: i18nCredentials,
   });
 
-  defineProps<{
+  const { storage } = storeToRefs(useChorusStorageDetailsStore());
+
+  const props = defineProps<{
     credential: ChorusCredential;
   }>();
 </script>
@@ -33,18 +38,26 @@
 <template>
   <div class="credentials-actions-cell">
     <div class="actions-list">
-      <div class="actions-list__item actions-list__item--edit">
+      <div
+        v-if="storage"
+        class="actions-list__item actions-list__item--edit"
+      >
         <CTooltip :delay="1000">
           <template #trigger>
             <RouterLink
               :to="{
-                // name & params: TODO: add route name, once defined
+                name: RouteName.CHORUS_SET_CREDENTIAL,
+                params: {
+                  storageName: storage.name,
+                  alias: props.credential.alias,
+                },
               }"
             >
               <CButton
                 secondary
                 size="tiny"
                 type="primary"
+                tag="div"
               >
                 <template #icon>
                   <CIcon
