@@ -18,21 +18,13 @@ import { I18nLocale, type I18nMessages } from '@clyso/clyso-ui-kit';
 
 export default <I18nMessages>{
   [I18nLocale.EN]: {
-    credentialsTitle: 'Credentials',
-    columnUserAlias: 'User Alias',
-    columnAccessKey: 'Access Key',
-    columnActions: 'Actions',
-    filterByUserAliasPlaceholder: 'Filter by User Alias',
-    actionEdit: 'Edit',
-    addCredentialAction: 'Add Credential',
+    breadcrumbStorages: 'Storages',
+    breadcrumbAddCredential: 'Add Credential',
+    breadcrumbEditCredential: 'Edit Credential',
   },
   [I18nLocale.DE]: {
-    credentialsTitle: 'Zugangsdaten',
-    columnUserAlias: 'Benutzeralias',
-    columnAccessKey: 'Zugriffsschlüssel',
-    columnActions: 'Aktionen',
-    filterByUserAliasPlaceholder: 'Nach Benutzeralias filtern',
-    actionEdit: 'Bearbeiten',
-    addCredentialAction: 'Zugangsdaten hinzufügen',
+    breadcrumbStorages: 'Speicher',
+    breadcrumbAddCredential: 'Zugangsdaten hinzufügen',
+    breadcrumbEditCredential: 'Zugangsdaten bearbeiten',
   },
 };
