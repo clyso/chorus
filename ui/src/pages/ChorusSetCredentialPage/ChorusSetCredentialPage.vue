@@ -26,6 +26,7 @@
   import { RouteName } from '@/utils/types/router';
   import i18nSetCredential from '@/components/chorus/set-credential/i18nSetCredential';
   import { useChorusSetCredentialStore } from '@/stores/chorusSetCredentialStore';
+  import CredentialFormTile from '@/components/chorus/set-credential/CredentialFormTile/CredentialFormTile.vue';
 
   const props = defineProps<{
     storageName: string;
@@ -64,13 +65,19 @@
         <CBreadcrumbItem :is-active="true">
           {{
             isEditMode
-              ? t('breadcrumbEditCredential')
+              ? t('breadcrumbEditCredential', { alias: props.alias })
               : t('breadcrumbAddCredential')
           }}
         </CBreadcrumbItem>
       </CBreadcrumb>
     </template>
 
-    <!-- TODO: page content here-->
+    <CredentialFormTile />
   </CDashboardPage>
 </template>
+
+<style lang="scss" scoped>
+  .chorus-set-credential-page {
+    max-width: 600px;
+  }
+</style>
