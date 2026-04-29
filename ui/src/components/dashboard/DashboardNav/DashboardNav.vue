@@ -69,7 +69,8 @@
       if (tab.name === RouteName.CHORUS_STORAGES) {
         return (
           routeName.value === RouteName.CHORUS_STORAGES ||
-          routeName.value === RouteName.CHORUS_STORAGE_DETAILS
+          routeName.value === RouteName.CHORUS_STORAGE_DETAILS ||
+          routeName.value === RouteName.CHORUS_SET_CREDENTIAL
         );
       }
 
