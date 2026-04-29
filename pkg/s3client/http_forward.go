@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	mclient "github.com/minio/minio-go/v7"
@@ -61,8 +62,11 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		}
 	}()
 
-	// Parse bucket and object using the s3 package helper
-	bucket, object := s3.ParseBucketAndObject(req)
+	bucket := xctx.GetBucket(req.Context())
+	object := xctx.GetObject(req.Context())
+	if bucket == "" && object == "" {
+		bucket, object = s3.ParseBucketAndObject(req)
+	}
 
 	var newReq *http.Request
 	url := *req.URL
@@ -76,6 +80,11 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	}
 	url.OmitHost = false
 	url.ForceQuery = false
+	if xctx.GetVirtualHostStyle(req.Context()) {
+		if err = rewriteVirtualHostPath(&url, bucket); err != nil {
+			return nil, false, err
+		}
+	}
 
 	_, copyReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.CopyReq", xctx.GetMethod(req.Context()).String()))
 	var body io.Reader = http.NoBody
@@ -129,4 +138,21 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		return nil, false, err
 	}
 	return
+}
+
+func rewriteVirtualHostPath(u *url.URL, bucket string) error {
+	escapedPath := strings.TrimPrefix(u.EscapedPath(), "/")
+	rewrittenRawPath := "/" + url.PathEscape(bucket)
+	if escapedPath != "" {
+		rewrittenRawPath += "/" + escapedPath
+	}
+
+	rewrittenPath, err := url.PathUnescape(rewrittenRawPath)
+	if err != nil {
+		return err
+	}
+
+	u.Path = rewrittenPath
+	u.RawPath = rewrittenRawPath
+	return nil
 }

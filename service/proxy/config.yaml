@@ -1,4 +1,5 @@
 address: "http://localhost:9669" # Chorus proxy s3 api address
+virtual_hostname: "" # optional hostname or URL suffix for virtual-host-style buckets, e.g. s3.example.com
 port: 9669
 cors:
   enabled: false

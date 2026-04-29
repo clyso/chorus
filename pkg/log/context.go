@@ -125,6 +125,9 @@ func StartNew(from context.Context) (context.Context, context.CancelFunc) {
 	if u := xctx.GetUser(from); u != "" {
 		ctx = xctx.SetUser(ctx, u)
 	}
+	if v := xctx.GetVirtualHostStyle(from); v {
+		ctx = xctx.SetVirtualHostStyle(ctx, v)
+	}
 	if s := xctx.GetStorage(from); s != "" {
 		ctx = xctx.SetStorage(ctx, s)
 	}

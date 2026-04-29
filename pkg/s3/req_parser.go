@@ -18,12 +18,23 @@ package s3
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 )
 
-// ParseBucketAndObject extracts bucket and object from the request based on hostname and path
-// Returns bucket, object, and whether bucket was found in hostname (virtual host style)
+// ParseBucketAndObject extracts bucket and object from a request.
 func ParseBucketAndObject(r *http.Request) (bucket string, object string) {
+	bucket, object, _ = ParseBucketAndObjectForHost(r, "")
+	return
+}
+
+// ParseBucketAndObjectForHost extracts bucket and object from a request using an optional endpoint
+// address to resolve virtual-host-style bucket names.
+func ParseBucketAndObjectForHost(r *http.Request, endpointAddress string) (bucket string, object string, virtualHostStyle bool) {
+	if hostBucket := bucketFromHost(r.Host, endpointAddress); hostBucket != "" {
+		return hostBucket, strings.TrimPrefix(r.URL.Path, "/"), true
+	}
+
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	parts := strings.SplitN(path, "/", 2)
 	bucket = parts[0]
@@ -43,11 +54,16 @@ type ParseResult struct {
 	Object       string
 	ObjVersionID string
 	Method       Method
+	VirtualHost  bool
 }
 
 func ParseReq(r *http.Request) ParseResult {
+	return ParseReqForHost(r, "")
+}
+
+func ParseReqForHost(r *http.Request, endpointAddress string) ParseResult {
 	query := r.URL.Query()
-	bucket, object := ParseBucketAndObject(r)
+	bucket, object, virtualHost := ParseBucketAndObjectForHost(r, endpointAddress)
 	var method Method
 
 	switch {
@@ -124,7 +140,43 @@ func ParseReq(r *http.Request) ParseResult {
 		Object:       object,
 		Method:       method,
 		ObjVersionID: query.Get("versionId"),
+		VirtualHost:  virtualHost,
 	}
+}
+
+func bucketFromHost(reqHost, endpointAddress string) string {
+	endpointHost := normalizeHost(endpointAddress)
+	if endpointHost == "" {
+		return ""
+	}
+
+	host := normalizeHost(reqHost)
+	if host == "" || host == endpointHost {
+		return ""
+	}
+
+	suffix := "." + endpointHost
+	if !strings.HasSuffix(host, suffix) {
+		return ""
+	}
+
+	return strings.TrimSuffix(host, suffix)
+}
+
+func normalizeHost(in string) string {
+	if in == "" {
+		return ""
+	}
+	if !strings.Contains(in, "://") {
+		in = "http://" + in
+	}
+
+	u, err := url.Parse(in)
+	if err != nil {
+		return ""
+	}
+
+	return u.Hostname()
 }
 
 func routeObject(r *http.Request) Method {

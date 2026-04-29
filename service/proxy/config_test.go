@@ -70,4 +70,12 @@ auth:
 		r.NoError(err)
 		r.Equal("encryption-key!!", conf.Storage.DynamicCredentials.MasterPassword)
 	})
+
+	t.Run("CFG_VIRTUAL_HOSTNAME", func(t *testing.T) {
+		r := require.New(t)
+		t.Setenv("CFG_VIRTUAL_HOSTNAME", "s3.example.com")
+		conf, err := GetConfig(config.Reader(strings.NewReader(storagesOverride), "test"))
+		r.NoError(err)
+		r.Equal("s3.example.com", conf.VirtualHostname)
+	})
 }
