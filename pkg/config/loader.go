@@ -91,28 +91,36 @@ func setMapValue(m map[string]any, path []string, value string) bool {
 		return false
 	}
 
-	var foundKey string
-	for k := range m {
-		if strings.EqualFold(k, path[0]) {
-			foundKey = k
-			break
+	for width := len(path); width >= 1; width-- {
+		foundKey := findMatchingKey(m, strings.Join(path[:width], "_"))
+		if foundKey == "" {
+			continue
+		}
+
+		if width == len(path) {
+			m[foundKey] = convertToOriginalType(m[foundKey], value)
+			return true
+		}
+
+		nested, ok := m[foundKey].(map[string]any)
+		if !ok {
+			return false
+		}
+		if setMapValue(nested, path[width:], value) {
+			return true
 		}
 	}
 
-	if foundKey == "" {
-		return false
-	}
+	return false
+}
 
-	if len(path) == 1 {
-		m[foundKey] = convertToOriginalType(m[foundKey], value)
-		return true
+func findMatchingKey(m map[string]any, candidate string) string {
+	for k := range m {
+		if strings.EqualFold(k, candidate) {
+			return k
+		}
 	}
-
-	nested, ok := m[foundKey].(map[string]any)
-	if !ok {
-		return false
-	}
-	return setMapValue(nested, path[1:], value)
+	return ""
 }
 
 // convertToOriginalType converts value string to match the original value's type.

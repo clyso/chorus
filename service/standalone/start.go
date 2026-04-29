@@ -164,12 +164,13 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 
 	if conf.Proxy.Enabled {
 		proxyConf := proxy.Config{
-			Common:  conf.Common,
-			Auth:    conf.Proxy.Auth,
-			Port:    conf.Proxy.Port,
-			Address: conf.Proxy.Address,
-			Storage: conf.Proxy.Storage,
-			Cors:    conf.Proxy.Cors,
+			Common:          conf.Common,
+			Auth:            conf.Proxy.Auth,
+			Port:            conf.Proxy.Port,
+			Address:         conf.Proxy.Address,
+			VirtualHostname: conf.Proxy.VirtualHostname,
+			Storage:         conf.Proxy.Storage,
+			Cors:            conf.Proxy.Cors,
 		}
 		proxyConf.Redis = workerConf.Redis
 

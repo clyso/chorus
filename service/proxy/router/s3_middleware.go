@@ -26,10 +26,10 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func S3Middleware() func(next http.Handler) http.Handler {
+func S3Middleware(endpointAddress string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			res := s3.ParseReq(r)
+			res := s3.ParseReqForHost(r, endpointAddress)
 
 			ctx := r.Context()
 			ctx = log.WithBucket(ctx, res.Bucket)
@@ -37,6 +37,7 @@ func S3Middleware() func(next http.Handler) http.Handler {
 			ctx = log.WithMethod(ctx, res.Method)
 			ctx = log.WithObjVer(ctx, res.ObjVersionID)
 			ctx = log.WithFlow(ctx, xctx.Event)
+			ctx = xctx.SetVirtualHostStyle(ctx, res.VirtualHost)
 			if res.Method == s3.UndefinedMethod {
 				zerolog.Ctx(ctx).Warn().Str("request_url", r.Method+": "+r.URL.Path+"?"+r.URL.RawQuery).Msg("unable to define s3 method")
 			}

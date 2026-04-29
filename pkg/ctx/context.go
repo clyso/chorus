@@ -39,6 +39,7 @@ type userKey struct{}
 type routingPolicyKey struct{}
 type replicationsKey struct{}
 type inProgressZeroDowntimeKey struct{}
+type virtualHostStyleKey struct{}
 
 type Flow string
 
@@ -175,6 +176,15 @@ func SetUser(ctx context.Context, u string) context.Context {
 func GetUser(ctx context.Context) string {
 	k, _ := ctx.Value(userKey{}).(string)
 	return k
+}
+
+func SetVirtualHostStyle(ctx context.Context, in bool) context.Context {
+	return context.WithValue(ctx, virtualHostStyleKey{}, in)
+}
+
+func GetVirtualHostStyle(ctx context.Context) bool {
+	res, _ := ctx.Value(virtualHostStyleKey{}).(bool)
+	return res
 }
 
 func GetRoutingPolicy(ctx context.Context) string {

@@ -48,11 +48,12 @@ type Storage = objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]
 type Config struct {
 	config.Common `yaml:",inline,omitempty" mapstructure:",squash"`
 
-	Storage Storages     `yaml:"storage,omitempty"`
-	Auth    *auth.Config `yaml:"auth,omitempty"`
-	Port    int          `yaml:"port"`
-	Address string       `yaml:"address"`
-	Cors    *cors.Config `yaml:"cors"`
+	Storage         Storages     `yaml:"storage,omitempty"`
+	Auth            *auth.Config `yaml:"auth,omitempty"`
+	Port            int          `yaml:"port"`
+	Address         string       `yaml:"address"`
+	VirtualHostname string       `yaml:"virtual_hostname"`
+	Cors            *cors.Config `yaml:"cors"`
 }
 
 func (c *Config) Validate() error {

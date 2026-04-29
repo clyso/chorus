@@ -118,6 +118,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		proxyConfig.TraceMiddleware = trace.HttpMiddleware(tp)
 	}
 	if s3Conf := conf.Storage.S3Storages(); len(s3Conf) != 0 {
+		virtualHostname := conf.VirtualHostname
 		metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
 		credsConf, err := ProxyToCredsConf(conf.Storage)
 		if err != nil {
@@ -133,12 +134,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		}
 		routeSvc := router.NewS3Router(clientRegistry, verSvc, uploadSvc, limiter)
 		replSvc := replication.NewS3(queueSvc, verSvc, policySvc)
-		authCheck := auth.Middleware(conf.Auth, credsSvc)
+		authCheck := auth.Middleware(conf.Auth, credsSvc, virtualHostname)
 		proxyConfig.Storages[dom.S3] = router.StorageProxy{
 			Router:             routeSvc,
 			Replicator:         replSvc,
 			AuthMiddleware:     authCheck.Wrap,
-			ReqParseMiddleware: router.S3Middleware(),
+			ReqParseMiddleware: router.S3Middleware(virtualHostname),
 		}
 		logger.Info().Msg("s3 proxy configured")
 	}
