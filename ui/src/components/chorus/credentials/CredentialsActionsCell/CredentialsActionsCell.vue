@@ -16,16 +16,18 @@
 
 <script setup lang="ts">
   import { CButton, CTooltip, CIcon } from '@clyso/clyso-ui-kit';
-  import { storeToRefs } from 'pinia';
   import { useI18n } from 'vue-i18n';
   import i18nCredentials from '../i18nCredentials';
-  import { useChorusStorageDetailsStore } from '@/stores/chorusStorageDetailsStore';
+  import { IconName } from '@/utils/types/icon';
+  import type { ChorusCredential } from '@/utils/types/chorus';
 
   const { t } = useI18n({
     messages: i18nCredentials,
   });
 
-  const { storage } = storeToRefs(useChorusStorageDetailsStore());
+  defineProps<{
+    credential: ChorusCredential;
+  }>();
 </script>
 
 <template>
@@ -43,12 +45,11 @@
                 secondary
                 size="tiny"
                 type="primary"
-                :loading="!storage"
               >
                 <template #icon>
                   <CIcon
                     :is-inline="true"
-                    name="base-create"
+                    :name="IconName.BASE_CREATE"
                   />
                 </template>
               </CButton>

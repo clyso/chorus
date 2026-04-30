@@ -33,11 +33,10 @@ interface ChorusStorageDetailsState {
   hasError: boolean;
   storage: ChorusStorage | null;
 
-  credentialsList: ChorusCredential[];
   credentialsSorter: DataTableSortState | null;
   credentialsPage: number;
   credentialsPageSize: number;
-  credentialsFilterAlias: string[];
+  credentialsFilterAliases: string[];
 }
 
 function getInitialState(): ChorusStorageDetailsState {
@@ -46,11 +45,10 @@ function getInitialState(): ChorusStorageDetailsState {
     hasError: false,
     storage: null,
 
-    credentialsList: [],
     credentialsSorter: null,
     credentialsPage: 1,
     credentialsPageSize: CREDENTIALS_PAGE_SIZES[0],
-    credentialsFilterAlias: [],
+    credentialsFilterAliases: [],
   };
 }
 
@@ -72,8 +70,8 @@ export const useChorusStorageDetailsStore = defineStore(
 
         if (state.storage === null) {
           router.push({ name: RouteName.CHORUS_STORAGES });
-        } else {
-          state.credentialsList = state.storage.credentials;
+
+          return;
         }
       } catch {
         state.hasError = true;
@@ -82,17 +80,21 @@ export const useChorusStorageDetailsStore = defineStore(
       }
     }
 
+    const credentialsList = computed<ChorusCredential[]>(
+      () => state.storage?.credentials ?? [],
+    );
+
     const filteredCredentials = computed<ChorusCredential[]>(() =>
-      state.credentialsList.filter((credential) => {
+      credentialsList.value.filter((credential) => {
         return (
-          !state.credentialsFilterAlias.length ||
-          state.credentialsFilterAlias.includes(credential.alias)
+          !state.credentialsFilterAliases.length ||
+          state.credentialsFilterAliases.includes(credential.alias)
         );
       }),
     );
 
     const isCredentialsFiltered = computed<boolean>(
-      () => state.credentialsFilterAlias.length !== 0,
+      () => state.credentialsFilterAliases.length !== 0,
     );
 
     const computedCredentials = computed<ChorusCredential[]>(() => {
@@ -125,7 +127,7 @@ export const useChorusStorageDetailsStore = defineStore(
         }
 
         if (isCredentialsFiltered.value) {
-          return `Filtered: ${filteredCredentials.value.length} / Total: ${state.credentialsList.length}`;
+          return `Filtered: ${filteredCredentials.value.length} / Total: ${credentialsList.value.length}`;
         }
 
         return `Total: ${itemCount}`;
@@ -138,6 +140,7 @@ export const useChorusStorageDetailsStore = defineStore(
 
     return {
       ...toRefs(state),
+      credentialsList,
       initStorageDetails,
       computedCredentials,
       credentialsPagination,

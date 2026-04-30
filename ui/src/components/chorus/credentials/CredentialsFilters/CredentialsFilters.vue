@@ -31,8 +31,7 @@
       class="credentials-filters__list"
     >
       <CSkeleton
-        v-for="(_, index) in Array(1)"
-        :key="index"
+        :key="0"
         :height="34"
         :border-radius="4"
       />

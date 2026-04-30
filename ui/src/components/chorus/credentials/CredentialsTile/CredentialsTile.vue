@@ -45,9 +45,5 @@
     &__filters {
       margin-bottom: utils.unit(6);
     }
-
-    &__actions {
-      margin-bottom: utils.unit(4);
-    }
   }
 </style>
