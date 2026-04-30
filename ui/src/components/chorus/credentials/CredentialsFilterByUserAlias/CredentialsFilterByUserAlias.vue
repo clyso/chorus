@@ -26,7 +26,7 @@
     messages: i18nCredentials,
   });
 
-  const { credentialsList, credentialsFilterAlias, credentialsPage } =
+  const { credentialsList, credentialsFilterAliases, credentialsPage } =
     storeToRefs(useChorusStorageDetailsStore());
 
   const credentials = computed(() =>
@@ -36,7 +36,7 @@
 
 <template>
   <ChorusUserFilter
-    v-model:filterValue="credentialsFilterAlias"
+    v-model:filterValue="credentialsFilterAliases"
     :users="credentials"
     :placeholder="t('filterByUserAliasPlaceholder')"
     @update:filter-value="credentialsPage = 1"
