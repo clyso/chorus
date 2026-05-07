@@ -481,6 +481,10 @@ func (s *credsSvc) storeCred(ctx context.Context, storType dom.StorageType, stor
 	if _, err := tx.Exec(ctx); err != nil {
 		return fmt.Errorf("failed to set S3 credentials in redis: %w", err)
 	}
+	// sync local cache immediately so subsequent reads see the new credential
+	if err := s.sync(ctx); err != nil {
+		return fmt.Errorf("failed to sync credentials cache after update: %w", err)
+	}
 	return nil
 }
 
