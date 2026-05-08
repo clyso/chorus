@@ -43,6 +43,7 @@ func (s *svc) HandleObjectSync(ctx context.Context, t *asynq.Task) (err error) {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
+	ctx = log.WithUser(ctx, p.ID.User())
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 

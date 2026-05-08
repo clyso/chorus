@@ -42,6 +42,7 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 	ctx = log.WithBucket(ctx, p.Bucket)
 	ctx = log.WithObjName(ctx, p.Obj.Name)
+	ctx = log.WithUser(ctx, p.ID.User())
 	logger := zerolog.Ctx(ctx)
 	fromBucket, toBucket := p.ID.FromToBuckets(p.Bucket)
 

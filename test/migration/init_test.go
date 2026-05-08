@@ -35,6 +35,8 @@ func init() {
 	workerConf.Features.ACL = false
 	workerConf.Features.Tagging = false
 	workerConf.Log.Level = "warn"
+	workerConf.Metrics.Enabled = true
+	workerConf.Metrics.Port = 0
 
 	proxyConf, err = proxy.GetConfig()
 	if err != nil {
