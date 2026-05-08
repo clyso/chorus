@@ -83,62 +83,41 @@ func (s svc) WorkerInProgressBytesInc(ctx context.Context, bytes int64) {
 	if !s.enabled {
 		return
 	}
-	labels := prometheus.Labels{}
-	if flow := xctx.GetFlow(ctx); flow != "" {
-		labels["flow"] = string(flow)
-	}
-	if user := xctx.GetUser(ctx); user != "" {
-		labels["user"] = user
-	}
-	if bucket := xctx.GetBucket(ctx); bucket != "" {
-		labels["bucket"] = bucket
-	}
-	copyInProgressBytes.With(labels).Add(float64(bytes))
+	copyInProgressBytes.WithLabelValues(
+		string(xctx.GetFlow(ctx)),
+		xctx.GetUser(ctx),
+		xctx.GetBucket(ctx),
+	).Add(float64(bytes))
 }
 
 func (s svc) WorkerInProgressBytesDec(ctx context.Context, bytes int64) {
 	if !s.enabled {
 		return
 	}
-	labels := prometheus.Labels{}
-	if flow := xctx.GetFlow(ctx); flow != "" {
-		labels["flow"] = string(flow)
-	}
-	if user := xctx.GetUser(ctx); user != "" {
-		labels["user"] = user
-	}
-	if bucket := xctx.GetBucket(ctx); bucket != "" {
-		labels["bucket"] = bucket
-	}
-	copyInProgressBytes.With(labels).Sub(float64(bytes))
+	copyInProgressBytes.WithLabelValues(
+		string(xctx.GetFlow(ctx)),
+		xctx.GetUser(ctx),
+		xctx.GetBucket(ctx),
+	).Sub(float64(bytes))
 }
 
 func (s svc) Count(flow xctx.Flow, storage string, method string) {
 	if !s.enabled {
 		return
 	}
-	countRequests.With(prometheus.Labels{
-		"flow":    string(flow),
-		"storage": storage,
-		"method":  method}).Inc()
+	countRequests.WithLabelValues(string(flow), storage, method).Inc()
 }
 
 func (s svc) Upload(flow xctx.Flow, storage, bucket string, bytes int) {
 	if !s.enabled {
 		return
 	}
-	bytesUpload.With(prometheus.Labels{
-		"flow":    string(flow),
-		"storage": storage,
-		"bucket":  bucket}).Add(float64(bytes))
+	bytesUpload.WithLabelValues(string(flow), storage, bucket).Add(float64(bytes))
 }
 
 func (s svc) Download(flow xctx.Flow, storage, bucket string, bytes int) {
 	if !s.enabled {
 		return
 	}
-	bytesDownload.With(prometheus.Labels{
-		"flow":    string(flow),
-		"storage": storage,
-		"bucket":  bucket}).Add(float64(bytes))
+	bytesDownload.WithLabelValues(string(flow), storage, bucket).Add(float64(bytes))
 }

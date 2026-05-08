@@ -66,6 +66,8 @@ func (s *svc) HandleVersionedObjectMigration(ctx context.Context, t *asynq.Task)
 	if err := json.Unmarshal(t.Payload(), &migratePayload); err != nil {
 		return fmt.Errorf("unable to unmarshal payload: %w", err)
 	}
+	ctx = log.WithBucket(ctx, migratePayload.Bucket)
+	ctx = log.WithUser(ctx, migratePayload.ID.User())
 	logger := zerolog.Ctx(ctx)
 	// check rate limit before proceeding the task to avoid rollback in the middle of the operation
 	if err := s.limit.StorReq(ctx, migratePayload.ID.FromStorage()); err != nil {

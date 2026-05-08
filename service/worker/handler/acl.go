@@ -78,6 +78,7 @@ func (s *svc) HandleObjectACL(ctx context.Context, t *asynq.Task) error {
 	}
 	ctx = log.WithBucket(ctx, p.Object.Bucket)
 	ctx = log.WithObjName(ctx, p.Object.Name)
+	ctx = log.WithUser(ctx, p.ID.User())
 	_, toBucket := p.ID.FromToBuckets(p.Object.Bucket)
 	logger := zerolog.Ctx(ctx)
 	// acquire rate limits for source and destination storage before proceeding
