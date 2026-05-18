@@ -134,7 +134,7 @@ export const useChorusStorageDetailsStore = defineStore(
       },
     }));
 
-    async function $reset() {
+    function $reset() {
       Object.assign(state, getInitialState());
     }
 

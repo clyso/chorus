@@ -58,7 +58,7 @@ export const useChorusStoragesStore = defineStore('chorusStorages', () => {
     }
   }
 
-  async function $reset() {
+  function $reset() {
     Object.assign(state, getInitialState());
   }
 

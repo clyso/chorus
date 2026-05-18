@@ -295,7 +295,7 @@ export const useChorusAddReplicationStore = defineStore(
       });
     }
 
-    async function $reset() {
+    function $reset() {
       Object.assign(state, getInitialState());
       validator.value.$reset();
     }
