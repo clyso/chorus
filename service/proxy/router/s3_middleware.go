@@ -18,6 +18,8 @@ package router
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -26,10 +28,10 @@ import (
 	"github.com/clyso/chorus/pkg/s3"
 )
 
-func S3Middleware() func(next http.Handler) http.Handler {
+func S3Middleware(endpointAddress string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			res := s3.ParseReq(r)
+			res := s3.ParseReqForHost(r, endpointAddress)
 
 			ctx := r.Context()
 			ctx = log.WithBucket(ctx, res.Bucket)
@@ -37,10 +39,34 @@ func S3Middleware() func(next http.Handler) http.Handler {
 			ctx = log.WithMethod(ctx, res.Method)
 			ctx = log.WithObjVer(ctx, res.ObjVersionID)
 			ctx = log.WithFlow(ctx, xctx.Event)
+			if res.VirtualHost {
+				if err := rewriteVirtualHostPath(r.URL, res.Bucket); err != nil {
+					zerolog.Ctx(ctx).Err(err).Str("request_url", r.URL.String()).Msg("unable to rewrite virtual-host-style s3 request")
+					http.Error(w, "invalid virtual-host-style request", http.StatusBadRequest)
+					return
+				}
+			}
 			if res.Method == s3.UndefinedMethod {
 				zerolog.Ctx(ctx).Warn().Str("request_url", r.Method+": "+r.URL.Path+"?"+r.URL.RawQuery).Msg("unable to define s3 method")
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func rewriteVirtualHostPath(u *url.URL, bucket string) error {
+	escapedPath := strings.TrimPrefix(u.EscapedPath(), "/")
+	rewrittenRawPath := "/" + url.PathEscape(bucket)
+	if escapedPath != "" {
+		rewrittenRawPath += "/" + escapedPath
+	}
+
+	rewrittenPath, err := url.PathUnescape(rewrittenRawPath)
+	if err != nil {
+		return err
+	}
+
+	u.Path = rewrittenPath
+	u.RawPath = rewrittenRawPath
+	return nil
 }

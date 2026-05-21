@@ -104,7 +104,7 @@ func (m *middleware) doesSignatureV2Match(r *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	encodedResource, err = getResource(encodedResource, r.Host, nil)
+	encodedResource, err = getResource(encodedResource, r.Host, m.endpoint)
 	if err != nil {
 		return "", err
 	}
@@ -275,12 +275,17 @@ func unescapeQueries(encodedQuery string) (unescapedQueries []string, err error)
 }
 
 // Returns "/bucketName/objectName" for path-style or virtual-host-style requests.
-func getResource(path string, _ string, domains []string) (string, error) {
-	if len(domains) == 0 {
-		return path, nil
+func getResource(path string, host string, endpointAddress string) (string, error) {
+	if bucket, _, virtualHost := s3.ParseBucketAndObjectForHost(&http.Request{
+		Host: host,
+		URL:  &url.URL{Path: path},
+	}, endpointAddress); virtualHost {
+		if path == "/" || path == "" {
+			return "/" + bucket, nil
+		}
+
+		return "/" + bucket + "/" + strings.TrimPrefix(path, "/"), nil
 	}
 
-	// If virtual-host-style is enabled construct the "resource" properly.
-	// todo: support virtual host
 	return path, nil
 }

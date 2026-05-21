@@ -133,12 +133,12 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		}
 		routeSvc := router.NewS3Router(clientRegistry, verSvc, uploadSvc, limiter)
 		replSvc := replication.NewS3(queueSvc, verSvc, policySvc)
-		authCheck := auth.Middleware(conf.Auth, credsSvc)
+		authCheck := auth.Middleware(conf.Auth, credsSvc, conf.Address)
 		proxyConfig.Storages[dom.S3] = router.StorageProxy{
 			Router:             routeSvc,
 			Replicator:         replSvc,
 			AuthMiddleware:     authCheck.Wrap,
-			ReqParseMiddleware: router.S3Middleware(),
+			ReqParseMiddleware: router.S3Middleware(conf.Address),
 		}
 		logger.Info().Msg("s3 proxy configured")
 	}

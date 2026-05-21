@@ -98,7 +98,6 @@ func setMapValue(m map[string]any, path []string, value string) bool {
 			break
 		}
 	}
-
 	if foundKey == "" {
 		return false
 	}
