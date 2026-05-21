@@ -61,8 +61,11 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 		}
 	}()
 
-	// Parse bucket and object using the s3 package helper
-	bucket, object := s3.ParseBucketAndObject(req)
+	bucket := xctx.GetBucket(req.Context())
+	object := xctx.GetObject(req.Context())
+	if bucket == "" && object == "" {
+		bucket, object = s3.ParseBucketAndObject(req)
+	}
 
 	var newReq *http.Request
 	url := *req.URL

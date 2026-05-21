@@ -31,7 +31,7 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 )
 
-func Middleware(conf *Config, credsSvc objstore.CredsService) *middleware {
+func Middleware(conf *Config, credsSvc objstore.CredsService, endpointAddress string) *middleware {
 	custom := map[string]credMeta{}
 	for user, cred := range conf.Custom {
 		custom[cred.AccessKeyID] = credMeta{
@@ -44,6 +44,7 @@ func Middleware(conf *Config, credsSvc objstore.CredsService) *middleware {
 		custom:      custom,
 		storageName: conf.UseStorage,
 		credsSvc:    credsSvc,
+		endpoint:    endpointAddress,
 	}
 }
 
@@ -57,6 +58,7 @@ type middleware struct {
 	custom      map[string]credMeta
 	storageName string
 	credsSvc    objstore.CredsService
+	endpoint    string
 }
 
 func (m *middleware) Wrap(next http.Handler) http.Handler {

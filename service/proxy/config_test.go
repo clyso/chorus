@@ -70,4 +70,5 @@ auth:
 		r.NoError(err)
 		r.Equal("encryption-key!!", conf.Storage.DynamicCredentials.MasterPassword)
 	})
+
 }
