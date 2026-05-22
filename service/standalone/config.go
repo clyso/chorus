@@ -57,12 +57,12 @@ type Config struct {
 	UIPort int `yaml:"uiPort"`
 
 	Proxy struct {
-		Storage         proxy.Storages `yaml:"storage,omitempty"`
-		Enabled         bool           `yaml:"enabled"`
-		Auth            *auth.Config   `yaml:"auth,omitempty"`
-		Port            int            `yaml:"port"`
-		Address         string         `yaml:"address"`
-		Cors            *cors.Config   `yaml:"cors"`
+		Storage proxy.Storages `yaml:"storage,omitempty"`
+		Enabled bool           `yaml:"enabled"`
+		Auth    *auth.Config   `yaml:"auth,omitempty"`
+		Port    int            `yaml:"port"`
+		Address string         `yaml:"address"`
+		Cors    *cors.Config   `yaml:"cors"`
 	} `yaml:"proxy"`
 }
 
