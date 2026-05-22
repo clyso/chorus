@@ -276,10 +276,7 @@ func unescapeQueries(encodedQuery string) (unescapedQueries []string, err error)
 
 // Returns "/bucketName/objectName" for path-style or virtual-host-style requests.
 func getResource(path string, host string, endpointAddress string) (string, error) {
-	if bucket, _, virtualHost := s3.ParseBucketAndObjectForHost(&http.Request{
-		Host: host,
-		URL:  &url.URL{Path: path},
-	}, endpointAddress); virtualHost {
+	if bucket := s3.BucketFromHost(host, endpointAddress); bucket != "" {
 		if path == "/" || path == "" {
 			return "/" + bucket, nil
 		}
