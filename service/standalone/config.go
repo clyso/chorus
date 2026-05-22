@@ -62,7 +62,6 @@ type Config struct {
 		Auth            *auth.Config   `yaml:"auth,omitempty"`
 		Port            int            `yaml:"port"`
 		Address         string         `yaml:"address"`
-		VirtualHostname string         `yaml:"virtual_hostname"`
 		Cors            *cors.Config   `yaml:"cors"`
 	} `yaml:"proxy"`
 }

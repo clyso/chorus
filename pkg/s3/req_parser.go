@@ -31,7 +31,7 @@ func ParseBucketAndObject(r *http.Request) (bucket string, object string) {
 // ParseBucketAndObjectForHost extracts bucket and object from a request using an optional endpoint
 // address to resolve virtual-host-style bucket names.
 func ParseBucketAndObjectForHost(r *http.Request, endpointAddress string) (bucket string, object string, virtualHostStyle bool) {
-	if hostBucket := bucketFromHost(r.Host, endpointAddress); hostBucket != "" {
+	if hostBucket := BucketFromHost(r.Host, endpointAddress); hostBucket != "" {
 		return hostBucket, strings.TrimPrefix(r.URL.Path, "/"), true
 	}
 
@@ -144,7 +144,7 @@ func ParseReqForHost(r *http.Request, endpointAddress string) ParseResult {
 	}
 }
 
-func bucketFromHost(reqHost, endpointAddress string) string {
+func BucketFromHost(reqHost, endpointAddress string) string {
 	endpointHost := normalizeHost(endpointAddress)
 	if endpointHost == "" {
 		return ""
