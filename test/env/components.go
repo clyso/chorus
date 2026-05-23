@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -46,6 +47,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"golang.org/x/sync/errgroup"
 )
 
 func init() {
@@ -68,6 +70,7 @@ const (
 	CKeystoneAdminUsername            = "admin"
 	CKeystoneAdminPassword            = "password"
 	CKeystoneAdminDomainName          = "Default"
+	CKeystoneDefaultDomainID          = "default"
 	CKeystoneAdminTenantName          = "admin"
 	CkeystoneAdminRoleName            = "admin"
 	CKeystoneObjectStoreServiceType   = "object-store"
@@ -206,7 +209,14 @@ type ContainerPort struct {
 }
 
 type ComponentCreationConfig struct {
-	InstantiateFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
+	// startFunc creates and starts the component.
+	// For Docker containers: creates, starts, and waits for health check.
+	// For in-process components: fully starts and stores access config.
+	startFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
+	// readyFunc runs post-start setup (user creation, endpoint registration, etc.)
+	// and stores the final access config. Nil if no post-start work needed.
+	readyFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
+
 	Dependencies    []string
 	DisabledLogs    []string
 	HostAccessPorts []int
@@ -299,25 +309,113 @@ type CephRGWTemplateValues struct {
 type Terminator func(context.Context) error
 
 type TestEnvironment struct {
+	mu              sync.Mutex
 	creationConfigs map[string]ComponentCreationConfig
 	network         *testcontainers.DockerNetwork
 	accessConfigs   map[string]any
 	terminators     map[string]Terminator
+	containers      map[string]testcontainers.Container
+}
+
+// setContainer stores a Docker container reference and its terminator.
+// Safe for concurrent use from parallel startFuncs.
+func (r *TestEnvironment) setContainer(name string, c testcontainers.Container) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.containers[name] = c
+	r.terminators[name] = func(ctx context.Context) error {
+		return stopContainer(ctx, c)
+	}
+}
+
+// setTerminator stores a terminator for an in-process component.
+// Safe for concurrent use from parallel startFuncs.
+func (r *TestEnvironment) setTerminator(name string, t Terminator) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.terminators[name] = t
+}
+
+// setAccessConfig stores access configuration for a component.
+// Safe for concurrent use from parallel startFuncs.
+func (r *TestEnvironment) setAccessConfig(name string, cfg any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.accessConfigs[name] = cfg
 }
 
 func NewTestEnvironment(ctx context.Context, envConfig map[string]ComponentCreationConfig) (*TestEnvironment, error) {
+	// Validate that all declared dependencies exist in the config map.
+	for name, cfg := range envConfig {
+		for _, dep := range cfg.Dependencies {
+			if _, ok := envConfig[dep]; !ok {
+				return nil, fmt.Errorf("component %s depends on %s, which is not in the config", name, dep)
+			}
+		}
+	}
+
 	configLen := len(envConfig)
 	env := &TestEnvironment{
 		creationConfigs: envConfig,
 		accessConfigs:   make(map[string]any, configLen),
 		terminators:     make(map[string]Terminator, configLen),
+		containers:      make(map[string]testcontainers.Container, configLen),
 	}
 
-	for componentName, componentConfig := range envConfig {
-		if err := instantiate(ctx, env, componentName, &componentConfig); err != nil {
-			return nil, fmt.Errorf("unable to create component instance %s: %w", componentName, err)
+	// Ensure cleanup of any created containers/components on failure.
+	success := false
+	defer func() {
+		if !success {
+			_ = env.Terminate(context.Background())
+		}
+	}()
+
+	// Create network if any component needs Docker.
+	for _, cfg := range envConfig {
+		if cfg.Container {
+			net, err := vlan(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create env network: %w", err)
+			}
+			env.network = net
+			break
 		}
 	}
+
+	order := topoSort(envConfig)
+
+	// Phase 1: Start — all components in parallel.
+	// Docker containers: create, start, and wait for health check.
+	// In-process components: start instantly.
+	// Each goroutine stores its results via thread-safe env.set* methods.
+	g, gctx := errgroup.WithContext(ctx)
+	for _, name := range order {
+		cfg := envConfig[name]
+		if cfg.startFunc == nil {
+			continue
+		}
+		g.Go(func() error {
+			return cfg.startFunc(gctx, env, name, &cfg)
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	// Phase 2: Ready — topological order, sequential.
+	// Post-start setup: user/role creation, endpoint registration, access config storage.
+	// Runs after all containers are healthy. Topo order ensures dependencies are ready first.
+	for _, name := range order {
+		cfg := envConfig[name]
+		if cfg.readyFunc == nil {
+			continue
+		}
+		if err := cfg.readyFunc(ctx, env, name, &cfg); err != nil {
+			return nil, fmt.Errorf("unable to ready component %s: %w", name, err)
+		}
+	}
+
+	success = true
 
 	go func() {
 		<-ctx.Done()
@@ -428,8 +526,9 @@ func (r *TestEnvironment) GetCephAccessConfig(instanceName string) (*CephAccessC
 
 func AsMinio(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		InstantiateFunc: startMinioInstance,
-		Container:       true,
+		startFunc: startMinioContainer,
+		readyFunc: readyMinioInstance,
+		Container: true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -439,8 +538,9 @@ func AsMinio(opts ...ComponentOption) ComponentCreationConfig {
 
 func AsRedis(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		InstantiateFunc: startRedisInstance,
-		Container:       true,
+		startFunc: startRedisContainer,
+		readyFunc: readyRedisInstance,
+		Container: true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -450,7 +550,7 @@ func AsRedis(opts ...ComponentOption) ComponentCreationConfig {
 
 func AsMiniRedis(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		InstantiateFunc: startMiniRedisInstance,
+		startFunc: startMiniRedisInstance,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -460,7 +560,7 @@ func AsMiniRedis(opts ...ComponentOption) ComponentCreationConfig {
 
 func AsGoFakeS3(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		InstantiateFunc: startGoFakeS3instance,
+		startFunc: startGoFakeS3Instance,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -470,8 +570,9 @@ func AsGoFakeS3(opts ...ComponentOption) ComponentCreationConfig {
 
 func AsKeystone(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		InstantiateFunc: startKeystoneInstance,
-		Container:       true,
+		startFunc: startKeystoneContainer,
+		readyFunc: readyKeystoneInstance,
+		Container: true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -481,9 +582,10 @@ func AsKeystone(opts ...ComponentOption) ComponentCreationConfig {
 
 func AsSwift(keystoneInstance string, opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		Dependencies:    []string{keystoneInstance},
-		InstantiateFunc: startSwiftInstance,
-		Container:       true,
+		Dependencies: []string{keystoneInstance},
+		startFunc:    startSwiftContainer,
+		readyFunc:    readySwiftInstance,
+		Container:    true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -493,8 +595,9 @@ func AsSwift(keystoneInstance string, opts ...ComponentOption) ComponentCreation
 
 func AsCeph(opts ...ComponentOption) ComponentCreationConfig {
 	cfg := ComponentCreationConfig{
-		InstantiateFunc: startCephInstance,
-		Container:       true,
+		startFunc: startCephContainer,
+		readyFunc: readyCephInstance,
+		Container: true,
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -510,42 +613,95 @@ func vlan(ctx context.Context) (*testcontainers.DockerNetwork, error) {
 	return vlan, nil
 }
 
-func instantiate(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
-	if _, ok := env.terminators[componentName]; ok {
-		return nil
+// topoSort returns component names in dependency-first order.
+func topoSort(configs map[string]ComponentCreationConfig) []string {
+	visited := make(map[string]bool, len(configs))
+	order := make([]string, 0, len(configs))
+
+	var visit func(string)
+	visit = func(name string) {
+		if visited[name] {
+			return
+		}
+		visited[name] = true
+		cfg := configs[name]
+		for _, dep := range cfg.Dependencies {
+			visit(dep)
+		}
+		order = append(order, name)
 	}
 
-	if componentConfig.Container && env.network == nil {
-		vlan, err := vlan(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to create env network: %w", err)
-		}
-		env.network = vlan
+	for name := range configs {
+		visit(name)
 	}
 
-	for _, dependencyName := range componentConfig.Dependencies {
-		if _, ok := env.terminators[dependencyName]; ok {
-			continue
-		}
+	return order
+}
 
-		dependencyConfig, ok := env.creationConfigs[dependencyName]
-		if !ok {
-			return fmt.Errorf("unable to find config for dependency %s", dependencyName)
-		}
+// --- Swift ---
 
-		if err := instantiate(ctx, env, dependencyName, &dependencyConfig); err != nil {
-			return fmt.Errorf("unable to create dependency instance %s: %w", dependencyName, err)
-		}
+func startSwiftContainer(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	// Use Keystone's network alias (its component name) for inter-container communication.
+	// Docker DNS resolves this after both containers start on the same network.
+	keystoneAlias := componentConfig.Dependencies[0]
+
+	// Render proxy-server.conf using known constants + Keystone network alias.
+	swiftProxyConfig := SwiftProxyConfigTemplateValues{
+		AuthHost:         keystoneAlias,
+		AdminAuthPort:    CKeystoneAdminPort,
+		ExternalAuthPort: CKeystoneExternalPort,
+		AdminTenant:      CKeystoneServiceProjectName,
+		AdminDomain:      CKeystoneDefaultDomainID,
+		AdminUser:        CKeystoneSwiftUsername,
+		AdminPassword:    CKeystoneSwiftPassword,
+		OperatorRole:     CKeystoneSwiftOperatorRole,
+		ResellerRole:     CKeystoneSwiftResellerRole,
 	}
 
-	if err := componentConfig.InstantiateFunc(ctx, env, componentName, componentConfig); err != nil {
-		return fmt.Errorf("unable to create instance: %w", err)
+	swiftProxyTemplate, err := template.New("proxy-server.conf").Parse(proxyServerConf)
+	if err != nil {
+		return fmt.Errorf("unable to create swift proxy config template: %w", err)
 	}
 
+	templateBuffer := &bytes.Buffer{}
+	if err := swiftProxyTemplate.Execute(templateBuffer, &swiftProxyConfig); err != nil {
+		return fmt.Errorf("unable to create proxy config out of template: %w", err)
+	}
+
+	natPortString := fmt.Sprintf(CNATPortTemplate, CSwiftPort)
+	natPort := nat.Port(natPortString)
+	req := testcontainers.ContainerRequest{
+		Image:      CSwiftImage,
+		WaitingFor: wait.ForHTTP("/healthcheck").WithPort(natPort).WithStartupTimeout(5 * time.Minute),
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.AutoRemove = true
+		},
+		ExposedPorts: []string{natPortString},
+		Networks:     []string{env.network.Name},
+		Files: []testcontainers.ContainerFile{
+			{
+				Reader:            templateBuffer,
+				ContainerFilePath: "/etc/swift/proxy-server.conf",
+				FileMode:          0o777,
+			},
+		},
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
+			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
+		},
+	}
+
+	c, err := startContainer(ctx, req)
+	if err != nil {
+		return fmt.Errorf("unable to start swift container: %w", err)
+	}
+	env.setContainer(componentName, c)
 	return nil
 }
 
-func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+func readySwiftInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	c := env.containers[componentName]
+
 	keystoneEnv, err := env.GetKeystoneAccessConfig(componentConfig.Dependencies[0])
 	if err != nil {
 		return fmt.Errorf("unable to get keystone env: %w", err)
@@ -630,68 +786,19 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 		return fmt.Errorf("unable to create swift reseller role: %w", err)
 	}
 
-	swiftProxyConfig := SwiftProxyConfigTemplateValues{
-		AuthHost:         keystoneEnv.Host.NAT,
-		AdminAuthPort:    keystoneEnv.AdminPort.Exposed,
-		ExternalAuthPort: keystoneEnv.ExternalPort.Exposed,
-		AdminTenant:      keystoneEnv.ServiceProject.Name,
-		AdminDomain:      keystoneEnv.DefaultDomain.ID,
-		AdminUser:        swiftUser.Name,
-		AdminPassword:    CKeystoneSwiftPassword,
-		OperatorRole:     operatorRole.Name,
-		ResellerRole:     resellerRole.Name,
-	}
-
-	swiftProxyTemplate, err := template.New("proxy-server.conf").Parse(proxyServerConf)
-	if err != nil {
-		return fmt.Errorf("unable to create swift proxy config template: %w", err)
-	}
-
-	templateBuffer := &bytes.Buffer{}
-
-	if err := swiftProxyTemplate.Execute(templateBuffer, &swiftProxyConfig); err != nil {
-		return fmt.Errorf("unable to create proxy config out of template: %w", err)
-	}
-
-	natPortString := fmt.Sprintf(CNATPortTemplate, CSwiftPort)
-	natPort := nat.Port(natPortString)
-	req := testcontainers.ContainerRequest{
-		Image:      CSwiftImage,
-		WaitingFor: wait.ForHTTP("/healthcheck").WithPort(natPort).WithStartupTimeout(5 * time.Minute),
-		HostConfigModifier: func(hc *container.HostConfig) {
-			hc.AutoRemove = true
-		},
-		ExposedPorts: []string{natPortString},
-		Networks:     []string{env.network.Name},
-		Files: []testcontainers.ContainerFile{
-			{
-				Reader:            templateBuffer,
-				ContainerFilePath: "/etc/swift/proxy-server.conf",
-				FileMode:          0o777,
-			},
-		},
-		LogConsumerCfg: &testcontainers.LogConsumerConfig{
-			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
-			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
-		},
-	}
-
-	container, err := startContainer(ctx, req)
-	if err != nil {
-		return fmt.Errorf("unable to start swift container: %w", err)
-	}
-
-	containerIP, err := container.ContainerIP(ctx)
+	containerIP, err := c.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get swift host: %w", err)
 	}
 
-	containerHost, err := container.Host(ctx)
+	containerHost, err := c.Host(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get swift container host: %w", err)
 	}
 
-	forwardedPort, err := container.MappedPort(ctx, natPort)
+	natPortString := fmt.Sprintf(CNATPortTemplate, CSwiftPort)
+	natPort := nat.Port(natPortString)
+	forwardedPort, err := c.MappedPort(ctx, natPort)
 	if err != nil {
 		return fmt.Errorf("unable to get swift api forwarded port: %w", err)
 	}
@@ -738,17 +845,14 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 			ResellerRole: resellerRole,
 		},
 	}
-	env.terminators[componentName] = func(ctx context.Context) error {
-		return stopContainer(ctx, container)
-	}
-
 	return nil
 }
 
-func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+// --- Keystone ---
+
+func startKeystoneContainer(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	adminNATPortString := fmt.Sprintf(CNATPortTemplate, CKeystoneAdminPort)
 	externalNATPortString := fmt.Sprintf(CNATPortTemplate, CKeystoneExternalPort)
-	adminNATPort := nat.Port(adminNATPortString)
 	externalNATPort := nat.Port(externalNATPortString)
 	req := testcontainers.ContainerRequest{
 		Image:      CKeystoneImage,
@@ -763,35 +867,46 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 		},
 		ExposedPorts: []string{adminNATPortString, externalNATPortString},
 		Networks:     []string{env.network.Name},
+		NetworkAliases: map[string][]string{
+			env.network.Name: {componentName},
+		},
 		LogConsumerCfg: &testcontainers.LogConsumerConfig{
 			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
 			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
 		},
 	}
 
-	container, err := startContainer(ctx, req)
+	c, err := startContainer(ctx, req)
 	if err != nil {
 		return fmt.Errorf("unable to start keystone container: %w", err)
 	}
+	env.setContainer(componentName, c)
+	return nil
+}
 
-	containerIP, err := container.ContainerIP(ctx)
+func readyKeystoneInstance(ctx context.Context, env *TestEnvironment, componentName string, _ *ComponentCreationConfig) error {
+	c := env.containers[componentName]
+
+	containerIP, err := c.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get keystone host: %w", err)
 	}
 
-	containerHost, err := container.Host(ctx)
+	containerHost, err := c.Host(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get keystone container host: %w", err)
 	}
 
-	adminForwardedPort, err := container.MappedPort(ctx, adminNATPort)
+	adminNATPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CKeystoneAdminPort))
+	adminForwardedPort, err := c.MappedPort(ctx, adminNATPort)
 	if err != nil {
-		return fmt.Errorf("unable to get keystone api forwarded port: %w", err)
+		return fmt.Errorf("unable to get keystone admin forwarded port: %w", err)
 	}
 
-	externalForwardedPort, err := container.MappedPort(ctx, externalNATPort)
+	externalNATPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CKeystoneExternalPort))
+	externalForwardedPort, err := c.MappedPort(ctx, externalNATPort)
 	if err != nil {
-		return fmt.Errorf("unable to get keystone api forwarded port: %w", err)
+		return fmt.Errorf("unable to get keystone external forwarded port: %w", err)
 	}
 
 	providerClient, err := openstack.AuthenticatedClient(ctx, gophercloud.AuthOptions{
@@ -827,7 +942,7 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("unable to list roles: %w", err)
+		return fmt.Errorf("unable to list domains: %w", err)
 	}
 	if defaultDomain == nil {
 		return errors.New("unable to find admin domain")
@@ -860,14 +975,12 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 		TenantName:     CKeystoneAdminTenantName,
 		ServiceProject: serviceProject,
 	}
-	env.terminators[componentName] = func(ctx context.Context) error {
-		return stopContainer(ctx, container)
-	}
-
 	return nil
 }
 
-func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+// --- Redis ---
+
+func startRedisContainer(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	natPortString := fmt.Sprintf(CNATPortTemplate, CRedisPort)
 	natPort := nat.Port(natPortString)
 	req := testcontainers.ContainerRequest{
@@ -888,22 +1001,29 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 		},
 	}
 
-	container, err := startContainer(ctx, req)
+	c, err := startContainer(ctx, req)
 	if err != nil {
 		return fmt.Errorf("unable to start redis container: %w", err)
 	}
+	env.setContainer(componentName, c)
+	return nil
+}
 
-	containerIP, err := container.ContainerIP(ctx)
+func readyRedisInstance(ctx context.Context, env *TestEnvironment, componentName string, _ *ComponentCreationConfig) error {
+	c := env.containers[componentName]
+
+	containerIP, err := c.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get redis host: %w", err)
 	}
 
-	containerHost, err := container.Host(ctx)
+	containerHost, err := c.Host(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get redis container host: %w", err)
 	}
 
-	forwardedPort, err := container.MappedPort(ctx, natPort)
+	natPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CRedisPort))
+	forwardedPort, err := c.MappedPort(ctx, natPort)
 	if err != nil {
 		return fmt.Errorf("unable to get redis api forwarded port: %w", err)
 	}
@@ -919,14 +1039,12 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 		},
 		Password: CRedisPassword,
 	}
-	env.terminators[componentName] = func(ctx context.Context) error {
-		return stopContainer(ctx, container)
-	}
-
 	return nil
 }
 
-func startMiniRedisInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+// --- MiniRedis (in-process) ---
+
+func startMiniRedisInstance(ctx context.Context, env *TestEnvironment, componentName string, _ *ComponentCreationConfig) error {
 	miniRedis := miniredis.NewMiniRedis()
 	miniRedis.RequireAuth(CRedisPassword)
 
@@ -945,23 +1063,21 @@ func startMiniRedisInstance(ctx context.Context, env *TestEnvironment, component
 		return fmt.Errorf("unable to convert port string %s to int: %w", portString, err)
 	}
 
-	host := miniRedis.Host()
-
-	env.accessConfigs[componentName] = MiniRedisAccessConfig{
+	env.setAccessConfig(componentName, MiniRedisAccessConfig{
 		Port:     port,
-		Host:     host,
+		Host:     miniRedis.Host(),
 		Password: CRedisPassword,
-	}
-
-	env.terminators[componentName] = func(ctx context.Context) error {
+	})
+	env.setTerminator(componentName, func(ctx context.Context) error {
 		miniRedis.Close()
 		return nil
-	}
-
+	})
 	return nil
 }
 
-func startGoFakeS3instance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+// --- GoFakeS3 (in-process) ---
+
+func startGoFakeS3Instance(ctx context.Context, env *TestEnvironment, componentName string, _ *ComponentCreationConfig) error {
 	fakeS3Backend := s3mem.New()
 	fakeS3 := gofakes3.New(fakeS3Backend)
 	fakeS3Server := httptest.NewServer(fakeS3.Server())
@@ -976,26 +1092,25 @@ func startGoFakeS3instance(ctx context.Context, env *TestEnvironment, componentN
 		return fmt.Errorf("unable to convert port string %s to int: %w", portString, err)
 	}
 
-	env.accessConfigs[componentName] = GoFakeS3AccessConfig{
+	env.setAccessConfig(componentName, GoFakeS3AccessConfig{
 		Port:        port,
 		Host:        url.Host,
 		AccessToken: CGoFakeS3EC2AccessToken,
 		SecretToken: CGoFakeS3EC2SecretToken,
-	}
-
-	env.terminators[componentName] = func(ctx context.Context) error {
+	})
+	env.setTerminator(componentName, func(ctx context.Context) error {
 		fakeS3Server.Close()
 		return nil
-	}
-
+	})
 	return nil
 }
 
-func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+// --- Minio ---
+
+func startMinioContainer(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	s3NATPortString := fmt.Sprintf(CNATPortTemplate, CMinioS3Port)
 	s3NATPort := nat.Port(s3NATPortString)
 	managementNATPortString := fmt.Sprintf(CNATPortTemplate, CMinioManagementPort)
-	managementNATPort := nat.Port(managementNATPortString)
 	req := testcontainers.ContainerRequest{
 		Image:      CMinioImage,
 		WaitingFor: wait.ForHTTP("/minio/health/live").WithPort(s3NATPort),
@@ -1015,29 +1130,37 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 		},
 	}
 
-	container, err := startContainer(ctx, req)
+	c, err := startContainer(ctx, req)
 	if err != nil {
 		return fmt.Errorf("unable to start minio container: %w", err)
 	}
+	env.setContainer(componentName, c)
+	return nil
+}
 
-	containerIP, err := container.ContainerIP(ctx)
+func readyMinioInstance(ctx context.Context, env *TestEnvironment, componentName string, _ *ComponentCreationConfig) error {
+	c := env.containers[componentName]
+
+	containerIP, err := c.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get minio host: %w", err)
 	}
 
-	containerHost, err := container.Host(ctx)
+	containerHost, err := c.Host(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get minio container host: %w", err)
 	}
 
-	s3ForwardedPort, err := container.MappedPort(ctx, s3NATPort)
+	s3NATPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CMinioS3Port))
+	s3ForwardedPort, err := c.MappedPort(ctx, s3NATPort)
 	if err != nil {
-		return fmt.Errorf("unable to get minio api forwarded port: %w", err)
+		return fmt.Errorf("unable to get minio s3 forwarded port: %w", err)
 	}
 
-	managementForwardedPort, err := container.MappedPort(ctx, managementNATPort)
+	managementNATPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CMinioManagementPort))
+	managementForwardedPort, err := c.MappedPort(ctx, managementNATPort)
 	if err != nil {
-		return fmt.Errorf("unable to get minio api forwarded port: %w", err)
+		return fmt.Errorf("unable to get minio management forwarded port: %w", err)
 	}
 
 	env.accessConfigs[componentName] = MinioAccessConfig{
@@ -1056,23 +1179,94 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 		User:     CMinioUsername,
 		Password: CMinioPassword,
 	}
-	env.terminators[componentName] = func(ctx context.Context) error {
-		return stopContainer(ctx, container)
-	}
-
 	return nil
 }
 
-func startCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
-	withKeystone := len(componentConfig.Dependencies) != 0
-	if withKeystone {
-		return startCephInstanceWithKeystone(ctx, env, componentName, componentConfig)
-	} else {
-		return startStandaloneCephInstance(ctx, env, componentName, componentConfig)
+// --- Ceph ---
+
+func startCephContainer(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	if len(componentConfig.Dependencies) != 0 {
+		return startCephContainerWithKeystone(ctx, env, componentName, componentConfig)
 	}
+	return startStandaloneCephContainer(ctx, env, componentName, componentConfig)
 }
 
-func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+func readyCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	if len(componentConfig.Dependencies) != 0 {
+		return readyCephInstanceWithKeystone(ctx, env, componentName, componentConfig)
+	}
+	return readyStandaloneCephInstance(ctx, env, componentName, componentConfig)
+}
+
+func startCephContainerWithKeystone(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	// Use Keystone's network alias (its component name) for inter-container communication.
+	keystoneAlias := componentConfig.Dependencies[0]
+
+	// Render ceph-keystone.conf using known constants + Keystone network alias.
+	cephRGWConfig := CephRGWTemplateValues{
+		WithKeystone:     true,
+		AuthHost:         keystoneAlias,
+		ExternalAuthPort: CKeystoneExternalPort,
+		AdminProject:     CKeystoneServiceProjectName,
+		AdminDomain:      CKeystoneAdminDomainName,
+		AdminUser:        CKeystoneCephUsername,
+		AdminPassword:    CKeystoneCephPassword,
+		OperatorRole:     CKeystoneCephOperatorRole,
+		ResellerRole:     CKeystoneCephResellerRole,
+	}
+
+	cephKeystoneTemplate, err := template.New("ceph-keystone.conf").Parse(cephKeystoneConf)
+	if err != nil {
+		return fmt.Errorf("unable to create ceph keystone config template: %w", err)
+	}
+
+	templateBuffer := &bytes.Buffer{}
+	if err := cephKeystoneTemplate.Execute(templateBuffer, &cephRGWConfig); err != nil {
+		return fmt.Errorf("unable to create keystone config out of template: %w", err)
+	}
+
+	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
+	apiNatPort := nat.Port(apiNatPortString)
+	req := testcontainers.ContainerRequest{
+		Image: CCephImage,
+		WaitingFor: wait.ForHTTP("/swift/v1").
+			WithStartupTimeout(5 * time.Minute).
+			WithPort(apiNatPort).
+			WithStatusCodeMatcher(func(status int) bool {
+				return status != http.StatusServiceUnavailable
+			}),
+		Env: map[string]string{
+			"CEPH_DEMO_UID":   CCephDemoUID,
+			"CEPH_EXTRA_CONF": templateBuffer.String(),
+		},
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.AutoRemove = true
+		},
+		HostAccessPorts: []int{CCephAPIPort},
+		ExposedPorts:    []string{apiNatPortString},
+		Networks:        []string{env.network.Name},
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
+			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
+		},
+	}
+
+	c, err := startContainer(ctx, req)
+	if err != nil {
+		return fmt.Errorf("unable to start ceph container: %w", err)
+	}
+	env.setContainer(componentName, c)
+	return nil
+}
+
+func readyCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	c := env.containers[componentName]
+
+	// Create system user via radosgw-admin.
+	if err := cephCreateSystemUser(ctx, c); err != nil {
+		return err
+	}
+
 	keystoneEnv, err := env.GetKeystoneAccessConfig(componentConfig.Dependencies[0])
 	if err != nil {
 		return fmt.Errorf("unable to get keystone env: %w", err)
@@ -1147,85 +1341,18 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		return fmt.Errorf("unable to create ceph reseller role: %w", err)
 	}
 
-	cephRGWConfig := CephRGWTemplateValues{
-		WithKeystone:     true,
-		AuthHost:         keystoneEnv.Host.NAT,
-		ExternalAuthPort: keystoneEnv.ExternalPort.Exposed,
-		AdminProject:     keystoneEnv.ServiceProject.Name,
-		AdminDomain:      keystoneEnv.DefaultDomain.Name,
-		AdminUser:        cephUser.Name,
-		AdminPassword:    CKeystoneCephPassword,
-		OperatorRole:     operatorRole.Name,
-		ResellerRole:     resellerRole.Name,
-	}
-
-	cephKeystoneTemplate, err := template.New("ceph-keystone.conf").Parse(cephKeystoneConf)
-	if err != nil {
-		return fmt.Errorf("unable to create ceph keystone config template: %w", err)
-	}
-
-	templateBuffer := &bytes.Buffer{}
-
-	if err := cephKeystoneTemplate.Execute(templateBuffer, &cephRGWConfig); err != nil {
-		return fmt.Errorf("unable to create keystone config out of template: %w", err)
-	}
-
-	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
-	apiNatPort := nat.Port(apiNatPortString)
-	req := testcontainers.ContainerRequest{
-		Image:      CCephImage,
-		WaitingFor: wait.ForHTTP("/").WithStartupTimeout(5 * time.Minute).WithPort(apiNatPort),
-		Env: map[string]string{
-			"CEPH_DEMO_UID":   CCephDemoUID,
-			"CEPH_EXTRA_CONF": templateBuffer.String(),
-		},
-		HostConfigModifier: func(hc *container.HostConfig) {
-			hc.AutoRemove = true
-		},
-		HostAccessPorts: []int{CCephAPIPort},
-		ExposedPorts:    []string{apiNatPortString},
-		Networks:        []string{env.network.Name},
-		LogConsumerCfg: &testcontainers.LogConsumerConfig{
-			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
-			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
-		},
-	}
-
-	container, err := startContainer(ctx, req)
-	if err != nil {
-		return fmt.Errorf("unable to start ceph container: %w", err)
-	}
-
-	retCode, outReader, err := container.Exec(ctx,
-		[]string{"radosgw-admin", "user", "create",
-			"--uid", CCephSystemUserUID,
-			"--display-name", CCephSystemUserDisplayName,
-			"--access-key", CCephSystemUserAccessToken,
-			"--secret-key", CCephSystemUserSecretToken,
-			"--system"})
-	if err != nil {
-		return fmt.Errorf("unable to execute command: %w", err)
-	}
-	if retCode != 0 {
-		outBytes, err := io.ReadAll(outReader)
-		if err != nil {
-			return fmt.Errorf("unable to read output: %w", err)
-		}
-		out := string(outBytes)
-		return fmt.Errorf("command exit code %d: %s", retCode, out)
-	}
-
-	containerIP, err := container.ContainerIP(ctx)
+	containerIP, err := c.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph container ip: %w", err)
 	}
 
-	containerHost, err := container.Host(ctx)
+	containerHost, err := c.Host(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph container host: %w", err)
 	}
 
-	apiForwardedPort, err := container.MappedPort(ctx, apiNatPort)
+	apiNatPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CCephAPIPort))
+	apiForwardedPort, err := c.MappedPort(ctx, apiNatPort)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph api forwarded port: %w", err)
 	}
@@ -1288,14 +1415,10 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		SystemUser:     CCephSystemUserAccessToken,
 		SystemPassword: CCephSystemUserSecretToken,
 	}
-	env.terminators[componentName] = func(ctx context.Context) error {
-		return stopContainer(ctx, container)
-	}
-
 	return nil
 }
 
-func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+func startStandaloneCephContainer(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
 	apiNatPort := nat.Port(apiNatPortString)
 	req := testcontainers.ContainerRequest{
@@ -1317,41 +1440,33 @@ func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, comp
 		},
 	}
 
-	container, err := startContainer(ctx, req)
+	c, err := startContainer(ctx, req)
 	if err != nil {
 		return fmt.Errorf("unable to start ceph container: %w", err)
 	}
+	env.setContainer(componentName, c)
+	return nil
+}
 
-	retCode, outReader, err := container.Exec(ctx,
-		[]string{"radosgw-admin", "user", "create",
-			"--uid", CCephSystemUserUID,
-			"--display-name", CCephSystemUserDisplayName,
-			"--access-key", CCephSystemUserAccessToken,
-			"--secret-key", CCephSystemUserSecretToken,
-			"--system"})
-	if err != nil {
-		return fmt.Errorf("unable to execute command: %w", err)
-	}
-	if retCode != 0 {
-		outBytes, err := io.ReadAll(outReader)
-		if err != nil {
-			return fmt.Errorf("unable to read output: %w", err)
-		}
-		out := string(outBytes)
-		return fmt.Errorf("command exit code %d: %s", retCode, out)
+func readyStandaloneCephInstance(ctx context.Context, env *TestEnvironment, componentName string, _ *ComponentCreationConfig) error {
+	c := env.containers[componentName]
+
+	if err := cephCreateSystemUser(ctx, c); err != nil {
+		return err
 	}
 
-	containerIP, err := container.ContainerIP(ctx)
+	containerIP, err := c.ContainerIP(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph container ip: %w", err)
 	}
 
-	containerHost, err := container.Host(ctx)
+	containerHost, err := c.Host(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph container host: %w", err)
 	}
 
-	apiForwardedPort, err := container.MappedPort(ctx, apiNatPort)
+	apiNatPort := nat.Port(fmt.Sprintf(CNATPortTemplate, CCephAPIPort))
+	apiForwardedPort, err := c.MappedPort(ctx, apiNatPort)
 	if err != nil {
 		return fmt.Errorf("unable to get ceph api forwarded port: %w", err)
 	}
@@ -1368,22 +1483,41 @@ func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, comp
 		SystemUser:     CCephSystemUserAccessToken,
 		SystemPassword: CCephSystemUserSecretToken,
 	}
-	env.terminators[componentName] = func(ctx context.Context) error {
-		return stopContainer(ctx, container)
-	}
-
 	return nil
 }
 
+func cephCreateSystemUser(ctx context.Context, c testcontainers.Container) error {
+	retCode, outReader, err := c.Exec(ctx,
+		[]string{"radosgw-admin", "user", "create",
+			"--uid", CCephSystemUserUID,
+			"--display-name", CCephSystemUserDisplayName,
+			"--access-key", CCephSystemUserAccessToken,
+			"--secret-key", CCephSystemUserSecretToken,
+			"--system"})
+	if err != nil {
+		return fmt.Errorf("unable to execute radosgw-admin: %w", err)
+	}
+	if retCode != 0 {
+		outBytes, err := io.ReadAll(outReader)
+		if err != nil {
+			return fmt.Errorf("unable to read output: %w", err)
+		}
+		return fmt.Errorf("radosgw-admin exit code %d: %s", retCode, string(outBytes))
+	}
+	return nil
+}
+
+// --- Container helpers ---
+
 func startContainer(ctx context.Context, req testcontainers.ContainerRequest) (testcontainers.Container, error) {
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to create container: %w", err)
+		return nil, fmt.Errorf("unable to start container: %w", err)
 	}
-	return container, nil
+	return c, nil
 }
 
 func stopContainer(ctx context.Context, container testcontainers.Container) error {
