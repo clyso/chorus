@@ -148,7 +148,7 @@
       }
     },
     "/diff/report": {
-      "get": {
+      "post": {
         "operationId": "Diff_GetReport",
         "responses": {
           "200": {
@@ -164,13 +164,23 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusDiffCheckRequest"
+            }
+          }
+        ],
         "tags": [
           "Diff"
         ]
       }
     },
     "/diff/report-entries": {
-      "get": {
+      "post": {
         "operationId": "Diff_GetReportEntries",
         "responses": {
           "200": {
@@ -188,18 +198,12 @@
         },
         "parameters": [
           {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "uint64"
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "uint64"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusGetDiffCheckReportEntriesRequest"
+            }
           }
         ],
         "tags": [
@@ -1265,6 +1269,26 @@
         },
         "date": {
           "type": "string"
+        }
+      }
+    },
+    "chorusGetDiffCheckReportEntriesRequest": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusMigrateLocation"
+          }
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "pageSize": {
+          "type": "string",
+          "format": "uint64"
         }
       }
     },

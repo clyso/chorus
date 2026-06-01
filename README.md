@@ -137,6 +137,6 @@ Chorus worker [implements gRPC server](./pkg/api/) defined in [proto/chorus/chor
 Steps to add new API:
 1. Add new service or endpoint definition to [proto/chorus/chorus.proto](./proto/chorus/chorus.proto)
 2. Add corresponding mapping to [proto/http.yaml](./proto/http.yaml)
-3. Run `./proto/gen_proto.sh` to generate go client, server, and openapi definitions to [proto/gen](./proto/gen) directory.
+3. Run `make proto-gen` to generate go client, server, and openapi definitions to [proto/gen](./proto/gen) directory.
 4. Implement new service or endpoint in [pkg/api](./pkg/api/)
 5. Support new API in [chorctl](./tools/chorctl) and [WebUI](./ui) clients.
