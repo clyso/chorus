@@ -10,9 +10,11 @@ http:
     - selector: chorus.Diff.List
       get: /diff/list
     - selector: chorus.Diff.GetReport
-      get: /diff/report
+      post: /diff/report
+      body: "*"
     - selector: chorus.Diff.GetReportEntries
-      get: /diff/report-entries
+      post: /diff/report-entries
+      body: "*"
     - selector: chorus.Diff.DeleteReport
       put: /diff/delete
       body: "*"
