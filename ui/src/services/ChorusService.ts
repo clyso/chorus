@@ -25,6 +25,7 @@ import type {
   ChorusProxyCredentials,
   ChorusReplicationId,
   ChorusReplicationListResponse,
+  DiffReportListResponse,
   RoutingPolicyListRequest,
   RoutingPolicyListResponse,
   ChorusStorageListResponse,
@@ -157,5 +158,13 @@ export abstract class ChorusService {
     payload: UserCredentialSetRequest,
   ): Promise<void> {
     await apiClient.post(ApiHelper.getChorusAPIUrl('/credentials'), payload);
+  }
+
+  static async getDiffReports(): Promise<DiffReportListResponse> {
+    const { data } = await apiClient.get<DiffReportListResponse>(
+      ApiHelper.getChorusAPIUrl('/diff/list'),
+    );
+
+    return data;
   }
 }

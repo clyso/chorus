@@ -291,3 +291,26 @@ export interface UserCredentialSetRequest {
   s3Cred?: S3Credential;
   swiftCred?: SwiftCredential;
 }
+
+export interface DiffReportLocation {
+  storage: string;
+  bucket: string;
+}
+
+export interface DiffReport {
+  locations: DiffReportLocation[];
+  queued: string;
+  completed: string;
+  ready: boolean;
+  consistent: boolean;
+  versioned: boolean;
+  ignoreSizes: boolean;
+  ignoreEtags: boolean;
+  fixQueued: string;
+  fixCompleted: string;
+  fixReady: boolean;
+}
+
+export interface DiffReportListResponse {
+  checks: DiffReport[];
+}
