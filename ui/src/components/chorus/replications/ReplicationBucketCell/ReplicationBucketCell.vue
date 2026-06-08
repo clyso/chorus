@@ -16,12 +16,12 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { CTooltip, CTag, CIcon } from '@clyso/clyso-ui-kit';
+  import { CTooltip, CTag } from '@clyso/clyso-ui-kit';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import type { AddId } from '@/utils/types/helper';
   import type { ChorusReplication } from '@/utils/types/chorus';
-  import { IconName } from '@/utils/types/icon';
   import { ReplicationType } from '@/utils/types/chorus';
+  import ChorusDirectionCell from '@/components/chorus/common/ChorusDirectionCell/ChorusDirectionCell.vue';
 
   const { t } = useI18n({
     messages: i18nReplications,
@@ -56,61 +56,15 @@
     </div>
     <div
       class="replication-bucket-cell__bucket"
-      v-else
+      v-else-if="replication.id.fromBucket && replication.id.toBucket"
     >
-      <CTooltip :delay="500">
-        <template #trigger>
-          <CTag
-            class="replication-bucket-cell__from"
-            round
-            type="success"
-            size="small"
-          >
-            {{ replication.id.fromBucket }}
-          </CTag>
-        </template>
-        <span class="replication-bucket-cell__from-tooltip">
-          <strong>{{ replication.id.fromBucket }}</strong
-          >: {{ t('replicationFrom') }}
-        </span>
-      </CTooltip>
-
-      <CIcon
-        class="replication-bucket-cell__arrow"
-        :is-inline="true"
-        :name="IconName.BASE_ARROW_FORWARD"
+      <ChorusDirectionCell
+        :from-text="replication.id.fromBucket"
+        :to-text="replication.id.toBucket"
+        :from-tooltip="t('replicationFrom')"
+        :to-tooltip="t('replicationTo')"
+        to-type="warning"
       />
-
-      <CTooltip :delay="500">
-        <template #trigger>
-          <CTag
-            round
-            class="replication-bucket-cell__to"
-            type="warning"
-            size="small"
-          >
-            {{ replication.id.toBucket }}
-          </CTag>
-        </template>
-        <span class="replication-bucket-cell__to-tooltip">
-          <strong>{{ replication.id.toBucket }}</strong
-          >: {{ t('replicationTo') }}
-        </span>
-      </CTooltip>
     </div>
   </div>
 </template>
-
-<style lang="scss" scoped>
-  @use '@/styles/utils' as utils;
-
-  .replication-bucket-cell__bucket {
-    display: flex;
-    align-items: center;
-    gap: utils.unit(2);
-
-    > * {
-      flex-shrink: 0;
-    }
-  }
-</style>
