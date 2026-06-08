@@ -16,12 +16,10 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { CIcon } from '@clyso/clyso-ui-kit';
-  import ChorusStorageTag from '../../common/ChorusStorageTag/ChorusStorageTag.vue';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import type { ChorusReplication } from '@/utils/types/chorus';
   import type { AddId } from '@/utils/types/helper';
-  import { IconName } from '@/utils/types/icon';
+  import ChorusDirectionCell from '@/components/chorus/common/ChorusDirectionCell/ChorusDirectionCell.vue';
 
   const { t } = useI18n({
     messages: i18nReplications,
@@ -33,36 +31,11 @@
 </script>
 
 <template>
-  <div class="replication-direction-cell">
-    <ChorusStorageTag
-      :storage-name="replication.id.fromStorage"
-      :tooltip="t('replicationFrom')"
-    />
-
-    <CIcon
-      class="replication-direction-cell__arrow"
-      :is-inline="true"
-      :name="IconName.BASE_ARROW_FORWARD"
-    />
-
-    <ChorusStorageTag
-      :storage-name="replication.id.toStorage"
-      :tooltip="t('replicationTo')"
-      type="warning"
-    />
-  </div>
+  <ChorusDirectionCell
+    :from-text="replication.id.fromStorage"
+    :to-text="replication.id.toStorage"
+    :from-tooltip="t('replicationFrom')"
+    :to-tooltip="t('replicationTo')"
+    to-type="warning"
+  />
 </template>
-
-<style lang="scss" scoped>
-  @use '@/styles/utils' as utils;
-
-  .replication-direction-cell {
-    display: flex;
-    align-items: center;
-    gap: utils.unit(2);
-
-    > * {
-      flex-shrink: 0;
-    }
-  }
-</style>
