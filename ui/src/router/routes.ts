@@ -26,6 +26,7 @@ import ChorusStorageDetailsPage from '@/pages/ChorusStorageDetailsPage/ChorusSto
 import ChorusRoutingPoliciesPage from '@/pages/ChorusRoutingPoliciesPage/ChorusRoutingPoliciesPage.vue';
 import ChorusAddRoutingPolicyPage from '@/pages/ChorusAddRoutingPolicyPage/ChorusAddRoutingPolicyPage.vue';
 import ChorusSetCredentialPage from '@/pages/ChorusSetCredentialPage/ChorusSetCredentialPage.vue';
+import ChorusDiffReportsPage from '@/pages/ChorusDiffReportsPage/ChorusDiffReportsPage.vue';
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -47,6 +48,11 @@ export const routes: RouteRecordRaw[] = [
         path: 'replication/add',
         name: RouteName.CHORUS_ADD_REPLICATION,
         component: ChorusAddReplicationPage,
+      },
+      {
+        path: 'diff-reports',
+        name: RouteName.CHORUS_DIFF_REPORTS,
+        component: ChorusDiffReportsPage,
       },
       {
         path: 'storages',

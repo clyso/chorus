@@ -41,6 +41,10 @@
       label: t(RouteName.CHORUS_REPLICATION),
     },
     {
+      name: RouteName.CHORUS_DIFF_REPORTS,
+      label: t(RouteName.CHORUS_DIFF_REPORTS),
+    },
+    {
       name: RouteName.CHORUS_STORAGES,
       label: t(RouteName.CHORUS_STORAGES),
     },

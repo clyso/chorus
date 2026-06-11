@@ -314,3 +314,9 @@ export interface DiffReport {
 export interface DiffReportListResponse {
   checks: DiffReport[];
 }
+
+export enum DiffReportStatusFilter {
+  CHECKING = 'CHECKING',
+  CONSISTENT = 'CONSISTENT',
+  INCONSISTENT = 'INCONSISTENT',
+}
