@@ -14,11 +14,46 @@
  *  limitations under the License.
  */
 
-import type { DiffReport } from '@/utils/types/chorus';
+import { DiffReportStatusFilter, type DiffReport } from '@/utils/types/chorus';
 
 export abstract class DiffReportsHelper {
   static getDiffReportId(locations: DiffReport['locations']): string {
     return locations.map((l) => `${l.storage}:${l.bucket}`).join('|');
+  }
+
+  static getBucketPair(report: DiffReport): string {
+    if (report.locations.length !== 2) {
+      return '';
+    }
+
+    return `${report.locations[0]?.bucket} → ${report.locations[1]?.bucket}`;
+  }
+
+  static getDirectionPair(report: DiffReport): string {
+    if (report.locations.length !== 2) {
+      return '';
+    }
+
+    return `${report.locations[0]?.storage} → ${report.locations[1]?.storage}`;
+  }
+
+  static isDiffReportStatusMatched(
+    diffReport: DiffReport,
+    status: DiffReportStatusFilter,
+  ): boolean {
+    if (status === DiffReportStatusFilter.CHECKING) {
+      return !diffReport.ready;
+    }
+
+    if (status === DiffReportStatusFilter.CONSISTENT) {
+      return diffReport.ready && diffReport.consistent;
+    }
+
+    if (status === DiffReportStatusFilter.INCONSISTENT) {
+      return diffReport.ready && !diffReport.consistent;
+    }
+
+    return false;
   }
 
   static getStatusSortOrder(report: DiffReport): number {
