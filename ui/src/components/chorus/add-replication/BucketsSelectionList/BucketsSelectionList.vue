@@ -33,6 +33,7 @@
   import i18nAddReplication from '@/components/chorus/add-replication/i18nAddReplication';
   import { GeneralHelper } from '@/utils/helpers/GeneralHelper';
   import { IconName } from '@/utils/types/icon';
+  import ChorusListError from '@/components/chorus/common/ChorusListError/ChorusListError.vue';
 
   interface BucketRowData {
     name: string;
@@ -198,24 +199,16 @@
         </template>
 
         <template #error>
-          <CResult
+          <ChorusListError
             v-if="hasBucketsError"
-            key="error"
             class="buckets-selection-list__error"
-            type="error"
+            :title="t('errorTitle')"
+            :text="t('initBucketsError')"
+            :action-text="t('errorAction')"
             :max-width="400"
-            @positive-click="initBucketsList"
-          >
-            <template #title>
-              {{ t('errorTitle') }}
-            </template>
-
-            <p>{{ t('initBucketsError') }}</p>
-
-            <template #positive-text>
-              {{ t('errorAction') }}
-            </template>
-          </CResult>
+            key="error"
+            @retry="initBucketsList"
+          />
         </template>
 
         <template #empty>
