@@ -15,42 +15,47 @@
   -->
 
 <script setup lang="ts">
-  import { useI18n } from 'vue-i18n';
   import { CResult } from '@clyso/clyso-ui-kit';
-  import i18nReplications from '@/components/chorus/replications/i18nReplications';
-  import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
 
-  const { t } = useI18n({
-    messages: i18nReplications,
-  });
+  withDefaults(
+    defineProps<{
+      title: string;
+      text: string;
+      actionText: string;
+      maxWidth?: number;
+    }>(),
+    {
+      maxWidth: 600,
+    },
+  );
 
-  const { initReplicationsPage } = useChorusReplicationsStore();
+  const emit = defineEmits<{
+    (e: 'retry'): void;
+  }>();
 </script>
 
 <template>
   <CResult
-    class="replications-error"
+    class="chorus-list-error"
     type="error"
     size="large"
-    :max-width="600"
-    @positive-click="initReplicationsPage"
+    :max-width="maxWidth"
+    @positive-click="emit('retry')"
   >
     <template #title>
-      {{ t('errorTitle') }}
+      {{ title }}
     </template>
 
-    <p>{{ t('errorText') }}</p>
+    <p>{{ text }}</p>
 
     <template #positive-text>
-      {{ t('errorAction') }}
+      {{ actionText }}
     </template>
   </CResult>
 </template>
 
 <style lang="scss" scoped>
-  @use '@/styles/utils' as utils;
-
-  .replications-error {
+  .chorus-list-error {
     p {
       white-space: pre-line;
     }

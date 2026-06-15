@@ -30,11 +30,11 @@
   import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import type { AddId } from '@/utils/types/helper';
-  import ReplicationsError from '@/components/chorus/replications/ReplicationsError/ReplicationsError.vue';
   import ReplicationStatusCell from '@/components/chorus/replications/ReplicationStatusCell/ReplicationStatusCell.vue';
   import ReplicationsEmpty from '@/components/chorus/replications/ReplicationsEmpty/ReplicationsEmpty.vue';
   import ReplicationDirectionCell from '@/components/chorus/replications/ReplicationDirectionCell/ReplicationDirectionCell.vue';
   import ReplicationActionsCell from '@/components/chorus/replications/ReplicationActionsCell/ReplicationActionsCell.vue';
+  import ChorusListError from '@/components/chorus/common/ChorusListError/ChorusListError.vue';
 
   const { t } = useI18n({
     messages: i18nReplications,
@@ -161,7 +161,13 @@
         </template>
 
         <template #error>
-          <ReplicationsError class="replications-list__result" />
+          <ChorusListError
+            class="replications-list__result"
+            :title="t('errorTitle')"
+            :text="t('errorText')"
+            :action-text="t('errorAction')"
+            @retry="initReplicationsPage"
+          />
         </template>
 
         <template #empty>
