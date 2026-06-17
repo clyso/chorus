@@ -109,14 +109,14 @@ func (s svc) Count(flow xctx.Flow, storage string, method string) {
 }
 
 func (s svc) Upload(flow xctx.Flow, storage, bucket string, bytes int) {
-	if !s.enabled {
+	if !s.enabled || bytes <= 0 {
 		return
 	}
 	bytesUpload.WithLabelValues(string(flow), storage, bucket).Add(float64(bytes))
 }
 
 func (s svc) Download(flow xctx.Flow, storage, bucket string, bytes int) {
-	if !s.enabled {
+	if !s.enabled || bytes <= 0 {
 		return
 	}
 	bytesDownload.WithLabelValues(string(flow), storage, bucket).Add(float64(bytes))
