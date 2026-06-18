@@ -16,7 +16,7 @@
 
 import type { AddId } from '@/utils/types/helper';
 import type { ChorusReplication } from '@/utils/types/chorus';
-import { ReplicationStatusFilter } from '@/utils/types/chorus';
+import { ReplicationStatusFilter, ReplicationType } from '@/utils/types/chorus';
 
 export abstract class ReplicationsHelper {
   static getLiveReplicationEventsDifference(
@@ -75,5 +75,13 @@ export abstract class ReplicationsHelper {
     const createdAtMs = new Date(replication.createdAt).getTime();
 
     return createdAtMs >= rangeStartMs && createdAtMs <= rangeEndMs;
+  }
+
+  static getDirectionPairString(replication: ChorusReplication): string {
+    if (replication.replicationType === ReplicationType.USER) {
+      throw new Error('getBucketPair requires a bucket replication');
+    }
+
+    return `${replication.id.fromStorage} → ${replication.id.toStorage}`;
   }
 }
