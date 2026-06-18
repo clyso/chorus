@@ -51,7 +51,7 @@ interface ChorusReplicationsState {
 
   filterUsers: string[];
   filterBucket: string;
-  filterToStorages: string[];
+  filterDirections: string[];
   filterStatuses: ReplicationStatusFilter[];
   filterCreatedAtRange: [number, number] | null;
   filterType: ReplicationType | null;
@@ -92,7 +92,7 @@ function getInitialState(): ChorusReplicationsState {
 
     filterUsers: [],
     filterBucket: '',
-    filterToStorages: [],
+    filterDirections: [],
     filterStatuses: [],
     filterCreatedAtRange: null,
     filterType: null,
@@ -127,9 +127,11 @@ export const useChorusReplicationsStore = defineStore(
             ?.toLowerCase()
             .trim()
             .includes(state.filterBucket.toLowerCase().trim());
-        const isToStorageMatched =
-          !state.filterToStorages.length ||
-          state.filterToStorages.includes(replication.id.toStorage);
+        const isDirectionsMatched =
+          !state.filterDirections.length ||
+          state.filterDirections.includes(
+            ReplicationsHelper.getDirectionPairString(replication),
+          );
         const isStatusMatched =
           !state.filterStatuses.length ||
           state.filterStatuses.every((status) =>
@@ -147,7 +149,7 @@ export const useChorusReplicationsStore = defineStore(
         return (
           isUserMatched &&
           isBucketMatched &&
-          isToStorageMatched &&
+          isDirectionsMatched &&
           isStatusMatched &&
           isCreatedAtMatched &&
           isTypeMatched
@@ -159,7 +161,7 @@ export const useChorusReplicationsStore = defineStore(
       () =>
         state.filterUsers.length !== 0 ||
         state.filterBucket !== '' ||
-        state.filterToStorages.length !== 0 ||
+        state.filterDirections.length !== 0 ||
         state.filterStatuses.length !== 0 ||
         state.filterCreatedAtRange !== null ||
         state.filterType !== null,
@@ -168,7 +170,7 @@ export const useChorusReplicationsStore = defineStore(
     function clearFilters() {
       state.filterUsers = [];
       state.filterBucket = '';
-      state.filterToStorages = [];
+      state.filterDirections = [];
       state.filterStatuses = [];
       state.filterCreatedAtRange = null;
       state.filterType = null;

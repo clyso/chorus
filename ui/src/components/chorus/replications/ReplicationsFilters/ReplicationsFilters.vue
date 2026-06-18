@@ -20,10 +20,10 @@
   import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
   import ReplicationsFilterByUser from '@/components/chorus/replications/ReplicationsFilterByUser/ReplicationsFilterByUser.vue';
   import ReplicationsFilterByBucket from '@/components/chorus/replications/ReplicationsFilterByBucket/ReplicationsFilterByBucket.vue';
-  import ReplicationsFilterByToStorage from '@/components/chorus/replications/ReplicationsFilterByToStorage/ReplicationsFilterByToStorage.vue';
   import ReplicationsFilterByStatus from '@/components/chorus/replications/ReplicationsFilterByStatus/ReplicationsFilterByStatus.vue';
   import ReplicationsFilterByCreatedAt from '@/components/chorus/replications/ReplicationsFilterByCreatedAt/ReplicationsFilterByCreatedAt.vue';
   import ReplicationsFilterByType from '@/components/chorus/replications/ReplicationsFilterByType/ReplicationsFilterByType.vue';
+  import ReplicationsFilterByDirection from '@/components/chorus/replications/ReplicationsFilterByDirection/ReplicationsFilterByDirection.vue';
 
   const { isLoading } = storeToRefs(useChorusReplicationsStore());
 </script>
@@ -55,7 +55,7 @@
 
       <ReplicationsFilterByCreatedAt class="replications-filters__created-at" />
 
-      <ReplicationsFilterByToStorage class="replications-filters__to-storage" />
+      <ReplicationsFilterByDirection class="replications-filters__direction" />
 
       <ReplicationsFilterByStatus class="replications-filters__status" />
     </div>

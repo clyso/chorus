@@ -21,25 +21,28 @@
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
   import ChorusStorageFilter from '@/components/chorus/common/ChorusStorageFilter/ChorusStorageFilter.vue';
+  import { ReplicationsHelper } from '@/utils/helpers/ReplicationsHelper';
 
   const { t } = useI18n({
     messages: i18nReplications,
   });
 
-  const { replications, filterToStorages, page } = storeToRefs(
+  const { replications, filterDirections, page } = storeToRefs(
     useChorusReplicationsStore(),
   );
 
   const storages = computed(() =>
-    replications.value.map((replication) => replication.id.toStorage),
+    replications.value.map((replication) =>
+      ReplicationsHelper.getDirectionPairString(replication),
+    ),
   );
 </script>
 
 <template>
   <ChorusStorageFilter
-    v-model:filterValue="filterToStorages"
+    v-model:filterValue="filterDirections"
     :storages="storages"
-    :placeholder="t('filterByToPlaceholder')"
+    :placeholder="t('filterByDirectionPlaceholder')"
     @update:value="page = 1"
   />
 </template>
