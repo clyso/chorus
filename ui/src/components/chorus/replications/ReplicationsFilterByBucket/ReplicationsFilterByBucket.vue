@@ -16,70 +16,38 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { computed, ref, watch } from 'vue';
-  import { CAutoComplete } from '@clyso/clyso-ui-kit';
+  import { computed } from 'vue';
   import { storeToRefs } from 'pinia';
   import i18nReplications from '@/components/chorus/replications/i18nReplications';
   import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
-  import { GeneralHelper } from '@/utils/helpers/GeneralHelper';
+  import ChorusBucketFilter from '@/components/chorus/common/ChorusBucketFilter/ChorusBucketFilter.vue';
+  import { ReplicationsHelper } from '@/utils/helpers/ReplicationsHelper';
+  import { ReplicationType } from '@/utils/types/chorus';
 
   const { t } = useI18n({
     messages: i18nReplications,
   });
 
-  const searchString = ref('');
-  const select = ref<InstanceType<typeof CAutoComplete> | null>(null);
-
-  const { replications, filterBucket, page } = storeToRefs(
+  const { replications, filterBuckets, page } = storeToRefs(
     useChorusReplicationsStore(),
   );
 
-  const bucketOptions = computed<string[]>(() => {
-    const uniqueBucketOptions = [
-      ...new Set(
-        replications.value
-          .flatMap((replication) => [
-            replication.id.fromBucket,
-            replication.id.toBucket,
-          ])
-          .filter((bucket) => bucket !== undefined && bucket !== null),
-      ),
-    ];
-
-    return uniqueBucketOptions
-      .filter((bucket) =>
-        bucket
-          .trim()
-          .toLowerCase()
-          .includes(searchString.value.trim().toLowerCase()),
+  const bucketOptions = computed(() =>
+    replications.value
+      .filter(
+        (replication) => replication.replicationType === ReplicationType.BUCKET,
       )
-      .sort();
-  });
-
-  const handleValueUpdate = GeneralHelper.debounce(() => {
-    page.value = 1;
-    filterBucket.value = searchString.value;
-  }, 1000);
-
-  watch(filterBucket, () => {
-    if (filterBucket.value === '') {
-      searchString.value = '';
-    }
-  });
+      .map((replication) =>
+        ReplicationsHelper.getBucketPairString(replication),
+      ),
+  );
 </script>
 
 <template>
-  <CAutoComplete
-    ref="select"
-    v-model:value="searchString"
-    class="replications-filter-by-bucket"
-    :input-props="{
-      autocomplete: 'disabled',
-    }"
-    :options="bucketOptions"
+  <ChorusBucketFilter
+    v-model:filterValue="filterBuckets"
+    :buckets="bucketOptions"
     :placeholder="t('filterByBucketPlaceholder')"
-    clearable
-    blur-after-select
-    @update:value="handleValueUpdate"
+    @update:value="page = 1"
   />
 </template>

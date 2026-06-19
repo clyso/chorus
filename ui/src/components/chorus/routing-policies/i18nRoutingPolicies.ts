@@ -34,7 +34,7 @@ export default <I18nMessages>{
     allBuckets: 'All Buckets',
     allBucketsDescription: 'Apply to all buckets (including future ones)',
     filterByUserPlaceholder: 'Filter by User',
-    filterByBucketPlaceholder: 'Search by Bucket',
+    filterByBucketPlaceholder: 'Filter by Bucket',
     filterByStoragePlaceholder: 'Filter by Storage',
     filterStatusAllowed: 'Allowed',
     filterStatusBlocked: 'Blocked',
@@ -115,7 +115,7 @@ export default <I18nMessages>{
     allBucketsDescription:
       'Auf alle Buckets anwenden (einschließlich zukünftiger)',
     filterByUserPlaceholder: 'Nach Benutzer filtern',
-    filterByBucketPlaceholder: 'Nach Bucket suchen',
+    filterByBucketPlaceholder: 'Nach Bucket filtern',
     filterByStoragePlaceholder: 'Nach Speicherort filtern',
     filterByStorageNoResult: 'Kein Speicher entspricht Ihren Suchkriterien',
     filterStatusAllowed: 'Zugelassen',

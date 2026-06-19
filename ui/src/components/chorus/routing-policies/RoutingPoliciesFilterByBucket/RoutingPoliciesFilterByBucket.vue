@@ -16,67 +16,30 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { computed, ref, watch } from 'vue';
-  import { CAutoComplete } from '@clyso/clyso-ui-kit';
-  import { GeneralHelper } from '@clyso/clyso-ui-kit';
+  import { computed } from 'vue';
   import { storeToRefs } from 'pinia';
   import i18nRoutingPolicies from '../i18nRoutingPolicies';
   import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
+  import ChorusBucketFilter from '@/components/chorus/common/ChorusBucketFilter/ChorusBucketFilter.vue';
 
   const { t } = useI18n({
     messages: i18nRoutingPolicies,
   });
 
-  const searchString = ref('');
-  const select = ref<InstanceType<typeof CAutoComplete> | null>(null);
-
-  const { routingPolicies, filterBucket, page } = storeToRefs(
+  const { routingPolicies, filterBuckets, page } = storeToRefs(
     useChorusRoutingPoliciesStore(),
   );
 
-  const bucketOptions = computed<string[]>(() => {
-    const uniqueBucketOptions = [
-      ...new Set(
-        routingPolicies.value
-          .map((routingPolicy) => routingPolicy.bucket)
-          .filter((bucket) => bucket !== undefined && bucket !== null),
-      ),
-    ];
-
-    return uniqueBucketOptions
-      .filter((bucket) =>
-        bucket
-          .trim()
-          .toLowerCase()
-          .includes(searchString.value.trim().toLowerCase()),
-      )
-      .sort();
-  });
-
-  const handleValueUpdate = GeneralHelper.debounce(() => {
-    page.value = 1;
-    filterBucket.value = searchString.value;
-  }, 1000);
-
-  watch(filterBucket, () => {
-    if (filterBucket.value === '') {
-      searchString.value = '';
-    }
-  });
+  const bucketOptions = computed(() =>
+    routingPolicies.value.map((routingPolicy) => routingPolicy.bucket),
+  );
 </script>
 
 <template>
-  <CAutoComplete
-    ref="select"
-    v-model:value="searchString"
-    class="routing-policies-filter-by-bucket"
-    :input-props="{
-      autocomplete: 'disabled',
-    }"
-    :options="bucketOptions"
+  <ChorusBucketFilter
+    v-model:filterValue="filterBuckets"
+    :buckets="bucketOptions"
     :placeholder="t('filterByBucketPlaceholder')"
-    clearable
-    blur-after-select
-    @update:value="handleValueUpdate"
+    @update:value="page = 1"
   />
 </template>
