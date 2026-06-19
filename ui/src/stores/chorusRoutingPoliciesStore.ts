@@ -46,7 +46,7 @@ interface ChorusRoutingPoliciesState {
   routingPoliciesRequestOptions: RoutingPolicyListRequest | null;
 
   filterUsers: string[];
-  filterBucket: string;
+  filterBuckets: string[];
   filterStorages: string[];
   filterStatus: RoutingPolicyStatusFilter | null;
 }
@@ -70,7 +70,7 @@ function getInitialState(): ChorusRoutingPoliciesState {
     routingPoliciesRequestOptions: null,
 
     filterUsers: [],
-    filterBucket: '',
+    filterBuckets: [],
     filterStorages: [],
     filterStatus: null,
   };
@@ -98,12 +98,8 @@ export const useChorusRoutingPoliciesStore = defineStore(
           (state.filterStatus === RoutingPolicyStatusFilter.BLOCKED) ===
             routingPolicy.isBlocked;
         const isBucketMatched =
-          !state.filterBucket ||
-          !routingPolicy.bucket ||
-          routingPolicy.bucket
-            .toLocaleLowerCase()
-            .trim()
-            .includes(state.filterBucket?.toLowerCase().trim());
+          !state.filterBuckets.length ||
+          state.filterBuckets.includes(routingPolicy.bucket);
 
         return (
           isUserMatched &&
@@ -136,14 +132,14 @@ export const useChorusRoutingPoliciesStore = defineStore(
     const isFiltered = computed<boolean>(
       () =>
         state.filterUsers.length !== 0 ||
-        state.filterBucket !== '' ||
+        state.filterBuckets.length !== 0 ||
         state.filterStorages.length !== 0 ||
         state.filterStatus !== null,
     );
 
     function clearFilters() {
       state.filterUsers = [];
-      state.filterBucket = '';
+      state.filterBuckets = [];
       state.filterStorages = [];
       state.filterStatus = null;
     }
