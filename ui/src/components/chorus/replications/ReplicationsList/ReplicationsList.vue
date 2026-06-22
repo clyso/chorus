@@ -62,13 +62,13 @@
     {
       title: t('columnUser'),
       key: 'id.user',
-      width: '15%',
+      width: '10%',
       sorter: true,
     },
     {
       title: t('columnBucket'),
       key: 'bucket',
-      width: '20%',
+      width: '25%',
     },
     {
       title: t('columnCreatedAt'),
