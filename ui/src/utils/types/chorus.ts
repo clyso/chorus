@@ -320,3 +320,7 @@ export enum DiffReportStatusFilter {
   CONSISTENT = 'CONSISTENT',
   INCONSISTENT = 'INCONSISTENT',
 }
+
+export interface DiffReportDeleteRequest {
+  locations: DiffReportLocation[];
+}
