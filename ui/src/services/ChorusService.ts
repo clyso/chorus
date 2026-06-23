@@ -25,6 +25,7 @@ import type {
   ChorusProxyCredentials,
   ChorusReplicationId,
   ChorusReplicationListResponse,
+  DiffReportDeleteRequest,
   DiffReportListResponse,
   RoutingPolicyListRequest,
   RoutingPolicyListResponse,
@@ -158,6 +159,12 @@ export abstract class ChorusService {
     payload: UserCredentialSetRequest,
   ): Promise<void> {
     await apiClient.post(ApiHelper.getChorusAPIUrl('/credentials'), payload);
+  }
+
+  static async deleteDiffReport(
+    payload: DiffReportDeleteRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/diff/delete'), payload);
   }
 
   static async getDiffReports(): Promise<DiffReportListResponse> {
