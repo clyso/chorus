@@ -52,6 +52,7 @@ interface ChorusRoutingPoliciesState {
 }
 
 const PAGE_SIZES = [10, 20, 30, 50, 100] as const;
+const POLL_INTERVAL_MS = 5000;
 
 function getInitialState(): ChorusRoutingPoliciesState {
   return {
@@ -185,7 +186,7 @@ export const useChorusRoutingPoliciesStore = defineStore(
         state.pollingRequest = null;
         state.pollingTimeout = window.setTimeout(
           startRoutingPoliciesPolling,
-          5000,
+          POLL_INTERVAL_MS,
         );
       }
     }

@@ -58,6 +58,7 @@ interface ChorusReplicationsState {
 }
 
 const PAGE_SIZES = [10, 20, 30, 50, 100] as const;
+const POLL_INTERVAL_MS = 5000;
 
 function getChorusReplicationId(replicationId: ChorusReplicationId): string {
   return (
@@ -230,7 +231,10 @@ export const useChorusReplicationsStore = defineStore(
         await state.pollingRequest;
       } finally {
         state.pollingRequest = null;
-        state.pollingTimeout = window.setTimeout(startReplicationPolling, 5000);
+        state.pollingTimeout = window.setTimeout(
+          startReplicationPolling,
+          POLL_INTERVAL_MS,
+        );
       }
     }
 
