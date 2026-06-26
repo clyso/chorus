@@ -35,6 +35,9 @@ interface ChorusDiffReportsState {
   pageSize: number;
   pollingRequest: Promise<unknown> | null;
   pollingTimeout: number | null;
+
+  selectedReportIds: string[];
+
   filterDirections: string[];
   filterBuckets: string[];
   filterStatuses: DiffReportStatusFilter[];
@@ -53,6 +56,9 @@ function getInitialState(): ChorusDiffReportsState {
     pageSize: PAGE_SIZES[0],
     pollingRequest: null,
     pollingTimeout: null,
+
+    selectedReportIds: [],
+
     filterDirections: [],
     filterBuckets: [],
     filterStatuses: [],
@@ -140,6 +146,18 @@ export const useChorusDiffReportsStore = defineStore('chorusDiffReport', () => {
     },
   }));
 
+  const selectedReportsCount = computed(() => state.selectedReportIds.length);
+
+  const isAnyReportsSelected = computed(
+    () => state.selectedReportIds.length !== 0,
+  );
+
+  const selectedReports = computed<AddId<DiffReport>[]>(() =>
+    state.reports.filter((report) =>
+      state.selectedReportIds.includes(report.idStr as string),
+    ),
+  );
+
   async function getDiffReports() {
     const res = await ChorusService.getDiffReports();
 
@@ -216,6 +234,9 @@ export const useChorusDiffReportsStore = defineStore('chorusDiffReport', () => {
     isFiltered,
     pagination,
     computedReports,
+    selectedReportsCount,
+    isAnyReportsSelected,
+    selectedReports,
     clearFilters,
     initDiffReportPage,
     $reset,
