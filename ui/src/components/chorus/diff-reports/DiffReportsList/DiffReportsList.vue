@@ -36,6 +36,7 @@
   import DiffReportsStatusCell from '@/components/chorus/diff-reports/DiffReportsStatusCell/DiffReportsStatusCell.vue';
   import DiffReportsConfigsCell from '@/components/chorus/diff-reports/DiffReportsConfigsCell/DiffReportsConfigsCell.vue';
   import ChorusListError from '@/components/chorus/common/ChorusListError/ChorusListError.vue';
+  import DiffReportsActionsCell from '@/components/chorus/diff-reports/DiffReportsActionsCell/DiffReportsActionsCell.vue';
 
   const { t } = useI18n({
     messages: i18nDiffReports,

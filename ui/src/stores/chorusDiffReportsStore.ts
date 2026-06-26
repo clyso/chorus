@@ -37,6 +37,7 @@ interface ChorusDiffReportsState {
   pollingTimeout: number | null;
 
   selectedReportIds: string[];
+  isDeleteSelectedProcessing: boolean;
 
   filterDirections: string[];
   filterBuckets: string[];
@@ -58,6 +59,7 @@ function getInitialState(): ChorusDiffReportsState {
     pollingTimeout: null,
 
     selectedReportIds: [],
+    isDeleteSelectedProcessing: false,
 
     filterDirections: [],
     filterBuckets: [],
@@ -158,6 +160,49 @@ export const useChorusDiffReportsStore = defineStore('chorusDiffReport', () => {
     ),
   );
 
+  async function deleteDiffReports(reports: AddId<DiffReport>[]) {
+    state.isDeleteSelectedProcessing = true;
+
+    await stopPolling();
+
+    const successList: AddId<DiffReport>[] = [];
+    const errorList: AddId<DiffReport>[] = [];
+
+    await Promise.all(
+      reports.map(async (report) => {
+        try {
+          await ChorusService.deleteDiffReport({
+            locations: report.locations,
+          });
+          successList.push(report);
+        } catch {
+          errorList.push(report);
+        }
+      }),
+    );
+
+    if (successList.length > 0) {
+      state.reports = state.reports.filter(
+        (report) => !successList.some((item) => item.idStr === report.idStr),
+      );
+
+      state.selectedReportIds = state.selectedReportIds.filter(
+        (id) => !successList.some((item) => item.idStr === id),
+      );
+
+      const pageCount = pagination.value.pageCount ?? 1;
+
+      if (state.page > pageCount) {
+        state.page = pageCount;
+      }
+    }
+
+    startPolling();
+    state.isDeleteSelectedProcessing = false;
+
+    return { successList, errorList };
+  }
+
   async function getDiffReports() {
     const res = await ChorusService.getDiffReports();
 
@@ -238,6 +283,7 @@ export const useChorusDiffReportsStore = defineStore('chorusDiffReport', () => {
     isAnyReportsSelected,
     selectedReports,
     clearFilters,
+    deleteDiffReports,
     initDiffReportPage,
     $reset,
   };

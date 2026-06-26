@@ -54,6 +54,35 @@ export default <I18nMessages>{
     errorText:
       'An error occurred while getting the diff report list.\nPlease try one more time.',
     errorAction: 'Retry',
+
+    deleteDiffReportSuccessTitle: 'Deleted!',
+    deleteDiffReportSuccessContent: 'Diff report deleted:',
+    deleteDiffReportErrorTitle: 'Deletion failed!',
+    deleteDiffReportErrorAction: 'Retry',
+    deleteDiffReportErrorContent:
+      'An error occurred while deleting the diff report:',
+    deleteDiffReportConfirmTitle: 'Delete Diff Report',
+    deleteDiffReportConfirmContent: 'You are about to delete the diff report:',
+    deleteDiffReportConfirmQuestion: 'Are you sure you want to proceed?',
+    deleteDiffReportConfirmAction: 'Delete',
+    deleteDiffReportCancelAction: 'Cancel',
+    deleteDiffReportDeleteAction: 'Delete',
+
+    deleteDiffReportsSuccessTitle: 'Deleted!',
+    deleteDiffReportsSuccessContent:
+      'The following {total} diff reports have been deleted:',
+    deleteDiffReportsErrorTitle: 'Deletion failed!',
+    deleteDiffReportsErrorAction: 'Retry',
+    deleteDiffReportsErrorContent:
+      'An error occurred while deleting the following {total} diff reports:',
+    deleteDiffReportsConfirmTitle: 'Delete Diff Reports',
+    deleteDiffReportsConfirmContent:
+      'You are about to delete the following diff reports:',
+    deleteDiffReportsConfirmQuestion: 'Are you sure you want to proceed?',
+    deleteDiffReportsConfirmAction: 'Delete',
+    deleteDiffReportsCancelAction: 'Cancel',
+    deleteDiffReportsDeleteAction: 'Delete',
+    deleteDiffReportsSelected: 'Delete {total} selected',
   },
   [I18nLocale.DE]: {
     diffReportTitle: 'Diff-Reports',
@@ -92,5 +121,37 @@ export default <I18nMessages>{
     errorText:
       'Beim Abrufen der Diff-Report-Liste ist ein Fehler aufgetreten.\nBitte versuchen Sie es erneut.',
     errorAction: 'Erneut versuchen',
+
+    deleteDiffReportSuccessTitle: 'Gelöscht!',
+    deleteDiffReportSuccessContent: 'Diff-Report gelöscht:',
+    deleteDiffReportErrorTitle: 'Löschen fehlgeschlagen!',
+    deleteDiffReportErrorAction: 'Erneut versuchen',
+    deleteDiffReportErrorContent:
+      'Beim Löschen des Diff-Reports ist ein Fehler aufgetreten:',
+    deleteDiffReportConfirmTitle: 'Diff-Report löschen',
+    deleteDiffReportConfirmContent:
+      'Sie sind dabei, den folgenden Diff-Report zu löschen:',
+    deleteDiffReportConfirmQuestion:
+      'Sind Sie sicher, dass Sie fortfahren möchten?',
+    deleteDiffReportConfirmAction: 'Löschen',
+    deleteDiffReportCancelAction: 'Abbrechen',
+    deleteDiffReportDeleteAction: 'Löschen',
+
+    deleteDiffReportsSuccessTitle: 'Gelöscht!',
+    deleteDiffReportsSuccessContent:
+      'Die folgenden {total} Diff-Reports wurden gelöscht:',
+    deleteDiffReportsErrorTitle: 'Löschen fehlgeschlagen!',
+    deleteDiffReportsErrorAction: 'Erneut versuchen',
+    deleteDiffReportsErrorContent:
+      'Beim Löschen der folgenden {total} Diff-Reports ist ein Fehler aufgetreten:',
+    deleteDiffReportsConfirmTitle: 'Diff-Reports löschen',
+    deleteDiffReportsConfirmContent:
+      'Sie sind dabei, die folgenden Diff-Reports zu löschen:',
+    deleteDiffReportsConfirmQuestion:
+      'Sind Sie sicher, dass Sie fortfahren möchten?',
+    deleteDiffReportsConfirmAction: 'Löschen',
+    deleteDiffReportsCancelAction: 'Abbrechen',
+    deleteDiffReportsDeleteAction: 'Löschen',
+    deleteDiffReportsSelected: '{total} ausgewählte löschen',
   },
 };
