@@ -17,6 +17,7 @@
 <script setup lang="ts">
   import type {
     DataTableBaseColumn,
+    DataTableSelectionColumn,
     DataTableSortState,
   } from '@clyso/clyso-ui-kit';
   import { CDataTable } from '@clyso/clyso-ui-kit';
@@ -49,11 +50,17 @@
     page,
     pageSize,
     pagination,
+    selectedReportIds,
   } = storeToRefs(useChorusDiffReportsStore());
 
   const { initDiffReportPage } = useChorusDiffReportsStore();
 
-  const columns = computed<DataTableBaseColumn<AddId<DiffReport>>[]>(() => [
+  const columns = computed<
+    (DataTableBaseColumn<AddId<DiffReport>> | DataTableSelectionColumn)[]
+  >(() => [
+    {
+      type: 'selection',
+    },
     {
       title: t('columnDirection'),
       key: 'direction',
@@ -74,6 +81,10 @@
     {
       title: t('columnConfigs'),
       key: 'configs',
+    },
+    {
+      title: t('columnActions'),
+      key: 'actions',
     },
   ]);
 
@@ -120,6 +131,7 @@
         :bordered="false"
         :sorter="sorter"
         :row-key="rowKey"
+        v-model:checked-row-keys="selectedReportIds"
         @update:sorter="handleSortingChange"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeUpdate"
@@ -161,6 +173,13 @@
 
         <template #configs="{ rowData }: { rowData: AddId<DiffReport> }">
           <DiffReportsConfigsCell
+            v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
+            :report="rowData"
+          />
+        </template>
+
+        <template #actions="{ rowData }: { rowData: AddId<DiffReport> }">
+          <DiffReportsActionsCell
             v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
             :report="rowData"
           />
