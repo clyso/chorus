@@ -78,10 +78,18 @@ export abstract class ReplicationsHelper {
   }
 
   static getDirectionPairString(replication: ChorusReplication): string {
-    if (replication.replicationType === ReplicationType.USER) {
-      throw new Error('getBucketPair requires a bucket replication');
+    return `${replication.id.fromStorage} → ${replication.id.toStorage}`;
+  }
+
+  /**
+   * Returns the bucket pair string (e.g. "from → to") for a given replication.
+   * Returns an empty string for user replications as they have no bucket pair.
+   */
+  static getBucketPairString(replication: ChorusReplication): string {
+    if (replication.replicationType === ReplicationType.BUCKET) {
+      return `${replication.id.fromBucket} → ${replication.id.toBucket}`;
     }
 
-    return `${replication.id.fromStorage} → ${replication.id.toStorage}`;
+    return '';
   }
 }
