@@ -27,6 +27,7 @@
   import type { DiffReport, DiffReportLocation } from '@/utils/types/chorus';
   import type { AddId } from '@/utils/types/helper';
   import { useChorusDiffReportsStore } from '@/stores/chorusDiffReportsStore';
+  import { DiffReportsHelper } from '@/utils/helpers/DiffReportsHelper';
   import DiffReportsEmpty from '@/components/chorus/diff-reports/DiffReportsEmpty/DiffReportsEmpty.vue';
   import DiffReportsBucketCell from '@/components/chorus/diff-reports/DiffReportsBucketCell/DiffReportsBucketCell.vue';
   import DiffReportsDirectionCell from '@/components/chorus/diff-reports/DiffReportsDirectionCell/DiffReportsDirectionCell.vue';
@@ -75,10 +76,6 @@
       key: 'configs',
     },
   ]);
-
-  function isTwoLocationReport(report: DiffReport): boolean {
-    return report.locations.length === 2;
-  }
 
   function getLocations(
     report: DiffReport,
@@ -130,7 +127,7 @@
       >
         <template #direction="{ rowData }: { rowData: AddId<DiffReport> }">
           <span
-            v-if="!isTwoLocationReport(rowData)"
+            v-if="!DiffReportsHelper.isTwoLocationReport(rowData)"
             class="diff-reports-list__location-warning"
           >
             {{ t('cliCheckWarning') }}
@@ -143,28 +140,28 @@
 
         <template #bucket="{ rowData }: { rowData: AddId<DiffReport> }">
           <DiffReportsBucketCell
-            v-if="isTwoLocationReport(rowData)"
+            v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
             :locations="getLocations(rowData)"
           />
         </template>
 
         <template #progress="{ rowData }: { rowData: AddId<DiffReport> }">
           <DiffReportsProgressCell
-            v-if="isTwoLocationReport(rowData)"
+            v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
             :report="rowData"
           />
         </template>
 
         <template #status="{ rowData }: { rowData: AddId<DiffReport> }">
           <DiffReportsStatusCell
-            v-if="isTwoLocationReport(rowData)"
+            v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
             :report="rowData"
           />
         </template>
 
         <template #configs="{ rowData }: { rowData: AddId<DiffReport> }">
           <DiffReportsConfigsCell
-            v-if="isTwoLocationReport(rowData)"
+            v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
             :report="rowData"
           />
         </template>

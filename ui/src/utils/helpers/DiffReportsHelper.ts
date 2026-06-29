@@ -56,6 +56,10 @@ export abstract class DiffReportsHelper {
     return false;
   }
 
+  static isTwoLocationReport(report: DiffReport): boolean {
+    return report.locations.length === 2;
+  }
+
   static getStatusSortOrder(report: DiffReport): number {
     if (!report.ready) return 0; // checking
 
