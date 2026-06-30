@@ -38,6 +38,7 @@ interface ChorusDiffReportsState {
 
   selectedReportIds: string[];
   isDeleteSelectedProcessing: boolean;
+  isRestartSelectedProcessing: boolean;
 
   filterDirections: string[];
   filterBuckets: string[];
@@ -60,6 +61,7 @@ function getInitialState(): ChorusDiffReportsState {
 
     selectedReportIds: [],
     isDeleteSelectedProcessing: false,
+    isRestartSelectedProcessing: false,
 
     filterDirections: [],
     filterBuckets: [],
@@ -203,6 +205,33 @@ export const useChorusDiffReportsStore = defineStore('chorusDiffReport', () => {
     return { successList, errorList };
   }
 
+  async function restartDiffReports(reports: AddId<DiffReport>[]) {
+    state.isRestartSelectedProcessing = true;
+
+    await stopPolling();
+
+    const successList: AddId<DiffReport>[] = [];
+    const errorList: AddId<DiffReport>[] = [];
+
+    await Promise.all(
+      reports.map(async (report) => {
+        try {
+          await ChorusService.restartDiffReport({
+            locations: report.locations,
+          });
+          successList.push(report);
+        } catch {
+          errorList.push(report);
+        }
+      }),
+    );
+
+    startPolling();
+    state.isRestartSelectedProcessing = false;
+
+    return { successList, errorList };
+  }
+
   async function getDiffReports() {
     const res = await ChorusService.getDiffReports();
 
@@ -284,6 +313,7 @@ export const useChorusDiffReportsStore = defineStore('chorusDiffReport', () => {
     selectedReports,
     clearFilters,
     deleteDiffReports,
+    restartDiffReports,
     initDiffReportPage,
     $reset,
   };

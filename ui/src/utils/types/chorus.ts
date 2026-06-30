@@ -324,3 +324,5 @@ export enum DiffReportStatusFilter {
 export interface DiffReportDeleteRequest {
   locations: DiffReportLocation[];
 }
+
+export type DiffReportRestartRequest = DiffReportDeleteRequest;

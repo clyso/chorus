@@ -83,6 +83,36 @@ export default <I18nMessages>{
     deleteDiffReportsCancelAction: 'Cancel',
     deleteDiffReportsDeleteAction: 'Delete',
     deleteDiffReportsSelected: 'Delete {total} selected',
+
+    restartDiffReportSuccessTitle: 'Restarted!',
+    restartDiffReportSuccessContent: 'Diff report restarted:',
+    restartDiffReportErrorTitle: 'Restart failed!',
+    restartDiffReportErrorAction: 'Retry',
+    restartDiffReportErrorContent:
+      'An error occurred while restarting the diff report:',
+    restartDiffReportConfirmTitle: 'Restart Diff Report',
+    restartDiffReportConfirmContent:
+      'You are about to restart the diff report generation for the following diff report:',
+    restartDiffReportConfirmQuestion: 'Are you sure you want to proceed?',
+    restartDiffReportConfirmAction: 'Restart',
+    restartDiffReportCancelAction: 'Cancel',
+    restartDiffReportRestartAction: 'Restart',
+
+    restartDiffReportsSuccessTitle: 'Restarted!',
+    restartDiffReportsSuccessContent:
+      'The following {total} diff reports have been restarted:',
+    restartDiffReportsErrorTitle: 'Restart failed!',
+    restartDiffReportsErrorAction: 'Retry',
+    restartDiffReportsErrorContent:
+      'An error occurred while restarting the following {total} diff reports:',
+    restartDiffReportsConfirmTitle: 'Restart Diff Reports',
+    restartDiffReportsConfirmContent:
+      'You are about to restart the diff report generation for the following {total} diff reports:',
+    restartDiffReportsConfirmQuestion: 'Are you sure you want to proceed?',
+    restartDiffReportsConfirmAction: 'Restart',
+    restartDiffReportsCancelAction: 'Cancel',
+    restartDiffReportsRestartAction: 'Restart',
+    restartDiffReportsSelected: 'Restart {total} selected',
   },
   [I18nLocale.DE]: {
     diffReportTitle: 'Diff-Reports',
@@ -153,5 +183,37 @@ export default <I18nMessages>{
     deleteDiffReportsCancelAction: 'Abbrechen',
     deleteDiffReportsDeleteAction: 'Löschen',
     deleteDiffReportsSelected: '{total} ausgewählte löschen',
+
+    restartDiffReportSuccessTitle: 'Neugestartet!',
+    restartDiffReportSuccessContent: 'Diff-Report neugestartet:',
+    restartDiffReportErrorTitle: 'Neustart fehlgeschlagen!',
+    restartDiffReportErrorAction: 'Erneut versuchen',
+    restartDiffReportErrorContent:
+      'Beim Neustart des Diff-Reports ist ein Fehler aufgetreten:',
+    restartDiffReportConfirmTitle: 'Diff-Report neustarten',
+    restartDiffReportConfirmContent:
+      'Sie sind dabei, die Diff-Report-Generierung für den folgenden Diff-Report neu zu starten:',
+    restartDiffReportConfirmQuestion:
+      'Sind Sie sicher, dass Sie fortfahren möchten?',
+    restartDiffReportConfirmAction: 'Neustarten',
+    restartDiffReportCancelAction: 'Abbrechen',
+    restartDiffReportRestartAction: 'Neustarten',
+
+    restartDiffReportsSuccessTitle: 'Neugestartet!',
+    restartDiffReportsSuccessContent:
+      'Die folgenden {total} Diff-Reports wurden neugestartet:',
+    restartDiffReportsErrorTitle: 'Neustart fehlgeschlagen!',
+    restartDiffReportsErrorAction: 'Erneut versuchen',
+    restartDiffReportsErrorContent:
+      'Beim Neustart der folgenden {total} Diff-Reports ist ein Fehler aufgetreten:',
+    restartDiffReportsConfirmTitle: 'Diff-Reports neustarten',
+    restartDiffReportsConfirmContent:
+      'Sie sind dabei, die Diff-Report-Generierung für die folgenden {total} Diff-Reports neu zu starten:',
+    restartDiffReportsConfirmQuestion:
+      'Sind Sie sicher, dass Sie fortfahren möchten?',
+    restartDiffReportsConfirmAction: 'Neustarten',
+    restartDiffReportsCancelAction: 'Abbrechen',
+    restartDiffReportsRestartAction: 'Neustarten',
+    restartDiffReportsSelected: '{total} ausgewählte neustarten',
   },
 };

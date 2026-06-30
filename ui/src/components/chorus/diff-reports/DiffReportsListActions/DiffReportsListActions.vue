@@ -37,14 +37,16 @@
   const { t } = useI18n({ messages: i18nDiffReports });
 
   const {
-    selectedReportsCount,
     isAnyReportsSelected,
     selectedReports,
     isDeleteSelectedProcessing,
+    isRestartSelectedProcessing,
   } = storeToRefs(useChorusDiffReportsStore());
 
-  const { deleteDiffReports: storeDeleteDiffReports } =
-    useChorusDiffReportsStore();
+  const {
+    deleteDiffReports: storeDeleteDiffReports,
+    restartDiffReports: storeRestartDiffReports,
+  } = useChorusDiffReportsStore();
   const { createNotification } = useChorusNotification();
   const { createDialog } = useDialog();
 
@@ -52,20 +54,83 @@
    * Filter out reports with more than 2 locations. These have to be handled on
    * CLI.
    */
-  const selectedDiffReportsForDelete = computed(() =>
+  const actionableReports = computed(() =>
     selectedReports.value.filter((report) =>
       DiffReportsHelper.isTwoLocationReport(report),
     ),
   );
 
-  const isDeleteDisabled = computed(
-    () =>
-      !isAnyReportsSelected.value ||
-      selectedDiffReportsForDelete.value.length === 0,
+  const isActionDisabled = computed(
+    () => !isAnyReportsSelected.value || actionableReports.value.length === 0,
   );
 
+  async function restartDiffReports(
+    reports: AddId<DiffReport>[] = actionableReports.value,
+  ) {
+    const { successList, errorList } = await storeRestartDiffReports(reports);
+
+    if (successList.length > 0) {
+      createNotification({
+        type: 'success',
+        title: t('restartDiffReportsSuccessTitle'),
+        duration: 4000,
+        content: () =>
+          h('div', [
+            t('restartDiffReportsSuccessContent', {
+              total: successList.length,
+            }),
+            h(DiffReportsShortList, { reports: successList }),
+          ]),
+      });
+    }
+
+    if (errorList.length > 0) {
+      createNotification({
+        type: 'error',
+        title: t('restartDiffReportsErrorTitle'),
+        positiveText: t('restartDiffReportsErrorAction'),
+        positiveHandler: () => {
+          restartDiffReports(errorList);
+        },
+        content: () =>
+          h('div', [
+            t('restartDiffReportsErrorContent', {
+              total: errorList.length,
+            }),
+            h(DiffReportsShortList, { reports: errorList }),
+          ]),
+      });
+    }
+  }
+
+  function handleDiffReportsRestart() {
+    createDialog({
+      type: 'warning',
+      iconName: IconName.BASE_REFRESH,
+      title: t('restartDiffReportsConfirmTitle'),
+      content: () => [
+        h(
+          'div',
+          { style: 'margin-bottom: 8px' },
+          t('restartDiffReportsConfirmContent', {
+            total: actionableReports.value.length,
+          }),
+        ),
+        h(DiffReportsShortList, {
+          reports: actionableReports.value,
+          size: 'medium',
+          style: 'margin-bottom: 8px',
+        }),
+        t('restartDiffReportsConfirmQuestion'),
+      ],
+      positiveText: t('restartDiffReportsConfirmAction'),
+      negativeText: t('restartDiffReportsCancelAction'),
+      positiveHandler: () => restartDiffReports(),
+    });
+  }
+
   async function deleteDiffReports(
-    reports: AddId<DiffReport>[] = selectedDiffReportsForDelete.value,
+    reports: AddId<DiffReport>[] = actionableReports.value,
   ) {
     const { successList, errorList } = await storeDeleteDiffReports(reports);
 
@@ -111,7 +176,7 @@
           t('deleteDiffReportsConfirmContent'),
         ),
         h(DiffReportsShortList, {
-          reports: selectedDiffReportsForDelete.value,
+          reports: actionableReports.value,
           size: 'medium',
           style: 'margin-bottom: 8px',
         }),
@@ -131,12 +196,47 @@
         <template #trigger>
           <CBadge
             :offset="[-4, 0]"
-            :value="selectedDiffReportsForDelete.length"
+            :value="actionableReports.length"
             :max="100"
           >
             <CButton
               secondary
-              :disabled="isDeleteDisabled"
+              :disabled="isActionDisabled"
+              :loading="isRestartSelectedProcessing"
+              size="medium"
+              type="warning"
+              @click="handleDiffReportsRestart"
+            >
+              <template #icon>
+                <CIcon
+                  :is-inline="true"
+                  :name="IconName.BASE_REFRESH"
+                />
+              </template>
+            </CButton>
+          </CBadge>
+        </template>
+
+        <template v-if="!isAnyReportsSelected">
+          {{ t('restartDiffReportsRestartAction') }}
+        </template>
+        <template v-else>
+          {{
+            t('restartDiffReportsSelected', { total: actionableReports.length })
+          }}
+        </template>
+      </CTooltip>
+
+      <CTooltip :delay="1000">
+        <template #trigger>
+          <CBadge
+            :offset="[-4, 0]"
+            :value="actionableReports.length"
+            :max="100"
+          >
+            <CButton
+              secondary
+              :disabled="isActionDisabled"
               :loading="isDeleteSelectedProcessing"
               size="medium"
               type="error"
@@ -156,7 +256,9 @@
           {{ t('deleteDiffReportsDeleteAction') }}
         </template>
         <template v-else>
-          {{ t('deleteDiffReportsSelected', { total: selectedReportsCount }) }}
+          {{
+            t('deleteDiffReportsSelected', { total: actionableReports.length })
+          }}
         </template>
       </CTooltip>
     </div>

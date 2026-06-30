@@ -26,6 +26,7 @@ import type {
   ChorusReplicationId,
   ChorusReplicationListResponse,
   DiffReportDeleteRequest,
+  DiffReportRestartRequest,
   DiffReportListResponse,
   RoutingPolicyListRequest,
   RoutingPolicyListResponse,
@@ -165,6 +166,12 @@ export abstract class ChorusService {
     payload: DiffReportDeleteRequest,
   ): Promise<void> {
     await apiClient.put(ApiHelper.getChorusAPIUrl('/diff/delete'), payload);
+  }
+
+  static async restartDiffReport(
+    payload: DiffReportRestartRequest,
+  ): Promise<void> {
+    await apiClient.put(ApiHelper.getChorusAPIUrl('/diff/restart'), payload);
   }
 
   static async getDiffReports(): Promise<DiffReportListResponse> {
