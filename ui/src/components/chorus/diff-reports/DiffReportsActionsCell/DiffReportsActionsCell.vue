@@ -32,10 +32,11 @@
     report: AddId<DiffReport>;
   }>();
 
-  const { deleteDiffReports } = useChorusDiffReportsStore();
+  const { deleteDiffReports, restartDiffReports } = useChorusDiffReportsStore();
   const { createNotification } = useChorusNotification();
   const { createDialog } = useDialog();
   const isDeleteLoading = ref(false);
+  const isRestartLoading = ref(false);
 
   async function deleteDiffReport() {
     isDeleteLoading.value = true;
@@ -74,6 +75,67 @@
     }
   }
 
+  async function restartDiffReport() {
+    isRestartLoading.value = true;
+
+    const { successList, errorList } = await restartDiffReports([report]);
+
+    isRestartLoading.value = false;
+
+    if (successList.length > 0) {
+      createNotification({
+        type: 'success',
+        title: t('restartDiffReportSuccessTitle'),
+        duration: 4000,
+        content: () =>
+          h('div', [
+            t('restartDiffReportSuccessContent'),
+            h(DiffReportsShortList, { reports: successList }),
+          ]),
+      });
+    }
+
+    if (errorList.length > 0) {
+      createNotification({
+        type: 'error',
+        title: t('restartDiffReportErrorTitle'),
+        positiveText: t('restartDiffReportErrorAction'),
+        positiveHandler: () => {
+          restartDiffReport();
+        },
+        content: () =>
+          h('div', [
+            t('restartDiffReportErrorContent'),
+            h(DiffReportsShortList, { reports: errorList }),
+          ]),
+      });
+    }
+  }
+
+  function handleDiffReportRestart() {
+    createDialog({
+      type: 'warning',
+      iconName: IconName.BASE_REFRESH,
+      title: t('restartDiffReportConfirmTitle'),
+      content: () => [
+        h(
+          'div',
+          { style: 'margin-bottom: 8px' },
+          t('restartDiffReportConfirmContent'),
+        ),
+        h(DiffReportsShortList, {
+          reports: [report],
+          size: 'medium',
+          style: 'margin-bottom: 8px',
+        }),
+        t('restartDiffReportConfirmQuestion'),
+      ],
+      positiveText: t('restartDiffReportConfirmAction'),
+      negativeText: t('restartDiffReportCancelAction'),
+      positiveHandler: () => restartDiffReport(),
+    });
+  }
+
   function handleDiffReportDelete() {
     createDialog({
       type: 'error',
@@ -103,6 +165,30 @@
   <div class="diff-reports-actions">
     <div class="diff-reports-actions__list">
       <div
+        class="diff-reports-actions__item diff-reports-actions__item--restart"
+      >
+        <CTooltip :delay="1000">
+          <template #trigger>
+            <CButton
+              secondary
+              size="tiny"
+              type="warning"
+              :loading="isRestartLoading"
+              @click="handleDiffReportRestart"
+            >
+              <template #icon>
+                <CIcon
+                  :is-inline="true"
+                  :name="IconName.BASE_REFRESH"
+                />
+              </template>
+            </CButton>
+          </template>
+
+          {{ t('restartDiffReportRestartAction') }}
+        </CTooltip>
+      </div>
+      <div
         class="diff-reports-actions__item diff-reports-actions__item--delete"
       >
         <CTooltip :delay="1000">
@@ -129,3 +215,14 @@
     </div>
   </div>
 </template>
+
+<style lang="scss" scoped>
+  @use '@/styles/utils' as utils;
+
+  .diff-reports-actions {
+    .diff-reports-actions__list {
+      display: flex;
+      gap: utils.unit(1);
+    }
+  }
+</style>
