@@ -21,6 +21,7 @@
   import RoutingPoliciesList from '../RoutingPoliciesList/RoutingPoliciesList.vue';
   import RoutingPoliciesFilters from '../RoutingPoliciesFilters/RoutingPoliciesFilters.vue';
   import RoutingPoliciesListActions from '../RoutingPoliciesListActions/RoutingPoliciesListActions.vue';
+  import RoutingPoliciesListTags from '@/components/chorus/routing-policies/RoutingPoliciesListTags/RoutingPoliciesListTags.vue';
 
   const { t } = useI18n({
     messages: i18nRoutingPolicies,
@@ -34,6 +35,8 @@
     </template>
 
     <RoutingPoliciesFilters class="routing-policies-tile__filters" />
+
+    <RoutingPoliciesListTags class="routing-policies-tile__tags" />
 
     <RoutingPoliciesListActions class="routing-policies-tile__actions" />
 

@@ -21,6 +21,7 @@
   import DiffReportsList from '@/components/chorus/diff-reports/DiffReportsList/DiffReportsList.vue';
   import DiffReportsFilters from '@/components/chorus/diff-reports/DiffReportsFilters/DiffReportsFilters.vue';
   import DiffReportsListActions from '@/components/chorus/diff-reports/DiffReportsListActions/DiffReportsListActions.vue';
+  import DiffReportsListTags from '@/components/chorus/diff-reports/DiffReportsListTags/DiffReportsListTags.vue';
 
   const { t } = useI18n({
     messages: i18nDiffReports,
@@ -35,6 +36,8 @@
 
     <DiffReportsFilters class="diff-reports-tile__filters" />
 
+    <DiffReportsListTags class="diff-reports-tile__tags" />
+
     <DiffReportsListActions class="diff-reports-tile__actions" />
 
     <DiffReportsList class="diff-reports-tile__diff-reports" />
@@ -47,6 +50,10 @@
   .diff-reports-tile {
     &__filters {
       margin-bottom: utils.unit(6);
+    }
+
+    &__tags {
+      margin-bottom: utils.unit(4);
     }
 
     &__actions {

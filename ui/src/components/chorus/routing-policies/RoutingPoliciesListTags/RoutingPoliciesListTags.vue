@@ -16,20 +16,20 @@
 
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
-  import { useChorusReplicationsStore } from '@/stores/chorusReplicationsStore';
+  import { useChorusRoutingPoliciesStore } from '@/stores/chorusRoutingPoliciesStore';
   import ChorusListTags from '@/components/chorus/common/ChorusListTags/ChorusListTags.vue';
 
-  const { selectedReplicationIds, selectedReplicationsCount, isFiltered } =
-    storeToRefs(useChorusReplicationsStore());
+  const { selectedRoutingPolicyIds, selectedRoutingPoliciesCount, isFiltered } =
+    storeToRefs(useChorusRoutingPoliciesStore());
 
-  const { clearFilters } = useChorusReplicationsStore();
+  const { clearFilters } = useChorusRoutingPoliciesStore();
 </script>
 
 <template>
   <ChorusListTags
-    :selected-count="selectedReplicationsCount"
+    :selected-count="selectedRoutingPoliciesCount"
     :is-filtered="isFiltered"
-    @clear-selection="selectedReplicationIds = []"
+    @clear-selection="selectedRoutingPolicyIds = []"
     @clear-filters="clearFilters"
   />
 </template>
