@@ -103,8 +103,6 @@ export default <I18nMessages>{
     actionResumeSelected: 'Resume {total} selected replications',
     actionPauseSelected: 'Pause {total} selected replications',
     actionDeleteSelected: 'Delete {total} selected replications',
-    tagSelectedReplications: '{total} replications selected',
-    tagClearFilters: 'Filters applied',
     actionSelectedResumeTitle: 'Resume selected',
     actionSelectedResumeContent:
       'You are about to resume the following {total} replications:',
@@ -239,8 +237,6 @@ export default <I18nMessages>{
     actionResumeSelected: 'Fortsetzen {total} ausgewählter Replikationen',
     actionPauseSelected: 'Pausieren {total} ausgewählter Replikationen',
     actionDeleteSelected: 'Löschen {total} ausgewählter Replikationen',
-    tagSelectedReplications: '{total} Replikationen ausgewählt',
-    tagClearFilters: 'Filter angewendet',
     actionSelectedResumeTitle: 'Ausgewählte fortsetzen',
     actionSelectedResumeContent:
       'Sie sind dabei, die folgenden {total} Replikationen fortzusetzen:',
