@@ -28,6 +28,7 @@
   import { useChorusDiffReportsStore } from '@/stores/chorusDiffReportsStore';
   import i18nDiffReports from '@/components/chorus/diff-reports/i18nDiffReports';
   import { IconName } from '@/utils/types/icon';
+  import { RouteName } from '@/utils/types/router';
   import { useChorusNotification } from '@/utils/composables/useChorusNotification';
   import DiffReportsShortList from '@/components/chorus/diff-reports/DiffReportsShortList/DiffReportsShortList.vue';
   import { DiffReportsHelper } from '@/utils/helpers/DiffReportsHelper';
@@ -191,6 +192,26 @@
 
 <template>
   <div class="diff-reports-list-actions">
+    <div class="diff-reports-list-actions__creation">
+      <RouterLink :to="{ name: RouteName.CHORUS_ADD_DIFF_REPORT }">
+        <CButton
+          type="primary"
+          size="medium"
+          ghost
+          class="add-diff-report-button"
+          tag="div"
+        >
+          <template #icon>
+            <CIcon
+              :is-inline="true"
+              :name="IconName.BASE_ADD"
+            />
+          </template>
+          {{ t('actionCreateDiffReport') }}
+        </CButton>
+      </RouterLink>
+    </div>
+
     <div class="diff-reports-list-actions__selection-actions">
       <CTooltip :delay="1000">
         <template #trigger>
@@ -270,6 +291,7 @@
 
   .diff-reports-list-actions {
     display: flex;
+    flex-direction: row-reverse;
     justify-content: space-between;
     gap: utils.unit(2);
 
