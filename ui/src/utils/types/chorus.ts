@@ -326,3 +326,11 @@ export interface DiffReportDeleteRequest {
 }
 
 export type DiffReportRestartRequest = DiffReportDeleteRequest;
+
+export interface AddDiffReportRequest {
+  locations: DiffReportLocation[];
+  user: string;
+  checkOnlyLastVersions: boolean;
+  ignoreEtags: boolean;
+  ignoreSizes: boolean;
+}

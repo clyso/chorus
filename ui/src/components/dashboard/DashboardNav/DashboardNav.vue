@@ -78,6 +78,13 @@
         );
       }
 
+      if (tab.name === RouteName.CHORUS_DIFF_REPORTS) {
+        return (
+          routeName.value === RouteName.CHORUS_DIFF_REPORTS ||
+          routeName.value === RouteName.CHORUS_ADD_DIFF_REPORT
+        );
+      }
+
       return tab.name === routeName.value;
     });
 

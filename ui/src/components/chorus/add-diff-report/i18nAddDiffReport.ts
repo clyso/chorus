@@ -14,17 +14,16 @@
  *  limitations under the License.
  */
 
-export enum RouteName {
-  LOGIN = 'LOGIN',
-  CHORUS_HOME = 'CHORUS_HOME',
-  CHORUS_REPLICATION = 'CHORUS_REPLICATION',
-  CHORUS_ADD_REPLICATION = 'CHORUS_ADD_REPLICATION',
-  CHORUS_STORAGES = 'CHORUS_STORAGES',
-  CHORUS_STORAGE_DETAILS = 'CHORUS_STORAGE_DETAILS',
-  CHORUS_MONITORING = 'CHORUS_MONITORING',
-  CHORUS_ROUTING_POLICIES = 'CHORUS_ROUTING_POLICIES',
-  CHORUS_ADD_ROUTING_POLICY = 'CHORUS_ADD_ROUTING_POLICY',
-  CHORUS_SET_CREDENTIAL = 'CHORUS_SET_CREDENTIAL',
-  CHORUS_DIFF_REPORTS = 'CHORUS_DIFF_REPORTS',
-  CHORUS_ADD_DIFF_REPORT = 'CHORUS_ADD_DIFF_REPORT',
-}
+import { I18nLocale, type I18nMessages } from '@clyso/clyso-ui-kit';
+
+export default <I18nMessages>{
+  [I18nLocale.EN]: {
+    // Breadcrumbs
+    breadcrumbDiffReports: 'Diff Reports',
+    breadcrumbCreateDiffReport: 'Add Diff Report',
+  },
+  [I18nLocale.DE]: {
+    breadcrumbDiffReports: 'Diff-Reports',
+    breadcrumbCreateDiffReport: 'Diff-Report hinzufügen',
+  },
+};
