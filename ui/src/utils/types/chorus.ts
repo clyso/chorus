@@ -334,3 +334,10 @@ export interface AddDiffReportRequest {
   ignoreEtags: boolean;
   ignoreSizes: boolean;
 }
+
+export enum AddDiffReportStepName {
+  'FROM_STORAGE_BUCKET' = 1,
+  'TO_STORAGE_BUCKET' = 2,
+  'USER' = 3,
+  'SETTINGS' = 4,
+}

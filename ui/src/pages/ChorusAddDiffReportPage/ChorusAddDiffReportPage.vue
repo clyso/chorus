@@ -25,6 +25,7 @@
   import { RouteName } from '@/utils/types/router';
   import { useChorusAddDiffReportStore } from '@/stores/chorusAddDiffReportStore';
   import i18nAddDiffReport from '@/components/chorus/add-diff-report/i18nAddDiffReport';
+  import AddDiffReportTile from '@/components/chorus/add-diff-report/AddDiffReportTile/AddDiffReportTile.vue';
 
   const { t } = useI18n({ messages: i18nAddDiffReport });
   const { initAddDiffReportPage, $reset } = useChorusAddDiffReportStore();
@@ -50,5 +51,7 @@
         </CBreadcrumbItem>
       </CBreadcrumb>
     </template>
+
+    <AddDiffReportTile />
   </CDashboardPage>
 </template>
