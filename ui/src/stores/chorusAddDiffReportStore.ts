@@ -16,7 +16,7 @@
 
 import type { Step } from '@clyso/clyso-ui-kit';
 import { defineStore } from 'pinia';
-import { computed, reactive, toRefs } from 'vue';
+import { computed, reactive, toRefs, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { helpers } from '@vuelidate/validators';
 import useVuelidate from '@vuelidate/core';
@@ -43,6 +43,8 @@ interface ChorusAddDiffReportState {
   storages: ChorusStorage[];
   fromStorage: ChorusStorage | null;
   fromBucketName: string;
+  toStorage: ChorusStorage | null;
+  toBucketName: string;
 
   currentStep: AddDiffReportStepName;
 
@@ -57,6 +59,8 @@ function getInitialState(): ChorusAddDiffReportState {
     storages: [],
     fromStorage: null,
     fromBucketName: '',
+    toStorage: null,
+    toBucketName: '',
 
     currentStep: AddDiffReportStepName.FROM_STORAGE_BUCKET,
 
@@ -124,6 +128,13 @@ export const useChorusAddDiffReportStore = defineStore(
         ),
       },
       fromBucketName: bucketNameValidationRules(),
+      toStorage: {
+        required: helpers.withMessage(
+          t('toStorageRequired'),
+          (value: ChorusStorage | null) => !!value,
+        ),
+      },
+      toBucketName: bucketNameValidationRules(),
     }));
 
     const validator = useVuelidate(validationRules, state);
@@ -133,7 +144,7 @@ export const useChorusAddDiffReportStore = defineStore(
         'fromStorage',
         'fromBucketName',
       ],
-      [AddDiffReportStepName.TO_STORAGE_BUCKET]: [],
+      [AddDiffReportStepName.TO_STORAGE_BUCKET]: ['toStorage', 'toBucketName'],
       [AddDiffReportStepName.USER]: [],
       [AddDiffReportStepName.SETTINGS]: [],
     };
@@ -162,6 +173,29 @@ export const useChorusAddDiffReportStore = defineStore(
       }
     }
 
+    function findStorageToCompare(
+      excludedStorage: ChorusStorage,
+    ): ChorusStorage | null {
+      return (
+        state.storages.find(
+          (storage) => storage.name !== excludedStorage.name,
+        ) ?? null
+      );
+    }
+
+    watch(
+      () => state.fromStorage,
+      (newFromStorage) => {
+        if (
+          newFromStorage &&
+          state.toStorage &&
+          state.toStorage.name === newFromStorage.name
+        ) {
+          state.toStorage = findStorageToCompare(newFromStorage);
+        }
+      },
+    );
+
     function prepareForm() {
       const mainStorage =
         state.storages.find((storage) => storage.isMain) ??
@@ -169,6 +203,7 @@ export const useChorusAddDiffReportStore = defineStore(
         null;
 
       state.fromStorage = mainStorage;
+      state.toStorage = mainStorage ? findStorageToCompare(mainStorage) : null;
     }
 
     function $reset() {
