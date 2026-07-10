@@ -48,6 +48,10 @@ interface ChorusAddDiffReportState {
 
   selectedUser: string | null;
 
+  checkOnlyLastVersions: boolean;
+  ignoreEtags: boolean;
+  ignoreSizes: boolean;
+
   currentStep: AddDiffReportStepName;
 
   isSubmitting: boolean;
@@ -65,6 +69,10 @@ function getInitialState(): ChorusAddDiffReportState {
     toBucketName: '',
 
     selectedUser: null,
+
+    checkOnlyLastVersions: true,
+    ignoreEtags: false,
+    ignoreSizes: false,
 
     currentStep: AddDiffReportStepName.FROM_STORAGE_BUCKET,
 

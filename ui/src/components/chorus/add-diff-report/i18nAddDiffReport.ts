@@ -82,6 +82,17 @@ export default <I18nMessages>{
     noUsersTitle: 'No User Credentials Found',
     noUsersText:
       'No users with credentials on both selected storages were found.',
+    // Additional settings section
+    additionalSettingsTitle: 'Additional Settings',
+    checkOnlyLastVersionsLabel: 'Check only last versions',
+    checkOnlyLastVersionsDescription:
+      'Verify only the latest version of each object. Disabled it to check historical versions as well.',
+    ignoreEtagsLabel: 'Ignore ETags',
+    ignoreEtagsDescription:
+      'Skip checksum comparison based on ETags. Helpful when comparing data between different cloud providers that calculate hashes differently.',
+    ignoreSizesLabel: 'Ignore Sizes',
+    ignoreSizesDescription:
+      'Skip object size verification. Use this if payload sizes differ due to automated server-side transformation or encryption during transit.',
   },
   [I18nLocale.DE]: {
     breadcrumbDiffReports: 'Diff-Reports',
@@ -141,5 +152,15 @@ export default <I18nMessages>{
     noUsersTitle: 'Keine Benutzer-Credentials gefunden',
     noUsersText:
       'Es wurden keine Benutzer mit Credentials auf beiden ausgewählten Storages gefunden.',
+    additionalSettingsTitle: 'Erweiterte Einstellungen',
+    checkOnlyLastVersionsLabel: 'Nur letzte Versionen prüfen',
+    checkOnlyLastVersionsDescription:
+      'Überprüft nur die neueste Version jedes Objekts. Deaktivieren, um auch historische Versionen zu prüfen.',
+    ignoreEtagsLabel: 'ETags ignorieren',
+    ignoreEtagsDescription:
+      'Überspringt den Prüfsummenvergleich anhand von ETags. Hilfreich beim Vergleich zwischen verschiedenen Cloud-Anbietern mit unterschiedlicher Hash-Berechnung.',
+    ignoreSizesLabel: 'Größen ignorieren',
+    ignoreSizesDescription:
+      'Überspringt die Objektgrößenprüfung. Verwenden, wenn sich Payload-Größen durch serverseitige Transformation oder Verschlüsselung unterscheiden.',
   },
 };
