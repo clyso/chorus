@@ -95,7 +95,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		return fmt.Errorf("%w: unable to instrument tracing app redis", err)
 	}
 
-	credsSvc, err := objstore.NewCredsSvc(ctx, &conf.Storage, appRedis)
+	credsSvc, err := objstore.New(ctx, appRedis, conf.Storage.DynamicCredentials, &conf.Storage, nil)
 	if err != nil {
 		return err
 	}

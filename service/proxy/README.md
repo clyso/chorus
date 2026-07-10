@@ -38,3 +38,31 @@ For S3, Proxy supports S3 signature v4 (v2 can be enabled). See `auth` section i
 - `auth.custom` - use custom credentials for proxy endpoint
 
 For SWIFT, proxy does not perform authentication itself. It checks response status from forwarded requests to Swift storage.
+
+### Credential aliases
+
+Unlike the Worker, the Proxy supports multiple S3 credentials per user. Proxy S3 storage
+credentials are nested `user -> alias -> credential`:
+
+```yaml
+storage:
+  storages:
+    one:
+      address: s3.example.com
+      credentials:
+        user1:            # user (routing/replication policy key)
+          laptop:         # alias
+            accessKeyID: AKIA1
+            secretAccessKey: ...
+          ci:
+            accessKeyID: AKIA2
+            secretAccessKey: ...
+```
+
+The proxy authenticates callers by alias access key, keeps routing and replication policy
+keyed by user only, and re-signs forwarded requests with the target storage's credential of
+the same alias name. `auth.custom` uses the same nested form; each custom `(user, alias)`
+pair must exist in the main storage credentials.
+
+Aliases can also be added at runtime via the management API
+(`chorctl set-user --alias <name> ...`) - see [docs/dynamic-creds.md](../../docs/dynamic-creds.md).

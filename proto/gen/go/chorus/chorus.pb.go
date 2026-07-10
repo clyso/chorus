@@ -254,10 +254,14 @@ func (x *Storage) GetCredentials() []*Credential {
 }
 
 type Credential struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Alias         string                 `protobuf:"bytes,1,opt,name=alias,proto3" json:"alias,omitempty"`
-	AccessKey     string                 `protobuf:"bytes,2,opt,name=access_key,json=accessKey,proto3" json:"access_key,omitempty"`
-	SecretKey     string                 `protobuf:"bytes,3,opt,name=secret_key,json=secretKey,proto3" json:"secret_key,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Display name of the credential:
+	//   - in GetStoragesResponse: the user name
+	//   - in GetProxyCredentialsResponse: "<user>:<alias>" of the proxy alias
+	//     credential
+	Alias         string `protobuf:"bytes,1,opt,name=alias,proto3" json:"alias,omitempty"`
+	AccessKey     string `protobuf:"bytes,2,opt,name=access_key,json=accessKey,proto3" json:"access_key,omitempty"`
+	SecretKey     string `protobuf:"bytes,3,opt,name=secret_key,json=secretKey,proto3" json:"secret_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -366,11 +370,15 @@ func (x *GetProxyCredentialsResponse) GetCredentials() []*Credential {
 }
 
 type SetUserCredentialsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
-	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
-	S3Cred        *S3Credential          `protobuf:"bytes,3,opt,name=s3_cred,json=s3Cred,proto3,oneof" json:"s3_cred,omitempty"`
-	SwiftCred     *SwiftCredential       `protobuf:"bytes,4,opt,name=swift_cred,json=swiftCred,proto3,oneof" json:"swift_cred,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Storage   string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
+	User      string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	S3Cred    *S3Credential          `protobuf:"bytes,3,opt,name=s3_cred,json=s3Cred,proto3,oneof" json:"s3_cred,omitempty"`
+	SwiftCred *SwiftCredential       `protobuf:"bytes,4,opt,name=swift_cred,json=swiftCred,proto3,oneof" json:"swift_cred,omitempty"`
+	// Optional proxy alias name for the credential. S3 only.
+	// When set, the credential is stored as a proxy alias credential
+	// used by the proxy to authenticate and re-sign forwarded requests.
+	Alias         *string `protobuf:"bytes,5,opt,name=alias,proto3,oneof" json:"alias,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -431,6 +439,13 @@ func (x *SetUserCredentialsRequest) GetSwiftCred() *SwiftCredential {
 		return x.SwiftCred
 	}
 	return nil
+}
+
+func (x *SetUserCredentialsRequest) GetAlias() string {
+	if x != nil && x.Alias != nil {
+		return *x.Alias
+	}
+	return ""
 }
 
 type S3Credential struct {
@@ -582,16 +597,18 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"secret_key\x18\x03 \x01(\tR\tsecretKey\"m\n" +
 	"\x1bGetProxyCredentialsResponse\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x124\n" +
-	"\vcredentials\x18\x02 \x03(\v2\x12.chorus.CredentialR\vcredentials\"\xd5\x01\n" +
+	"\vcredentials\x18\x02 \x03(\v2\x12.chorus.CredentialR\vcredentials\"\xfa\x01\n" +
 	"\x19SetUserCredentialsRequest\x12\x18\n" +
 	"\astorage\x18\x01 \x01(\tR\astorage\x12\x12\n" +
 	"\x04user\x18\x02 \x01(\tR\x04user\x122\n" +
 	"\as3_cred\x18\x03 \x01(\v2\x14.chorus.S3CredentialH\x00R\x06s3Cred\x88\x01\x01\x12;\n" +
 	"\n" +
-	"swift_cred\x18\x04 \x01(\v2\x17.chorus.SwiftCredentialH\x01R\tswiftCred\x88\x01\x01B\n" +
+	"swift_cred\x18\x04 \x01(\v2\x17.chorus.SwiftCredentialH\x01R\tswiftCred\x88\x01\x01\x12\x19\n" +
+	"\x05alias\x18\x05 \x01(\tH\x02R\x05alias\x88\x01\x01B\n" +
 	"\n" +
 	"\b_s3_credB\r\n" +
-	"\v_swift_cred\"L\n" +
+	"\v_swift_credB\b\n" +
+	"\x06_alias\"L\n" +
 	"\fS3Credential\x12\x1d\n" +
 	"\n" +
 	"access_key\x18\x01 \x01(\tR\taccessKey\x12\x1d\n" +

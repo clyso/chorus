@@ -81,9 +81,10 @@ storage:
 # =============================================================================
 # CREDENTIALS (Secret)
 # =============================================================================
-# Storage credentials - stored in Kubernetes Secret
+# Worker storage credentials - stored in Kubernetes Secret
+# One credential per user per storage. Used by the worker for replication.
 credentials:
-  # Per-storage credentials
+  # Per-storage credentials: user -> credential
   storages: {}
     # S3 credentials example:
     # main:
@@ -100,8 +101,37 @@ credentials:
     #     tenantName: admin
 
 # Use existing secret instead of creating one
-# Secret must have 'config' key with YAML content matching override.yaml format
+# Secret must have 'config.yaml' key with YAML content matching worker override.yaml format
 existingCredentialsSecret: ""
+
+# =============================================================================
+# PROXY CREDENTIALS (Secret)
+# =============================================================================
+# Proxy S3 storage credentials - stored in a separate Kubernetes Secret.
+# Unlike the worker, the proxy supports multiple credentials per user:
+# user -> alias -> credential. The proxy authenticates callers by alias access
+# key, keeps routing/replication policy keyed by user, and re-signs forwarded
+# requests with the target storage's credential of the same alias name.
+proxyCredentials:
+  # Per-storage S3 credentials: user -> alias -> credential
+  storages: {}
+    # main:
+    #   user1:
+    #     laptop:  # alias name, joins credentials across storages
+    #       accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+    #       secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    #     ci:
+    #       accessKeyID: "AKIAI44QH8DHBEXAMPLE"
+    #       secretAccessKey: "je7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY"
+    # follower:
+    #   user1:
+    #     laptop:
+    #       accessKeyID: "BKIAIOSFODNN7EXAMPLE"
+    #       secretAccessKey: "xJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Use existing secret instead of creating one
+# Secret must have 'config.yaml' key with YAML content matching proxy override.yaml format
+existingProxyCredentialsSecret: ""
 
 # =============================================================================
 # FEATURES
@@ -218,11 +248,13 @@ proxy:
 
     auth:
       allowV2Signature: false
-      useStorage: "" # Use credentials from this storage
-      custom: {} # Or define custom credentials
+      useStorage: "" # Use proxy credentials of this storage (see proxyCredentials)
+      custom: {} # Or define custom credentials: user -> alias -> credential.
+        # Each (user, alias) pair must exist in the main storage proxy credentials.
         # user1:
-        #   accessKeyID: xxx
-        #   secretAccessKey: xxx
+        #   alias1:
+        #     accessKeyID: xxx
+        #     secretAccessKey: xxx
 
 # =============================================================================
 # WORKER

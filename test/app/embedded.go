@@ -479,12 +479,20 @@ func WorkerS3Config(main string, storages map[string]s3.Storage) objstore.Config
 func ProxyS3Config(main string, storages map[string]s3.Storage) proxy.Storages {
 	res := proxy.Storages{
 		Main:     main,
-		Storages: map[string]objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]{},
+		Storages: map[string]objstore.GenericStorage[*s3.ProxyStorage, *router.SwiftStorage]{},
 	}
 	for name, stor := range storages {
-		s := stor
-		res.Storages[name] = objstore.GenericStorage[*s3.Storage, *router.SwiftStorage]{
-			S3: &s,
+		// wrap each user credential under alias "default" so existing tests
+		// keep signing with the same keys and forwarding joins across storages
+		creds := make(map[string]map[string]s3.CredentialsV4, len(stor.Credentials))
+		for user, cred := range stor.Credentials {
+			creds[user] = map[string]s3.CredentialsV4{"default": cred}
+		}
+		res.Storages[name] = objstore.GenericStorage[*s3.ProxyStorage, *router.SwiftStorage]{
+			S3: &s3.ProxyStorage{
+				Credentials:    creds,
+				StorageAddress: stor.StorageAddress,
+			},
 			CommonConfig: objstore.CommonConfig{
 				Type: dom.S3,
 			},

@@ -35,7 +35,7 @@ func Test_credsSvc_Disabled(t *testing.T) {
 		},
 	}
 	r.False(conf.DynamicCredentials.Enabled)
-	s, err := NewCredsSvc(ctx, conf, nil)
+	s, err := New(ctx, nil, conf.DynamicCredentials, conf, nil)
 	r.NoError(err)
 
 	// HasUser returns from config
@@ -94,24 +94,16 @@ func Test_credsSvc_Disabled(t *testing.T) {
 		r.Error(err, "cannot add creds when dynamic credentials disabled")
 	})
 
-	t.Run("FindS3Credentials", func(t *testing.T) {
+	t.Run("proxy lookups fail fast in worker mode", func(t *testing.T) {
 		r := require.New(t)
 		creds := validS3.Credentials[validUser]
 
-		user, gotCreds, err := s.FindS3Credentials(s3Stor, creds.AccessKeyID)
-		r.NoError(err)
-		r.EqualValues(creds, gotCreds)
-		r.Equal(validUser, user)
-
-		// unknown access key
-		_, _, err = s.FindS3Credentials(s3Stor, "unknown_access_key")
-		r.Error(err)
-		// swift storage
-		_, _, err = s.FindS3Credentials(swiftStor, creds.AccessKeyID)
-		r.Error(err)
-		// secret key match is not supported
-		_, _, err = s.FindS3Credentials(s3Stor, creds.SecretAccessKey)
-		r.Error(err)
+		_, _, _, err := s.FindS3Credentials(s3Stor, creds.AccessKeyID)
+		r.ErrorIs(err, ErrRoleNotConfigured)
+		_, err = s.GetS3AliasCredentials(s3Stor, validUser, "alias")
+		r.ErrorIs(err, ErrRoleNotConfigured)
+		_, err = s.ListS3Aliases(s3Stor, validUser)
+		r.ErrorIs(err, ErrRoleNotConfigured)
 	})
 
 	t.Run("GetS3Address", func(t *testing.T) {
@@ -193,11 +185,11 @@ func Test_credsSvc_Enabled(t *testing.T) {
 			conf.DynamicCredentials.MasterPassword = "superseretlongpassword"
 
 			// create two instances to emlulate multiple replicas
-			svcA, err := NewCredsSvc(ctx, conf, c)
+			svcA, err := New(ctx, c, conf.DynamicCredentials, conf, nil)
 			r.NoError(err)
 			conf.DynamicCredentials.DisableEncryption = !enabled
 			conf.DynamicCredentials.MasterPassword = "superseretlongpassword"
-			svcB, err := NewCredsSvc(ctx, conf, c)
+			svcB, err := New(ctx, c, conf.DynamicCredentials, conf, nil)
 			r.NoError(err)
 
 			// veryfy existing creds from config
@@ -324,30 +316,11 @@ func Test_credsSvc_Enabled(t *testing.T) {
 			swiftUsersB := svcB.ListUsers(swiftStor)
 			r.Len(swiftUsersB, 1)
 			r.NotContains(swiftUsersB, newUser)
-			// test find existing by access key
-			user, creds, err := svcA.FindS3Credentials(s3Stor, validS3.Credentials[validUser].AccessKeyID)
-			r.NoError(err)
-			r.Equal(validUser, user)
-			r.EqualValues(validS3.Credentials[validUser], creds)
-			user, creds, err = svcB.FindS3Credentials(s3Stor, validS3.Credentials[validUser].AccessKeyID)
-			r.NoError(err)
-			r.Equal(validUser, user)
-			r.EqualValues(validS3.Credentials[validUser], creds)
-			// test find new by access key
-			user, creds, err = svcA.FindS3Credentials(s3Stor, newS3Creds.AccessKeyID)
-			r.NoError(err)
-			r.Equal(newUser, user)
-			r.EqualValues(newS3Creds, creds)
-			user, creds, err = svcB.FindS3Credentials(s3Stor, newS3Creds.AccessKeyID)
-			r.NoError(err)
-			r.Equal(newUser, user)
-			r.EqualValues(newS3Creds, creds)
-			// test cannot find new by secret key
-			_, _, err = svcA.FindS3Credentials(s3Stor, newS3Creds.SecretAccessKey)
-			r.Error(err)
-			// test cannot find on Swift storage
-			_, _, err = svcA.FindS3Credentials(swiftStor, newS3Creds.AccessKeyID)
-			r.Error(err)
+			// find by access key is proxy-only and fails fast in worker mode
+			_, _, _, err = svcA.FindS3Credentials(s3Stor, validS3.Credentials[validUser].AccessKeyID)
+			r.ErrorIs(err, ErrRoleNotConfigured)
+			_, _, _, err = svcB.FindS3Credentials(s3Stor, newS3Creds.AccessKeyID)
+			r.ErrorIs(err, ErrRoleNotConfigured)
 
 			// update new S3 creds via svcB
 			updatedS3Creds := s3.CredentialsV4{
@@ -461,7 +434,7 @@ func Test_credsSvc_Enabled(t *testing.T) {
 			r.Contains(swiftUsersB, newUser)
 
 			// verify that creds are stored encrypted in Redis
-			s3Key := credsToRedisField(dom.S3, s3Stor, newUser)
+			s3Key := credsToRedisField(dom.S3, s3Stor, newUser, "")
 			rawCred, err := c.HGet(ctx, redisHashKey, s3Key).Result()
 			r.NoError(err)
 			if enabled {
@@ -733,7 +706,7 @@ func Test_credsSvc_ValidateReplicationID(t *testing.T) {
 			ctx := t.Context()
 			r.NoError(c.FlushAll(ctx).Err())
 			// create two instances to emlulate multiple replicas
-			svcA, err := NewCredsSvc(ctx, conf, c)
+			svcA, err := New(ctx, c, conf.DynamicCredentials, conf, nil)
 			r.NoError(err)
 
 			if tt.dynamicS3Users != nil {
@@ -777,4 +750,272 @@ func Test_credsSvc_ValidateReplicationID(t *testing.T) {
 			}
 		})
 	}
+}
+
+var (
+	validAlias        = "alias1"
+	validProxyS3Creds = s3.CredentialsV4{
+		AccessKeyID:     "proxy_id",
+		SecretAccessKey: "proxy_key",
+	}
+	validProxyS3 = s3.ProxyStorage{
+		Credentials: map[string]map[string]s3.CredentialsV4{
+			validUser: {
+				validAlias: validProxyS3Creds,
+			},
+		},
+		StorageAddress: s3.StorageAddress{
+			Address:  "clyso.com",
+			Provider: "Ceph",
+			IsSecure: false,
+		},
+	}
+)
+
+func proxyTestConf(dc DynamicCredentialsConfig) *ProxyConfig {
+	stor := validProxyS3
+	return &ProxyConfig{
+		Main: "s3storage",
+		Storages: map[string]GenericStorage[*s3.ProxyStorage, *swift.Storage]{
+			"s3storage": {
+				CommonConfig: CommonConfig{Type: dom.S3},
+				S3:           &stor,
+			},
+		},
+		DynamicCredentials: dc,
+	}
+}
+
+func Test_credsRedisField_RoundTrip(t *testing.T) {
+	r := require.New(t)
+
+	// worker entry: 3 segments
+	field := credsToRedisField(dom.S3, "stor", "alice", "")
+	r.Equal("S3:stor:alice", field)
+	storType, storage, user, alias, err := credsFromRedisField(field)
+	r.NoError(err)
+	r.Equal(dom.S3, storType)
+	r.Equal("stor", storage)
+	r.Equal("alice", user)
+	r.Equal("", alias)
+
+	// proxy alias entry: 4 segments
+	field = credsToRedisField(dom.S3, "stor", "alice", "laptop")
+	r.Equal("S3:stor:alice:laptop", field)
+	storType, storage, user, alias, err = credsFromRedisField(field)
+	r.NoError(err)
+	r.Equal(dom.S3, storType)
+	r.Equal("stor", storage)
+	r.Equal("alice", user)
+	r.Equal("laptop", alias)
+
+	// invalid formats
+	_, _, _, _, err = credsFromRedisField("S3:stor")
+	r.Error(err)
+	_, _, _, _, err = credsFromRedisField("S3:stor:alice:laptop:extra")
+	r.Error(err)
+}
+
+func Test_credsSvc_ProxyMode_Static(t *testing.T) {
+	r := require.New(t)
+	ctx := t.Context()
+	conf := proxyTestConf(DynamicCredentialsConfig{Enabled: false})
+	s, err := New(ctx, nil, conf.DynamicCredentials, nil, conf)
+	r.NoError(err)
+
+	t.Run("FindS3Credentials", func(t *testing.T) {
+		r := require.New(t)
+		user, alias, cred, err := s.FindS3Credentials("s3storage", validProxyS3Creds.AccessKeyID)
+		r.NoError(err)
+		r.Equal(validUser, user)
+		r.Equal(validAlias, alias)
+		r.EqualValues(validProxyS3Creds, cred)
+
+		// unknown access key
+		_, _, _, err = s.FindS3Credentials("s3storage", "unknown_access_key")
+		r.Error(err)
+		// unknown storage
+		_, _, _, err = s.FindS3Credentials("unknownstorage", validProxyS3Creds.AccessKeyID)
+		r.Error(err)
+		// secret key match is not supported
+		_, _, _, err = s.FindS3Credentials("s3storage", validProxyS3Creds.SecretAccessKey)
+		r.Error(err)
+	})
+
+	t.Run("GetS3AliasCredentials", func(t *testing.T) {
+		r := require.New(t)
+		cred, err := s.GetS3AliasCredentials("s3storage", validUser, validAlias)
+		r.NoError(err)
+		r.EqualValues(validProxyS3Creds, cred)
+
+		_, err = s.GetS3AliasCredentials("s3storage", validUser, "unknownalias")
+		r.ErrorIs(err, dom.ErrNotFound)
+		_, err = s.GetS3AliasCredentials("s3storage", "unknownuser", validAlias)
+		r.ErrorIs(err, dom.ErrNotFound)
+		_, err = s.GetS3AliasCredentials("unknownstorage", validUser, validAlias)
+		r.ErrorIs(err, dom.ErrNotFound)
+	})
+
+	t.Run("ListS3Aliases", func(t *testing.T) {
+		r := require.New(t)
+		aliases, err := s.ListS3Aliases("s3storage", validUser)
+		r.NoError(err)
+		r.Equal([]string{validAlias}, aliases)
+
+		aliases, err = s.ListS3Aliases("s3storage", "unknownuser")
+		r.NoError(err)
+		r.Empty(aliases)
+	})
+
+	t.Run("worker lookups fail fast in proxy mode", func(t *testing.T) {
+		r := require.New(t)
+		_, err := s.GetS3Credentials("s3storage", validUser)
+		r.ErrorIs(err, ErrRoleNotConfigured)
+		_, err = s.GetSwiftCredentials("s3storage", validUser)
+		r.ErrorIs(err, ErrRoleNotConfigured)
+	})
+
+	t.Run("topology", func(t *testing.T) {
+		r := require.New(t)
+		r.Equal("s3storage", s.MainStorage())
+		r.Equal(map[string]dom.StorageType{"s3storage": dom.S3}, s.Storages())
+		addr, err := s.GetS3Address("s3storage")
+		r.NoError(err)
+		r.EqualValues(validProxyS3.StorageAddress, addr)
+		r.NoError(s.HasUser("s3storage", validUser))
+		r.Error(s.HasUser("s3storage", "unknownuser"))
+		users := s.ListUsers("s3storage")
+		r.Equal([]string{validUser}, users)
+	})
+}
+
+func Test_credsSvc_ProxyMode_Dynamic(t *testing.T) {
+	r := require.New(t)
+	ctx := t.Context()
+	c := testutil.SetupRedis(t)
+	pollInterval := 100 * time.Millisecond
+	dc := DynamicCredentialsConfig{
+		Enabled:           true,
+		DisableEncryption: true,
+		PollInterval:      pollInterval,
+	}
+	s3Stor, swiftStor := "s3storage", "swiftstorage"
+	workerConf := &Config{
+		Main: s3Stor,
+		Storages: map[string]Storage{
+			s3Stor: {
+				CommonConfig: CommonConfig{Type: dom.S3},
+				S3:           &validS3,
+			},
+			swiftStor: {
+				CommonConfig: CommonConfig{Type: dom.Swift},
+				Swift:        &validSwift,
+			},
+		},
+		DynamicCredentials: dc,
+	}
+	proxyConf := proxyTestConf(dc)
+
+	svcW, err := New(ctx, c, dc, workerConf, nil)
+	r.NoError(err)
+	svcP, err := New(ctx, c, dc, nil, proxyConf)
+	r.NoError(err)
+
+	t.Run("alias entry visible to proxy, ignored by worker", func(t *testing.T) {
+		r := require.New(t)
+		aliasCred := s3.CredentialsV4{
+			AccessKeyID:     "bob_laptop_key",
+			SecretAccessKey: "bob_laptop_secret",
+		}
+		// write via worker instance (as the management API would)
+		r.NoError(svcW.SetS3AliasCredentials(ctx, s3Stor, "bob", "laptop", aliasCred))
+
+		// proxy instance picks up the alias entry
+		r.Eventually(func() bool {
+			user, alias, cred, err := svcP.FindS3Credentials(s3Stor, aliasCred.AccessKeyID)
+			return err == nil && user == "bob" && alias == "laptop" && cred == aliasCred
+		}, pollInterval*3, pollInterval/2)
+		cred, err := svcP.GetS3AliasCredentials(s3Stor, "bob", "laptop")
+		r.NoError(err)
+		r.EqualValues(aliasCred, cred)
+		aliases, err := svcP.ListS3Aliases(s3Stor, "bob")
+		r.NoError(err)
+		r.Equal([]string{"laptop"}, aliases)
+		r.NoError(svcP.HasUser(s3Stor, "bob"))
+		r.Contains(svcP.ListUsers(s3Stor), "bob")
+
+		// worker instance ignores the alias entry
+		r.Error(svcW.HasUser(s3Stor, "bob"))
+		_, err = svcW.GetS3Credentials(s3Stor, "bob")
+		r.ErrorIs(err, dom.ErrNotFound)
+		r.NotContains(svcW.ListUsers(s3Stor), "bob")
+	})
+
+	t.Run("worker entry ignored by proxy", func(t *testing.T) {
+		r := require.New(t)
+		userCred := s3.CredentialsV4{
+			AccessKeyID:     "carol_key",
+			SecretAccessKey: "carol_secret",
+		}
+		r.NoError(svcW.SetS3Credentials(ctx, s3Stor, "carol", userCred))
+
+		// worker sees it
+		got, err := svcW.GetS3Credentials(s3Stor, "carol")
+		r.NoError(err)
+		r.EqualValues(userCred, got)
+
+		// wait until proxy syncs past the write, then confirm it is ignored
+		time.Sleep(pollInterval * 3)
+		_, _, _, err = svcP.FindS3Credentials(s3Stor, userCred.AccessKeyID)
+		r.ErrorIs(err, dom.ErrNotFound)
+		r.Error(svcP.HasUser(s3Stor, "carol"))
+		r.NotContains(svcP.ListUsers(s3Stor), "carol")
+	})
+
+	t.Run("static config precedence over dynamic alias", func(t *testing.T) {
+		r := require.New(t)
+		shadowCred := s3.CredentialsV4{
+			AccessKeyID:     "shadow_key",
+			SecretAccessKey: "shadow_secret",
+		}
+		// same (user, alias) as static config, different credentials
+		r.NoError(svcP.SetS3AliasCredentials(ctx, s3Stor, validUser, validAlias, shadowCred))
+		// static credential wins
+		cred, err := svcP.GetS3AliasCredentials(s3Stor, validUser, validAlias)
+		r.NoError(err)
+		r.EqualValues(validProxyS3Creds, cred)
+	})
+
+	t.Run("write and immediate readback", func(t *testing.T) {
+		r := require.New(t)
+		aliasCred := s3.CredentialsV4{
+			AccessKeyID:     "dave_ci_key",
+			SecretAccessKey: "dave_ci_secret",
+		}
+		r.NoError(svcP.SetS3AliasCredentials(ctx, s3Stor, "dave", "ci", aliasCred))
+		// storeCred syncs the writer immediately
+		cred, err := svcP.GetS3AliasCredentials(s3Stor, "dave", "ci")
+		r.NoError(err)
+		r.EqualValues(aliasCred, cred)
+	})
+
+	t.Run("write validation", func(t *testing.T) {
+		r := require.New(t)
+		cred := s3.CredentialsV4{
+			AccessKeyID:     "k",
+			SecretAccessKey: "s",
+		}
+		// alias creds are S3-only
+		r.Error(svcW.SetS3AliasCredentials(ctx, swiftStor, "bob", "laptop", cred))
+		// unknown storage
+		r.Error(svcW.SetS3AliasCredentials(ctx, "unknownstorage", "bob", "laptop", cred))
+		// empty alias
+		r.Error(svcW.SetS3AliasCredentials(ctx, s3Stor, "bob", "", cred))
+		// ':' is rejected in names
+		r.Error(svcW.SetS3AliasCredentials(ctx, s3Stor, "bob", "lap:top", cred))
+		r.Error(svcW.SetS3AliasCredentials(ctx, s3Stor, "bo:b", "laptop", cred))
+		r.Error(svcW.SetS3Credentials(ctx, s3Stor, "bo:b", cred))
+		// invalid credentials
+		r.Error(svcW.SetS3AliasCredentials(ctx, s3Stor, "bob", "laptop", s3.CredentialsV4{}))
+	})
 }

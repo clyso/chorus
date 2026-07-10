@@ -45,7 +45,10 @@ storage:
 
 ### Credentials
 
-Stored in Kubernetes Secret, separate from storage config:
+Stored in Kubernetes Secrets, separate from storage config. Worker and proxy
+use different credential models:
+
+**Worker** (`credentials`) - one credential per user per storage:
 
 ```yaml
 credentials:
@@ -55,6 +58,28 @@ credentials:
         accessKeyID: "..."
         secretAccessKey: "..."
 ```
+
+**Proxy** (`proxyCredentials`) - multiple credentials per user, keyed by alias
+(`user -> alias -> credential`). The proxy authenticates S3 clients by alias
+access key and re-signs forwarded requests with the target storage's credential
+of the same alias:
+
+```yaml
+proxyCredentials:
+  storages:
+    main:
+      user1:
+        laptop:
+          accessKeyID: "..."
+          secretAccessKey: "..."
+        ci:
+          accessKeyID: "..."
+          secretAccessKey: "..."
+```
+
+Required when the proxy is enabled with `proxy.config.auth.useStorage`. Routing
+and replication policies stay keyed by user; aliases only affect proxy
+authentication and request signing.
 
 ### Dynamic Credentials
 

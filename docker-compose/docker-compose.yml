@@ -55,9 +55,9 @@ services:
       - type: bind
         source: ./proxy-conf.yaml
         target: /bin/config/config.yaml
-      # common config: s3 credentials
+      # proxy s3 credentials (user -> alias -> credential)
       - type: bind
-        source: ./s3-credentials.yaml
+        source: ./proxy-s3-credentials.yaml
         target: /bin/config/override.yaml
     ports:
       - "9669:9669" # expose proxy s3 api

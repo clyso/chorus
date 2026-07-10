@@ -155,6 +155,18 @@ func Test_Dynamic_creds(t *testing.T) {
 			}
 		}
 	}
+	// register a proxy alias credential for the new user: the proxy
+	// authenticates only alias credentials, user-level entries are worker-only
+	alias := "default"
+	_, err = e.ChorusClient.SetUserCredentials(tstCtx, &pb.SetUserCredentialsRequest{
+		Storage: "main",
+		User:    newUser,
+		S3Cred:  newCred,
+		Alias:   &alias,
+	})
+	r.NoError(err, "success")
+	time.Sleep(dcInterval * 2)
+
 	// create s3 clients with new user creds
 	proxyAddr, err := e.ChorusClient.GetProxyCredentials(tstCtx, &emptypb.Empty{})
 	r.NoError(err)

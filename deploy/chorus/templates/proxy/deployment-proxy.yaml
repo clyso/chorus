@@ -19,7 +19,7 @@ spec:
         app.kubernetes.io/component: proxy
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/proxy/config.yaml") . | sha256sum }}
-        {{- if include "chorus.createCredentialsSecret" . }}
+        {{- if include "chorus.createProxyCredentialsSecret" . }}
         checksum/secret: {{ include (print $.Template.BasePath "/secrets/secret.yaml") . | sha256sum }}
         {{- end }}
         {{- if .Values.proxy.config.metrics.enabled }}
@@ -95,7 +95,7 @@ spec:
             - name: config
               mountPath: /bin/config/config.yaml
               subPath: config.yaml
-            {{- if or .Values.existingCredentialsSecret (include "chorus.createCredentialsSecret" .) }}
+            {{- if or .Values.existingProxyCredentialsSecret (include "chorus.createProxyCredentialsSecret" .) }}
             - name: credentials
               mountPath: /bin/config/override.yaml
               subPath: config.yaml
@@ -104,10 +104,10 @@ spec:
         - name: config
           configMap:
             name: {{ include "chorus.fullname" . }}-proxy
-        {{- if or .Values.existingCredentialsSecret (include "chorus.createCredentialsSecret" .) }}
+        {{- if or .Values.existingProxyCredentialsSecret (include "chorus.createProxyCredentialsSecret" .) }}
         - name: credentials
           secret:
-            secretName: {{ include "chorus.credentialsSecretName" . }}
+            secretName: {{ include "chorus.proxyCredentialsSecretName" . }}
         {{- end }}
       {{- $nodeSelector := include "chorus.nodeSelector" (list .Values.proxy.nodeSelector .Values.global.nodeSelector) }}
       {{- if $nodeSelector }}

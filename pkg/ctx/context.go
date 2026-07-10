@@ -36,6 +36,7 @@ type storageKey struct{}
 type flowKey struct{}
 type traceKey struct{}
 type userKey struct{}
+type aliasKey struct{}
 type routingPolicyKey struct{}
 type replicationsKey struct{}
 type inProgressZeroDowntimeKey struct{}
@@ -174,6 +175,23 @@ func SetUser(ctx context.Context, u string) context.Context {
 
 func GetUser(ctx context.Context) string {
 	k, _ := ctx.Value(userKey{}).(string)
+	return k
+}
+
+func SetAlias(ctx context.Context, a string) context.Context {
+	if a == "" {
+		zerolog.Ctx(ctx).Warn().Msg("ignore: trying to set empty alias to ctx")
+		return ctx
+	}
+	if prev := GetAlias(ctx); prev != "" && prev != a {
+		zerolog.Ctx(ctx).Warn().Msgf("cannot set alias %s, ctx already contains alias %s", a, prev)
+		return ctx
+	}
+	return context.WithValue(ctx, aliasKey{}, a)
+}
+
+func GetAlias(ctx context.Context) string {
+	k, _ := ctx.Value(aliasKey{}).(string)
 	return k
 }
 

@@ -28,11 +28,11 @@ proxy:
   auth:
     allowV2Signature: true
     useStorage: # use credentials from one of configured storages <one|two>
-    custom: # use custom credentials for proxy s3 endpoint
-    #      - accessKeyID: <s3 v4 accessKey credential>
-    #        secretAccessKey: <s3 v4 secretKey credential>
-    #      - accessKeyID: <s3 v4 accessKey credential>
-    #        secretAccessKey: <s3 v4 secretKey credential>
+    custom: # use custom credentials for proxy s3 endpoint: user -> alias -> credential
+    #      user1:
+    #        alias1:
+    #          accessKeyID: <s3 v4 accessKey credential>
+    #          secretAccessKey: <s3 v4 secretKey credential>
 worker:
   queueUpdateInterval: 3s
   swiftRetryInterval: 1m # used for swift task retries caused by swift inconsistent state

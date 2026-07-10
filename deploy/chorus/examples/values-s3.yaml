@@ -22,7 +22,8 @@ storage:
       isSecure: true
       defaultRegion: eu-west-1
 
-# Storage credentials (stored in Kubernetes Secret)
+# Worker storage credentials (stored in Kubernetes Secret)
+# One credential per user per storage, used by the worker for replication
 credentials:
   storages:
     main:
@@ -42,13 +43,39 @@ credentials:
         accessKeyID: "BKIAI44QH8DHBEXAMPLE"
         secretAccessKey: "ke7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY"
 
+# Proxy storage credentials (stored in a separate Kubernetes Secret)
+# user -> alias -> credential: the proxy authenticates S3 clients by alias
+# access key and re-signs forwarded requests with the target storage's
+# credential of the same alias
+proxyCredentials:
+  storages:
+    main:
+      admin:
+        default:
+          accessKeyID: "CKIAIOSFODNN7EXAMPLE"
+          secretAccessKey: "yJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      backup-service:
+        default:
+          accessKeyID: "CKIAI44QH8DHBEXAMPLE"
+          secretAccessKey: "le7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY"
+
+    follower:
+      admin:
+        default:
+          accessKeyID: "DKIAIOSFODNN7EXAMPLE"
+          secretAccessKey: "zJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      backup-service:
+        default:
+          accessKeyID: "DKIAI44QH8DHBEXAMPLE"
+          secretAccessKey: "me7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY"
+
 # Proxy configuration
 proxy:
   enabled: true
   replicas: 2
   config:
     auth:
-      # Use credentials from main storage for S3 proxy authentication
+      # Authenticate S3 clients against main storage proxy credentials
       useStorage: main
 
 # Worker configuration

@@ -27,6 +27,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/objects"
 	"github.com/minio/minio-go/v7"
 
+	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
@@ -40,6 +41,11 @@ var (
 
 type Config = StoragesConfig[*s3.Storage, *swift.Storage]
 type Storage = GenericStorage[*s3.Storage, *swift.Storage]
+
+// ProxyConfig is the proxy-side storage config with per-alias S3 credentials.
+// The Swift half reuses *swift.Storage purely to satisfy the generic; proxy
+// Swift storages carry no credentials and are dropped by the proxy conversion.
+type ProxyConfig = StoragesConfig[*s3.ProxyStorage, *swift.Storage]
 
 type NameAndVersion struct {
 	Name    string
@@ -166,9 +172,24 @@ func NewRegistry(ctx context.Context, creds CredsService, metricsSvc metrics.Ser
 		for _, user := range users {
 			switch storageType {
 			case dom.S3:
-				_, err := res.AsS3(ctx, storageName, user)
+				aliases, err := creds.ListS3Aliases(storageName, user)
+				if errors.Is(err, ErrRoleNotConfigured) {
+					// worker mode: one client per user
+					_, err := res.AsS3(ctx, storageName, user)
+					if err != nil {
+						return nil, fmt.Errorf("failed to init S3 client for storage %q user %q: %w", storageName, user, err)
+					}
+					continue
+				}
 				if err != nil {
-					return nil, fmt.Errorf("failed to init S3 client for storage %q user %q: %w", storageName, user, err)
+					return nil, fmt.Errorf("failed to list S3 aliases for storage %q user %q: %w", storageName, user, err)
+				}
+				// proxy mode: one client per alias
+				for _, alias := range aliases {
+					_, err := res.asS3Alias(ctx, storageName, user, alias)
+					if err != nil {
+						return nil, fmt.Errorf("failed to init S3 client for storage %q user %q alias %q: %w", storageName, user, alias, err)
+					}
 				}
 			case dom.Swift:
 				_, err := res.AsSwift(ctx, storageName, user)
@@ -206,6 +227,10 @@ type swiftCacheVal struct {
 }
 
 func (r *clients) AsS3(ctx context.Context, storage, user string) (s3client.Client, error) {
+	if alias := xctx.GetAlias(ctx); alias != "" {
+		// proxy mode: alias set by auth middleware selects the alias credential
+		return r.asS3Alias(ctx, storage, user, alias)
+	}
 	creds, err := r.credsSvc.GetS3Credentials(storage, user)
 	if err != nil {
 		return nil, err
@@ -230,6 +255,52 @@ func (r *clients) AsS3(ctx context.Context, storage, user string) (s3client.Clie
 	defer r.Unlock()
 	// re-check cache after acquiring write lock
 	cred, err := r.credsSvc.GetS3Credentials(storage, user)
+	if err != nil {
+		return nil, err
+	}
+	cacheVal, ok = r.s3Clients[key]
+	if ok && cacheVal.cred == cred {
+		return cacheVal.client, nil
+	}
+	// create new client
+	client, err := s3client.NewClient(ctx, r.metricsSvc, s3Addr, cred, storage, user)
+	if err != nil {
+		return nil, err
+	}
+	r.s3Clients[key] = s3CacheVal{
+		cred:   cred,
+		client: client,
+	}
+	return client, nil
+}
+
+// asS3Alias mirrors AsS3 for proxy-mode alias credentials. The cache is keyed
+// by "<storage>:<user>:<alias>"; metrics labels stay alias-free.
+func (r *clients) asS3Alias(ctx context.Context, storage, user, alias string) (s3client.Client, error) {
+	creds, err := r.credsSvc.GetS3AliasCredentials(storage, user, alias)
+	if err != nil {
+		return nil, err
+	}
+	key := aliasCacheKey(storage, user, alias)
+	// obtain read lock to check cache
+	r.RLock()
+	cacheVal, ok := r.s3Clients[key]
+	r.RUnlock()
+	if ok && cacheVal.cred == creds {
+		// return cached client
+		return cacheVal.client, nil
+	}
+	// not found in cache or creds changed - obtain write lock to create new client
+
+	s3Addr, err := r.credsSvc.GetS3Address(storage)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Lock()
+	defer r.Unlock()
+	// re-check cache after acquiring write lock
+	cred, err := r.credsSvc.GetS3AliasCredentials(storage, user, alias)
 	if err != nil {
 		return nil, err
 	}
