@@ -74,6 +74,14 @@ export default <I18nMessages>{
     toBucketTitle: 'Destination Bucket',
     toBucketDescription:
       'Enter the bucket from the destination storage to compare against the source bucket.',
+    // User section
+    userTitle: 'User',
+    userDescription:
+      'Select the S3 credential alias used to access both storages. Only users with credentials on both storages are shown.',
+    userRequired: 'Please select a user.',
+    noUsersTitle: 'No User Credentials Found',
+    noUsersText:
+      'No users with credentials on both selected storages were found.',
   },
   [I18nLocale.DE]: {
     breadcrumbDiffReports: 'Diff-Reports',
@@ -126,5 +134,12 @@ export default <I18nMessages>{
     toBucketTitle: 'Ziel-Bucket',
     toBucketDescription:
       'Geben Sie den Bucket des Ziel-Storages ein, der mit dem Quell-Bucket verglichen werden soll.',
+    userTitle: 'Benutzer',
+    userDescription:
+      'Wählen Sie den S3-Credential-Alias für den Zugriff auf beide Storages. Es werden nur Benutzer angezeigt, die auf beiden Storages konfiguriert sind.',
+    userRequired: 'Bitte wählen Sie einen Benutzer.',
+    noUsersTitle: 'Keine Benutzer-Credentials gefunden',
+    noUsersText:
+      'Es wurden keine Benutzer mit Credentials auf beiden ausgewählten Storages gefunden.',
   },
 };

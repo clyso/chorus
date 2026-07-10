@@ -46,6 +46,8 @@ interface ChorusAddDiffReportState {
   toStorage: ChorusStorage | null;
   toBucketName: string;
 
+  selectedUser: string | null;
+
   currentStep: AddDiffReportStepName;
 
   isSubmitting: boolean;
@@ -62,6 +64,8 @@ function getInitialState(): ChorusAddDiffReportState {
     toStorage: null,
     toBucketName: '',
 
+    selectedUser: null,
+
     currentStep: AddDiffReportStepName.FROM_STORAGE_BUCKET,
 
     isSubmitting: false,
@@ -76,6 +80,21 @@ export const useChorusAddDiffReportStore = defineStore(
       messages: i18nAddDiffReport,
     });
     const hasEnoughStorages = computed(() => state.storages.length >= 2);
+
+    // Filter for users available on both storages
+    const users = computed<string[]>(() => {
+      if (!state.fromStorage || !state.toStorage) return [];
+
+      const fromStorageAliases = new Set(
+        state.fromStorage.credentials.map((credential) => credential.alias),
+      );
+
+      return state.toStorage.credentials
+        .map((credential) => credential.alias)
+        .filter((alias) => fromStorageAliases.has(alias))
+        .sort();
+    });
+
     const steps = computed<Step[]>(() => [
       {
         title: t('step1Title'),
@@ -135,6 +154,12 @@ export const useChorusAddDiffReportStore = defineStore(
         ),
       },
       toBucketName: bucketNameValidationRules(),
+      selectedUser: {
+        required: helpers.withMessage(
+          t('userRequired'),
+          (value: string | null) => !!value,
+        ),
+      },
     }));
 
     const validator = useVuelidate(validationRules, state);
@@ -145,7 +170,7 @@ export const useChorusAddDiffReportStore = defineStore(
         'fromBucketName',
       ],
       [AddDiffReportStepName.TO_STORAGE_BUCKET]: ['toStorage', 'toBucketName'],
-      [AddDiffReportStepName.USER]: [],
+      [AddDiffReportStepName.USER]: ['selectedUser'],
       [AddDiffReportStepName.SETTINGS]: [],
     };
 
@@ -183,6 +208,7 @@ export const useChorusAddDiffReportStore = defineStore(
       );
     }
 
+    // Update toStorage in case of fromStorage updates
     watch(
       () => state.fromStorage,
       (newFromStorage) => {
@@ -196,6 +222,13 @@ export const useChorusAddDiffReportStore = defineStore(
       },
     );
 
+    // Update selectedUser if fromStorage and/or toStorage have been updated
+    watch(users, (newUsers) => {
+      if (state.selectedUser && newUsers.includes(state.selectedUser)) return;
+
+      state.selectedUser = newUsers[0] ?? null;
+    });
+
     function prepareForm() {
       const mainStorage =
         state.storages.find((storage) => storage.isMain) ??
@@ -204,6 +237,7 @@ export const useChorusAddDiffReportStore = defineStore(
 
       state.fromStorage = mainStorage;
       state.toStorage = mainStorage ? findStorageToCompare(mainStorage) : null;
+      state.selectedUser = users.value[0] ?? null;
     }
 
     function $reset() {
@@ -214,6 +248,7 @@ export const useChorusAddDiffReportStore = defineStore(
     return {
       ...toRefs(state),
       hasEnoughStorages,
+      users,
       initAddDiffReportPage,
       validateCurrentStep,
       validator,
