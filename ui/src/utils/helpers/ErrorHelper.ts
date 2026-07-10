@@ -36,4 +36,17 @@ export abstract class ErrorHelper {
 
     return errorInfo?.reason ?? null;
   }
+
+  static getValidationErrorMessage(
+    field: {
+      $errors: { $message: unknown }[];
+    },
+    unknownErrorMessage = '',
+  ): string {
+    const errors = field.$errors;
+
+    if (!errors || errors.length === 0) return '';
+
+    return String(errors[0]?.$message) || unknownErrorMessage;
+  }
 }

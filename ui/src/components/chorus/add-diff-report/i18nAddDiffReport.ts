@@ -45,6 +45,35 @@ export default <I18nMessages>{
     notEnoughStoragesTitle: 'Not Enough Storages',
     notEnoughStoragesText:
       'At least two storages are required to create a diff report.',
+    // From Storage section
+    fromStorageTitle: 'Source Storage',
+    fromStorageDescription:
+      'Select the source storage location where the original data resides.',
+    fromStorageRequired: 'Please select a source storage.',
+    // Bucket section
+    fromBucketTitle: 'Source Bucket',
+    fromBucketDescription:
+      'Enter the target bucket from the source storage to include in the consistency check.',
+    bucketPlaceholder: 'e.g. my-bucket',
+    bucketRequired: 'Please enter a bucket name.',
+    bucketErrLength: 'Bucket name must be between 3 and 63 characters.',
+    bucketErrChars:
+      'Bucket name may only contain lowercase letters, numbers, dots, and hyphens.',
+    bucketErrStartEnd:
+      'Bucket name must start and end with a letter or number.',
+    bucketErrAdjacentPeriods: 'Bucket name must not contain adjacent periods.',
+    bucketErrIpAddress: 'Bucket name must not be formatted as an IP address.',
+    bucketErrPrefixSuffix:
+      'Bucket name contains a restricted AWS prefix or suffix.',
+    // To Storage section
+    toStorageTitle: 'Destination Storage',
+    toStorageDescription:
+      'Select the destination storage location to compare against the source.',
+    toStorageRequired: 'Please select a destination storage.',
+    // To Bucket section
+    toBucketTitle: 'Destination Bucket',
+    toBucketDescription:
+      'Enter the bucket from the destination storage to compare against the source bucket.',
   },
   [I18nLocale.DE]: {
     breadcrumbDiffReports: 'Diff-Reports',
@@ -69,5 +98,33 @@ export default <I18nMessages>{
     notEnoughStoragesTitle: 'Nicht genug Storages',
     notEnoughStoragesText:
       'Für einen Diff-Report werden mindestens zwei Storages benötigt.',
+    fromStorageTitle: 'Quell-Storage',
+    fromStorageDescription:
+      'Wählen Sie den Quell-Storage, in dem sich die Originaldaten befinden.',
+    fromStorageRequired: 'Bitte wählen Sie einen Quell-Storage.',
+    fromBucketTitle: 'Quell-Bucket',
+    fromBucketDescription:
+      'Geben Sie den Ziel-Bucket des Quell-Storages für die Konsistenzprüfung ein.',
+    bucketPlaceholder: 'z.B. my-bucket',
+    bucketRequired: 'Bitte geben Sie einen Bucket-Namen ein.',
+    bucketErrLength:
+      'Der Bucket-Name muss zwischen 3 und 63 Zeichen lang sein.',
+    bucketErrChars:
+      'Der Bucket-Name darf nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche enthalten.',
+    bucketErrStartEnd:
+      'Der Bucket-Name muss mit einem Buchstaben oder einer Zahl beginnen und enden.',
+    bucketErrAdjacentPeriods:
+      'Der Bucket-Name darf keine aufeinanderfolgenden Punkte enthalten.',
+    bucketErrIpAddress:
+      'Der Bucket-Name darf nicht als IP-Adresse formatiert sein.',
+    bucketErrPrefixSuffix:
+      'Der Bucket-Name enthält ein unzulässiges AWS-Präfix oder -Suffix.',
+    toStorageTitle: 'Ziel-Storage',
+    toStorageDescription:
+      'Wählen Sie den Ziel-Storage, mit dem die Quelle verglichen werden soll.',
+    toStorageRequired: 'Bitte wählen Sie einen Ziel-Storage.',
+    toBucketTitle: 'Ziel-Bucket',
+    toBucketDescription:
+      'Geben Sie den Bucket des Ziel-Storages ein, der mit dem Quell-Bucket verglichen werden soll.',
   },
 };

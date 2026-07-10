@@ -16,8 +16,8 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
-  import { computed } from 'vue';
   import { storeToRefs } from 'pinia';
+  import { computed } from 'vue';
   import i18nAddDiffReport from '@/components/chorus/add-diff-report/i18nAddDiffReport';
   import { useChorusAddDiffReportStore } from '@/stores/chorusAddDiffReportStore';
   import ChorusWizard from '@/components/chorus/common/ChorusWizard/ChorusWizard.vue';
@@ -26,25 +26,35 @@
     messages: i18nAddDiffReport,
   });
 
-  const { currentStep, stepsCount, isLoading, isSubmitting } = storeToRefs(
-    useChorusAddDiffReportStore(),
-  );
+  const store = useChorusAddDiffReportStore();
+  const { currentStep, stepsCount, isLoading, isSubmitting } =
+    storeToRefs(store);
 
   const isNextDisabled = computed<boolean>(
     () => isLoading.value || currentStep.value === stepsCount.value,
   );
+
+  async function handleStepChange(step: number) {
+    // Only check validation if going forward
+    if (step > currentStep.value && !store.validateCurrentStep()) {
+      return;
+    }
+
+    currentStep.value = step;
+  }
 
   function handleSubmit() {}
 </script>
 
 <template>
   <ChorusWizard
-    v-model:current-step="currentStep"
+    :current-step="currentStep"
     :steps-count="stepsCount"
     :is-submitting="isSubmitting"
     :is-next-disabled="isNextDisabled"
     :submit-label="t('actionAddDiffReport')"
     :next-label="t('nextAction')"
+    @update:current-step="handleStepChange"
     @submit="handleSubmit"
   />
 </template>

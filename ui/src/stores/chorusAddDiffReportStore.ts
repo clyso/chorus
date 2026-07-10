@@ -18,18 +18,31 @@ import type { Step } from '@clyso/clyso-ui-kit';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { helpers } from '@vuelidate/validators';
+import useVuelidate from '@vuelidate/core';
 import {
   AddDiffReportStepName,
   type ChorusStorage,
 } from '@/utils/types/chorus';
 import { ChorusService } from '@/services/ChorusService';
 import i18nAddDiffReport from '@/components/chorus/add-diff-report/i18nAddDiffReport';
+import {
+  hasNoAdjacentPeriods,
+  hasValidChars,
+  hasValidPrefixSuffix,
+  hasValidStartEnd,
+  isNotIpAddress,
+  isRequired,
+  isValidLength,
+} from '@/utils/validators/s3BucketNameValidator';
 
 interface ChorusAddDiffReportState {
   isLoading: boolean;
   hasError: boolean;
 
   storages: ChorusStorage[];
+  fromStorage: ChorusStorage | null;
+  fromBucketName: string;
 
   currentStep: AddDiffReportStepName;
 
@@ -42,6 +55,8 @@ function getInitialState(): ChorusAddDiffReportState {
     hasError: false,
 
     storages: [],
+    fromStorage: null,
+    fromBucketName: '',
 
     currentStep: AddDiffReportStepName.FROM_STORAGE_BUCKET,
 
@@ -77,6 +92,60 @@ export const useChorusAddDiffReportStore = defineStore(
     ]);
     const stepsCount = computed(() => steps.value.length);
 
+    function bucketNameValidationRules() {
+      return {
+        required: helpers.withMessage(t('bucketRequired'), isRequired),
+        validLength: helpers.withMessage(t('bucketErrLength'), isValidLength),
+        validChars: helpers.withMessage(t('bucketErrChars'), hasValidChars),
+        validStartEnd: helpers.withMessage(
+          t('bucketErrStartEnd'),
+          hasValidStartEnd,
+        ),
+        noAdjacentPeriods: helpers.withMessage(
+          t('bucketErrAdjacentPeriods'),
+          hasNoAdjacentPeriods,
+        ),
+        notIpAddress: helpers.withMessage(
+          t('bucketErrIpAddress'),
+          isNotIpAddress,
+        ),
+        validPrefixSuffix: helpers.withMessage(
+          t('bucketErrPrefixSuffix'),
+          hasValidPrefixSuffix,
+        ),
+      };
+    }
+
+    const validationRules = computed(() => ({
+      fromStorage: {
+        required: helpers.withMessage(
+          t('fromStorageRequired'),
+          (value: ChorusStorage | null) => !!value,
+        ),
+      },
+      fromBucketName: bucketNameValidationRules(),
+    }));
+
+    const validator = useVuelidate(validationRules, state);
+
+    const stepValidationFields: Record<AddDiffReportStepName, string[]> = {
+      [AddDiffReportStepName.FROM_STORAGE_BUCKET]: [
+        'fromStorage',
+        'fromBucketName',
+      ],
+      [AddDiffReportStepName.TO_STORAGE_BUCKET]: [],
+      [AddDiffReportStepName.USER]: [],
+      [AddDiffReportStepName.SETTINGS]: [],
+    };
+
+    function validateCurrentStep(): boolean {
+      const fields = stepValidationFields[state.currentStep];
+
+      fields.forEach((field) => validator.value[field].$touch());
+
+      return fields.every((field) => !validator.value[field].$error);
+    }
+
     async function initAddDiffReportPage() {
       state.isLoading = true;
       state.hasError = false;
@@ -93,16 +162,26 @@ export const useChorusAddDiffReportStore = defineStore(
       }
     }
 
-    function prepareForm() {}
+    function prepareForm() {
+      const mainStorage =
+        state.storages.find((storage) => storage.isMain) ??
+        state.storages[0] ??
+        null;
+
+      state.fromStorage = mainStorage;
+    }
 
     function $reset() {
       Object.assign(state, getInitialState());
+      validator.value.$reset();
     }
 
     return {
       ...toRefs(state),
       hasEnoughStorages,
       initAddDiffReportPage,
+      validateCurrentStep,
+      validator,
       steps,
       stepsCount,
       $reset,

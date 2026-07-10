@@ -28,6 +28,8 @@
   import { useChorusAddDiffReportStore } from '@/stores/chorusAddDiffReportStore';
   import i18nAddDiffReport from '@/components/chorus/add-diff-report/i18nAddDiffReport';
   import AddDiffReportWizard from '@/components/chorus/add-diff-report/AddDiffReportWizard/AddDiffReportWizard.vue';
+  import FromStep from '@/components/chorus/add-diff-report/FromStep/FromStep.vue';
+  import { AddDiffReportStepName } from '@/utils/types/chorus';
 
   const store = useChorusAddDiffReportStore();
   const { isLoading, hasError, hasEnoughStorages, currentStep, steps } =
@@ -93,6 +95,10 @@
           name="opacity"
           mode="out-in"
         >
+          <FromStep
+            v-if="currentStep === AddDiffReportStepName.FROM_STORAGE_BUCKET"
+            :key="AddDiffReportStepName.FROM_STORAGE_BUCKET"
+          />
         </Transition>
       </div>
 
