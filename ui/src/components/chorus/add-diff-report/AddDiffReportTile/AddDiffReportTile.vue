@@ -31,6 +31,7 @@
   import FromStep from '@/components/chorus/add-diff-report/FromStep/FromStep.vue';
   import ToStep from '@/components/chorus/add-diff-report/ToStep/ToStep.vue';
   import { AddDiffReportStepName } from '@/utils/types/chorus';
+  import UserStep from '@/components/chorus/add-diff-report/UserStep/UserStep.vue';
 
   const store = useChorusAddDiffReportStore();
   const { isLoading, hasError, hasEnoughStorages, currentStep, steps } =
@@ -103,6 +104,10 @@
           <ToStep
             v-else-if="currentStep === AddDiffReportStepName.TO_STORAGE_BUCKET"
             :key="AddDiffReportStepName.TO_STORAGE_BUCKET"
+          />
+          <UserStep
+            v-else-if="currentStep === AddDiffReportStepName.USER"
+            :key="AddDiffReportStepName.USER"
           />
         </Transition>
       </div>

@@ -15,15 +15,31 @@
   -->
 
 <script setup lang="ts">
-  import { CAvatar } from '@clyso/clyso-ui-kit';
+  import { CAvatar, CResult, I18nLocale } from '@clyso/clyso-ui-kit';
+  import { useI18n } from 'vue-i18n';
   import ChorusUserCard from '@/components/chorus/common/ChorusUserCard/ChorusUserCard.vue';
 
   interface Props {
     users: string[];
     modelValue: string | null;
+    emptyMessage?: string;
+    emptyMessageTitle?: string;
   }
 
   defineProps<Props>();
+
+  const { t } = useI18n({
+    messages: {
+      [I18nLocale.EN]: {
+        noUsersTitle: 'No users',
+        noUsers: 'No users found.',
+      },
+      [I18nLocale.DE]: {
+        noUsersTitle: 'Keine Benutzer',
+        noUsers: 'Keine Benutzer gefunden.',
+      },
+    },
+  });
 
   const emit = defineEmits<{
     (e: 'update:modelValue', value: string | null): void;
@@ -35,7 +51,10 @@
 </script>
 
 <template>
-  <div class="user-list">
+  <div
+    v-if="users.length"
+    class="user-list"
+  >
     <ChorusUserCard
       v-for="user in users"
       :key="user"
@@ -55,6 +74,23 @@
       </div>
     </ChorusUserCard>
   </div>
+
+  <CResult
+    v-else
+    status="error"
+    type="error"
+    :max-width="600"
+    :has-positive="false"
+    class="user-list__error"
+  >
+    <template #title>
+      {{ emptyMessageTitle ?? t('noUsersTitle') }}
+    </template>
+
+    <p>
+      {{ emptyMessage ?? t('noUsers') }}
+    </p>
+  </CResult>
 </template>
 
 <style lang="scss" scoped>
