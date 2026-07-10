@@ -29,6 +29,7 @@
   import i18nAddDiffReport from '@/components/chorus/add-diff-report/i18nAddDiffReport';
   import AddDiffReportWizard from '@/components/chorus/add-diff-report/AddDiffReportWizard/AddDiffReportWizard.vue';
   import FromStep from '@/components/chorus/add-diff-report/FromStep/FromStep.vue';
+  import ToStep from '@/components/chorus/add-diff-report/ToStep/ToStep.vue';
   import { AddDiffReportStepName } from '@/utils/types/chorus';
 
   const store = useChorusAddDiffReportStore();
@@ -98,6 +99,10 @@
           <FromStep
             v-if="currentStep === AddDiffReportStepName.FROM_STORAGE_BUCKET"
             :key="AddDiffReportStepName.FROM_STORAGE_BUCKET"
+          />
+          <ToStep
+            v-else-if="currentStep === AddDiffReportStepName.TO_STORAGE_BUCKET"
+            :key="AddDiffReportStepName.TO_STORAGE_BUCKET"
           />
         </Transition>
       </div>
