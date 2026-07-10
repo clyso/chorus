@@ -50,37 +50,37 @@ func compareSignatureV4(sig1, sig2 string) bool {
 	return subtle.ConstantTimeCompare([]byte(sig1), []byte(sig2)) == 1
 }
 
-func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request) (string, error) {
+func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request) (credMeta, error) {
 	req := *r
 
 	v4Auth := req.Header.Get(s3.Authorization)
 
 	signV4Values, err := s3.ParseSignV4(v4Auth)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 
 	extractedSignedHeaders, err := s3.ExtractSignedHeaders(signV4Values.SignedHeaders, r)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 
 	credInfo, err := m.getCred(signV4Values.Credential.AccessKey)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 	cred := credInfo.cred
 
 	var date string
 	if date = req.Header.Get(s3.AmzDate); date == "" {
 		if date = r.Header.Get(s3.Date); date == "" {
-			return "", fmt.Errorf("%w: invalid signature: %q header is missing", dom.ErrAuth, s3.AmzDate)
+			return credMeta{}, fmt.Errorf("%w: invalid signature: %q header is missing", dom.ErrAuth, s3.AmzDate)
 		}
 	}
 
 	t, e := time.Parse(iso8601Format, date)
 	if e != nil {
-		return "", fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
+		return credMeta{}, fmt.Errorf("%w: invalid signature: %q - %q invalid date format", dom.ErrAuth, s3.AmzDate, date)
 	}
 	queryStr := req.URL.Query().Encode()
 	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
@@ -90,7 +90,7 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 	newSignature := getV4Signature(signingKey, stringToSign)
 
 	if !compareSignatureV4(newSignature, signV4Values.Signature) {
-		return "", mclient.ErrorResponse{
+		return credMeta{}, mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "SignatureDoesNotMatch",
 			Message:    "The request signature that the server calculated does not match the signature that you provided. Check your AWS secret access key and signing method. For more information, see REST Authentication and SOAP Authentication.",
@@ -100,7 +100,7 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 		}
 	}
 
-	return credInfo.user, nil
+	return credInfo, nil
 }
 
 func getCanonicalV4Request(extractedSignedHeaders http.Header, payload, queryStr, urlPath, method string) string {

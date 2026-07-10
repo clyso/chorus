@@ -120,7 +120,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 
 		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 	})
 
 	t.Run("non-default region in credential scope", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 
 		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 	})
 
 	t.Run("preserves non-auth query params", func(t *testing.T) {
@@ -144,7 +144,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 
 		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 	})
 
 	t.Run("wrong secret key", func(t *testing.T) {
@@ -227,7 +227,7 @@ func TestIsReqAuthenticatedPresigned(t *testing.T) {
 
 		got, hashedPayload, err := m.isReqAuthenticated(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 		require.Equal(t, unsignedPayload, hashedPayload)
 	})
 

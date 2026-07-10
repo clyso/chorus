@@ -21,7 +21,8 @@ import (
 )
 
 type Config struct {
-	AllowV2Signature bool                        `yaml:"allowV2Signature"`
-	UseStorage       string                      `yaml:"useStorage"`
-	Custom           map[string]s3.CredentialsV4 `yaml:"custom"`
+	AllowV2Signature bool   `yaml:"allowV2Signature"`
+	UseStorage       string `yaml:"useStorage"`
+	// Custom credentials for the proxy s3 endpoint: user -> alias -> credential.
+	Custom map[string]map[string]s3.CredentialsV4 `yaml:"custom"`
 }

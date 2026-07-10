@@ -7,13 +7,15 @@ cors:
 auth:
   allowV2Signature: false
   useStorage: # use credentials from one of configured storages <one|two>
-  custom: # OR use custom credentials for proxy s3 endpoint
+  custom: # OR use custom credentials for proxy s3 endpoint: user -> alias -> credential
 #    user1:
-#      accessKeyID: <user1 v4 accessKey credential>
-#      secretAccessKey: <user1 v4 secretKey credential>
+#      alias1: # alias name for the credential, e.g. laptop or ci
+#        accessKeyID: <user1 alias1 v4 accessKey credential>
+#        secretAccessKey: <user1 alias1 v4 secretKey credential>
 #    user2:
-#      accessKeyID: <user2 v4 accessKey credential>
-#      secretAccessKey: <user2 v4 secretKey credential>
+#      alias1:
+#        accessKeyID: <user2 alias1 v4 accessKey credential>
+#        secretAccessKey: <user2 alias1 v4 secretKey credential>
 storage:
   defaultRegion: "us-east-1" # fallback region. Will be used if origin region is not supported by replication destination
   dynamicCredentials:
@@ -24,13 +26,18 @@ storage:
   storages:
 #    one: # yaml key with some handy storage name
 #      address: <s3.chorus.com>
-#      credentials:
+#      credentials: # user -> alias -> credential
 #        user1:
-#          accessKeyID: <user1 v4 accessKey credential>
-#          secretAccessKey: <user1 v4 secretKey credential>
+#          alias1: # alias name for the credential, e.g. laptop or ci
+#            accessKeyID: <user1 alias1 v4 accessKey credential>
+#            secretAccessKey: <user1 alias1 v4 secretKey credential>
+#          alias2:
+#            accessKeyID: <user1 alias2 v4 accessKey credential>
+#            secretAccessKey: <user1 alias2 v4 secretKey credential>
 #        user2:
-#          accessKeyID: <user2 v4 accessKey credential>
-#          secretAccessKey: <user2 v4 secretKey credential>
+#          alias1:
+#            accessKeyID: <user2 alias1 v4 accessKey credential>
+#            secretAccessKey: <user2 alias1 v4 secretKey credential>
 #      provider: <Ceph|Minio|Other> # S3 provider name. Required to use provider-specific APIs, like keeping original versionID. Use 'Other' if your storage is S3 compatible but not listed.
 #      isMain: true # <true|false> one of the storages in should be main
 #      healthCheckInterval: 10s
@@ -41,13 +48,18 @@ storage:
 #        rpm: 60
 #    two: # yaml key with some handy storage name
 #      address: <news3.chorus.com>
-#      credentials:
+#      credentials: # user -> alias -> credential. Alias names join credentials across storages
 #        user1:
-#          accessKeyID: <user1 v4 accessKey credential>
-#          secretAccessKey: <user1 v4 secretKey credential>
+#          alias1:
+#            accessKeyID: <user1 alias1 v4 accessKey credential>
+#            secretAccessKey: <user1 alias1 v4 secretKey credential>
+#          alias2:
+#            accessKeyID: <user1 alias2 v4 accessKey credential>
+#            secretAccessKey: <user1 alias2 v4 secretKey credential>
 #        user2:
-#          accessKeyID: <user2 v4 accessKey credential>
-#          secretAccessKey: <user2 v4 secretKey credential>
+#          alias1:
+#            accessKeyID: <user2 alias1 v4 accessKey credential>
+#            secretAccessKey: <user2 alias1 v4 secretKey credential>
 #      provider: <Ceph|Minio|Other> # S3 provider name. Required to use provider-specific APIs, like keeping original versionID. Use 'Other' if your storage is S3 compatible but not listed.
 #      isMain: false # <true|false> one of the storages in should be main
 #      healthCheckInterval: 10s

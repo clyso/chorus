@@ -108,6 +108,17 @@ Credentials secret name
 {{- end }}
 
 {{/*
+Proxy credentials secret name
+*/}}
+{{- define "chorus.proxyCredentialsSecretName" -}}
+{{- if .Values.existingProxyCredentialsSecret }}
+{{- .Values.existingProxyCredentialsSecret }}
+{{- else }}
+{{- printf "%s-proxy-credentials" (include "chorus.fullname" .) }}
+{{- end }}
+{{- end }}
+
+{{/*
 Redis secret name
 */}}
 {{- define "chorus.redisSecretName" -}}
@@ -154,6 +165,15 @@ Check if credentials secret should be created
 */}}
 {{- define "chorus.createCredentialsSecret" -}}
 {{- if and (not .Values.existingCredentialsSecret) .Values.credentials.storages }}
+true
+{{- end }}
+{{- end }}
+
+{{/*
+Check if proxy credentials secret should be created
+*/}}
+{{- define "chorus.createProxyCredentialsSecret" -}}
+{{- if and (not .Values.existingProxyCredentialsSecret) .Values.proxyCredentials.storages }}
 true
 {{- end }}
 {{- end }}
