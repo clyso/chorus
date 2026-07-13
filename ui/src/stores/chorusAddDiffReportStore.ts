@@ -54,6 +54,7 @@ interface ChorusAddDiffReportState {
 
   currentStep: AddDiffReportStepName;
 
+  isConfirmDialogOpen: boolean;
   isSubmitting: boolean;
 }
 
@@ -76,6 +77,7 @@ function getInitialState(): ChorusAddDiffReportState {
 
     currentStep: AddDiffReportStepName.FROM_STORAGE_BUCKET,
 
+    isConfirmDialogOpen: false,
     isSubmitting: false,
   };
 }
@@ -248,6 +250,29 @@ export const useChorusAddDiffReportStore = defineStore(
       state.selectedUser = users.value[0] ?? null;
     }
 
+    async function createDiffReport() {
+      const { fromStorage, toStorage, selectedUser } = state;
+
+      if (!fromStorage || !toStorage || !selectedUser) return;
+
+      state.isSubmitting = true;
+
+      try {
+        await ChorusService.addDiffReport({
+          locations: [
+            { storage: fromStorage.name, bucket: state.fromBucketName },
+            { storage: toStorage.name, bucket: state.toBucketName },
+          ],
+          user: selectedUser,
+          checkOnlyLastVersions: state.checkOnlyLastVersions,
+          ignoreEtags: state.ignoreEtags,
+          ignoreSizes: state.ignoreSizes,
+        });
+      } finally {
+        state.isSubmitting = false;
+      }
+    }
+
     function $reset() {
       Object.assign(state, getInitialState());
       validator.value.$reset();
@@ -262,6 +287,7 @@ export const useChorusAddDiffReportStore = defineStore(
       validator,
       steps,
       stepsCount,
+      createDiffReport,
       $reset,
     };
   },

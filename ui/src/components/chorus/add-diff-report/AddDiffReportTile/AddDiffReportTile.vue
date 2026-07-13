@@ -33,6 +33,7 @@
   import { AddDiffReportStepName } from '@/utils/types/chorus';
   import UserStep from '@/components/chorus/add-diff-report/UserStep/UserStep.vue';
   import AdditionalSettingsStep from '@/components/chorus/add-diff-report/AdditionalSettingsStep/AdditionalSettingsStep.vue';
+  import AddDiffReportConfirmDialog from '@/components/chorus/add-diff-report/AddDiffReportConfirmDialog/AddDiffReportConfirmDialog.vue';
 
   const store = useChorusAddDiffReportStore();
   const { isLoading, hasError, hasEnoughStorages, currentStep, steps } =
@@ -119,6 +120,8 @@
 
       <AddDiffReportWizard />
     </div>
+
+    <AddDiffReportConfirmDialog />
   </CTile>
 </template>
 
