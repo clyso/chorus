@@ -93,6 +93,21 @@ export default <I18nMessages>{
     ignoreSizesLabel: 'Ignore Sizes',
     ignoreSizesDescription:
       'Skip object size verification. Use this if payload sizes differ due to automated server-side transformation or encryption during transit.',
+    // Confirm dialog
+    confirmDiffReportTitle: 'Confirm Diff Report',
+    confirmDiffReportDescription:
+      'You are about to create the following diff report.',
+    confirmDiffReportPositive: 'Create Diff Report',
+    confirmDiffReportNegative: 'Cancel',
+    // Summary
+    summaryStorages: 'Storages',
+    summaryBuckets: 'Buckets',
+    summaryUser: 'User',
+    summaryOptions: 'Options',
+    // Success / error notifications
+    successTitle: 'Success',
+    createDiffReportSuccess: 'Diff report has been created successfully.',
+    createDiffReportError: 'An error occurred while creating the diff report.',
   },
   [I18nLocale.DE]: {
     breadcrumbDiffReports: 'Diff-Reports',
@@ -162,5 +177,18 @@ export default <I18nMessages>{
     ignoreSizesLabel: 'Größen ignorieren',
     ignoreSizesDescription:
       'Überspringt die Objektgrößenprüfung. Verwenden, wenn sich Payload-Größen durch serverseitige Transformation oder Verschlüsselung unterscheiden.',
+    confirmDiffReportTitle: 'Diff-Report bestätigen',
+    confirmDiffReportDescription:
+      'Sie sind dabei den folgenden Diff-Report zu erstellen',
+    confirmDiffReportPositive: 'Diff-Report erstellen',
+    confirmDiffReportNegative: 'Abbrechen',
+    summaryStorages: 'Storages',
+    summaryBuckets: 'Buckets',
+    summaryUser: 'Benutzer',
+    summaryOptions: 'Optionen',
+    successTitle: 'Erfolg',
+    createDiffReportSuccess: 'Der Diff-Report wurde erfolgreich erstellt.',
+    createDiffReportError:
+      'Beim Erstellen des Diff-Reports ist ein Fehler aufgetreten.',
   },
 };

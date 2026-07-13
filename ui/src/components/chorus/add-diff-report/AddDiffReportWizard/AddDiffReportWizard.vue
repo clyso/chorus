@@ -27,8 +27,14 @@
   });
 
   const store = useChorusAddDiffReportStore();
-  const { currentStep, stepsCount, isLoading, isSubmitting } =
-    storeToRefs(store);
+  const {
+    currentStep,
+    stepsCount,
+    isLoading,
+    isSubmitting,
+    isConfirmDialogOpen,
+    validator,
+  } = storeToRefs(store);
 
   const isNextDisabled = computed<boolean>(
     () => isLoading.value || currentStep.value === stepsCount.value,
@@ -43,7 +49,13 @@
     currentStep.value = step;
   }
 
-  function handleSubmit() {}
+  function handleSubmit() {
+    validator.value.$touch();
+
+    if (validator.value.$error) return;
+
+    isConfirmDialogOpen.value = true;
+  }
 </script>
 
 <template>
