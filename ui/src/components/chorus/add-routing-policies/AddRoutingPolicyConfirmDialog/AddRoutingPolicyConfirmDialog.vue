@@ -17,7 +17,7 @@
   import { storeToRefs } from 'pinia';
   import { CDialog } from '@clyso/clyso-ui-kit';
   import { useI18n } from 'vue-i18n';
-  import { h, nextTick } from 'vue';
+  import { nextTick } from 'vue';
   import { useRouter } from 'vue-router';
   import i18nAddRoutingPolicy from '../i18nAddRoutingPolicy';
   import AddRoutingPolicySummary from '../AddRoutingPolicySummary/AddRoutingPolicySummary.vue';
@@ -28,7 +28,8 @@
   const { isConfirmDialogOpen } = storeToRefs(useChorusAddRoutingPolicyStore());
   const { addRoutingPolicy: callAddRoutingPolicyStore } =
     useChorusAddRoutingPolicyStore();
-  const { createNotification } = useChorusNotification();
+  const { createNotification, createRetryNotification } =
+    useChorusNotification();
 
   const { t } = useI18n({
     messages: i18nAddRoutingPolicy,
@@ -54,24 +55,14 @@
 
       router.push({ name: RouteName.CHORUS_ROUTING_POLICIES });
     } catch (error: unknown) {
-      createNotification({
-        type: 'error',
+      createRetryNotification({
         title: t('addRoutingPolicyErrorTitle'),
+        message: t('addRoutingPolicyErrorContent'),
+        error,
         positiveText: t('addErrorAction'),
         positiveHandler: () => {
           addRoutingPolicy();
         },
-        content: () =>
-          h('div', [
-            t('addRoutingPolicyErrorContent'),
-            h('br'),
-            h('br'),
-            h(
-              'span',
-              { style: 'white-space: pre-wrap' },
-              error instanceof Error ? error.message : String(error),
-            ),
-          ]),
       });
     }
   }

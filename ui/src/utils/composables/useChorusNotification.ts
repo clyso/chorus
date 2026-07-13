@@ -14,8 +14,16 @@
  *  limitations under the License.
  */
 
-import { ref, type Ref } from 'vue';
+import { h, ref, type Ref } from 'vue';
 import { useNotification, type NotificationConfig } from '@clyso/clyso-ui-kit';
+
+interface RetryNotificationConfig {
+  title: string;
+  message: string;
+  error: unknown;
+  positiveText: string;
+  positiveHandler: () => void;
+}
 
 export function useChorusNotification() {
   const {
@@ -66,10 +74,33 @@ export function useChorusNotification() {
     return id;
   }
 
+  function createRetryNotification(config: RetryNotificationConfig): string {
+    return createNotification({
+      type: 'error',
+      title: config.title,
+      positiveText: config.positiveText,
+      positiveHandler: config.positiveHandler,
+      content: () =>
+        h('div', [
+          config.message,
+          h('br'),
+          h('br'),
+          h(
+            'span',
+            { style: 'white-space: pre-wrap' },
+            config.error instanceof Error
+              ? config.error.message
+              : String(config.error),
+          ),
+        ]),
+    });
+  }
+
   return {
     activeNotificationIds,
     removeNotification,
     removeNotifications,
     createNotification,
+    createRetryNotification,
   };
 }
