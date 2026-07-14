@@ -36,7 +36,7 @@ func (r *s3Router) putObject(req *http.Request) (resp *http.Response, taskList [
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.AsS3(ctx, storage, user)
+	client, err := r.clients.AsS3FromAlias(ctx, storage, user, xctx.GetAlias(ctx))
 	if err != nil {
 		return nil, nil, "", false, err
 	}
@@ -86,7 +86,7 @@ func (r *s3Router) deleteObjects(req *http.Request) (resp *http.Response, taskLi
 	ctx = xctx.SetStorage(ctx, storage)
 	req = req.WithContext(ctx)
 
-	client, err := r.clients.AsS3(ctx, storage, user)
+	client, err := r.clients.AsS3FromAlias(ctx, storage, user, xctx.GetAlias(ctx))
 	if err != nil {
 		return nil, nil, "", false, err
 	}

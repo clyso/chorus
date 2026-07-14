@@ -99,11 +99,11 @@ func Test_credsSvc_Disabled(t *testing.T) {
 		creds := validS3.Credentials[validUser]
 
 		_, _, _, err := s.FindS3Credentials(s3Stor, creds.AccessKeyID)
-		r.ErrorIs(err, ErrRoleNotConfigured)
+		r.ErrorIs(err, dom.ErrNotImplemented)
 		_, err = s.GetS3AliasCredentials(s3Stor, validUser, "alias")
-		r.ErrorIs(err, ErrRoleNotConfigured)
+		r.ErrorIs(err, dom.ErrNotImplemented)
 		_, err = s.ListS3Aliases(s3Stor, validUser)
-		r.ErrorIs(err, ErrRoleNotConfigured)
+		r.ErrorIs(err, dom.ErrNotImplemented)
 	})
 
 	t.Run("GetS3Address", func(t *testing.T) {
@@ -318,9 +318,9 @@ func Test_credsSvc_Enabled(t *testing.T) {
 			r.NotContains(swiftUsersB, newUser)
 			// find by access key is proxy-only and fails fast in worker mode
 			_, _, _, err = svcA.FindS3Credentials(s3Stor, validS3.Credentials[validUser].AccessKeyID)
-			r.ErrorIs(err, ErrRoleNotConfigured)
+			r.ErrorIs(err, dom.ErrNotImplemented)
 			_, _, _, err = svcB.FindS3Credentials(s3Stor, newS3Creds.AccessKeyID)
-			r.ErrorIs(err, ErrRoleNotConfigured)
+			r.ErrorIs(err, dom.ErrNotImplemented)
 
 			// update new S3 creds via svcB
 			updatedS3Creds := s3.CredentialsV4{
@@ -870,9 +870,9 @@ func Test_credsSvc_ProxyMode_Static(t *testing.T) {
 	t.Run("worker lookups fail fast in proxy mode", func(t *testing.T) {
 		r := require.New(t)
 		_, err := s.GetS3Credentials("s3storage", validUser)
-		r.ErrorIs(err, ErrRoleNotConfigured)
+		r.ErrorIs(err, dom.ErrNotImplemented)
 		_, err = s.GetSwiftCredentials("s3storage", validUser)
-		r.ErrorIs(err, ErrRoleNotConfigured)
+		r.ErrorIs(err, dom.ErrNotImplemented)
 	})
 
 	t.Run("topology", func(t *testing.T) {

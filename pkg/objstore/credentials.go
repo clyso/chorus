@@ -47,10 +47,6 @@ const (
 	minPasswordLength  = 12
 )
 
-// ErrRoleNotConfigured is returned by role-specific lookups when the service
-// was constructed for the other role (worker vs proxy).
-var ErrRoleNotConfigured = errors.New("credentials service: lookup not supported in this mode")
-
 // WorkerCredsLookup resolves per-user credentials used by the worker.
 type WorkerCredsLookup interface {
 	GetS3Credentials(storage, user string) (s3.CredentialsV4, error)
@@ -110,7 +106,7 @@ func (c *DynamicCredentialsConfig) Validate() error {
 
 // New creates a credentials service. Exactly one of worker/proxy must be
 // non-nil; that selects the service mode. Role-specific lookups for the
-// missing config fail with ErrRoleNotConfigured.
+// missing config fail with dom.ErrNotImplemented.
 func New(ctx context.Context, rc redis.UniversalClient, dc DynamicCredentialsConfig,
 	worker *Config, proxy *ProxyConfig) (*credsSvc, error) {
 	if (worker == nil) == (proxy == nil) {
@@ -180,7 +176,7 @@ Otherwise, credentials are stored in Redis and cached locally with periodic sync
 The service runs in one of two modes selected at construction:
 - worker mode: per-user credentials (GetS3Credentials/GetSwiftCredentials)
 - proxy mode: per-alias S3 credentials (FindS3Credentials/GetS3AliasCredentials/ListS3Aliases)
-Lookups for the other mode fail with ErrRoleNotConfigured.
+Lookups for the other mode fail with dom.ErrNotImplemented.
 
 Redis HASH structure:
 - Key: "chorus:dynamic_creds"
@@ -228,7 +224,7 @@ type s3CredsByAccessKey struct {
 
 func (s *credsSvc) FindS3Credentials(storage, accessKey string) (user, alias string, cred s3.CredentialsV4, err error) {
 	if s.proxy == nil {
-		return "", "", s3.CredentialsV4{}, fmt.Errorf("%w: FindS3Credentials", ErrRoleNotConfigured)
+		return "", "", s3.CredentialsV4{}, fmt.Errorf("%w: FindS3Credentials requires proxy-mode credentials service", dom.ErrNotImplemented)
 	}
 	if s.dc.Enabled {
 		s.RLock()
@@ -244,7 +240,7 @@ func (s *credsSvc) FindS3Credentials(storage, accessKey string) (user, alias str
 
 func (s *credsSvc) GetS3AliasCredentials(storage, user, alias string) (s3.CredentialsV4, error) {
 	if s.proxy == nil {
-		return s3.CredentialsV4{}, fmt.Errorf("%w: GetS3AliasCredentials", ErrRoleNotConfigured)
+		return s3.CredentialsV4{}, fmt.Errorf("%w: GetS3AliasCredentials requires proxy-mode credentials service", dom.ErrNotImplemented)
 	}
 	// static config takes precedence over dynamic entries
 	if stor, ok := s.proxy.S3Storages()[storage]; ok {
@@ -266,7 +262,7 @@ func (s *credsSvc) GetS3AliasCredentials(storage, user, alias string) (s3.Creden
 
 func (s *credsSvc) ListS3Aliases(storage, user string) ([]string, error) {
 	if s.proxy == nil {
-		return nil, fmt.Errorf("%w: ListS3Aliases", ErrRoleNotConfigured)
+		return nil, fmt.Errorf("%w: ListS3Aliases requires proxy-mode credentials service", dom.ErrNotImplemented)
 	}
 	seen := make(map[string]struct{})
 	if stor, ok := s.proxy.S3Storages()[storage]; ok {
@@ -564,7 +560,7 @@ func (s *credsSvc) sync(ctx context.Context) error {
 
 func (s *credsSvc) GetS3Credentials(storage string, user string) (s3.CredentialsV4, error) {
 	if s.worker == nil {
-		return s3.CredentialsV4{}, fmt.Errorf("%w: GetS3Credentials", ErrRoleNotConfigured)
+		return s3.CredentialsV4{}, fmt.Errorf("%w: GetS3Credentials requires worker-mode credentials service", dom.ErrNotImplemented)
 	}
 	creds, err := s.getS3FromConfig(storage, user)
 	if !s.dc.Enabled {
@@ -600,7 +596,7 @@ func (s *credsSvc) getS3FromConfig(storage string, user string) (s3.CredentialsV
 
 func (s *credsSvc) GetSwiftCredentials(storage string, user string) (swift.Credentials, error) {
 	if s.worker == nil {
-		return swift.Credentials{}, fmt.Errorf("%w: GetSwiftCredentials", ErrRoleNotConfigured)
+		return swift.Credentials{}, fmt.Errorf("%w: GetSwiftCredentials requires worker-mode credentials service", dom.ErrNotImplemented)
 	}
 	creds, err := s.getSwiftFromConfig(storage, user)
 	if !s.dc.Enabled {
