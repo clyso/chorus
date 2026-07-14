@@ -37,12 +37,18 @@ type QueueService interface {
 }
 
 type QueueStats struct {
-	// Number of tasks to be processed in the queue.
-	// Includes includes in_progress, not_started, and retied tasks.
-	// In other words, all tasks except failed and processed tasks.
+	// Current number of tasks present in the queue (asynq QueueInfo.Size).
+	// Includes pending, active, scheduled, retry, aggregating AND archived
+	// (permanently failed) tasks. It is a live snapshot, not a lifetime total,
+	// and it does NOT include tasks that were already processed and deleted.
 	Unprocessed int
-	// Total number of tasks processed.
+	// Total number of times tasks in this queue finished processing, counting
+	// every retry and archival. asynq bumps this counter on success AND on each
+	// failed attempt, so it is NOT the number of successful tasks on its own.
+	// Successful tasks = ProcessedTotal - FailedTotal.
 	ProcessedTotal int
+	// Total number of failed processing attempts (retries + archived tasks).
+	FailedTotal int
 
 	// Paused indicates whether the queue is paused.
 	// If true, tasks in the queue will not be processed.
@@ -82,6 +88,7 @@ func (q *queueService) Stats(ctx context.Context, queueName string) (*QueueStats
 	return &QueueStats{
 		Unprocessed:    info.Size,
 		ProcessedTotal: info.ProcessedTotal,
+		FailedTotal:    info.FailedTotal,
 		Paused:         info.Paused,
 		MemoryUsage:    info.MemoryUsage,
 		Latency:        info.Latency,

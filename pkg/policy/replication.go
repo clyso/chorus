@@ -167,7 +167,11 @@ func (r *policySvc) buildQueueStats(ctx context.Context, queue string) (bool, en
 	}
 	return stats.Paused, entity.QueueStats{
 		Unprocessed: stats.Unprocessed,
-		Done:        stats.ProcessedTotal,
+		// asynq's ProcessedTotal counts every finished attempt, including retries
+		// and archived (permanently failed) tasks, while FailedTotal counts only
+		// the failed attempts. Their difference is the number of tasks that
+		// actually succeeded, which is what we report as Done.
+		Done:        stats.ProcessedTotal - stats.FailedTotal,
 		Latency:     stats.Latency,
 		MemoryUsage: stats.MemoryUsage,
 	}, nil
