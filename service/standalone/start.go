@@ -234,7 +234,7 @@ func printCreds(conf *Config, printSecrets bool) string {
 	if !conf.Proxy.Enabled {
 		return ""
 	}
-	var creds map[string]s3.CredentialsV4
+	var creds map[string]map[string]s3.CredentialsV4
 	if conf.Proxy.Auth.UseStorage != "" {
 		if s3torageConf, ok := conf.Proxy.Storage.S3Storages()[conf.Proxy.Auth.UseStorage]; ok {
 			creds = s3torageConf.Credentials
@@ -246,12 +246,14 @@ func printCreds(conf *Config, printSecrets bool) string {
 		return "<no credentials provided in config>"
 	}
 	res := make([]string, 0, len(creds))
-	for s, v4 := range creds {
-		secret := "<hidden>"
-		if printSecrets {
-			secret = v4.SecretAccessKey
+	for user, aliases := range creds {
+		for alias, v4 := range aliases {
+			secret := "<hidden>"
+			if printSecrets {
+				secret = v4.SecretAccessKey
+			}
+			res = append(res, fmt.Sprintf(" - %s:%s: [%s|%s]", user, alias, v4.AccessKeyID, secret))
 		}
-		res = append(res, fmt.Sprintf(" - %s: [%s|%s]", s, v4.AccessKeyID, secret))
 	}
 	return strings.Join(res, "\n")
 }

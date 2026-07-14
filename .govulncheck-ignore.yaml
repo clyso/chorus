@@ -19,3 +19,12 @@
 - id: GO-2026-4883
   module: github.com/docker/docker
   reason: "No fix available — Moby off-by-one error in plugin privilege validation. Pulled in only via testcontainers-go from test/env/components.go (test infra); not linked into product binaries."
+- id: GO-2026-5617
+  module: github.com/docker/docker
+  reason: "No fix available — Moby docker cp race condition allows bind mount redirection to host path. Pulled in only via testcontainers-go from test/env/components.go (test infra); not linked into product binaries."
+- id: GO-2026-5668
+  module: github.com/docker/docker
+  reason: "No fix available — Moby docker cp race condition allows creation of arbitrary empty files on the host via symlink swap. Pulled in only via testcontainers-go from test/env/components.go (test infra); not linked into product binaries."
+- id: GO-2026-5746
+  module: github.com/docker/docker
+  reason: "No fix available — Moby PUT /containers/{id}/archive executes container binary on the host. Pulled in only via testcontainers-go from test/env/components.go (test infra); not linked into product binaries."

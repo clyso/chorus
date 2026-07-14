@@ -123,7 +123,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		if err != nil {
 			return err
 		}
-		credsSvc, err := objstore.NewCredsSvc(ctx, &credsConf, appRedis)
+		credsSvc, err := objstore.New(ctx, appRedis, credsConf.DynamicCredentials, nil, &credsConf)
 		if err != nil {
 			return err
 		}
@@ -168,7 +168,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	logger.Info().Msg("proxy created")
 
-	credentials := []map[string]s3.CredentialsV4{conf.Auth.Custom}
+	credentials := []map[string]map[string]s3.CredentialsV4{conf.Auth.Custom}
 	if s3torageConf, ok := conf.Storage.S3Storages()[conf.Auth.UseStorage]; ok {
 		credentials = append(credentials, s3torageConf.Credentials)
 	}
@@ -191,15 +191,18 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	return server.Start(ctx)
 }
 
-func requestReplyServer(proxyUrl string, credentials ...map[string]s3.CredentialsV4) rpc.ProxyGetCredentials {
+func requestReplyServer(proxyUrl string, credentials ...map[string]map[string]s3.CredentialsV4) rpc.ProxyGetCredentials {
 	creds := make([]*pb.Credential, 0)
 	for _, c := range credentials {
-		for alias, cred := range c {
-			creds = append(creds, &pb.Credential{
-				Alias:     alias,
-				AccessKey: cred.AccessKeyID,
-				SecretKey: cred.SecretAccessKey,
-			})
+		for user, aliases := range c {
+			for alias, cred := range aliases {
+				creds = append(creds, &pb.Credential{
+					// display-only connection info: keep the user visible
+					Alias:     user + ":" + alias,
+					AccessKey: cred.AccessKeyID,
+					SecretKey: cred.SecretAccessKey,
+				})
+			}
 		}
 	}
 	slices.SortFunc(creds, func(a, b *pb.Credential) int {

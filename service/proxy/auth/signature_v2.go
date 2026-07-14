@@ -81,14 +81,14 @@ func isRequestSignatureV2(r *http.Request) bool {
 		strings.HasPrefix(r.Header.Get(s3.Authorization), signV2Algorithm)
 }
 
-func (m *middleware) doesSignatureV2Match(r *http.Request) (string, error) {
+func (m *middleware) doesSignatureV2Match(r *http.Request) (credMeta, error) {
 	accessKey, err := getReqAccessKeyV2(r)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 	credInfo, err := m.getCred(accessKey)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 	cred := credInfo.cred
 
@@ -102,22 +102,22 @@ func (m *middleware) doesSignatureV2Match(r *http.Request) (string, error) {
 
 	unescapedQueries, err := unescapeQueries(encodedQuery)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 	encodedResource, err = getResource(encodedResource, r.Host, m.endpoint)
 	if err != nil {
-		return "", err
+		return credMeta{}, err
 	}
 	expectedAuth := signatureV2(cred, r.Method, encodedResource, strings.Join(unescapedQueries, "&"), r.Header)
 
 	v2Auth := r.Header.Get(s3.Authorization)
 	prefix := fmt.Sprintf("%s %s:", signV2Algorithm, cred.AccessKeyID)
 	if !strings.HasPrefix(v2Auth, prefix) {
-		return "", fmt.Errorf("%w: unsupported sign alhorithm", dom.ErrAuth)
+		return credMeta{}, fmt.Errorf("%w: unsupported sign alhorithm", dom.ErrAuth)
 	}
 	v2Auth = v2Auth[len(prefix):]
 	if !compareSignatureV2(v2Auth, expectedAuth) {
-		return "", mclient.ErrorResponse{
+		return credMeta{}, mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "SignatureDoesNotMatch",
 			Message:    "The request signature that the server calculated does not match the signature that you provided. Check your AWS secret access key and signing method. For more information, see REST Authentication and SOAP Authentication.",
@@ -126,7 +126,7 @@ func (m *middleware) doesSignatureV2Match(r *http.Request) (string, error) {
 			StatusCode: http.StatusForbidden,
 		}
 	}
-	return credInfo.user, nil
+	return credInfo, nil
 }
 
 func getReqAccessKeyV2(r *http.Request) (string, error) {

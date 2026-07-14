@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,8 +47,27 @@ const (
 	minPasswordLength  = 12
 )
 
+// WorkerCredsLookup resolves per-user credentials used by the worker.
+type WorkerCredsLookup interface {
+	GetS3Credentials(storage, user string) (s3.CredentialsV4, error)
+	GetSwiftCredentials(storage, user string) (swift.Credentials, error)
+}
+
+// ProxyCredsLookup resolves per-alias credentials used by the proxy.
+type ProxyCredsLookup interface {
+	FindS3Credentials(storage, accessKey string) (user, alias string, cred s3.CredentialsV4, err error)
+	GetS3AliasCredentials(storage, user, alias string) (s3.CredentialsV4, error)
+	ListS3Aliases(storage, user string) ([]string, error)
+}
+
+// CredsWriter stores dynamic credentials.
+type CredsWriter interface {
+	SetS3Credentials(ctx context.Context, storage, user string, cred s3.CredentialsV4) error
+	SetS3AliasCredentials(ctx context.Context, storage, user, alias string, cred s3.CredentialsV4) error
+	SetSwiftCredentials(ctx context.Context, storage, user string, cred swift.Credentials) error
+}
+
 type CredsService interface {
-	FindS3Credentials(storage, accessKey string) (user string, cred s3.CredentialsV4, err error)
 	MainStorage() string
 	Storages() map[string]dom.StorageType
 	GetS3Address(storage string) (s3.StorageAddress, error)
@@ -56,11 +76,9 @@ type CredsService interface {
 	HasUser(storage, user string) error
 	ListUsers(storage string) []string
 
-	GetSwiftCredentials(storage, user string) (swift.Credentials, error)
-	GetS3Credentials(storage, user string) (s3.CredentialsV4, error)
-
-	SetSwiftCredentials(ctx context.Context, storage, user string, cred swift.Credentials) error
-	SetS3Credentials(ctx context.Context, storage, user string, cred s3.CredentialsV4) error
+	WorkerCredsLookup
+	ProxyCredsLookup
+	CredsWriter
 }
 
 type DynamicCredentialsConfig struct {
@@ -86,30 +104,43 @@ func (c *DynamicCredentialsConfig) Validate() error {
 	return nil
 }
 
-func NewCredsSvc(ctx context.Context, conf *Config, rc redis.UniversalClient) (*credsSvc, error) {
-	if err := conf.DynamicCredentials.Validate(); err != nil {
+// New creates a credentials service. Exactly one of worker/proxy must be
+// non-nil; that selects the service mode. Role-specific lookups for the
+// missing config fail with dom.ErrNotImplemented.
+func New(ctx context.Context, rc redis.UniversalClient, dc DynamicCredentialsConfig,
+	worker *Config, proxy *ProxyConfig) (*credsSvc, error) {
+	if (worker == nil) == (proxy == nil) {
+		return nil, fmt.Errorf("%w: exactly one of worker or proxy config must be set", dom.ErrInvalidArg)
+	}
+	if err := dc.Validate(); err != nil {
 		return nil, err
 	}
 	instance := &credsSvc{
-		types:          conf.Types(),
-		s3AccessKeyIdx: buildS3AccessKeyIdxFromConf(conf),
-		config:         conf,
-		client:         rc,
-		version:        -1,
+		worker:  worker,
+		proxy:   proxy,
+		dc:      dc,
+		client:  rc,
+		version: -1,
 	}
-	if !conf.DynamicCredentials.Enabled {
+	if worker != nil {
+		instance.types = worker.Types()
+	} else {
+		instance.types = proxy.Types()
+		instance.s3AccessKeyIdx = buildS3AccessKeyIdxFromConf(proxy)
+	}
+	if !dc.Enabled {
 		// dynamic credentials disabled, return credentials from config only
 		return instance, nil
 	}
-	if !conf.DynamicCredentials.DisableEncryption {
+	if !dc.DisableEncryption {
 		// derive encryption key
 		salt, err := getOrCreateSalt(ctx, rc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create salt: %w", err)
 		}
-		instance.key = deriveKey(conf.DynamicCredentials.MasterPassword, salt)
+		instance.key = deriveKey(dc.MasterPassword, salt)
 	}
-	if conf.DynamicCredentials.DisableEncryption {
+	if dc.DisableEncryption {
 		zerolog.Ctx(ctx).Warn().Msg("dynamic credentials encryption is disabled, credentials will be stored in Redis in plaintext")
 	}
 	// fetch initial credentials from redis
@@ -118,7 +149,7 @@ func NewCredsSvc(ctx context.Context, conf *Config, rc redis.UniversalClient) (*
 	}
 	// start background sync goroutine
 	go func() {
-		ticker := time.NewTicker(conf.DynamicCredentials.PollInterval)
+		ticker := time.NewTicker(dc.PollInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -142,66 +173,134 @@ Implements CredsService interface for dynamic credentials management.
 If dynamic credentials are disabled, credentials are read from config only.
 Otherwise, credentials are stored in Redis and cached locally with periodic sync.
 
+The service runs in one of two modes selected at construction:
+- worker mode: per-user credentials (GetS3Credentials/GetSwiftCredentials)
+- proxy mode: per-alias S3 credentials (FindS3Credentials/GetS3AliasCredentials/ListS3Aliases)
+Lookups for the other mode fail with dom.ErrNotImplemented.
+
 Redis HASH structure:
 - Key: "chorus:dynamic_creds"
 - Fields:
   - "version": int64 - version of the credentials, incremented on each update
   - "salt": string - base64 encoded salt for encryption key derivation
-  - "<storType>:<storage>:<user>": credentials encoded string value
+  - "<storType>:<storage>:<user>": worker (per-user) credentials encoded string value
+  - "S3:<storage>:<user>:<alias>": proxy (per-alias) S3 credentials encoded string value
   - value: if encryption is enabled: JSON serialized credentials -> encrypted with AES-GCM -> base64 encoded
   - value: if encryption is disabled: JSON serialized credentials
+
+Alias fields are S3-only and read only by proxy-mode instances; worker-mode
+instances skip them. Storage, user, and alias names must not contain ':' -
+enforced on the write path so the field format stays unambiguous.
 
 Credentials encryption:
 - AES-GCM with 256-bit key derived from master password using Argon2id KDF with per-instance salt stored in Redis.
 
 Local cache:
-- Maps of storage:user to credentials for S3 and Swift, updated on sync if version changes in Redis.
+- worker mode: maps of storage:user to credentials for S3 and Swift, updated on sync if version changes in Redis.
+- proxy mode: map of storage:user:alias to S3 credentials plus an access-key index seeded from static config.
 */
 type credsSvc struct {
 	client     redis.UniversalClient
 	types      map[string]dom.StorageType
-	config     *Config
+	worker     *Config
+	proxy      *ProxyConfig
 	swiftCreds map[string]swift.Credentials
 	s3Creds    map[string]s3.CredentialsV4
+	// proxy mode: dynamic S3 alias credentials keyed "<storage>:<user>:<alias>"
+	s3AliasCreds map[string]s3.CredentialsV4
 	// index of S3 credentials by access key for chorus Proxy Auth Middleware
 	s3AccessKeyIdx map[string]s3CredsByAccessKey
 	key            []byte
+	dc             DynamicCredentialsConfig
 	version        int64
 	sync.RWMutex
 }
 
 type s3CredsByAccessKey struct {
 	user        string
+	alias       string
 	credentials s3.CredentialsV4
 }
 
-func (s *credsSvc) FindS3Credentials(storage, accessKey string) (user string, cred s3.CredentialsV4, err error) {
-	if s.config.DynamicCredentials.Enabled {
+func (s *credsSvc) FindS3Credentials(storage, accessKey string) (user, alias string, cred s3.CredentialsV4, err error) {
+	if s.proxy == nil {
+		return "", "", s3.CredentialsV4{}, fmt.Errorf("%w: FindS3Credentials requires proxy-mode credentials service", dom.ErrNotImplemented)
+	}
+	if s.dc.Enabled {
 		s.RLock()
 		defer s.RUnlock()
 	}
 	key := s3accessKeyIdxKey(storage, accessKey)
 	res, ok := s.s3AccessKeyIdx[key]
 	if !ok {
-		return "", s3.CredentialsV4{}, dom.ErrNotFound
+		return "", "", s3.CredentialsV4{}, dom.ErrNotFound
 	}
-	return res.user, res.credentials, nil
+	return res.user, res.alias, res.credentials, nil
+}
+
+func (s *credsSvc) GetS3AliasCredentials(storage, user, alias string) (s3.CredentialsV4, error) {
+	if s.proxy == nil {
+		return s3.CredentialsV4{}, fmt.Errorf("%w: GetS3AliasCredentials requires proxy-mode credentials service", dom.ErrNotImplemented)
+	}
+	// static config takes precedence over dynamic entries
+	if stor, ok := s.proxy.S3Storages()[storage]; ok {
+		if cred, ok := stor.Credentials[user][alias]; ok {
+			return cred, nil
+		}
+	}
+	if !s.dc.Enabled {
+		return s3.CredentialsV4{}, dom.ErrNotFound
+	}
+	s.RLock()
+	defer s.RUnlock()
+	cred, ok := s.s3AliasCreds[aliasCacheKey(storage, user, alias)]
+	if !ok {
+		return s3.CredentialsV4{}, dom.ErrNotFound
+	}
+	return cred, nil
+}
+
+func (s *credsSvc) ListS3Aliases(storage, user string) ([]string, error) {
+	if s.proxy == nil {
+		return nil, fmt.Errorf("%w: ListS3Aliases requires proxy-mode credentials service", dom.ErrNotImplemented)
+	}
+	seen := make(map[string]struct{})
+	if stor, ok := s.proxy.S3Storages()[storage]; ok {
+		for alias := range stor.Credentials[user] {
+			seen[alias] = struct{}{}
+		}
+	}
+	if s.dc.Enabled {
+		s.RLock()
+		prefix := credsCacheKey(storage, user) + ":"
+		for cacheKey := range s.s3AliasCreds {
+			if alias, ok := strings.CutPrefix(cacheKey, prefix); ok {
+				seen[alias] = struct{}{}
+			}
+		}
+		s.RUnlock()
+	}
+	res := make([]string, 0, len(seen))
+	for alias := range seen {
+		res = append(res, alias)
+	}
+	slices.Sort(res)
+	return res, nil
 }
 
 func (s *credsSvc) Storages() map[string]dom.StorageType {
 	return s.types
 }
 
-func (s *credsSvc) StorageType(storage string) (dom.StorageType, error) {
-	storConf, ok := s.config.Storages[storage]
-	if !ok {
-		return "", fmt.Errorf("%w: storage %q not found", dom.ErrNotFound, storage)
-	}
-	return storConf.CommonConfig.Type, nil
-}
-
 func (s *credsSvc) GetS3Address(storage string) (s3.StorageAddress, error) {
-	res, ok := s.config.S3Storages()[storage]
+	if s.worker != nil {
+		res, ok := s.worker.S3Storages()[storage]
+		if !ok {
+			return s3.StorageAddress{}, dom.ErrNotFound
+		}
+		return res.StorageAddress, nil
+	}
+	res, ok := s.proxy.S3Storages()[storage]
 	if !ok {
 		return s3.StorageAddress{}, dom.ErrNotFound
 	}
@@ -209,20 +308,57 @@ func (s *credsSvc) GetS3Address(storage string) (s3.StorageAddress, error) {
 }
 
 func (s *credsSvc) GetSwiftAddress(storage string) (swift.StorageAddress, error) {
-	res, ok := s.config.SwiftStorages()[storage]
+	if s.worker != nil {
+		res, ok := s.worker.SwiftStorages()[storage]
+		if !ok {
+			return swift.StorageAddress{}, dom.ErrNotFound
+		}
+		return res.StorageAddress, nil
+	}
+	res, ok := s.proxy.SwiftStorages()[storage]
 	if !ok {
 		return swift.StorageAddress{}, dom.ErrNotFound
 	}
 	return res.StorageAddress, nil
 }
 
+// existsInConfig checks static config of whichever mode is configured.
+func (s *credsSvc) existsInConfig(storage, user string) error {
+	if s.worker != nil {
+		return s.worker.Exists(storage, user)
+	}
+	return s.proxy.Exists(storage, user)
+}
+
+// configUserList returns static config users; ok is false for unknown storage.
+func (s *credsSvc) configUserList(storage string) (users []string, ok bool) {
+	if s.worker != nil {
+		stor, ok := s.worker.Storages[storage]
+		if !ok {
+			return nil, false
+		}
+		return stor.UserList(), true
+	}
+	stor, ok := s.proxy.Storages[storage]
+	if !ok {
+		return nil, false
+	}
+	return stor.UserList(), true
+}
+
+func (s *credsSvc) sameStorType(fromStorage, toStorage string) error {
+	if s.worker != nil {
+		return s.worker.sameStorType(fromStorage, toStorage)
+	}
+	return s.proxy.sameStorType(fromStorage, toStorage)
+}
+
 func (s *credsSvc) ListUsers(storage string) []string {
-	storageConf, ok := s.config.Storages[storage]
+	users, ok := s.configUserList(storage)
 	if !ok {
 		return nil
 	}
-	users := storageConf.UserList()
-	if !s.config.DynamicCredentials.Enabled {
+	if !s.dc.Enabled {
 		// dynamic credentials disabled, return users from config only
 		return users
 	}
@@ -230,7 +366,27 @@ func (s *credsSvc) ListUsers(storage string) []string {
 	s.RLock()
 	defer s.RUnlock()
 
-	switch storageConf.CommonConfig.Type {
+	if s.proxy != nil {
+		// proxy mode: users from dynamic alias entries
+		seen := make(map[string]struct{}, len(users))
+		for _, user := range users {
+			seen[user] = struct{}{}
+		}
+		for cacheKey := range s.s3AliasCreds {
+			stor, user, _ := aliasCacheKeyToCreds(cacheKey)
+			if stor != storage {
+				continue
+			}
+			if _, ok := seen[user]; ok {
+				continue
+			}
+			seen[user] = struct{}{}
+			users = append(users, user)
+		}
+		return users
+	}
+
+	switch s.types[storage] {
 	case dom.S3:
 		for cacheKey := range s.s3Creds {
 			stor, user := cacheKeyToCreds(cacheKey)
@@ -247,17 +403,20 @@ func (s *credsSvc) ListUsers(storage string) []string {
 		}
 	default:
 		// should not happen due to prior validation of storage config
-		panic(fmt.Sprintf("unsupported storage type %q", storageConf.CommonConfig.Type))
+		panic(fmt.Sprintf("unsupported storage type %q", s.types[storage]))
 	}
 	return users
 }
 
 func (s *credsSvc) MainStorage() string {
-	return s.config.Main
+	if s.worker != nil {
+		return s.worker.Main
+	}
+	return s.proxy.Main
 }
 
 func (s *credsSvc) ValidateReplicationID(id entity.UniversalReplicationID) error {
-	if err := s.config.sameStorType(id.FromStorage(), id.ToStorage()); err != nil {
+	if err := s.sameStorType(id.FromStorage(), id.ToStorage()); err != nil {
 		// TODO: allow cross-type replication in the future?
 		return err
 	}
@@ -273,8 +432,8 @@ func (s *credsSvc) ValidateReplicationID(id entity.UniversalReplicationID) error
 }
 
 func (s *credsSvc) HasUser(storage string, user string) error {
-	err := s.config.Exists(storage, user)
-	if !s.config.DynamicCredentials.Enabled {
+	err := s.existsInConfig(storage, user)
+	if !s.dc.Enabled {
 		// dynamic credentials disabled, return result from config
 		return err
 	}
@@ -286,6 +445,16 @@ func (s *credsSvc) HasUser(storage string, user string) error {
 	cacheKey := credsCacheKey(storage, user)
 	s.RLock()
 	defer s.RUnlock()
+	if s.proxy != nil {
+		// proxy mode: user exists if it has at least one dynamic alias
+		prefix := cacheKey + ":"
+		for aliasKey := range s.s3AliasCreds {
+			if strings.HasPrefix(aliasKey, prefix) {
+				return nil
+			}
+		}
+		return dom.ErrNotFound
+	}
 	if _, ok := s.s3Creds[cacheKey]; ok {
 		return nil
 	}
@@ -296,7 +465,7 @@ func (s *credsSvc) HasUser(storage string, user string) error {
 }
 
 func (s *credsSvc) sync(ctx context.Context) error {
-	if !s.config.DynamicCredentials.Enabled {
+	if !s.dc.Enabled {
 		return nil
 	}
 	// read redis version of creds and update local cache
@@ -314,7 +483,11 @@ func (s *credsSvc) sync(ctx context.Context) error {
 	}
 	s3Creds := make(map[string]s3.CredentialsV4)
 	swiftCreds := make(map[string]swift.Credentials)
-	s3AccessKeyIdx := buildS3AccessKeyIdxFromConf(s.config)
+	s3AliasCreds := make(map[string]s3.CredentialsV4)
+	var s3AccessKeyIdx map[string]s3CredsByAccessKey
+	if s.proxy != nil {
+		s3AccessKeyIdx = buildS3AccessKeyIdxFromConf(s.proxy)
+	}
 	for key, value := range allCreds {
 		if key == redisHFieldVersion {
 			// set remote version:
@@ -328,35 +501,44 @@ func (s *credsSvc) sync(ctx context.Context) error {
 			// ignore salt field
 			continue
 		}
-		storType, cacheKey, err := credsFromRedisField(key)
+		storType, storage, user, alias, err := credsFromRedisField(key)
 		if err != nil {
 			return fmt.Errorf("failed to parse redis field %s: %w", key, err)
 		}
+		if s.worker != nil && alias != "" {
+			// proxy alias entry - not used by the worker
+			continue
+		}
+		if s.proxy != nil && (alias == "" || storType != dom.S3) {
+			// proxy indexes only S3 alias entries; worker per-user entries are skipped
+			continue
+		}
 		plaintext, err := s.decrypt([]byte(value))
 		if err != nil {
-			return fmt.Errorf("failed to decrypt credentials for %s: %w", cacheKey, err)
+			return fmt.Errorf("failed to decrypt credentials for %s: %w", key, err)
 		}
 		switch storType {
 		case dom.S3:
 			var cred s3.CredentialsV4
 			if err := json.Unmarshal(plaintext, &cred); err != nil {
-				return fmt.Errorf("failed to unmarshal S3 credentials for %s: %w", cacheKey, err)
+				return fmt.Errorf("failed to unmarshal S3 credentials for %s: %w", key, err)
 			}
-			s3Creds[cacheKey] = cred
-
-			// update s3AccessKeyIdx
-			stor, user := cacheKeyToCreds(cacheKey)
-			s3AccessKeyIdxKey := s3accessKeyIdxKey(stor, cred.AccessKeyID)
-			s3AccessKeyIdx[s3AccessKeyIdxKey] = s3CredsByAccessKey{
-				user:        user,
-				credentials: cred,
+			if alias != "" {
+				s3AliasCreds[aliasCacheKey(storage, user, alias)] = cred
+				s3AccessKeyIdx[s3accessKeyIdxKey(storage, cred.AccessKeyID)] = s3CredsByAccessKey{
+					user:        user,
+					alias:       alias,
+					credentials: cred,
+				}
+				continue
 			}
+			s3Creds[credsCacheKey(storage, user)] = cred
 		case dom.Swift:
 			var cred swift.Credentials
 			if err := json.Unmarshal(plaintext, &cred); err != nil {
-				return fmt.Errorf("failed to unmarshal Swift credentials for %s: %w", cacheKey, err)
+				return fmt.Errorf("failed to unmarshal Swift credentials for %s: %w", key, err)
 			}
-			swiftCreds[cacheKey] = cred
+			swiftCreds[credsCacheKey(storage, user)] = cred
 		default:
 			return fmt.Errorf("%w: unknown storage type %s", dom.ErrInvalidArg, storType)
 		}
@@ -365,7 +547,10 @@ func (s *credsSvc) sync(ctx context.Context) error {
 	s.Lock()
 	defer s.Unlock()
 	s.s3Creds = s3Creds
-	s.s3AccessKeyIdx = s3AccessKeyIdx
+	s.s3AliasCreds = s3AliasCreds
+	if s.proxy != nil {
+		s.s3AccessKeyIdx = s3AccessKeyIdx
+	}
 	s.swiftCreds = swiftCreds
 	s.version = remoteVer
 
@@ -374,8 +559,11 @@ func (s *credsSvc) sync(ctx context.Context) error {
 }
 
 func (s *credsSvc) GetS3Credentials(storage string, user string) (s3.CredentialsV4, error) {
+	if s.worker == nil {
+		return s3.CredentialsV4{}, fmt.Errorf("%w: GetS3Credentials requires worker-mode credentials service", dom.ErrNotImplemented)
+	}
 	creds, err := s.getS3FromConfig(storage, user)
-	if !s.config.DynamicCredentials.Enabled {
+	if !s.dc.Enabled {
 		// dynamic credentials disabled, return result from config
 		return creds, err
 	}
@@ -395,7 +583,7 @@ func (s *credsSvc) GetS3Credentials(storage string, user string) (s3.Credentials
 }
 
 func (s *credsSvc) getS3FromConfig(storage string, user string) (s3.CredentialsV4, error) {
-	stor, ok := s.config.S3Storages()[storage]
+	stor, ok := s.worker.S3Storages()[storage]
 	if !ok {
 		return s3.CredentialsV4{}, dom.ErrNotFound
 	}
@@ -407,8 +595,11 @@ func (s *credsSvc) getS3FromConfig(storage string, user string) (s3.CredentialsV
 }
 
 func (s *credsSvc) GetSwiftCredentials(storage string, user string) (swift.Credentials, error) {
+	if s.worker == nil {
+		return swift.Credentials{}, fmt.Errorf("%w: GetSwiftCredentials requires worker-mode credentials service", dom.ErrNotImplemented)
+	}
 	creds, err := s.getSwiftFromConfig(storage, user)
-	if !s.config.DynamicCredentials.Enabled {
+	if !s.dc.Enabled {
 		// dynamic credentials disabled, return result from config
 		return creds, err
 	}
@@ -428,7 +619,7 @@ func (s *credsSvc) GetSwiftCredentials(storage string, user string) (swift.Crede
 }
 
 func (s *credsSvc) getSwiftFromConfig(storage string, user string) (swift.Credentials, error) {
-	stor, ok := s.config.SwiftStorages()[storage]
+	stor, ok := s.worker.SwiftStorages()[storage]
 	if !ok {
 		return swift.Credentials{}, dom.ErrNotFound
 	}
@@ -443,29 +634,44 @@ func (s *credsSvc) SetS3Credentials(ctx context.Context, storage string, user st
 	if err := cred.Validate(); err != nil {
 		return fmt.Errorf("%w: invalid S3 credentials: %w", dom.ErrInvalidArg, err)
 	}
-	return s.storeCred(ctx, dom.S3, storage, user, cred)
+	return s.storeCred(ctx, dom.S3, storage, user, "", cred)
 }
 
-func (s *credsSvc) storeCred(ctx context.Context, storType dom.StorageType, storage, user string, value any) error {
-	if !s.config.DynamicCredentials.Enabled {
+func (s *credsSvc) SetS3AliasCredentials(ctx context.Context, storage, user, alias string, cred s3.CredentialsV4) error {
+	if err := cred.Validate(); err != nil {
+		return fmt.Errorf("%w: invalid S3 credentials: %w", dom.ErrInvalidArg, err)
+	}
+	if alias == "" {
+		return fmt.Errorf("%w: alias is required", dom.ErrInvalidArg)
+	}
+	return s.storeCred(ctx, dom.S3, storage, user, alias, cred)
+}
+
+func (s *credsSvc) storeCred(ctx context.Context, storType dom.StorageType, storage, user, alias string, value any) error {
+	if !s.dc.Enabled {
 		return fmt.Errorf("%w: dynamic credentials are disabled", dom.ErrInvalidArg)
 	}
-	// cannot overwrite existing user in config
-	if err := s.config.Exists(storage, user); err == nil {
-		return fmt.Errorf("%w: cannot overwrite existing user %q in config for storage %q", dom.ErrInvalidArg, user, storage)
+	// keep the redis field format unambiguous
+	for _, name := range []string{storage, user, alias} {
+		if strings.Contains(name, ":") {
+			return fmt.Errorf("%w: storage, user, and alias names must not contain ':'", dom.ErrInvalidArg)
+		}
+	}
+	if user == "" {
+		return fmt.Errorf("%w: user is required", dom.ErrInvalidArg)
+	}
+	if alias == "" {
+		// cannot overwrite existing user in config
+		if err := s.existsInConfig(storage, user); err == nil {
+			return fmt.Errorf("%w: cannot overwrite existing user %q in config for storage %q", dom.ErrInvalidArg, user, storage)
+		}
+	} else if storType != dom.S3 {
+		// alias entries are S3-only
+		return fmt.Errorf("%w: alias credentials are supported only for S3 storages", dom.ErrInvalidArg)
 	}
 	// check if storage exists in config
-	switch storType {
-	case dom.S3:
-		if _, ok := s.config.S3Storages()[storage]; !ok {
-			return fmt.Errorf("%w: storage %q not found in config", dom.ErrInvalidArg, storage)
-		}
-	case dom.Swift:
-		if _, ok := s.config.SwiftStorages()[storage]; !ok {
-			return fmt.Errorf("%w: storage %q not found in config", dom.ErrInvalidArg, storage)
-		}
-	default:
-		return fmt.Errorf("%w: unknown storage type %q", dom.ErrInvalidArg, storType)
+	if s.types[storage] != storType {
+		return fmt.Errorf("%w: %s storage %q not found in config", dom.ErrInvalidArg, storType, storage)
 	}
 
 	// encrypt credentials
@@ -473,7 +679,7 @@ func (s *credsSvc) storeCred(ctx context.Context, storType dom.StorageType, stor
 	if err != nil {
 		return fmt.Errorf("failed to encrypt S3 credentials: %w", err)
 	}
-	key := credsToRedisField(storType, storage, user)
+	key := credsToRedisField(storType, storage, user, alias)
 	// store in redis and increment version in a transaction
 	tx := s.client.TxPipeline()
 	tx.HSet(ctx, redisHashKey, key, value)
@@ -492,7 +698,7 @@ func (s *credsSvc) SetSwiftCredentials(ctx context.Context, storage string, user
 	if err := cred.Validate(); err != nil {
 		return fmt.Errorf("%w: invalid Swift credentials: %w", dom.ErrInvalidArg, err)
 	}
-	return s.storeCred(ctx, dom.Swift, storage, user, cred)
+	return s.storeCred(ctx, dom.Swift, storage, user, "", cred)
 }
 
 func getOrCreateSalt(ctx context.Context, rc redis.UniversalClient) ([]byte, error) {
@@ -549,6 +755,12 @@ func credsCacheKey(storage, user string) string {
 	return storage + ":" + user
 }
 
+func aliasCacheKey(storage, user, alias string) string {
+	// cache key format: "<storage name>:<user name>:<alias name>"
+	// e.g. "my_storage:alice:laptop"
+	return storage + ":" + user + ":" + alias
+}
+
 func cacheKeyToCreds(cacheKey string) (storage, user string) {
 	parts := strings.SplitN(cacheKey, ":", 2)
 	if len(parts) != 2 {
@@ -557,19 +769,35 @@ func cacheKeyToCreds(cacheKey string) (storage, user string) {
 	return parts[0], parts[1]
 }
 
-func credsToRedisField(storType dom.StorageType, storage, user string) string {
-	// redis field format: "<storType S3|SWIFT>:<svc cache key: (<storage>:<user)>"
-	// e.g. "S3:my_storage:alice"
-	return fmt.Sprintf("%s:%s", storType, credsCacheKey(storage, user))
+func aliasCacheKeyToCreds(cacheKey string) (storage, user, alias string) {
+	parts := strings.SplitN(cacheKey, ":", 3)
+	if len(parts) != 3 {
+		panic(fmt.Sprintf("invalid alias cache key format: %s", cacheKey))
+	}
+	return parts[0], parts[1], parts[2]
 }
 
-func credsFromRedisField(field string) (storType dom.StorageType, cacheKey string, err error) {
-	parts := strings.SplitN(field, ":", 2)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("%w: invalid redis field format", dom.ErrInvalidArg)
+func credsToRedisField(storType dom.StorageType, storage, user, alias string) string {
+	// redis field format: "<storType S3|SWIFT>:<storage>:<user>" for worker entries
+	// e.g. "S3:my_storage:alice"
+	// and "S3:<storage>:<user>:<alias>" for proxy alias entries
+	// e.g. "S3:my_storage:alice:laptop"
+	if alias == "" {
+		return fmt.Sprintf("%s:%s", storType, credsCacheKey(storage, user))
 	}
-	storType, cacheKey = dom.StorageType(parts[0]), parts[1]
-	return storType, cacheKey, nil
+	return fmt.Sprintf("%s:%s", storType, aliasCacheKey(storage, user, alias))
+}
+
+func credsFromRedisField(field string) (storType dom.StorageType, storage, user, alias string, err error) {
+	parts := strings.Split(field, ":")
+	switch len(parts) {
+	case 3:
+		return dom.StorageType(parts[0]), parts[1], parts[2], "", nil
+	case 4:
+		return dom.StorageType(parts[0]), parts[1], parts[2], parts[3], nil
+	default:
+		return "", "", "", "", fmt.Errorf("%w: invalid redis field format", dom.ErrInvalidArg)
+	}
 }
 
 func s3accessKeyIdxKey(storage, accessKey string) string {
@@ -582,7 +810,7 @@ func (s *credsSvc) encrypt(credsStruct any) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal credentials to JSON: %w", err)
 	}
-	if s.config.DynamicCredentials.DisableEncryption {
+	if s.dc.DisableEncryption {
 		return string(plaintext), nil
 	}
 	// encrypt with AES-GCM
@@ -605,7 +833,7 @@ func (s *credsSvc) encrypt(credsStruct any) (string, error) {
 }
 
 func (s *credsSvc) decrypt(ciphertext []byte) ([]byte, error) {
-	if s.config.DynamicCredentials.DisableEncryption {
+	if s.dc.DisableEncryption {
 		return ciphertext, nil
 	}
 	// base64 decode
@@ -634,14 +862,17 @@ func (s *credsSvc) decrypt(ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-func buildS3AccessKeyIdxFromConf(conf *Config) map[string]s3CredsByAccessKey {
+func buildS3AccessKeyIdxFromConf(conf *ProxyConfig) map[string]s3CredsByAccessKey {
 	res := make(map[string]s3CredsByAccessKey)
 	for storage, storConf := range conf.S3Storages() {
-		for user, cred := range storConf.Credentials {
-			key := s3accessKeyIdxKey(storage, cred.AccessKeyID)
-			res[key] = s3CredsByAccessKey{
-				user:        user,
-				credentials: cred,
+		for user, aliases := range storConf.Credentials {
+			for alias, cred := range aliases {
+				key := s3accessKeyIdxKey(storage, cred.AccessKeyID)
+				res[key] = s3CredsByAccessKey{
+					user:        user,
+					alias:       alias,
+					credentials: cred,
+				}
 			}
 		}
 	}

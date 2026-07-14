@@ -28,7 +28,7 @@ storage:
       provider: Ceph
       isSecure: true
 
-# Credentials (stored in Kubernetes Secret)
+# Worker credentials (stored in Kubernetes Secret)
 credentials:
   storages:
     # Swift credentials - key must be OpenStack Project ID
@@ -53,18 +53,27 @@ credentials:
         accessKeyID: "AKIAIOSFODNN7EXAMPLE"
         secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
+# Proxy S3 credentials (stored in a separate Kubernetes Secret)
+# user -> alias -> credential. Only needed for the S3 storage: for Swift the
+# proxy does not perform authentication itself
+proxyCredentials:
+  storages:
+    s3-backup:
+      swift-admin:
+        default:
+          accessKeyID: "BKIAIOSFODNN7EXAMPLE"
+          secretAccessKey: "xJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
 # Proxy configuration
 proxy:
   enabled: true
   replicas: 2
   config:
     auth:
-      # For Swift, you typically use custom credentials or disable auth
-      # since Swift handles its own authentication
-      custom:
-        swift-admin:
-          accessKeyID: "custom-access-key"
-          secretAccessKey: "custom-secret-key"
+      # S3 clients authenticate against the S3 storage proxy credentials.
+      # Swift requests are not authenticated by the proxy - Swift handles
+      # its own authentication
+      useStorage: s3-backup
 
 # Worker configuration
 worker:

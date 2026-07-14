@@ -31,6 +31,7 @@ var (
 	suStorage       string
 	suUser          string
 	suType          string
+	suAlias         string
 	suAccessKey     string
 	suSecretKey     string
 	suSwiftUsername string
@@ -47,6 +48,9 @@ var setUserCmd = &cobra.Command{
 For S3 storage type:
   chorctl set-user --storage main --user admin --type s3 --access-key AKID --secret-key SECRET
 
+For S3 proxy alias credential:
+  chorctl set-user --storage main --user admin --type s3 --alias laptop --access-key AKID --secret-key SECRET
+
 For Swift storage type:
   chorctl set-user --storage main --user admin --type swift --swift-username user --swift-password pass --swift-domain default --swift-tenant tenant`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -59,6 +63,9 @@ For Swift storage type:
 			}
 		}
 		if suType == "swift" {
+			if suAlias != "" {
+				return fmt.Errorf("--alias is supported only for S3 credentials")
+			}
 			if suSwiftUsername == "" || suSwiftPassword == "" {
 				return fmt.Errorf("--swift-username and --swift-password are required for Swift credentials")
 			}
@@ -78,6 +85,9 @@ For Swift storage type:
 		req := &pb.SetUserCredentialsRequest{
 			Storage: suStorage,
 			User:    suUser,
+		}
+		if suAlias != "" {
+			req.Alias = &suAlias
 		}
 
 		if suType == "s3" {
@@ -108,6 +118,7 @@ func init() {
 	setUserCmd.Flags().StringVarP(&suStorage, "storage", "s", "", "storage name")
 	setUserCmd.Flags().StringVarP(&suUser, "user", "u", "", "user name")
 	setUserCmd.Flags().StringVarP(&suType, "type", "t", "", "credential type: 's3' or 'swift'")
+	setUserCmd.Flags().StringVar(&suAlias, "alias", "", "S3 proxy alias name for the credential")
 	setUserCmd.Flags().StringVar(&suAccessKey, "access-key", "", "S3 access key")
 	setUserCmd.Flags().StringVar(&suSecretKey, "secret-key", "", "S3 secret key")
 	setUserCmd.Flags().StringVar(&suSwiftUsername, "swift-username", "", "Swift username")

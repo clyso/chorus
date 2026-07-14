@@ -1140,7 +1140,8 @@
       "type": "object",
       "properties": {
         "alias": {
-          "type": "string"
+          "type": "string",
+          "title": "Display name of the credential:\n- in GetStoragesResponse: the user name\n- in GetProxyCredentialsResponse: \"\u003cuser\u003e:\u003calias\u003e\" of the proxy alias\n  credential"
         },
         "accessKey": {
           "type": "string"
@@ -1759,6 +1760,10 @@
         },
         "swiftCred": {
           "$ref": "#/definitions/chorusSwiftCredential"
+        },
+        "alias": {
+          "type": "string",
+          "description": "Optional proxy alias name for the credential. S3 only.\nWhen set, the credential is stored as a proxy alias credential\nused by the proxy to authenticate and re-sign forwarded requests."
         }
       }
     },

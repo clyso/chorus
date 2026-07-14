@@ -211,7 +211,7 @@ func TestMain(m *testing.M) {
 	if err := proxyStorages.Validate(); err != nil {
 		panic(err)
 	}
-	credsSvc, err := objstore.NewCredsSvc(tstCtx, &swiftConf, nil)
+	credsSvc, err := objstore.New(tstCtx, nil, swiftConf.DynamicCredentials, &swiftConf, nil)
 	if err != nil {
 		panic(err)
 	}

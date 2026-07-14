@@ -55,4 +55,31 @@ Pull-based approach:
    2. If `version` is greater than cached `version`, unseal new credentials and update cached credentials and `version`.
    3. If `version` is equal to cached `version`, do nothing.
 
+## Storage format
+
+All dynamic credentials live in a single redis HASH `chorus:dynamic_creds` (see the `credsSvc`
+doc comment in [pkg/objstore/credentials.go](../pkg/objstore/credentials.go) - the authoritative
+format description). Besides the `version` and `salt` fields, each credential is one hash field:
+
+- `<storType>:<storage>:<user>` - worker (per-user) credential, e.g. `S3:my_storage:alice`
+- `S3:<storage>:<user>:<alias>` - proxy alias credential, e.g. `S3:my_storage:alice:laptop`
+
+Storage, user, and alias names must not contain `:`.
+
+## Proxy alias credentials
+
+The proxy allows many S3 credentials per user. Each is an **alias**: one S3 access key
+belonging to a user. The proxy authenticates callers by alias access key, applies routing and
+replication policy by user only, and re-signs forwarded requests with the target storage's
+credential of the same alias name.
+
+Alias credentials are set via the `SetUserCredentials` management API with the optional `alias`
+field (`chorctl set-user --alias <name> ...`). The `alias` field is supported only for S3
+credentials; combining it with Swift credentials is an error.
+
+Mode semantics:
+- The **worker** uses only per-user entries and ignores alias entries.
+- The **proxy** is alias-only: it indexes static nested config plus dynamic alias entries.
+  Dynamic per-user entries (set without `alias`) do not authenticate at the proxy.
+
 

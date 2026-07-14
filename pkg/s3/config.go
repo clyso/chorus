@@ -103,6 +103,10 @@ func (s *Storage) Validate() error {
 		}
 	}
 
+	return s.StorageAddress.validate()
+}
+
+func (s *StorageAddress) validate() error {
 	if s.HttpTimeout == 0 {
 		s.HttpTimeout = defaultHttpTimeout
 	}
@@ -133,4 +137,55 @@ func (s *Storage) Validate() error {
 	}
 
 	return nil
+}
+
+// ProxyStorage is the proxy-side S3 storage config: user -> alias -> credential.
+// Each alias is a separate S3 access key belonging to the user. The proxy
+// authenticates callers by alias access key and joins credentials across
+// storages by alias name when re-signing forwarded requests.
+type ProxyStorage struct {
+	Credentials    map[string]map[string]CredentialsV4 `yaml:"credentials"`
+	StorageAddress `yaml:",inline" mapstructure:",squash"`
+}
+
+func (s *ProxyStorage) HasUser(user string) bool {
+	_, ok := s.Credentials[user]
+	return ok
+}
+
+func (s *ProxyStorage) HasUserAlias(user, alias string) bool {
+	_, ok := s.Credentials[user][alias]
+	return ok
+}
+
+func (s *ProxyStorage) UserList() []string {
+	users := make([]string, 0, len(s.Credentials))
+	for user := range s.Credentials {
+		users = append(users, user)
+	}
+	return users
+}
+
+func (s *ProxyStorage) Validate() error {
+	for user, aliases := range s.Credentials {
+		if strings.Contains(user, ":") {
+			return fmt.Errorf("%w: user name %q must not contain ':'", dom.ErrInvalidStorageConfig, user)
+		}
+		if len(aliases) == 0 {
+			return fmt.Errorf("%w: user %q has no alias credentials", dom.ErrInvalidStorageConfig, user)
+		}
+		for alias, cred := range aliases {
+			if alias == "" {
+				return fmt.Errorf("%w: empty alias name for user %q", dom.ErrInvalidStorageConfig, user)
+			}
+			if strings.Contains(alias, ":") {
+				return fmt.Errorf("%w: alias name %q for user %q must not contain ':'", dom.ErrInvalidStorageConfig, alias, user)
+			}
+			if err := cred.Validate(); err != nil {
+				return fmt.Errorf("%w: for user %q alias %q", err, user, alias)
+			}
+		}
+	}
+
+	return s.StorageAddress.validate()
 }
