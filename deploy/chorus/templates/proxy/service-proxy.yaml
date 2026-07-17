@@ -6,9 +6,9 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: proxy
-  {{- with .Values.proxy.service.annotations }}
+  {{- with (include "chorus.annotations" (list .Values.proxy.service.annotations .)) }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- . | nindent 4 }}
   {{- end }}
 spec:
   type: {{ .Values.proxy.service.type }}

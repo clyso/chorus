@@ -1,18 +1,23 @@
-{{- if and .Values.proxy.enabled .Values.proxy.config.metrics.enabled }}
+{{- if and .Values.proxy.enabled .Values.metrics.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "chorus.fullname" . }}-proxy-metrics
   labels:
-    app: proxy
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: proxy
+    chorus.clyso.com/metrics: "true"
+  {{- with (include "chorus.annotations" (list dict .)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   selector:
-    app: proxy
-  {{- include "chorus.selectorLabels" . | nindent 4 }}
+    {{- include "chorus.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: proxy
   ports:
     - name: metrics
-      port: 9090
+      port: {{ include "chorus.metricsPort" . }}
       targetPort: metrics
 {{- end }}

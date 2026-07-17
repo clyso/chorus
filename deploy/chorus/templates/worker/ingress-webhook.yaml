@@ -6,13 +6,14 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
-  {{- if or .Values.ingress.webhook.grpc .Values.ingress.webhook.annotations }}
+  {{- $annotations := include "chorus.annotations" (list .Values.ingress.webhook.annotations .) }}
+  {{- if or .Values.ingress.webhook.grpc $annotations }}
   annotations:
     {{- if .Values.ingress.webhook.grpc }}
     nginx.ingress.kubernetes.io/backend-protocol: GRPC
     {{- end }}
-    {{- with .Values.ingress.webhook.annotations }}
-    {{- toYaml . | nindent 4 }}
+    {{- with $annotations }}
+    {{- . | nindent 4 }}
     {{- end }}
   {{- end }}
 spec:

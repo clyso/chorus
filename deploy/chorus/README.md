@@ -77,6 +77,37 @@ externalRedis:
   existingSecret: "my-redis-secret"
 ```
 
+### Metrics
+
+`metrics.enabled` exposes a Prometheus `/metrics` endpoint on proxy and worker
+(port 9090) and creates a `ClusterIP` metrics Service for each.
+
+To scrape via the Prometheus Operator, also enable `serviceMonitor` and set the
+discovery label your Prometheus selects on (check your operator's
+`serviceMonitorSelector`):
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack  # match your Prometheus release
+    interval: 30s        # optional
+    scrapeTimeout: 10s   # optional
+```
+
+Enable `metrics` without `serviceMonitor` when scraping via pod annotations or a
+ServiceMonitor managed elsewhere (e.g. on a cluster without the operator CRDs).
+
+### Images
+
+Each component's image is set via `<component>.image` (`repository`, `tag`,
+`pullPolicy`). `tag` defaults to the chart's `appVersion`, and `pullPolicy`
+defaults to `IfNotPresent`. If you override `tag` with a mutable tag (e.g.
+`latest` or a dev tag), set `pullPolicy: Always` so nodes don't keep a stale
+cached image.
+
 ## Components
 
 | Component | Description | Default |

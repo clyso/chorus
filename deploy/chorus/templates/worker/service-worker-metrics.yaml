@@ -1,18 +1,23 @@
-{{- if .Values.worker.config.metrics.enabled }}
+{{- if .Values.metrics.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "chorus.fullname" . }}-worker-metrics
   labels:
-    app: worker
-  {{- include "chorus.labels" . | nindent 4 }}
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    chorus.clyso.com/metrics: "true"
+  {{- with (include "chorus.annotations" (list dict .)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   selector:
-    app: worker
-  {{- include "chorus.selectorLabels" . | nindent 4 }}
+    {{- include "chorus.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
   ports:
     - name: metrics
-      port: 9090
+      port: {{ include "chorus.metricsPort" . }}
       targetPort: metrics
 {{- end }}

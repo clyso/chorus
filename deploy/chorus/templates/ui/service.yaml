@@ -6,9 +6,9 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
-  {{- with .Values.ui.service.annotations }}
+  {{- with (include "chorus.annotations" (list .Values.ui.service.annotations .)) }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- . | nindent 4 }}
   {{- end }}
 spec:
   type: {{ .Values.ui.service.type }}
