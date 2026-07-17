@@ -29,7 +29,7 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
-Common labels
+Common labels (metadata only, never selectors)
 */}}
 {{- define "chorus.labels" -}}
 helm.sh/chart: {{ include "chorus.chart" . }}
@@ -38,6 +38,35 @@ helm.sh/chart: {{ include "chorus.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- with .Values.commonLabels }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
+{{/*
+Common annotations merged with a resource's own annotations (resource wins).
+Usage: {{- with (include "chorus.annotations" (list .Values.x.annotations .)) }}
+*/}}
+{{- define "chorus.annotations" -}}
+{{- $local := index . 0 | default dict -}}
+{{- $root := index . 1 -}}
+{{- $merged := merge (deepCopy $local) ($root.Values.commonAnnotations | default dict) -}}
+{{- with $merged -}}
+{{- toYaml . -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Pod-level user labels: podLabels merged over commonLabels (podLabels win).
+Emitted alongside the structural selector/component labels in pod templates.
+*/}}
+{{- define "chorus.podLabels" -}}
+{{- $local := index . 0 | default dict -}}
+{{- $root := index . 1 -}}
+{{- $merged := merge (deepCopy $local) ($root.Values.commonLabels | default dict) -}}
+{{- with $merged -}}
+{{- toYaml . -}}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -46,6 +75,14 @@ Selector labels
 {{- define "chorus.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "chorus.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Metrics port. Single source for the app (via CFG_METRICS_PORT), container port
+and metrics Service; matches the app default (pkg/config/config.yaml: metrics.port).
+*/}}
+{{- define "chorus.metricsPort" -}}
+9090
 {{- end }}
 
 {{/*

@@ -15,6 +15,11 @@ global:
 nameOverride: ""
 fullnameOverride: ""
 
+# Labels and annotations added to the metadata of every resource this chart
+# creates (do not put selector-style labels here — they are metadata only).
+commonLabels: {}
+commonAnnotations: {}
+
 imagePullSecrets: []
 
 serviceAccount:
@@ -111,6 +116,27 @@ features:
   acl: true
 
 # =============================================================================
+# METRICS & MONITORING
+# =============================================================================
+# When enabled, exposes /metrics on proxy and worker and creates a metrics
+# Service for each. Applies to all enabled components.
+metrics:
+  enabled: false
+
+  # Prometheus Operator ServiceMonitor (requires the monitoring.coreos.com CRDs).
+  # Leave disabled when scraping via annotations or a ServiceMonitor managed elsewhere.
+  serviceMonitor:
+    enabled: false
+    # Extra labels for Prometheus discovery, e.g. { release: kube-prometheus-stack }
+    labels: {}
+    # Scrape interval and timeout (rendered only when set; empty = Prometheus default)
+    interval: ""
+    scrapeTimeout: ""
+    honorLabels: false
+    relabelings: []
+    metricRelabelings: []
+
+# =============================================================================
 # REDIS CONFIGURATION
 # =============================================================================
 # Bundled Redis (Bitnami chart)
@@ -161,7 +187,7 @@ proxy:
   image:
     repository: harbor.clyso.com/chorus/proxy
     tag: "" # Defaults to Chart.appVersion
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
   # Resource limits
   resources: {}
@@ -173,6 +199,7 @@ proxy:
     #   memory: 128Mi
 
   # Pod-level settings
+  podLabels: {}
   podAnnotations: {}
   podSecurityContext: {}
   securityContext:
@@ -204,9 +231,6 @@ proxy:
       json: true
       level: info
 
-    metrics:
-      enabled: false
-
     trace:
       enabled: false
       endpoint: ""
@@ -233,10 +257,11 @@ worker:
   image:
     repository: harbor.clyso.com/chorus/worker
     tag: "" # Defaults to Chart.appVersion
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
   resources: {}
 
+  podLabels: {}
   podAnnotations: {}
   podSecurityContext: {}
   securityContext:
@@ -293,9 +318,6 @@ worker:
       json: true
       level: info
 
-    metrics:
-      enabled: false
-
     trace:
       enabled: false
       endpoint: ""
@@ -311,7 +333,7 @@ ui:
   image:
     repository: harbor.clyso.com/chorus/web-ui
     tag: ""
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
   resources:
     limits:
@@ -321,6 +343,7 @@ ui:
       cpu: 50m
       memory: 128Mi
 
+  podLabels: {}
   podAnnotations: {}
   podSecurityContext: {}
   securityContext:

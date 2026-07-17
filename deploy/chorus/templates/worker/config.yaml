@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
+  {{- with (include "chorus.annotations" (list dict .)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 data:
   config.yaml: |
     {{- /* Worker-specific config */}}

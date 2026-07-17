@@ -1,18 +1,46 @@
-{{- if .Values.worker.config.metrics.enabled }}
+{{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: worker-monitor
+  name: {{ include "chorus.fullname" . }}-worker
   labels:
-    release: kube-prometheus-stack
+    {{- include "chorus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with (include "chorus.annotations" (list dict .)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
+  jobLabel: app.kubernetes.io/component
   selector:
     matchLabels:
-      app: worker
+      {{- include "chorus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+      chorus.clyso.com/metrics: "true"
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
   endpoints:
     - port: metrics
-  jobLabel: app
+      path: /metrics
+      {{- with .Values.metrics.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- if .Values.metrics.serviceMonitor.honorLabels }}
+      honorLabels: true
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}

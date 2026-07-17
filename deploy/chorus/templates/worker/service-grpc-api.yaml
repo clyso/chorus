@@ -6,9 +6,9 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
-  {{- with .Values.worker.grpcService.annotations }}
+  {{- with (include "chorus.annotations" (list .Values.worker.grpcService.annotations .)) }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- . | nindent 4 }}
   {{- end }}
 spec:
   type: {{ .Values.worker.grpcService.type }}

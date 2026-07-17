@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: ui
+  {{- with (include "chorus.annotations" (list dict .)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.ui.replicas }}
   selector:
@@ -17,9 +21,12 @@ spec:
       labels:
         {{- include "chorus.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: ui
-      {{- with .Values.ui.podAnnotations }}
+        {{- with (include "chorus.podLabels" (list .Values.ui.podLabels .)) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      {{- with (include "chorus.annotations" (list .Values.ui.podAnnotations .)) }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
