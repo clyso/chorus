@@ -97,6 +97,7 @@ export default <I18nMessages>{
     restartDiffReportConfirmAction: 'Restart',
     restartDiffReportCancelAction: 'Cancel',
     restartDiffReportRestartAction: 'Restart',
+    diffReportDetailAction: 'Diff Report Details',
 
     restartDiffReportsSuccessTitle: 'Restarted!',
     restartDiffReportsSuccessContent:
@@ -198,6 +199,7 @@ export default <I18nMessages>{
     restartDiffReportConfirmAction: 'Neustarten',
     restartDiffReportCancelAction: 'Abbrechen',
     restartDiffReportRestartAction: 'Neustarten',
+    diffReportDetailAction: 'Diff-Report Details',
 
     restartDiffReportsSuccessTitle: 'Neugestartet!',
     restartDiffReportsSuccessContent:

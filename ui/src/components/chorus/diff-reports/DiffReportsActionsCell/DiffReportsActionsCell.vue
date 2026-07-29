@@ -18,13 +18,16 @@
   import { CButton, CIcon, CTooltip, useDialog } from '@clyso/clyso-ui-kit';
   import { h, ref } from 'vue';
   import { useI18n } from 'vue-i18n';
+  import { useRouter } from 'vue-router';
   import DiffReportsShortList from '@/components/chorus/diff-reports/DiffReportsShortList/DiffReportsShortList.vue';
   import i18nDiffReports from '@/components/chorus/diff-reports/i18nDiffReports';
   import { useChorusDiffReportsStore } from '@/stores/chorusDiffReportsStore';
   import { useChorusNotification } from '@/utils/composables/useChorusNotification';
+  import { DiffReportsHelper } from '@/utils/helpers/DiffReportsHelper';
   import type { DiffReport } from '@/utils/types/chorus';
   import type { AddId } from '@/utils/types/helper';
   import { IconName } from '@/utils/types/icon';
+  import { RouteName } from '@/utils/types/router';
 
   const { t } = useI18n({ messages: i18nDiffReports });
 
@@ -35,8 +38,23 @@
   const { deleteDiffReports, restartDiffReports } = useChorusDiffReportsStore();
   const { createNotification } = useChorusNotification();
   const { createDialog } = useDialog();
+  const router = useRouter();
   const isDeleteLoading = ref(false);
   const isRestartLoading = ref(false);
+
+  function handleDiffReportDetail() {
+    if (!report.locations[0] || !report.locations[1]) {
+      return;
+    }
+
+    router.push({
+      name: RouteName.CHORUS_DIFF_REPORT_DETAIL,
+      query: {
+        from: DiffReportsHelper.formatLocationForQuery(report.locations[0]),
+        to: DiffReportsHelper.formatLocationForQuery(report.locations[1]),
+      },
+    });
+  }
 
   async function deleteDiffReport() {
     isDeleteLoading.value = true;
@@ -164,6 +182,30 @@
 <template>
   <div class="diff-reports-actions">
     <div class="diff-reports-actions__list">
+      <div
+        v-if="DiffReportsHelper.isTwoLocationReport(report)"
+        class="diff-reports-actions__item diff-reports-actions__item--detail"
+      >
+        <CTooltip :delay="1000">
+          <template #trigger>
+            <CButton
+              secondary
+              size="tiny"
+              type="info"
+              @click="handleDiffReportDetail"
+            >
+              <template #icon>
+                <CIcon
+                  :is-inline="true"
+                  :name="IconName.BASE_EYE"
+                />
+              </template>
+            </CButton>
+          </template>
+
+          {{ t('diffReportDetailAction') }}
+        </CTooltip>
+      </div>
       <div
         class="diff-reports-actions__item diff-reports-actions__item--restart"
       >

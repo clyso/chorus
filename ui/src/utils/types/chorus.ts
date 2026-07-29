@@ -341,3 +341,36 @@ export enum AddDiffReportStepName {
   'USER' = 3,
   'SETTINGS' = 4,
 }
+
+export interface DiffReportEntry {
+  object: string;
+  versionIdx: string;
+  size: string;
+  etag: string;
+  storageEntries: DiffReportStorageEntry[];
+}
+
+export interface DiffReportStorageEntry {
+  storage: string;
+  versionId: string;
+  bucket: string;
+}
+
+export interface DiffReportEntriesRequest {
+  locations: DiffReportLocation[];
+  cursor?: string;
+  pageSize?: string;
+}
+
+export interface DiffReportEntriesResponse {
+  entries: DiffReportEntry[];
+  cursor: string;
+}
+
+export interface DiffReportDetailRequest {
+  locations: DiffReportLocation[];
+}
+
+export interface DiffReportDetailResponse {
+  check: DiffReport;
+}

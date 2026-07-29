@@ -35,6 +35,7 @@ const routes: I18nMessages<Routes> = {
     [RouteName.CHORUS_SET_CREDENTIAL]: 'Set Credential',
     [RouteName.CHORUS_DIFF_REPORTS]: 'Diff Reports',
     [RouteName.CHORUS_ADD_DIFF_REPORT]: 'Add Diff Report',
+    [RouteName.CHORUS_DIFF_REPORT_DETAIL]: 'Diff Report Detail',
   },
   [I18nLocale.DE]: {
     [RouteName.LOGIN]: 'Login',
@@ -49,6 +50,7 @@ const routes: I18nMessages<Routes> = {
     [RouteName.CHORUS_SET_CREDENTIAL]: 'Zugangsdaten setzen',
     [RouteName.CHORUS_DIFF_REPORTS]: 'Diff-Reports',
     [RouteName.CHORUS_ADD_DIFF_REPORT]: 'Diff-Report erstellen',
+    [RouteName.CHORUS_DIFF_REPORT_DETAIL]: 'Diff-Report Details',
   },
 };
 

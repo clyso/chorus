@@ -35,6 +35,10 @@ import type {
   RoutingPolicyAddRequest,
   UserCredentialSetRequest,
   AddDiffReportRequest,
+  DiffReportDetailRequest,
+  DiffReportDetailResponse,
+  DiffReportEntriesRequest,
+  DiffReportEntriesResponse,
 } from '@/utils/types/chorus';
 
 export abstract class ChorusService {
@@ -185,5 +189,27 @@ export abstract class ChorusService {
 
   static async addDiffReport(payload: AddDiffReportRequest): Promise<void> {
     await apiClient.post(ApiHelper.getChorusAPIUrl('/diff/start'), payload);
+  }
+
+  static async getDiffReport(
+    payload: DiffReportDetailRequest,
+  ): Promise<DiffReportDetailResponse> {
+    const { data } = await apiClient.post<DiffReportDetailResponse>(
+      ApiHelper.getChorusAPIUrl('/diff/report'),
+      payload,
+    );
+
+    return data;
+  }
+
+  static async getDiffReportEntries(
+    payload: DiffReportEntriesRequest,
+  ): Promise<DiffReportEntriesResponse> {
+    const { data } = await apiClient.post<DiffReportEntriesResponse>(
+      ApiHelper.getChorusAPIUrl('/diff/report-entries'),
+      payload,
+    );
+
+    return data;
   }
 }
