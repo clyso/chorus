@@ -37,6 +37,12 @@ export abstract class ErrorHelper {
     return errorInfo?.reason;
   }
 
+  static getStatusCode(error: unknown): number | null {
+    if (!axios.isAxiosError(error)) return null;
+
+    return error.status ?? null;
+  }
+
   static getValidationErrorMessage(
     field: {
       $errors: { $message: unknown }[];

@@ -14,7 +14,12 @@
  *  limitations under the License.
  */
 
-import { DiffReportStatusFilter, type DiffReport } from '@/utils/types/chorus';
+import type { LocationQueryValue } from 'vue-router';
+import {
+  DiffReportStatusFilter,
+  type DiffReport,
+  type DiffReportLocation,
+} from '@/utils/types/chorus';
 
 export abstract class DiffReportsHelper {
   static getDiffReportId(locations: DiffReport['locations']): string {
@@ -66,5 +71,29 @@ export abstract class DiffReportsHelper {
     if (report.consistent) return 1; // consistent
 
     return 2; // inconsistent
+  }
+
+  static parseLocationFromQuery(param: string): DiffReportLocation | null {
+    const [storage, bucket] = param.split(':');
+
+    if (!storage || !bucket) return null;
+
+    return { storage, bucket };
+  }
+
+  static formatLocationForQuery(location: DiffReportLocation): string {
+    return `${location.storage}:${location.bucket}`;
+  }
+
+  static parseQueryParamsToLocations(
+    ...params: (LocationQueryValue | LocationQueryValue[] | undefined)[]
+  ): DiffReportLocation[] {
+    return params
+      .flat()
+      .filter(
+        (queryParam): queryParam is string => typeof queryParam === 'string',
+      )
+      .map((queryParam) => DiffReportsHelper.parseLocationFromQuery(queryParam))
+      .filter((location): location is DiffReportLocation => location !== null);
   }
 }
