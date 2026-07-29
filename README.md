@@ -106,6 +106,8 @@ The chart source is located in [deploy/chorus](./deploy/chorus).
 
 See Helm example values in [deploy/chorus/examples/](./deploy/chorus/examples/).
 
+Proxy and worker expose Prometheus metrics - see [exposed metrics](./deploy/chorus/README.md#exposed-metrics).
+
 ## Develop
 
 Chorus is written in Go—no other dependencies are required to build, run, or test.

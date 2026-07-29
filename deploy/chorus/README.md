@@ -100,6 +100,45 @@ metrics:
 Enable `metrics` without `serviceMonitor` when scraping via pod annotations or a
 ServiceMonitor managed elsewhere (e.g. on a cluster without the operator CRDs).
 
+#### Exposed metrics
+
+All metrics are served at `/metrics` on port `9090`. The `flow` label marks what
+triggered the storage call: `event` (proxy/webhook change event), `migration`
+(bucket or object migration task), or `api` (management API call).
+
+Proxy:
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `proxy_requests_total` | counter | `method` | Number of S3 requests to the proxy, by S3 method |
+| `proxy_response_status` | counter | `status` | Proxy responses by HTTP status code |
+| `proxy_response_time_seconds` | histogram | `method` | Proxy request duration (default buckets) |
+
+Worker:
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `worker_processed_tasks_total` | counter | `queue`, `task_type` | Tasks processed (both successful and failed) |
+| `worker_failed_tasks_total` | counter | `queue`, `task_type` | Tasks whose processing returned an error |
+| `worker_in_progress_tasks` | gauge | `queue`, `task_type` | Tasks currently being processed |
+| `worker_task_duration_seconds` | histogram | `queue`, `task_type` | Task processing time (exponential buckets, 0.1s–600s) |
+| `copy_in_progress_obj_bytes` | gauge | `flow`, `user`, `bucket` | Total size of objects currently being copied |
+| `grpc_server_started_total`, `grpc_server_handled_total`, `grpc_server_msg_received_total`, `grpc_server_msg_sent_total` | counter | `grpc_service`, `grpc_method`, `grpc_type`, `grpc_code` | Management gRPC API, from [go-grpc-prometheus](https://github.com/grpc-ecosystem/go-grpc-prometheus) |
+
+Proxy and worker (S3/Swift client calls):
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `storage_requests_total` | counter | `flow`, `storage`, `method` | API calls made to a backing storage |
+| `storage_bucket_bytes_upload` | counter | `flow`, `storage`, `bucket` | Bytes uploaded to a storage |
+| `storage_bucket_bytes_download` | counter | `flow`, `storage`, `bucket` | Bytes downloaded from a storage |
+
+Both components additionally expose the default collectors of the Prometheus Go
+client: Go runtime metrics (`go_*`, see
+[collectors.NewGoCollector](https://pkg.go.dev/github.com/prometheus/client_golang/prometheus/collectors#NewGoCollector))
+and process metrics (`process_*`, see
+[Prometheus process metrics](https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics)).
+
 ### Images
 
 Each component's image is set via `<component>.image` (`repository`, `tag`,
