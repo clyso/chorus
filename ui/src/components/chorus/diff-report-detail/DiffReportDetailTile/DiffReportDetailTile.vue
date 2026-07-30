@@ -23,10 +23,14 @@
   import { useChorusDiffReportDetailStore } from '@/stores/chorusDiffReportDetailStore';
   import i18nDiffReportDetail from '@/components/chorus/diff-report-detail/i18nDiffReportDetail';
   import { RouteName } from '@/utils/types/router';
+  import DiffReportDetailHeader from '@/components/chorus/diff-report-detail/DiffReportDetailHeader/DiffReportDetailHeader.vue';
+  import DiffReportDetailOverview from '@/components/chorus/diff-report-detail/DiffReportDetailOverview/DiffReportDetailOverview.vue';
+  import DiffReportDetailProgress from '@/components/chorus/diff-report-detail/DiffReportDetailProgress/DiffReportDetailProgress.vue';
 
   const store = useChorusDiffReportDetailStore();
   const { initDiffReportDetailsPage } = store;
-  const { hasError, isNotFound, locations } = storeToRefs(store);
+  const { hasError, isNotFound, locations, hasFixActivity } =
+    storeToRefs(store);
   const { t } = useI18n({ messages: i18nDiffReportDetail });
   const router = useRouter();
 
@@ -56,6 +60,7 @@
       @positive-click="
         errorType === 'error' ? initDiffReportDetailsPage() : handleBackToList()
       "
+      class="diff-report-detail-tile__error"
     >
       <template #title>
         {{ t(`${errorType}Title`) }}
@@ -69,13 +74,48 @@
     </CResult>
 
     <template v-else>
-      <!-- Content will be added in Step 2 -->
+      <div class="diff-report-detail-tile__content">
+        <DiffReportDetailHeader />
+        <DiffReportDetailOverview />
+        <div class="diff-report-detail-tile__progress-row">
+          <DiffReportDetailProgress
+            type="diff"
+            class="diff-report-detail-tile__progress-item"
+          />
+          <DiffReportDetailProgress
+            v-if="hasFixActivity"
+            type="fix"
+            class="diff-report-detail-tile__progress-item"
+          />
+        </div>
+      </div>
     </template>
   </CTile>
 </template>
 
 <style lang="scss" scoped>
+  @use '@/styles/utils' as utils;
+
   .diff-report-detail-tile {
     min-height: 400px;
+
+    &__content {
+      display: grid;
+      gap: utils.unit(8);
+    }
+
+    &__progress-item {
+      flex: 1;
+      max-width: 500px;
+    }
+
+    &__progress-row {
+      display: flex;
+
+      @include utils.mobile {
+        flex-direction: column;
+        gap: utils.unit(6);
+      }
+    }
   }
 </style>
