@@ -36,13 +36,16 @@
 
 <template>
   <div class="chorus-direction-cell">
-    <ChorusStorageTag
-      :storage-name="fromText"
-      :tooltip="fromTooltip"
-      :type="fromType"
-      :size="size"
-      :icon-name="fromIconName"
-    />
+    <div class="chorus-direction-cell__location">
+      <ChorusStorageTag
+        :storage-name="fromText"
+        :tooltip="fromTooltip"
+        :type="fromType"
+        :size="size"
+        :icon-name="fromIconName"
+      />
+      <slot name="from-extra" />
+    </div>
 
     <CIcon
       class="chorus-direction-cell__arrow"
@@ -50,13 +53,16 @@
       :name="IconName.BASE_ARROW_FORWARD"
     />
 
-    <ChorusStorageTag
-      :storage-name="toText"
-      :tooltip="toTooltip"
-      :type="toType"
-      :size="size"
-      :icon-name="toIconName"
-    />
+    <div class="chorus-direction-cell__location">
+      <ChorusStorageTag
+        :storage-name="toText"
+        :tooltip="toTooltip"
+        :type="toType"
+        :size="size"
+        :icon-name="toIconName"
+      />
+      <slot name="to-extra" />
+    </div>
   </div>
 </template>
 
@@ -70,6 +76,12 @@
 
     @include utils.mobile {
       flex-direction: column;
+    }
+
+    &__location {
+      display: flex;
+      align-items: center;
+      gap: utils.unit(1);
     }
 
     &__arrow {
