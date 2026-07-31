@@ -26,6 +26,7 @@
   import DiffReportDetailHeader from '@/components/chorus/diff-report-detail/DiffReportDetailHeader/DiffReportDetailHeader.vue';
   import DiffReportDetailOverview from '@/components/chorus/diff-report-detail/DiffReportDetailOverview/DiffReportDetailOverview.vue';
   import DiffReportDetailProgress from '@/components/chorus/diff-report-detail/DiffReportDetailProgress/DiffReportDetailProgress.vue';
+  import DiffReportDetailEntries from '@/components/chorus/diff-report-detail/DiffReportDetailEntries/DiffReportDetailEntries.vue';
 
   const store = useChorusDiffReportDetailStore();
   const { initDiffReportDetailsPage } = store;
@@ -88,6 +89,7 @@
             class="diff-report-detail-tile__progress-item"
           />
         </div>
+        <DiffReportDetailEntries />
       </div>
     </template>
   </CTile>

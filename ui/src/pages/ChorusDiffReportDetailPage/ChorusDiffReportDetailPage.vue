@@ -25,20 +25,23 @@
   import { storeToRefs } from 'pinia';
   import { RouteName } from '@/utils/types/router';
   import { useChorusDiffReportDetailStore } from '@/stores/chorusDiffReportDetailStore';
+  import { useChorusDiffReportEntriesStore } from '@/stores/chorusDiffReportEntriesStore';
   import i18nDiffReportDetail from '@/components/chorus/diff-report-detail/i18nDiffReportDetail';
   import DiffReportDetailTile from '@/components/chorus/diff-report-detail/DiffReportDetailTile/DiffReportDetailTile.vue';
 
   const { t } = useI18n({ messages: i18nDiffReportDetail });
-  const store = useChorusDiffReportDetailStore();
-  const { initDiffReportDetailsPage, $reset } = store;
-  const { locations } = storeToRefs(store);
+
+  const diffReportDetailStore = useChorusDiffReportDetailStore();
+  const diffReportDetailEntriesStore = useChorusDiffReportEntriesStore();
+  const { locations } = storeToRefs(diffReportDetailStore);
 
   onBeforeMount(() => {
-    initDiffReportDetailsPage();
+    diffReportDetailStore.initDiffReportDetailsPage();
   });
 
   onUnmounted(() => {
-    $reset();
+    diffReportDetailStore.$reset();
+    diffReportDetailEntriesStore.$reset();
   });
 </script>
 
