@@ -39,7 +39,6 @@ export default <I18nMessages>{
     configNotIgnoresSizes: 'Considers Sizes',
     diffReportFrom: 'the source of comparison',
     diffReportTo: 'comparison destination',
-    diffReportStatusDetails: 'Diff Report Status Details',
     cliCheckWarning:
       'This check was created via CLI. For further details or actions, please use the CLI.',
     filterByDirectionPlaceholder: 'Filter by direction',
@@ -137,7 +136,6 @@ export default <I18nMessages>{
     configNotIgnoresSizes: 'Ignoriert Dateigrößen nicht',
     diffReportFrom: 'Quelle des Vergleichs',
     diffReportTo: 'Vergleichsziel',
-    diffReportStatusDetails: 'Diff-Report Status Details',
     cliCheckWarning:
       'Dieser Check wurde über die CLI erstellt. Für weitere Details oder Aktionen verwenden Sie bitte die CLI.',
     filterByDirectionPlaceholder: 'Nach Richtung filtern',

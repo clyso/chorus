@@ -32,11 +32,11 @@
   import DiffReportsEmpty from '@/components/chorus/diff-reports/DiffReportsEmpty/DiffReportsEmpty.vue';
   import DiffReportsBucketCell from '@/components/chorus/diff-reports/DiffReportsBucketCell/DiffReportsBucketCell.vue';
   import DiffReportsDirectionCell from '@/components/chorus/diff-reports/DiffReportsDirectionCell/DiffReportsDirectionCell.vue';
-  import DiffReportsProgressCell from '@/components/chorus/diff-reports/DiffReportsProgressCell/DiffReportsProgressCell.vue';
   import DiffReportsStatusCell from '@/components/chorus/diff-reports/DiffReportsStatusCell/DiffReportsStatusCell.vue';
   import DiffReportsConfigsCell from '@/components/chorus/diff-reports/DiffReportsConfigsCell/DiffReportsConfigsCell.vue';
   import ChorusListError from '@/components/chorus/common/ChorusListError/ChorusListError.vue';
   import DiffReportsActionsCell from '@/components/chorus/diff-reports/DiffReportsActionsCell/DiffReportsActionsCell.vue';
+  import ChorusDiffReportsProgress from '@/components/chorus/common/ChorusDiffReportProgress/ChorusDiffReportsProgress.vue';
 
   const { t } = useI18n({
     messages: i18nDiffReports,
@@ -159,7 +159,7 @@
         </template>
 
         <template #progress="{ rowData }: { rowData: AddId<DiffReport> }">
-          <DiffReportsProgressCell
+          <ChorusDiffReportsProgress
             v-if="DiffReportsHelper.isTwoLocationReport(rowData)"
             :report="rowData"
           />
