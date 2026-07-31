@@ -24,6 +24,7 @@
   } from '@clyso/clyso-ui-kit';
   import { storeToRefs } from 'pinia';
   import { useChorusDiffReportDetailStore } from '@/stores/chorusDiffReportDetailStore';
+  import { useChorusDiffReportEntriesStore } from '@/stores/chorusDiffReportEntriesStore';
   import i18nDiffReportDetail from '@/components/chorus/diff-report-detail/i18nDiffReportDetail';
   import ChorusDiffReportsProgress from '@/components/chorus/common/ChorusDiffReportProgress/ChorusDiffReportsProgress.vue';
 
@@ -31,8 +32,15 @@
     type: 'diff' | 'fix';
   }>();
 
-  const store = useChorusDiffReportDetailStore();
-  const { report } = storeToRefs(store);
+  const detailStore = useChorusDiffReportDetailStore();
+  const entriesStore = useChorusDiffReportEntriesStore();
+  const { report } = storeToRefs(detailStore);
+  const {
+    inconsistentObjectsCount,
+    hasError: hasEntriesStoreError,
+    isLoading: isEntriesLoading,
+  } = storeToRefs(entriesStore);
+
   const { t } = useI18n({ messages: i18nDiffReportDetail });
 
   interface DescriptionItem {
@@ -52,7 +60,13 @@
       return [
         { label: t('progressQueued'), value: report.value.queued },
         { label: t('progressCompleted'), value: report.value.completed },
-        { label: t('progressInconsistentObjects'), value: '-' },
+        {
+          label: t('progressInconsistentObjects'),
+          value:
+            hasEntriesStoreError.value || isEntriesLoading.value
+              ? '-'
+              : inconsistentObjectsCount.value,
+        },
       ];
     }
 
