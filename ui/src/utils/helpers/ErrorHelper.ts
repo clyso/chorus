@@ -30,11 +30,11 @@ export abstract class ErrorHelper {
 
     const details = error.response?.data.details;
 
-    if (!Array.isArray(details)) return null;
+    if (!Array.isArray(details)) return `${error.name} - ${error.message}`;
 
     const errorInfo = details.find((d) => d['@type'] === GOOGLE_RPC_ERROR_TYPE);
 
-    return errorInfo?.reason ?? null;
+    return errorInfo?.reason;
   }
 
   static getValidationErrorMessage(
