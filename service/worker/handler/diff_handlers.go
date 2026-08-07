@@ -23,6 +23,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
@@ -803,6 +804,7 @@ func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID,
 		return fmt.Errorf("unable to get objects to remove: %w", err)
 	}
 
+	zerolog.Ctx(ctx).Warn().Int("count", len(objectsToRemove)).Msg("EnsureObjectsDeleted: checking objects to remove")
 	client, err := r.clients.AsCommon(ctx, location.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to obtain client: %w", err)
@@ -833,6 +835,7 @@ func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID,
 		return fmt.Errorf("unable to get objects to copy: %w", err)
 	}
 
+	zerolog.Ctx(ctx).Warn().Int("count", len(objectsToCopy)).Msg("EnsureObjectsDeleted: enqueuing copy tasks")
 	for _, object := range objectsToCopy {
 		payload, err := makePayload(object.Name, object.IsDir)
 		if err != nil {
@@ -845,6 +848,10 @@ func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID,
 
 	if _, err := r.fixRemoveSetStore.Drop(ctx, id); err != nil {
 		return fmt.Errorf("unable to clean fix set store: %w", err)
+	}
+
+	if _, err := r.fixCopySetStore.Drop(ctx, id); err != nil {
+		return fmt.Errorf("unable to clean fix copy set store: %w", err)
 	}
 
 	return nil

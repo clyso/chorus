@@ -74,9 +74,13 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 	}
 	fromVer, toVer := versions.From, versions.To
 
-	if fromVer != 0 && fromVer <= toVer {
+	isDiffFix := t.Type() == tasks.TypeDiffFixCopyS3
+	if !isDiffFix && fromVer != 0 && fromVer <= toVer {
 		logger.Info().Int("from_ver", fromVer).Int("to_ver", toVer).Msg("migration obj copy: identical from/to obj version: skip copy")
 		return nil
+	}
+	if isDiffFix {
+		logger.Warn().Int("from_ver", fromVer).Int("to_ver", toVer).Msg("diff fix copy: proceeding with copy despite version check")
 	}
 	// 1. sync obj meta and content
 	err = lock.Do(ctx, time.Second*2, func() error {
@@ -105,7 +109,11 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 			return fmt.Errorf("migration obj copy: unable to update obj meta: %w", err)
 		}
 	}
-	logger.Info().Msg("migration obj copy: done")
+	if isDiffFix {
+		logger.Warn().Msg("diff fix copy: object copied successfully")
+	} else {
+		logger.Info().Msg("migration obj copy: done")
+	}
 
 	return nil
 }

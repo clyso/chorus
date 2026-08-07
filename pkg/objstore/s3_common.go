@@ -264,34 +264,19 @@ func (s *s3CommonClient) ObjectInfo(ctx context.Context, bucket string, name str
 
 // https://github.com/minio/minio/issues/17356
 // While working with lists, minio will output object keys as a/b/c, i.e, without leading slash.
-// It will also consider a/b as a valid value for prefix search parameter.
-// Prefix value /a/b will be considered invalid, search will return no results.
-// At the same time, other implementations, e.g. Ceph, will act the other way.
-// Meaning object keys will be listed as /a/b/c, with leading slash.
-// List operation with prefix /a/b will give results, with prefix a/b won't.
-// Therefore, in order to allow interoperability between providers, we should brind prefix parameter
-// and object keys in list to the expected format.
+// Ceph RGW (as deployed) also lists keys without leading slash and does not accept
+// leading slash in HeadObject/GetObject calls.
+// Therefore, we normalize by stripping any leading slash from both input and output names.
 func (s *s3CommonClient) normalizeInputName(name string) string {
 	if name == "" {
 		return name
 	}
-	isMinio := s.provider == s3.ProviderMinIO
-	hasLeadingSlash := strings.HasPrefix(name, "/")
-	if isMinio && hasLeadingSlash {
-		return strings.TrimPrefix(name, "/")
-	}
-	if !isMinio && !hasLeadingSlash {
-		return "/" + name
-	}
-	return name
+	return strings.TrimPrefix(name, "/")
 }
 
 func (s *s3CommonClient) normalizeOutputName(name string) string {
 	if name == "" {
 		return name
 	}
-	if !strings.HasPrefix(name, "/") {
-		return "/" + name
-	}
-	return name
+	return strings.TrimPrefix(name, "/")
 }
