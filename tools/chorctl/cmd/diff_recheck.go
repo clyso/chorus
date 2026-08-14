@@ -53,7 +53,7 @@ chorctl diff recheck oldstorage:bucket newstorage:altbucket`,
 			})
 		}
 
-		conn, err := api.Connect(ctx, address)
+		conn, err := api.Connect(ctx, address, insecureTLS)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}

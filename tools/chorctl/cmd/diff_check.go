@@ -79,7 +79,7 @@ chorctl diff check storage1:bucket1 storage2:bucket2 --user username --last-vers
 			CheckOnlyLastVersions: checkOnlyLastVersions,
 		}
 
-		conn, err := api.Connect(ctx, address)
+		conn, err := api.Connect(ctx, address, insecureTLS)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
