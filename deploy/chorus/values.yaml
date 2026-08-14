@@ -373,7 +373,7 @@ ingress:
       # - host: s3.example.com
       #   paths:
       #     - path: /
-      #       pathType: Prefix
+      #       pathType: Prefix  # optional, defaults to Prefix
     tls: []
       # - secretName: s3-tls
       #   hosts:
@@ -388,7 +388,7 @@ ingress:
       # - host: chorus-api.example.com
       #   paths:
       #     - path: /
-      #       pathType: Prefix
+      #       pathType: Prefix  # optional, defaults to Prefix
     tls: []
 
   # Ingress for webhook endpoints (S3 notifications, Swift events).
@@ -398,14 +398,11 @@ ingress:
     className: ""
     annotations: {}
       # nginx.ingress.kubernetes.io/proxy-body-size: "0"
-    # Route to webhook gRPC port instead of HTTP.
-    # Adds nginx.ingress.kubernetes.io/backend-protocol: GRPC automatically.
-    grpc: false
     hosts: []
       # - host: chorus-webhook.example.com
       #   paths:
       #     - path: /
-      #       pathType: Prefix
+      #       pathType: Prefix  # optional, defaults to Prefix
     tls: []
 
   # Ingress for Web UI
@@ -417,5 +414,5 @@ ingress:
       # - host: chorus.example.com
       #   paths:
       #     - path: /
-      #       pathType: Prefix
+      #       pathType: Prefix  # optional, defaults to Prefix
     tls: []

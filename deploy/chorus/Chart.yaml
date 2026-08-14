@@ -4,7 +4,7 @@ description: Helm chart for Chorus S3 management software.
 keywords: ["S3", "Backup", "Replication", "Migration"]
 home: https://github.com/clyso/chorus
 type: application
-version: 0.3.0
+version: 0.4.0
 appVersion: "v0.7.7"
 dependencies:
   - name: redis
