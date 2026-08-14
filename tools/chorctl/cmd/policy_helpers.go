@@ -20,16 +20,15 @@ import (
 	"context"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/tools/chorctl/internal/api"
 )
 
-// newPolicyClient dials the management API and returns a Policy client.
+// newPolicyClient creates a management API client and returns a Policy client.
 // The caller is responsible for closing the connection.
-func newPolicyClient(ctx context.Context) (*grpc.ClientConn, pb.PolicyClient) {
-	conn, err := api.Connect(ctx, address)
+func newPolicyClient(ctx context.Context) (*api.Conn, pb.PolicyClient) {
+	conn, err := api.Connect(ctx, address, insecureTLS)
 	if err != nil {
 		logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 	}

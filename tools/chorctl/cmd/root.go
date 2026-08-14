@@ -29,8 +29,9 @@ import (
 var cfgFile string
 var (
 	// flags:
-	address = ""
-	user    = ""
+	address     = ""
+	user        = ""
+	insecureTLS = false
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -62,10 +63,12 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.chorctl.yaml)")
 
-	rootCmd.PersistentFlags().StringVarP(&address, "address", "a", "localhost:9670", "address to chorus management grpc api (default: http://localhost:9670)")
+	rootCmd.PersistentFlags().StringVarP(&address, "address", "a", "http://localhost:9671", "URL of chorus management REST api")
 	rootCmd.PersistentFlags().StringVarP(&user, "user", "u", "", "storage user")
+	rootCmd.PersistentFlags().BoolVarP(&insecureTLS, "insecure", "k", false, "skip TLS certificate verification")
 	_ = viper.BindPFlag("address", rootCmd.PersistentFlags().Lookup("address"))
 	_ = viper.BindPFlag("user", rootCmd.PersistentFlags().Lookup("user"))
+	_ = viper.BindPFlag("insecure", rootCmd.PersistentFlags().Lookup("insecure"))
 
 	verbose := rootCmd.PersistentFlags().BoolP("verbose", "v", false, "prints additional log information")
 	if verbose != nil && *verbose {
@@ -99,4 +102,5 @@ func initConfig() {
 		logrus.Info("Using config file:", viper.ConfigFileUsed())
 	}
 	address = viper.GetString("address")
+	insecureTLS = viper.GetBool("insecure")
 }

@@ -90,8 +90,12 @@ bench: bench-bin
 	cd tools/bench; go build -ldflags="-X 'main.date=$(BUILD_DATE)' -X 'main.version=$(GIT_TAG)' -X 'main.commit=$(GIT_COMMIT)'" -o ../../build/bench main.go
 
 .PHONY: test
-test: pretty
+test: pretty test-chorctl
 	TEST_WAIT_SHORT=$(TEST_WAIT_SHORT) TEST_WAIT_LONG=$(TEST_WAIT_LONG) go test ./...
+
+.PHONY: test-chorctl
+test-chorctl:
+	cd tools/chorctl && go test ./...
 
 .PHONY: proto-gen
 proto-gen:

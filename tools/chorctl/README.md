@@ -25,10 +25,19 @@ brew install clyso/tap/chorctl
 
 ## Usage
 
-`chorctl` sends requests to the gRPC API hosted by [Chorus worker](../../service/worker).
-Deploy worker and provide gRPC API address to `chorctl` with `--address` flag or `CHORUS_ADDRESS` envar:
+`chorctl` sends requests to the REST API hosted by [Chorus worker](../../service/worker).
+Deploy worker and provide REST API URL (including `http://` or `https://` scheme) to `chorctl`
+with `--address` flag or `CHORUS_ADDRESS` envar (default: `http://localhost:9671`):
 ```shell
-export CHORUS_ADDRESS=127.0.0.1:9670
+export CHORUS_ADDRESS=http://127.0.0.1:9671
+```
+
+For `https://` addresses, TLS certificate verification can be disabled with `--insecure` (`-k`) flag.
+
+If the [Web UI](../../ui) is deployed, it proxies the same API under `/api`. E.g. for UI on
+`http://example.com:9090` use:
+```shell
+chorctl --address http://example.com:9090/api
 ```
 
 Run `chorctl --help` for available commands. Key commands:

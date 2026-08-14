@@ -67,7 +67,7 @@ chorctl repl switch`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		conn, err := api.Connect(ctx, address)
+		conn, err := api.Connect(ctx, address, insecureTLS)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to connect to api")
 		}

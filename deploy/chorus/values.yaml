@@ -275,13 +275,13 @@ worker:
     enabled: false
     minAvailable: 1
 
-  # gRPC API service (for chorctl)
+  # gRPC API service
   grpcService:
     type: ClusterIP
     port: 9670
     annotations: {}
 
-  # REST API service
+  # REST API service (for chorctl and web UI)
   restService:
     type: ClusterIP
     port: 9671

@@ -34,8 +34,8 @@ services:
         source: ./s3-credentials.yaml
         target: /bin/config/override.yaml
     ports:
-      - "9671:9671" # expose REST api for web UI
-      - "9670:9670" # expose grpc management API for CLI
+      - "9671:9671" # expose REST api for chorctl and web UI
+      - "9670:9670" # expose grpc management API
   # Chorus S3 proxy
   # Can be used capture data change and backup it with worker to another S3.
   # Can be used to migrate to another S3 by bucket. Before migration it will route all requests to old S3.

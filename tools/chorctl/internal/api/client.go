@@ -18,20 +18,38 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
-func Connect(ctx context.Context, url string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, url,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		//grpc.WithConnectParams(grpc.ConnectParams{Backoff: backoff.Config{MaxDelay: time.Second}}),
-		//grpc.WithInsecure(),
-	)
+// Connect creates a client for the chorus management REST API.
+// Address must be a full URL including http:// or https:// scheme,
+// e.g. http://localhost:9671.
+func Connect(_ context.Context, address string, insecureSkipTLSVerify bool) (*Conn, error) {
+	u, err := url.Parse(address)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, fmt.Errorf("address %q must be a full URL of chorus management REST api with http:// or https:// scheme, e.g. %q (note: REST api port 9671, not gRPC port 9670)", address, "http://localhost:9671")
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("address %q must contain a host, e.g. %q", address, "http://localhost:9671")
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if insecureSkipTLSVerify {
+		if u.Scheme == "http" {
+			logrus.Warn("--insecure flag has no effect for http:// address")
+		}
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // explicit user opt-in via --insecure flag
+	}
+	return &Conn{
+		httpClient: &http.Client{Transport: transport},
+		baseURL:    u,
+	}, nil
 }
 
 func PrintGrpcError(err error) {

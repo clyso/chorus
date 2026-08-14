@@ -155,6 +155,21 @@ cached image.
 | **worker** | Processes replication tasks | enabled |
 | **ui** | Web dashboard | disabled |
 
+## CLI access
+
+[chorctl](https://github.com/clyso/chorus/tree/main/tools/chorctl) talks to the worker REST API. Either port-forward it:
+
+```shell
+kubectl port-forward svc/<release>-chorus-rest 9671
+chorctl storage
+```
+
+Or, with UI ingress enabled, use the UI's `/api` path:
+
+```shell
+chorctl --address https://chorus.example.com/api
+```
+
 ## Documentation
 
 - [Chorus Documentation](https://chorus.clyso.com/)

@@ -74,7 +74,7 @@ chorctl diff fix --source storage1:bucket1 storage2:bucket2 `,
 			SourceIndex: 0,
 		}
 
-		conn, err := api.Connect(ctx, address)
+		conn, err := api.Connect(ctx, address, insecureTLS)
 		if err != nil {
 			logrus.WithError(err).WithField("address", address).Fatal("unable to connect to api")
 		}
