@@ -1,0 +1,77 @@
+# Example: exposing Chorus with ingress-nginx.
+#
+# An overlay — combine it with a storage example, e.g.
+#   helm install chorus ./deploy/chorus \
+#     -f examples/values-s3.yaml -f examples/values-ingress-nginx.yaml
+#
+# WARNING: ingress.api has no authentication. Enable it behind auth at the
+# ingress, or on a private network only. See README.md -> Ingress.
+
+ingress:
+  proxy:
+    enabled: true
+    className: nginx
+    annotations:
+      # S3 objects exceed ingress-nginx's 1m default body limit, which rejects
+      # larger uploads with 413. "0" disables the limit.
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    hosts:
+      - host: s3.chorus.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-s3-tls
+        hosts:
+          - s3.chorus.example.com
+
+  api:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: chorus-api.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-api-tls
+        hosts:
+          - chorus-api.example.com
+
+  webhook:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: chorus-webhook.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-webhook-tls
+        hosts:
+          - chorus-webhook.example.com
+
+  ui:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: chorus.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-ui-tls
+        hosts:
+          - chorus.example.com
+
+ui:
+  enabled: true
+
+worker:
+  config:
+    api:
+      webhook:
+        enabled: true
+        baseUrl: "https://chorus-webhook.example.com"
+        # Separate ports put the webhook on its own Service, away from the
+        # management API. Omit to serve webhooks on the main REST port.
+        grpcPort: 9680
+        httpPort: 9681
+
+# TLS secrets are not created by this chart.

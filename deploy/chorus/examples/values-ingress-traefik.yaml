@@ -1,0 +1,75 @@
+# Example: exposing Chorus with Traefik.
+#
+# An overlay — combine it with a storage example, e.g.
+#   helm install chorus ./deploy/chorus \
+#     -f examples/values-s3.yaml -f examples/values-ingress-traefik.yaml
+#
+# WARNING: ingress.api has no authentication. Enable it behind auth at the
+# ingress, or on a private network only. See README.md -> Ingress.
+
+ingress:
+  proxy:
+    enabled: true
+    className: traefik
+    # No body-size annotation needed: Traefik does not limit request bodies by
+    # default. Attach a Buffering middleware if you want a limit.
+    hosts:
+      - host: s3.chorus.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-s3-tls
+        hosts:
+          - s3.chorus.example.com
+
+  api:
+    enabled: true
+    className: traefik
+    hosts:
+      - host: chorus-api.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-api-tls
+        hosts:
+          - chorus-api.example.com
+
+  webhook:
+    enabled: true
+    className: traefik
+    hosts:
+      - host: chorus-webhook.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-webhook-tls
+        hosts:
+          - chorus-webhook.example.com
+
+  ui:
+    enabled: true
+    className: traefik
+    hosts:
+      - host: chorus.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: chorus-ui-tls
+        hosts:
+          - chorus.example.com
+
+ui:
+  enabled: true
+
+worker:
+  config:
+    api:
+      webhook:
+        enabled: true
+        baseUrl: "https://chorus-webhook.example.com"
+        # Separate ports put the webhook on its own Service, away from the
+        # management API. Omit to serve webhooks on the main REST port.
+        grpcPort: 9680
+        httpPort: 9681
+
+# TLS secrets are not created by this chart.

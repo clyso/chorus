@@ -1,4 +1,8 @@
 {{- if .Values.ingress.webhook.enabled }}
+{{- /* grpc: false was a shipped default, so only reject a deliberate true. */}}
+{{- if .Values.ingress.webhook.grpc }}
+{{- fail "ingress.webhook.grpc is no longer supported: the webhook ingress always routes HTTP. Remove the key." }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -6,15 +10,9 @@ metadata:
   labels:
     {{- include "chorus.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
-  {{- $annotations := include "chorus.annotations" (list .Values.ingress.webhook.annotations .) }}
-  {{- if or .Values.ingress.webhook.grpc $annotations }}
+  {{- with (include "chorus.annotations" (list .Values.ingress.webhook.annotations .)) }}
   annotations:
-    {{- if .Values.ingress.webhook.grpc }}
-    nginx.ingress.kubernetes.io/backend-protocol: GRPC
-    {{- end }}
-    {{- with $annotations }}
     {{- . | nindent 4 }}
-    {{- end }}
   {{- end }}
 spec:
   {{- if .Values.ingress.webhook.className }}
@@ -37,17 +35,15 @@ spec:
         paths:
           {{- range .paths }}
           - path: {{ .path }}
-            pathType: {{ .pathType }}
+            pathType: {{ .pathType | default "Prefix" }}
             backend:
               service:
-                {{- if gt (int ($.Values.worker.config.api.webhook.grpcPort | default 0)) 0 }}
+                {{- /* Dedicated webhook Service when the worker runs the webhook
+                       on its own ports, otherwise the main REST API. */}}
+                {{- if and $.Values.worker.config.api.webhook.enabled (gt (int ($.Values.worker.config.api.webhook.grpcPort | default 0)) 0) }}
                 name: {{ include "chorus.fullname" $ }}-webhook
                 port:
-                  name: {{ if $.Values.ingress.webhook.grpc }}grpc{{ else }}http{{ end }}
-                {{- else if $.Values.ingress.webhook.grpc }}
-                name: {{ include "chorus.fullname" $ }}-grpc
-                port:
-                  name: grpc
+                  name: http
                 {{- else }}
                 name: {{ include "chorus.fullname" $ }}-rest
                 port:

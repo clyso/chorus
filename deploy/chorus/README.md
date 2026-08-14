@@ -25,6 +25,8 @@ See the [examples/](./examples/) directory for ready-to-use configurations:
 | [values-webhook.yaml](./examples/values-webhook.yaml) | Webhook-based replication (without proxy) |
 | [values-dynamic-credentials.yaml](./examples/values-dynamic-credentials.yaml) | Manage credentials via API |
 | [values-external-redis.yaml](./examples/values-external-redis.yaml) | External Redis configuration |
+| [values-ingress-nginx.yaml](./examples/values-ingress-nginx.yaml) | Ingress overlay for ingress-nginx |
+| [values-ingress-traefik.yaml](./examples/values-ingress-traefik.yaml) | Ingress overlay for Traefik |
 
 ## Configuration
 
@@ -138,6 +140,39 @@ client: Go runtime metrics (`go_*`, see
 [collectors.NewGoCollector](https://pkg.go.dev/github.com/prometheus/client_golang/prometheus/collectors#NewGoCollector))
 and process metrics (`process_*`, see
 [Prometheus process metrics](https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics)).
+
+### Ingress
+
+The chart can create four Ingresses, all disabled by default. Enable one with
+`ingress.<name>.enabled: true` and at least one entry in `hosts`.
+
+| Values key | Backend Service | Port (default) | Backend exists only when |
+|------------|-----------------|----------------|--------------------------|
+| `ingress.proxy` | `<release>-proxy` | 9669 | `proxy.enabled: true` |
+| `ingress.api` | `<release>-rest` | 9671 | `worker.config.api.enabled: true` |
+| `ingress.webhook` | `<release>-webhook` on separate webhook ports, else `<release>-rest` | `webhook.httpPort` / 9671 | `worker.config.api.webhook.enabled: true` |
+| `ingress.ui` | `<release>-ui` | 9672 | `ui.enabled: true` |
+
+Before enabling an ingress, make sure its component is enabled — see the last
+column above.
+
+Any Kubernetes ingress controller is supported: the chart emits no
+controller-specific annotations. Set `className` for your controller and put
+controller-specific tuning under `annotations`. See
+[values-ingress-nginx.yaml](./examples/values-ingress-nginx.yaml) and
+[values-ingress-traefik.yaml](./examples/values-ingress-traefik.yaml).
+
+> **The management API has no authentication.** Anyone who can reach
+> `ingress.api` can change replication policies, read the proxy's S3
+> credentials, and write storage credentials when `dynamicCredentials.enabled`
+> is set. Enforce authentication at the ingress, or keep it on a private
+> network.
+
+Set `worker.config.api.webhook.grpcPort` / `httpPort` to run the webhook on its
+own ports and Service. Do that when exposing the webhook publicly: on the shared
+ports its ingress backend is `<release>-rest`, which also serves the management
+API described above. Set `worker.config.api.webhook.baseUrl` to the externally
+reachable URL when the storage pushes events from outside the cluster.
 
 ### Images
 
