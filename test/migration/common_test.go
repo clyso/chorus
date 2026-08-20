@@ -19,7 +19,6 @@ package migration
 import (
 	"context"
 	"math/rand"
-	"strings"
 	"testing"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
@@ -136,11 +135,6 @@ func replicationDiff(t *testing.T, e app.EmbeddedEnv, id *pb.ReplicationID) Repl
 		for _, entry := range batch.Entries {
 			if len(entry.StorageEntries) == 1 {
 				stor := entry.StorageEntries[0]
-				if strings.HasSuffix(entry.Object, "/") {
-					//TODO: fix consistency check to
-					// skip folder placehoders
-					continue
-				}
 				if stor.Storage == id.FromStorage && stor.Bucket == *id.FromBucket {
 					fromMap[entry.Object] = struct{}{}
 				} else if stor.Storage == id.ToStorage && stor.Bucket == *id.ToBucket {

@@ -66,29 +66,15 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		return fmt.Errorf("unable to get last listed object: %w", err)
 	}
 
-	objects := fromClient.S3().ListObjects(ctx, p.Bucket, mclient.ListObjectsOptions{StartAfter: lastObjName, Prefix: p.Prefix})
-	objectsNum := 0
+	objects := fromClient.S3().ListObjects(ctx, p.Bucket, mclient.ListObjectsOptions{StartAfter: lastObjName, Prefix: p.Prefix, Recursive: true})
 	for object := range objects {
 		if object.Err != nil {
 			return fmt.Errorf("migration bucket list obj: list objects error %w", object.Err)
 		}
-		objectsNum++
 		isDir := object.Size == 0 && strings.HasSuffix(object.Key, "/")
 		logger.Debug().Str(log.Object, object.Key).Str("obj_version_id", object.VersionID).Bool("is_dir", isDir).Msg("migration bucket list obj: start processing object from the list")
-		if isDir {
-			subP := p
-			subP.Prefix = object.Key
-			if err = s.queueSvc.EnqueueTask(ctx, subP); err != nil {
-				return fmt.Errorf("migration bucket list obj: unable to enqueue list obj sub task: %w", err)
-			}
-			err = s.listStateStore.Set(ctx, migrationID, object.Key)
-			if err != nil {
-				return fmt.Errorf("migration bucket list obj: unable to update last obj meta: %w", err)
-			}
-			continue
-		}
 
-		if p.Versioned {
+		if p.Versioned && !isDir {
 			task := tasks.ListObjectVersionsPayload{
 				Bucket: p.Bucket,
 				Prefix: object.Key,
@@ -117,21 +103,6 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 		}
 		if err = s.listStateStore.Set(ctx, migrationID, object.Key); err != nil {
 			return fmt.Errorf("migration bucket list obj: unable to update last obj meta: %w", err)
-		}
-	}
-
-	if lastObjName == "" && objectsNum == 0 && p.Prefix != "" {
-		// copy empty dir object
-		task := tasks.MigrateObjCopyPayload{
-			Bucket: p.Bucket,
-			Obj: tasks.ObjPayload{
-				Name: p.Prefix,
-			},
-		}
-		task.SetReplicationID(replicationID)
-		err = s.queueSvc.EnqueueTask(ctx, task)
-		if err != nil {
-			return fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)
 		}
 	}
 	_, _ = s.listStateStore.Drop(ctx, migrationID)
