@@ -45,11 +45,13 @@ const (
 	CSwiftTestContainerName = "test"
 	CSwiftTestFileName      = "test.txt"
 
-	CKeystoneTestComponentKey = "keystone"
-	CRedisTestComponentKey    = "redis"
-	CMinioTestComponentKey    = "minio"
-	CSwiftTestComponentKey    = "swift"
-	CCephTestComponentKey     = "ceph"
+	CKeystoneTestComponentKey  = "keystone"
+	CRedisTestComponentKey     = "redis"
+	CMinioTestComponentKey     = "minio"
+	CSwiftTestComponentKey     = "swift"
+	CCephTestComponentKey      = "ceph"
+	CGarageTestComponentKey    = "garage"
+	CSeaweedFSTestComponentKey = "seaweedfs"
 
 	CRedisTestKey   = "redistestkey"
 	CRedisTestValue = "redistestval"
@@ -77,11 +79,13 @@ var _ = BeforeSuite(func() {
 	suiteCtx = context.Background()
 
 	componentConfig := map[string]ComponentCreationConfig{
-		CMinioTestComponentKey:    AsMinio(WithDisabledSTDErrLog(), WithDisabledSTDOutLog()), // Example:Disable all logs for minio component
-		CKeystoneTestComponentKey: AsKeystone(),
-		CRedisTestComponentKey:    AsRedis(WithDisabledSTDOutLog()), // Example:Disable stdout logs for redis component
-		CSwiftTestComponentKey:    AsSwift(CKeystoneTestComponentKey),
-		CCephTestComponentKey:     AsCeph(WithKeystone(CKeystoneTestComponentKey)),
+		CMinioTestComponentKey:     AsMinio(WithDisabledSTDErrLog(), WithDisabledSTDOutLog()), // Example:Disable all logs for minio component
+		CKeystoneTestComponentKey:  AsKeystone(),
+		CRedisTestComponentKey:     AsRedis(WithDisabledSTDOutLog()), // Example:Disable stdout logs for redis component
+		CSwiftTestComponentKey:     AsSwift(CKeystoneTestComponentKey),
+		CCephTestComponentKey:      AsCeph(WithKeystone(CKeystoneTestComponentKey)),
+		CGarageTestComponentKey:    AsGarage(),
+		CSeaweedFSTestComponentKey: AsSeaweedFS(),
 	}
 	testEnv, err := NewTestEnvironment(suiteCtx, componentConfig)
 	Expect(err).NotTo(HaveOccurred())
@@ -306,6 +310,63 @@ var _ = Describe("Interacting with test components", func() {
 			ContentLength: fileStat.Size(),
 			ContentType:   CMultipartContentType,
 		}).Extract()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should allow to upload to garage", func() {
+		By("Creating S3 client")
+		garageAccessConfig, err := suiteEnv.GetGarageAccessConfig(CGarageTestComponentKey)
+		Expect(err).NotTo(HaveOccurred())
+
+		endpoint := fmt.Sprintf("%s:%d", garageAccessConfig.Host.Local, garageAccessConfig.S3Port.Forwarded)
+		s3Client, err := minio.New(endpoint, &minio.Options{
+			Creds:  mcredentials.NewStaticV4(garageAccessConfig.AccessToken, garageAccessConfig.SecretToken, ""),
+			Region: garageAccessConfig.Region,
+			Secure: false,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating bucket")
+		err = s3Client.MakeBucket(suiteCtx, CMinioTestBucketName, minio.MakeBucketOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Uploading file")
+		file, err := os.Open("proxy-server.conf")
+		Expect(err).NotTo(HaveOccurred())
+		defer file.Close()
+
+		fileStat, err := file.Stat()
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = s3Client.PutObject(suiteCtx, CMinioTestBucketName, CMinioTestFileName, file, fileStat.Size(), minio.PutObjectOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Should allow to upload to seaweedfs", func() {
+		By("Creating S3 client")
+		seaweedFSAccessConfig, err := suiteEnv.GetSeaweedFSAccessConfig(CSeaweedFSTestComponentKey)
+		Expect(err).NotTo(HaveOccurred())
+
+		endpoint := fmt.Sprintf("%s:%d", seaweedFSAccessConfig.Host.Local, seaweedFSAccessConfig.S3Port.Forwarded)
+		s3Client, err := minio.New(endpoint, &minio.Options{
+			Creds:  mcredentials.NewStaticV4(seaweedFSAccessConfig.AccessToken, seaweedFSAccessConfig.SecretToken, ""),
+			Secure: false,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating bucket")
+		err = s3Client.MakeBucket(suiteCtx, CMinioTestBucketName, minio.MakeBucketOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Uploading file")
+		file, err := os.Open("proxy-server.conf")
+		Expect(err).NotTo(HaveOccurred())
+		defer file.Close()
+
+		fileStat, err := file.Stat()
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = s3Client.PutObject(suiteCtx, CMinioTestBucketName, CMinioTestFileName, file, fileStat.Size(), minio.PutObjectOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	})
 

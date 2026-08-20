@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -98,6 +99,31 @@ const (
 	CMinioS3Port         = 9000
 	CMinioManagementPort = 9001
 
+	CGarageImage             = "dxflrs/garage:v1.0.1"
+	CGarageReplicationFactor = 1
+	CGarageRPCSecret         = "d90f9a1e0d5c4a5d8f1b7c3e6a2d4b8f0c1e3a5d7b9f2c4e6a8d0b1f3c5e7a9d"
+	CGarageS3Port            = 3900
+	CGarageRPCPort           = 3901
+	CGarageAdminPort         = 3903
+	CGarageRegion            = "garage"
+	CGarageZone              = "dc1"
+	CGarageKeyPermPath       = "/v1/key"
+	CGarageCapacityBytes     = 1_000_000_000
+	CGarageKeyName           = "chorus"
+	CGarageAccessToken       = "GK0123456789abcdef01234567"
+	CGarageSecretToken       = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	CGarageAdminToken        = "garage-admin-token"
+	CGarageConfigPath        = "/etc/garage.toml"
+
+	CSeaweedFSImage        = "chrislusf/seaweedfs:3.80"
+	CSeaweedFSS3Port       = 8333
+	CSeaweedFSMasterPort   = 9333
+	CSeaweedFSFilerPort    = 8888
+	CSeaweedFSIdentityName = "chorus"
+	CSeaweedFSAccessToken  = "seaweedfsaccesskey"
+	CSeaweedFSSecretToken  = "seaweedfssecretkey"
+	CSeaweedFSS3ConfigPath = "/etc/seaweedfs/s3.json"
+
 	CCephImage                 = "ghcr.io/arttor/ceph-test:v19"
 	CCephDemoUID               = "cephuid"
 	CCephSystemUserUID         = "superuser"
@@ -116,6 +142,10 @@ var (
 	proxyServerConf string
 	//go:embed ceph-keystone.conf
 	cephKeystoneConf string
+	//go:embed garage.toml
+	garageConf string
+	//go:embed seaweedfs-s3.json
+	seaweedFSS3Conf string
 )
 
 // ComponentOption interface to support Functional options for test-containers.
@@ -263,6 +293,24 @@ type MinioAccessConfig struct {
 	ManagementPort ContainerPort
 }
 
+type GarageAccessConfig struct {
+	Host        ContainerHost
+	Region      string
+	AccessToken string
+	SecretToken string
+	AdminToken  string
+	S3Port      ContainerPort
+	AdminPort   ContainerPort
+}
+
+type SeaweedFSAccessConfig struct {
+	Host        ContainerHost
+	AccessToken string
+	SecretToken string
+	S3Port      ContainerPort
+	MasterPort  ContainerPort
+}
+
 type CephAccessConfig struct {
 	Keystone       StorageKeystoneAccessConfig
 	Host           ContainerHost
@@ -281,6 +329,22 @@ type SwiftProxyConfigTemplateValues struct {
 	ResellerRole     string
 	AdminAuthPort    int
 	ExternalAuthPort int
+}
+
+type GarageConfigTemplateValues struct {
+	RPCSecret         string
+	AdminToken        string
+	Region            string
+	ReplicationFactor int
+	RPCPort           int
+	S3Port            int
+	AdminPort         int
+}
+
+type SeaweedFSS3ConfigTemplateValues struct {
+	Name        string
+	AccessToken string
+	SecretToken string
 }
 
 type CephRGWTemplateValues struct {
@@ -423,6 +487,52 @@ func (r *TestEnvironment) GetCephAccessConfig(instanceName string) (*CephAccessC
 		return nil, fmt.Errorf("unable to cast instance access cfg %s to ceph access cfg", instanceName)
 	}
 	return &cephAccessCfg, nil
+}
+
+func (r *TestEnvironment) GetGarageAccessConfig(instanceName string) (*GarageAccessConfig, error) {
+	instanceAccessCfg, ok := r.accessConfigs[instanceName]
+	if !ok {
+		return nil, fmt.Errorf("unable to find instance %s", instanceName)
+	}
+	garageAccessCfg, ok := instanceAccessCfg.(GarageAccessConfig)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast instance access cfg %s to garage access cfg", instanceName)
+	}
+	return &garageAccessCfg, nil
+}
+
+func (r *TestEnvironment) GetSeaweedFSAccessConfig(instanceName string) (*SeaweedFSAccessConfig, error) {
+	instanceAccessCfg, ok := r.accessConfigs[instanceName]
+	if !ok {
+		return nil, fmt.Errorf("unable to find instance %s", instanceName)
+	}
+	seaweedFSAccessCfg, ok := instanceAccessCfg.(SeaweedFSAccessConfig)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast instance access cfg %s to seaweedfs access cfg", instanceName)
+	}
+	return &seaweedFSAccessCfg, nil
+}
+
+func AsGarage(opts ...ComponentOption) ComponentCreationConfig {
+	cfg := ComponentCreationConfig{
+		InstantiateFunc: startGarageInstance,
+		Container:       true,
+	}
+	for _, opt := range opts {
+		opt.apply(&cfg)
+	}
+	return cfg
+}
+
+func AsSeaweedFS(opts ...ComponentOption) ComponentCreationConfig {
+	cfg := ComponentCreationConfig{
+		InstantiateFunc: startSeaweedFSInstance,
+		Container:       true,
+	}
+	for _, opt := range opts {
+		opt.apply(&cfg)
+	}
+	return cfg
 }
 
 func AsMinio(opts ...ComponentOption) ComponentCreationConfig {
@@ -1057,6 +1167,333 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 		},
 		User:     CMinioUsername,
 		Password: CMinioPassword,
+	}
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
+
+	return nil
+}
+
+type garageAdmin struct {
+	baseURL string
+	token   string
+}
+
+func (r garageAdmin) do(ctx context.Context, method string, path string, body any, out any) error {
+	var payload io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("unable to encode %s %s body: %w", method, path, err)
+		}
+		payload = bytes.NewReader(encoded)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, r.baseURL+path, payload)
+	if err != nil {
+		return fmt.Errorf("unable to create %s %s request: %w", method, path, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+r.token)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("unable to perform %s %s: %w", method, path, err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read %s %s response: %w", method, path, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s %s returned %d: %s", method, path, resp.StatusCode, string(responseBody))
+	}
+	if out == nil {
+		return nil
+	}
+	if err := json.Unmarshal(responseBody, out); err != nil {
+		return fmt.Errorf("unable to decode %s %s response %s: %w", method, path, string(responseBody), err)
+	}
+	return nil
+}
+
+type garageStatus struct {
+	Node string `json:"node"`
+}
+
+type garageRole struct {
+	ID       string   `json:"id"`
+	Zone     string   `json:"zone"`
+	Tags     []string `json:"tags"`
+	Capacity int64    `json:"capacity"`
+}
+
+type garageHealth struct {
+	StorageNodesOk int `json:"storageNodesOk"`
+}
+
+func waitForGarageStorage(ctx context.Context, admin garageAdmin, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		var health garageHealth
+		if lastErr = admin.do(ctx, http.MethodGet, "/v1/health", nil, &health); lastErr == nil {
+			if health.StorageNodesOk > 0 {
+				return nil
+			}
+			lastErr = fmt.Errorf("no storage node is ready yet")
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+	return fmt.Errorf("garage storage did not become ready in %s: %w", timeout, lastErr)
+}
+
+func s3GatewayReady(port string, timeout time.Duration) wait.Strategy {
+	return wait.ForHTTP("/").
+		WithPort(port).
+		WithStatusCodeMatcher(func(status int) bool { return status < http.StatusInternalServerError }).
+		WithStartupTimeout(timeout)
+}
+
+func startGarageInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	s3NATPortString := fmt.Sprintf(CNATPortTemplate, CGarageS3Port)
+	s3NATPort := s3NATPortString
+	adminNATPortString := fmt.Sprintf(CNATPortTemplate, CGarageAdminPort)
+	adminNATPort := adminNATPortString
+	rpcNATPortString := fmt.Sprintf(CNATPortTemplate, CGarageRPCPort)
+
+	garageTemplate, err := template.New("garage.toml").Parse(garageConf)
+	if err != nil {
+		return fmt.Errorf("unable to parse garage config template: %w", err)
+	}
+	templateBuffer := &bytes.Buffer{}
+	if err := garageTemplate.Execute(templateBuffer, &GarageConfigTemplateValues{
+		RPCSecret:         CGarageRPCSecret,
+		AdminToken:        CGarageAdminToken,
+		Region:            CGarageRegion,
+		ReplicationFactor: CGarageReplicationFactor,
+		RPCPort:           CGarageRPCPort,
+		S3Port:            CGarageS3Port,
+		AdminPort:         CGarageAdminPort,
+	}); err != nil {
+		return fmt.Errorf("unable to render garage config: %w", err)
+	}
+
+	req := testcontainers.ContainerRequest{
+		Image:      CGarageImage,
+		WaitingFor: wait.ForHTTP("/health").WithPort(adminNATPort).WithStartupTimeout(2 * time.Minute),
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.AutoRemove = true
+		},
+		HostAccessPorts: append([]int{CGarageS3Port}, componentConfig.HostAccessPorts...),
+		ExposedPorts:    []string{s3NATPortString, adminNATPortString, rpcNATPortString},
+		Networks:        []string{env.network.Name},
+		Files: []testcontainers.ContainerFile{
+			{
+				Reader:            templateBuffer,
+				ContainerFilePath: CGarageConfigPath,
+				FileMode:          0o644,
+			},
+		},
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
+			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
+		},
+	}
+
+	container, err := startContainer(ctx, req)
+	if err != nil {
+		return fmt.Errorf("unable to start garage container: %w", err)
+	}
+
+	containerIP, err := container.ContainerIP(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get garage container ip: %w", err)
+	}
+
+	containerHost, err := container.Host(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get garage container host: %w", err)
+	}
+
+	s3ForwardedPort, err := container.MappedPort(ctx, s3NATPort)
+	if err != nil {
+		return fmt.Errorf("unable to get garage s3 forwarded port: %w", err)
+	}
+
+	adminForwardedPort, err := container.MappedPort(ctx, adminNATPort)
+	if err != nil {
+		return fmt.Errorf("unable to get garage admin forwarded port: %w", err)
+	}
+
+	admin := garageAdmin{
+		baseURL: fmt.Sprintf("http://%s:%d", containerHost, adminForwardedPort.Num()),
+		token:   CGarageAdminToken,
+	}
+
+	var status garageStatus
+	if err := admin.do(ctx, http.MethodGet, "/v1/status", nil, &status); err != nil {
+		return fmt.Errorf("unable to get garage status: %w", err)
+	}
+	if status.Node == "" {
+		return errors.New("garage reported an empty node id")
+	}
+
+	if err := admin.do(ctx, http.MethodPost, "/v1/layout", []garageRole{{
+		ID:       status.Node,
+		Zone:     CGarageZone,
+		Capacity: CGarageCapacityBytes,
+		Tags:     []string{},
+	}}, nil); err != nil {
+		return fmt.Errorf("unable to stage garage layout: %w", err)
+	}
+
+	if err := admin.do(ctx, http.MethodPost, "/v1/layout/apply",
+		map[string]int{"version": 1}, nil); err != nil {
+		return fmt.Errorf("unable to apply garage layout: %w", err)
+	}
+
+	if err := admin.do(ctx, http.MethodPost, "/v1/key/import", map[string]string{
+		"accessKeyId":     CGarageAccessToken,
+		"secretAccessKey": CGarageSecretToken,
+		"name":            CGarageKeyName,
+	}, nil); err != nil {
+		return fmt.Errorf("unable to import garage key: %w", err)
+	}
+
+	if err := admin.do(ctx, http.MethodPost,
+		fmt.Sprintf("%s?id=%s", CGarageKeyPermPath, CGarageAccessToken),
+		map[string]any{"allow": map[string]bool{"createBucket": true}}, nil); err != nil {
+		return fmt.Errorf("unable to allow garage key to create buckets: %w", err)
+	}
+
+	if err := waitForGarageStorage(ctx, admin, time.Minute); err != nil {
+		return err
+	}
+
+	env.accessConfigs[componentName] = GarageAccessConfig{
+		Host: ContainerHost{
+			NAT:   containerIP,
+			Local: containerHost,
+		},
+		S3Port: ContainerPort{
+			Exposed:   CGarageS3Port,
+			Forwarded: int(s3ForwardedPort.Num()),
+		},
+		AdminPort: ContainerPort{
+			Exposed:   CGarageAdminPort,
+			Forwarded: int(adminForwardedPort.Num()),
+		},
+		Region:      CGarageRegion,
+		AccessToken: CGarageAccessToken,
+		SecretToken: CGarageSecretToken,
+		AdminToken:  CGarageAdminToken,
+	}
+	env.terminators[componentName] = func(ctx context.Context) error {
+		return stopContainer(ctx, container)
+	}
+
+	return nil
+}
+
+func startSeaweedFSInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
+	s3NATPortString := fmt.Sprintf(CNATPortTemplate, CSeaweedFSS3Port)
+	s3NATPort := s3NATPortString
+	masterNATPortString := fmt.Sprintf(CNATPortTemplate, CSeaweedFSMasterPort)
+	masterNATPort := masterNATPortString
+	filerNATPortString := fmt.Sprintf(CNATPortTemplate, CSeaweedFSFilerPort)
+
+	seaweedFSTemplate, err := template.New("seaweedfs-s3.json").Parse(seaweedFSS3Conf)
+	if err != nil {
+		return fmt.Errorf("unable to parse seaweedfs s3 config template: %w", err)
+	}
+	templateBuffer := &bytes.Buffer{}
+	if err := seaweedFSTemplate.Execute(templateBuffer, &SeaweedFSS3ConfigTemplateValues{
+		Name:        CSeaweedFSIdentityName,
+		AccessToken: CSeaweedFSAccessToken,
+		SecretToken: CSeaweedFSSecretToken,
+	}); err != nil {
+		return fmt.Errorf("unable to render seaweedfs s3 config: %w", err)
+	}
+
+	req := testcontainers.ContainerRequest{
+		Image: CSeaweedFSImage,
+		Cmd: []string{
+			"server",
+			"-dir=/data",
+			"-master.volumeSizeLimitMB=64",
+			"-s3",
+			fmt.Sprintf("-s3.port=%d", CSeaweedFSS3Port),
+			fmt.Sprintf("-s3.config=%s", CSeaweedFSS3ConfigPath),
+		},
+		WaitingFor: s3GatewayReady(s3NATPort, 2*time.Minute),
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.AutoRemove = true
+		},
+		HostAccessPorts: append([]int{CSeaweedFSS3Port}, componentConfig.HostAccessPorts...),
+		ExposedPorts:    []string{s3NATPortString, masterNATPortString, filerNATPortString},
+		Networks:        []string{env.network.Name},
+		Files: []testcontainers.ContainerFile{
+			{
+				Reader:            templateBuffer,
+				ContainerFilePath: CSeaweedFSS3ConfigPath,
+				FileMode:          0o644,
+			},
+		},
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts:      []testcontainers.LogProductionOption{testcontainers.WithLogProductionTimeout(1 * time.Second)},
+			Consumers: []testcontainers.LogConsumer{NewContainerLogConsumer(componentName, componentConfig.DisabledLogs)},
+		},
+	}
+
+	container, err := startContainer(ctx, req)
+	if err != nil {
+		return fmt.Errorf("unable to start seaweedfs container: %w", err)
+	}
+
+	containerIP, err := container.ContainerIP(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get seaweedfs container ip: %w", err)
+	}
+
+	containerHost, err := container.Host(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get seaweedfs container host: %w", err)
+	}
+
+	s3ForwardedPort, err := container.MappedPort(ctx, s3NATPort)
+	if err != nil {
+		return fmt.Errorf("unable to get seaweedfs s3 forwarded port: %w", err)
+	}
+
+	masterForwardedPort, err := container.MappedPort(ctx, masterNATPort)
+	if err != nil {
+		return fmt.Errorf("unable to get seaweedfs master forwarded port: %w", err)
+	}
+
+	env.accessConfigs[componentName] = SeaweedFSAccessConfig{
+		Host: ContainerHost{
+			NAT:   containerIP,
+			Local: containerHost,
+		},
+		S3Port: ContainerPort{
+			Exposed:   CSeaweedFSS3Port,
+			Forwarded: int(s3ForwardedPort.Num()),
+		},
+		MasterPort: ContainerPort{
+			Exposed:   CSeaweedFSMasterPort,
+			Forwarded: int(masterForwardedPort.Num()),
+		},
+		AccessToken: CSeaweedFSAccessToken,
+		SecretToken: CSeaweedFSSecretToken,
 	}
 	env.terminators[componentName] = func(ctx context.Context) error {
 		return stopContainer(ctx, container)

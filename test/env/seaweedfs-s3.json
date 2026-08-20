@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "{{ .Name }}",
+      "credentials": [
+        {
+          "accessKey": "{{ .AccessToken }}",
+          "secretKey": "{{ .SecretToken }}"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}
