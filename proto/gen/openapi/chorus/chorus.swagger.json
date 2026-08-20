@@ -12,10 +12,12 @@
       "name": "Diff"
     },
     {
-      "name": "Policy"
+      "name": "Policy",
+      "description": "Manages chorus routing/replication policies"
     },
     {
-      "name": "Webhook"
+      "name": "Webhook",
+      "description": "Webhook service receives storage events and enqueues replication tasks.\nReturns non-200 only on transient errors (context cancelled, Redis\nunavailable) where a retry may succeed. Permanent errors (unknown storage,\ninvalid events, no replication policy) are logged server-side and return 200."
     }
   ],
   "consumes": [
