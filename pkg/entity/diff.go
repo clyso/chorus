@@ -70,14 +70,16 @@ func NewDiffID(locations ...DiffLocation) DiffID {
 
 type DiffObjectID struct {
 	Storage string
+	Bucket  string
 	Prefix  string
 	DiffID  DiffID
 }
 
-func NewDiffObjectID(diffID DiffID, storage string, prefix string) DiffObjectID {
+func NewDiffObjectID(diffID DiffID, storage string, bucket string, prefix string) DiffObjectID {
 	return DiffObjectID{
 		DiffID:  diffID,
 		Storage: storage,
+		Bucket:  bucket,
 		Prefix:  prefix,
 	}
 }

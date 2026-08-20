@@ -47,7 +47,7 @@ func NewDiffCtrl(svc *DiffSvc, queueSvc tasks.QueueService) *DiffCtrl {
 func (r *DiffCtrl) HandleDiff(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	for idx := range payload.Locations {
@@ -69,7 +69,7 @@ func (r *DiffCtrl) HandleDiff(ctx context.Context, t *asynq.Task) error {
 func (r *DiffCtrl) HandleDiffList(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffListObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	diffID := r.diffIDFromMigrateLocations(payload.Locations)
@@ -100,7 +100,7 @@ func (r *DiffCtrl) HandleDiffList(ctx context.Context, t *asynq.Task) error {
 func (r *DiffCtrl) HandleDiffListVersions(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffListVersionsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	diffID := r.diffIDFromMigrateLocations(payload.Locations)
@@ -118,7 +118,7 @@ func (r *DiffCtrl) HandleDiffListVersions(ctx context.Context, t *asynq.Task) er
 func (r *DiffCtrl) HandleDiffCollectObjects(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffFixCollectObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	diffID := r.diffIDFromMigrateLocations(payload.Locations)
@@ -152,7 +152,7 @@ func (r *DiffCtrl) HandleDiffCollectObjects(ctx context.Context, t *asynq.Task) 
 func (r *DiffCtrl) HandleDiffRemoveObjects(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffFixRemoveObjectsPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	diffID := r.diffIDFromMigrateLocations(payload.Locations)
@@ -172,7 +172,7 @@ func (r *DiffCtrl) HandleDiffRemoveObjects(ctx context.Context, t *asynq.Task) e
 func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.Task) error {
 	var payload tasks.DiffFixEnsureObjectsRemovedPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	diffID := r.diffIDFromMigrateLocations(payload.Locations)
@@ -186,7 +186,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 		switch payload.StorageType {
 		case dom.Swift:
 			if payload.Versioned {
-				return nil, errors.New("swift versioned objects are not supported")
+				return nil, fmt.Errorf("swift versioned objects are not supported: %w", asynq.SkipRetry)
 			}
 			task := tasks.DiffFixSwiftCopyPayload{
 				Locations: payload.Locations,
@@ -221,7 +221,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 			task.SetReplicationID(universalReplID)
 			return task, nil
 		default:
-			return nil, fmt.Errorf("unknown storage type %s", payload.StorageType)
+			return nil, fmt.Errorf("unknown storage type %s: %w", payload.StorageType, asynq.SkipRetry)
 		}
 	}
 
@@ -288,7 +288,7 @@ func (r *DiffSvc) ShouldCheckVersions(ctx context.Context, user string, location
 
 func (r *DiffSvc) ProduceObjectTasks(ctx context.Context, diffID entity.DiffID, settings entity.DiffSettings, location entity.DiffLocation, prefix string, makePayload func(prefix string) tasks.DiffListVersionsPayload) error {
 	locationCount := len(diffID.Locations)
-	objectID := entity.NewDiffObjectID(diffID, location.Storage, prefix)
+	objectID := entity.NewDiffObjectID(diffID, location.Storage, location.Bucket, prefix)
 
 	lastObject, err := r.listStateStore.Get(ctx, objectID)
 	if err != nil && !errors.Is(err, dom.ErrNotFound) {
