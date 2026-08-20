@@ -113,6 +113,24 @@ func WithVersionID(versionID string) func(o *commonObjectOptions) {
 	}
 }
 
+type commonPutOptions struct {
+	unsignedPayload bool
+}
+
+func (r *commonPutOptions) toMinioPutOptions() minio.PutObjectOptions {
+	return minio.PutObjectOptions{
+		DisableContentSha256: r.unsignedPayload,
+	}
+}
+
+type PutObjectOption func(o *commonPutOptions)
+
+func WithUnsignedPayload() PutObjectOption {
+	return func(o *commonPutOptions) {
+		o.unsignedPayload = true
+	}
+}
+
 type Clients interface {
 	AsS3(ctx context.Context, storage, user string) (s3client.Client, error)
 	AsSwift(ctx context.Context, storage, user string) (*gophercloud.ServiceClient, error)
@@ -132,7 +150,7 @@ type Common interface {
 	RemoveBucket(ctx context.Context, bucket string) error
 	EnableBucketVersioning(ctx context.Context, bucket string) error
 	GetObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (io.Reader, error)
-	PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error
+	PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64, opts ...PutObjectOption) error
 	ObjectInfo(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (*CommonObjectInfo, error)
 	ObjectExists(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) (bool, error)
 	RemoveObject(ctx context.Context, bucket string, name string, opts ...func(o *commonObjectOptions)) error
@@ -301,11 +319,7 @@ func (r *clients) AsCommon(ctx context.Context, storage string, user string) (Co
 		if err != nil {
 			return nil, err
 		}
-		storageAddress, err := r.credsSvc.GetS3Address(storage)
-		if err != nil {
-			return nil, err
-		}
-		return WrapS3common(client, storageAddress.Provider), nil
+		return WrapS3common(client), nil
 	case dom.Swift:
 		client, err := r.AsSwift(ctx, storage, user)
 		if err != nil {

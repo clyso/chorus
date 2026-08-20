@@ -179,7 +179,7 @@ func (s *swiftCommonClient) GetObject(ctx context.Context, bucket string, name s
 	return response.Body, nil
 }
 
-func (s *swiftCommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error {
+func (s *swiftCommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64, _ ...PutObjectOption) error {
 	if _, err := objects.Create(ctx, s.client, bucket, name, objects.CreateOpts{
 		Content:       reader,
 		ContentLength: int64(len),

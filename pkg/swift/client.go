@@ -110,6 +110,7 @@ func NewClient(ctx context.Context, addr StorageAddress, user Credentials) (*gop
 		Password:         user.Password,
 		TenantName:       user.TenantName,
 		DomainName:       user.DomainName,
+		AllowReauth:      true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("swift client: failed to authenticate for tenant %q: %w", user.TenantName, err)

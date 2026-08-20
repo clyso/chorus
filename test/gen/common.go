@@ -216,10 +216,17 @@ func WithNameCharacters(chars []rune) CommonObjectGeneratorOptions {
 	}
 }
 
+func WithLeadingSlash() CommonObjectGeneratorOptions {
+	return func(gen *CommonObjectGenerator) {
+		gen.rootPath = "/"
+	}
+}
+
 type CommonObjectGenerator struct {
 	contentLenghtRange       *GeneratorRange
 	versionRange             *GeneratorRange
 	nameLengthRange          *GeneratorRange
+	rootPath                 string
 	nameGenerationCharacters []rune
 	versioned                bool
 }
@@ -271,7 +278,7 @@ func (r *CommonObjectGenerator) setDefaults() {
 
 func (r *CommonObjectGenerator) generateRoot() *GeneratedObject {
 	return &GeneratedObject{
-		fullPath: "/",
+		fullPath: r.rootPath,
 		aType:    CRootTreeNodeType,
 		contentLengthRange: &GeneratorRange{
 			Min: 0,

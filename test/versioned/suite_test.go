@@ -341,6 +341,9 @@ var _ = Describe("Minio versioned migration", func() {
 		}, 60*time.Second, time.Second).Should(BeTrue())
 
 		for treeObject := range testTree.DepthFirstValueIterator().Must() {
+			if treeObject.GetVersionCount() == 0 || treeObject.GetVersionCount() == 1 && treeObject.GetContentReader().Len() == 0 {
+				continue
+			}
 			srcObjectList := testMinioSrcUserClient.ListObjects(ctx, CMinioSrcBucket, minio.ListObjectsOptions{
 				WithVersions: true,
 				Prefix:       treeObject.GetFullPath(),
@@ -352,10 +355,17 @@ var _ = Describe("Minio versioned migration", func() {
 
 			for srcObject := range srcObjectList {
 				destObject := <-destObjectList
+
+				destObjectInfo, err := testMinioDestUserClient.StatObject(ctx, CMinioDestBucket, treeObject.GetFullPath(), minio.StatObjectOptions{
+					VersionID: destObject.VersionID,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
 				Expect(srcObject.ETag).To(Equal(destObject.ETag))
-				Expect(srcObject.VersionID).To(Equal(destObject.VersionID))
 				Expect(srcObject.Size).To(Equal(destObject.Size))
-				Expect(srcObject.VersionID).To(Equal(destObject.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)]))
+				Expect(srcObject.VersionID).To(Equal(destObject.VersionID))
+				Expect(destObjectInfo.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)]).To(HaveLen(1))
+				Expect(srcObject.VersionID).To(Equal(destObjectInfo.Metadata[http.CanonicalHeaderKey(copy.CChorusSourceVersionIDMetaHeader)][0]))
 			}
 		}
 	})
