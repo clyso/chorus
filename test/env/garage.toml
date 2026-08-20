@@ -1,0 +1,16 @@
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+
+replication_factor = {{ .ReplicationFactor }}
+
+rpc_bind_addr = "[::]:{{ .RPCPort }}"
+rpc_secret = "{{ .RPCSecret }}"
+
+[s3_api]
+s3_region = "{{ .Region }}"
+api_bind_addr = "[::]:{{ .S3Port }}"
+
+[admin]
+api_bind_addr = "[::]:{{ .AdminPort }}"
+admin_token = "{{ .AdminToken }}"
