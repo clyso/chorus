@@ -14,7 +14,6 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 
 	now := time.Now()
 	hourAgo := now.Add(-time.Hour)
-	minuteAgo := now.Add(-time.Minute)
 
 	ctx := t.Context()
 	replications := map[string]entity.UniversalReplicationID{
@@ -98,8 +97,9 @@ func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
 						Cron: stringPtr("@hourly"),
 					},
 					CreatedAt: hourAgo,
-					// was recently attempted
-					LastStartedAt: &minuteAgo,
+					// attempted at this very instant
+					// otherwise causes problems if run at the very beginning of an hour
+					LastStartedAt: &now,
 					LastStatus:    status,
 				})
 				r.NoError(err)

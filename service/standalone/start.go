@@ -40,10 +40,10 @@ import (
 
 const (
 	//nolint:staticcheck //character used to set terminal color
-	connectInfo = `[92m_________ .__                               
+	connectInfo = `[92m_________ .__
 \_   ___ \|  |__   ___________ __ __  ______
 /    \  \/|  |  \ /  _ \_  __ \  |  \/  ___/
-\     \___|   Y  (  <_> )  | \/  |  /\___ \ 
+\     \___|   Y  (  <_> )  | \/  |  /\___ \
  \______  /___|  /\____/|__|  |____//____  >
         \/     \/                        \/[0m
 
@@ -51,7 +51,7 @@ const (
 %s
 
 S3 Proxy URL: 	%s
-S3 Proxy Credentials (AccessKey|SecretKey): 		
+S3 Proxy Credentials (AccessKey|SecretKey):
 %s
 
 GRPC mgmt API:	%s
@@ -116,10 +116,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		if err != nil {
 			return fmt.Errorf("%w: unable to start redis", err)
 		}
-		go func() {
-			<-ctx.Done()
-			redisSvc.Close()
-		}()
+		// Closed only after g.Wait(), services still send redis
+		// commands while shutting down, and a dead server makes those dials retry.
+		defer redisSvc.Close()
 		conf.Config.Redis.Addresses = []string{redisSvc.Addr()}
 	}
 

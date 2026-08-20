@@ -30,8 +30,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/domains"
@@ -43,6 +41,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/pagination"
 	"github.com/johannesboyne/gofakes3"
 	"github.com/johannesboyne/gofakes3/backend/s3mem"
+	"github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -654,12 +653,15 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 	}
 
 	natPortString := fmt.Sprintf(CNATPortTemplate, CSwiftPort)
-	natPort := nat.Port(natPortString)
+	natPort := natPortString
 	req := testcontainers.ContainerRequest{
 		Image:      CSwiftImage,
 		WaitingFor: wait.ForHTTP("/healthcheck").WithPort(natPort).WithStartupTimeout(5 * time.Minute),
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
+			// swift.common.utils.checksum opens an AF_ALG socket at import,
+			// which the default seccomp profile denies.
+			hc.SecurityOpt = []string{"seccomp=unconfined"}
 		},
 		ExposedPorts: []string{natPortString},
 		Networks:     []string{env.network.Name},
@@ -702,7 +704,7 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
 			Name:         CKeystoneSwiftEndpointName,
 			Availability: gophercloud.AvailabilityInternal,
-			URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Int()),
+			URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Num()),
 			ServiceID:    swiftService.ID,
 		}).Extract()
 		return err
@@ -714,7 +716,7 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
 			Name:         CKeystoneSwiftEndpointName,
 			Availability: gophercloud.AvailabilityPublic,
-			URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Int()),
+			URL:          fmt.Sprintf(CKeystoneSwiftEndpointURLTemplate, containerHost, forwardedPort.Num()),
 			ServiceID:    swiftService.ID,
 		}).Extract()
 		return err
@@ -725,7 +727,7 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 	env.accessConfigs[componentName] = SwiftAccessConfig{
 		Port: ContainerPort{
 			Exposed:   CSwiftPort,
-			Forwarded: forwardedPort.Int(),
+			Forwarded: int(forwardedPort.Num()),
 		},
 		Host: ContainerHost{
 			NAT:   containerIP,
@@ -748,8 +750,8 @@ func startSwiftInstance(ctx context.Context, env *TestEnvironment, componentName
 func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	adminNATPortString := fmt.Sprintf(CNATPortTemplate, CKeystoneAdminPort)
 	externalNATPortString := fmt.Sprintf(CNATPortTemplate, CKeystoneExternalPort)
-	adminNATPort := nat.Port(adminNATPortString)
-	externalNATPort := nat.Port(externalNATPortString)
+	adminNATPort := adminNATPortString
+	externalNATPort := externalNATPortString
 	req := testcontainers.ContainerRequest{
 		Image:      CKeystoneImage,
 		WaitingFor: wait.ForHTTP("/v3").WithPort(externalNATPort),
@@ -795,7 +797,7 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 	}
 
 	providerClient, err := openstack.AuthenticatedClient(ctx, gophercloud.AuthOptions{
-		IdentityEndpoint: fmt.Sprintf("http://%s:%d/v3", containerHost, externalForwardedPort.Int()),
+		IdentityEndpoint: fmt.Sprintf("http://%s:%d/v3", containerHost, externalForwardedPort.Num()),
 		Username:         CKeystoneAdminUsername,
 		Password:         CKeystoneAdminPassword,
 		DomainName:       CKeystoneAdminDomainName,
@@ -844,11 +846,11 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 	env.accessConfigs[componentName] = KeystoneAccessConfig{
 		AdminPort: ContainerPort{
 			Exposed:   CKeystoneAdminPort,
-			Forwarded: adminForwardedPort.Int(),
+			Forwarded: int(adminForwardedPort.Num()),
 		},
 		ExternalPort: ContainerPort{
 			Exposed:   CKeystoneExternalPort,
-			Forwarded: externalForwardedPort.Int(),
+			Forwarded: int(externalForwardedPort.Num()),
 		},
 		Host: ContainerHost{
 			NAT:   containerIP,
@@ -869,7 +871,7 @@ func startKeystoneInstance(ctx context.Context, env *TestEnvironment, componentN
 
 func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	natPortString := fmt.Sprintf(CNATPortTemplate, CRedisPort)
-	natPort := nat.Port(natPortString)
+	natPort := natPortString
 	req := testcontainers.ContainerRequest{
 		Image: CRedisImage,
 		Cmd:   []string{"redis-server", "--save", "\"\"", "--appendonly", "no", "--requirepass", CRedisPassword},
@@ -911,7 +913,7 @@ func startRedisInstance(ctx context.Context, env *TestEnvironment, componentName
 	env.accessConfigs[componentName] = RedisAccessConfig{
 		Port: ContainerPort{
 			Exposed:   CRedisPort,
-			Forwarded: forwardedPort.Int(),
+			Forwarded: int(forwardedPort.Num()),
 		},
 		Host: ContainerHost{
 			NAT:   containerIP,
@@ -993,9 +995,9 @@ func startGoFakeS3instance(ctx context.Context, env *TestEnvironment, componentN
 
 func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	s3NATPortString := fmt.Sprintf(CNATPortTemplate, CMinioS3Port)
-	s3NATPort := nat.Port(s3NATPortString)
+	s3NATPort := s3NATPortString
 	managementNATPortString := fmt.Sprintf(CNATPortTemplate, CMinioManagementPort)
-	managementNATPort := nat.Port(managementNATPortString)
+	managementNATPort := managementNATPortString
 	req := testcontainers.ContainerRequest{
 		Image:      CMinioImage,
 		WaitingFor: wait.ForHTTP("/minio/health/live").WithPort(s3NATPort),
@@ -1047,11 +1049,11 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 		},
 		S3Port: ContainerPort{
 			Exposed:   CMinioS3Port,
-			Forwarded: s3ForwardedPort.Int(),
+			Forwarded: int(s3ForwardedPort.Num()),
 		},
 		ManagementPort: ContainerPort{
 			Exposed:   CMinioManagementPort,
-			Forwarded: managementForwardedPort.Int(),
+			Forwarded: int(managementForwardedPort.Num()),
 		},
 		User:     CMinioUsername,
 		Password: CMinioPassword,
@@ -1171,7 +1173,7 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 	}
 
 	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
-	apiNatPort := nat.Port(apiNatPortString)
+	apiNatPort := apiNatPortString
 	req := testcontainers.ContainerRequest{
 		Image:      CCephImage,
 		WaitingFor: wait.ForHTTP("/").WithStartupTimeout(5 * time.Minute).WithPort(apiNatPort),
@@ -1250,7 +1252,7 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
 			Name:         CKeystoneCephEndpointName,
 			Availability: gophercloud.AvailabilityInternal,
-			URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Int()),
+			URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Num()),
 			ServiceID:    cephService.ID,
 		}).Extract()
 		return err
@@ -1262,7 +1264,7 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 		_, err := endpoints.Create(ctx, identityClient, endpoints.CreateOpts{
 			Name:         CKeystoneCephEndpointName,
 			Availability: gophercloud.AvailabilityPublic,
-			URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Int()),
+			URL:          fmt.Sprintf(CKeystoneCephEndpointURLTemplate, containerHost, apiForwardedPort.Num()),
 			ServiceID:    cephService.ID,
 		}).Extract()
 		return err
@@ -1273,7 +1275,7 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 	env.accessConfigs[componentName] = CephAccessConfig{
 		Port: ContainerPort{
 			Exposed:   CCephAPIPort,
-			Forwarded: apiForwardedPort.Int(),
+			Forwarded: int(apiForwardedPort.Num()),
 		},
 		Host: ContainerHost{
 			NAT:   containerIP,
@@ -1297,7 +1299,7 @@ func startCephInstanceWithKeystone(ctx context.Context, env *TestEnvironment, co
 
 func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, componentName string, componentConfig *ComponentCreationConfig) error {
 	apiNatPortString := fmt.Sprintf(CNATPortTemplate, CCephAPIPort)
-	apiNatPort := nat.Port(apiNatPortString)
+	apiNatPort := apiNatPortString
 	req := testcontainers.ContainerRequest{
 		Image:      CCephImage,
 		WaitingFor: wait.ForHTTP("/").WithStartupTimeout(5 * time.Minute).WithPort(apiNatPort),
@@ -1359,7 +1361,7 @@ func startStandaloneCephInstance(ctx context.Context, env *TestEnvironment, comp
 	env.accessConfigs[componentName] = CephAccessConfig{
 		Port: ContainerPort{
 			Exposed:   CCephAPIPort,
-			Forwarded: apiForwardedPort.Int(),
+			Forwarded: int(apiForwardedPort.Num()),
 		},
 		Host: ContainerHost{
 			NAT:   containerIP,

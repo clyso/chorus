@@ -4,6 +4,6 @@ ARG GIT_COMMIT='not set'
 ENV PATH=$PATH:$GOPATH/bin
 ENV GO111MODULE=on
 
-RUN go install github.com/johannesboyne/gofakes3/cmd/...@1.0.0
+RUN go install github.com/johannesboyne/gofakes3/cmd/...@v1.2.0
 
 CMD ["gofakes3", "-backend", "memory"]
