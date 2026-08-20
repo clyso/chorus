@@ -39,7 +39,7 @@ const (
 func (s *svc) HandleObjectVersionList(ctx context.Context, t *asynq.Task) error {
 	var listVersionsPayload tasks.ListObjectVersionsPayload
 	if err := json.Unmarshal(t.Payload(), &listVersionsPayload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 
 	user := listVersionsPayload.ID.User()
@@ -64,7 +64,7 @@ func (s *svc) HandleObjectVersionList(ctx context.Context, t *asynq.Task) error 
 func (s *svc) HandleVersionedObjectMigration(ctx context.Context, t *asynq.Task) error {
 	var migratePayload tasks.MigrateVersionedObjectPayload
 	if err := json.Unmarshal(t.Payload(), &migratePayload); err != nil {
-		return fmt.Errorf("unable to unmarshal payload: %w", err)
+		return fmt.Errorf("unable to unmarshal payload: %w: %w", err, asynq.SkipRetry)
 	}
 	ctx = log.WithBucket(ctx, migratePayload.Bucket)
 	ctx = log.WithUser(ctx, migratePayload.ID.User())

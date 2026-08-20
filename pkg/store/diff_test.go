@@ -81,6 +81,51 @@ var _ = Describe("Diff stores", func() {
 	})
 })
 
+func TestDiffObjectIDToTokensConverter(t *testing.T) {
+	tests := []struct {
+		name string
+		id   entity.DiffObjectID
+	}{
+		{
+			name: "same storage different buckets",
+			id: entity.NewDiffObjectID(entity.NewDiffID(
+				entity.NewDiffLocation("main", "src-cb-test"),
+				entity.NewDiffLocation("main", "dst-cb-test"),
+			), "main", "src-cb-test", ""),
+		},
+		{
+			name: "prefix set",
+			id: entity.NewDiffObjectID(entity.NewDiffID(
+				entity.NewDiffLocation("f1", "restart1"),
+				entity.NewDiffLocation("main", "restart1"),
+			), "main", "restart1", "photo/"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			got, err := DiffObjectIDToTokensConverter(tt.id)
+			r.NoError(err)
+			gotID, err := TokensToDiffObjectIDConverter(got)
+			r.NoError(err)
+			r.EqualValues(tt.id, gotID)
+		})
+	}
+}
+
+func TestDiffObjectIDDistinguishesBucketsOnSameStorage(t *testing.T) {
+	r := require.New(t)
+	diffID := entity.NewDiffID(
+		entity.NewDiffLocation("main", "src-cb-test"),
+		entity.NewDiffLocation("main", "dst-cb-test"),
+	)
+	src, err := DiffObjectIDToTokensConverter(entity.NewDiffObjectID(diffID, "main", "src-cb-test", ""))
+	r.NoError(err)
+	dst, err := DiffObjectIDToTokensConverter(entity.NewDiffObjectID(diffID, "main", "dst-cb-test", ""))
+	r.NoError(err)
+	r.NotEqual(src, dst, "locations on the same storage must not share a listing cursor")
+}
+
 func TestDiffIDToTokensConverter(t *testing.T) {
 	type args struct {
 	}

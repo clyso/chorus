@@ -131,7 +131,8 @@ func TokensToDiffObjectIDConverter(tokens []string) (entity.DiffObjectID, error)
 	return entity.DiffObjectID{
 		DiffID:  diffID,
 		Storage: tokens[1],
-		Prefix:  tokens[2],
+		Bucket:  tokens[2],
+		Prefix:  tokens[3],
 	}, nil
 }
 
@@ -140,7 +141,7 @@ func DiffObjectIDToTokensConverter(id entity.DiffObjectID) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get diff id tokens: %w", err)
 	}
-	return []string{tokens[0], id.Storage, id.Prefix}, nil
+	return []string{tokens[0], id.Storage, id.Bucket, id.Prefix}, nil
 }
 
 type DiffListStateStore struct {
