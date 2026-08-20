@@ -310,11 +310,11 @@ func makeRedisFieldMap(value any) map[string]any {
 			result[redisTag] = nil
 			continue
 		}
-		if field.Type.Kind() == reflect.Ptr && fieldValue.IsNil() {
+		if field.Type.Kind() == reflect.Pointer && fieldValue.IsNil() {
 			result[redisTag] = nil
 			continue
 		}
-		if field.Type.Kind() == reflect.Ptr {
+		if field.Type.Kind() == reflect.Pointer {
 			result[redisTag] = fieldValue.Elem().Interface()
 		} else {
 			result[redisTag] = fieldValue.Interface()

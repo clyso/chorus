@@ -39,6 +39,16 @@ var (
 	selTextCol     = lipgloss.Color("229") //lipgloss.Color("#7D56F4")
 	headerStyle    = lipgloss.NewStyle().Border(lipgloss.ThickBorder(), false, true, false, true).Bold(true).BorderForeground(borderCol).Background(accentCol)
 	subHeaderStyle = lipgloss.NewStyle().Foreground(borderCol).Border(lipgloss.ThickBorder(), false, true, true, true).BorderForeground(borderCol)
+
+	tableHeaderStyle = table.DefaultStyles().Header.
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(borderCol).
+				BorderBottom(true).
+				AlignHorizontal(lipgloss.Center).
+				Bold(false)
+	// table.SetHeight subtracts the rendered header height, so the row count alone
+	// leaves no room for the rows themselves. The bottom border makes it two lines.
+	tableHeaderHeight = lipgloss.Height(tableHeaderStyle.Render(""))
 )
 
 var (
@@ -302,12 +312,7 @@ func (u *UI) updateTable(changeSelection bool) {
 	if u.table == nil || changeSelection {
 		tab := table.New(table.WithFocused(u.selected == ""), table.WithColumns(columns), table.WithRows(rows))
 		s := table.DefaultStyles()
-		s.Header = s.Header.
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(borderCol).
-			BorderBottom(true).
-			AlignHorizontal(lipgloss.Center).
-			Bold(false)
+		s.Header = tableHeaderStyle
 		if u.selected == "" {
 			s.Selected = s.Selected.
 				Foreground(selTextCol).
@@ -321,11 +326,11 @@ func (u *UI) updateTable(changeSelection bool) {
 		}
 		tab.SetStyles(s)
 		u.table = &tab
-		u.table.SetHeight(len(u.table.Rows()))
+		u.table.SetHeight(len(u.table.Rows()) + tableHeaderHeight)
 	} else {
 		u.table.SetColumns(columns)
 		u.table.SetRows(rows)
-		u.table.SetHeight(len(u.table.Rows()))
+		u.table.SetHeight(len(u.table.Rows()) + tableHeaderHeight)
 	}
 
 }
