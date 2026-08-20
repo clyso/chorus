@@ -50,20 +50,33 @@ func GenerateS3AvoidCharacters() []rune {
 	return runes
 }
 
-type S3Filler struct {
-	tree   *Tree[*GeneratedObject]
-	client *minio.Client
-}
+type S3FillerOption func(*S3Filler)
 
-func NewS3Filler(tree *Tree[*GeneratedObject], client *minio.Client) *S3Filler {
-	return &S3Filler{
-		tree:   tree,
-		client: client,
+func WithUnsignedPayload() S3FillerOption {
+	return func(f *S3Filler) {
+		f.putOptions.DisableContentSha256 = true
 	}
 }
 
+type S3Filler struct {
+	tree       *Tree[*GeneratedObject]
+	client     *minio.Client
+	putOptions minio.PutObjectOptions
+}
+
+func NewS3Filler(tree *Tree[*GeneratedObject], client *minio.Client, opts ...S3FillerOption) *S3Filler {
+	filler := &S3Filler{
+		tree:   tree,
+		client: client,
+	}
+	for _, opt := range opts {
+		opt(filler)
+	}
+	return filler
+}
+
 func (r *S3Filler) putObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error {
-	if _, err := r.client.PutObject(ctx, bucket, name, reader, int64(len), minio.PutObjectOptions{}); err != nil {
+	if _, err := r.client.PutObject(ctx, bucket, name, reader, int64(len), r.putOptions); err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
 	}
 	return nil

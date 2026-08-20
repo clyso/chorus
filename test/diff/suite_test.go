@@ -47,12 +47,14 @@ import (
 )
 
 const (
-	CMinioTestStorageBackend = "minio"
-	CCephTestStorageBackend  = "ceph"
-	CSwiftTestStorageBackend = "swift"
+	CMinioTestStorageBackend    = "minio"
+	CGoFakeS3TestStorageBackend = "gofakes3"
+	CCephTestStorageBackend     = "ceph"
+	CSwiftTestStorageBackend    = "swift"
 
 	CKeystoneInstance = "keystone"
 	CMinioInstance    = "minio"
+	CGoFakeS3Instance = "gofakes3"
 	CCephInstance     = "ceph"
 	CSwiftInstance    = "swift"
 	CRedisInstance    = "redis"
@@ -182,8 +184,81 @@ func setupEnvWithMinio(ctx context.Context, tree *gen.Tree[*gen.GeneratedObject]
 
 	return &TestDependencies{
 		ObjStoreConfig: &objstoreConfig,
-		ObjStoreClient: objstore.WrapS3common(s3ClientSet, s3.ProviderMinIO),
+		ObjStoreClient: objstore.WrapS3common(s3ClientSet),
 		Filler:         filler,
+		RedisConfig:    redisConfig,
+	}, nil
+}
+
+func setupEnvWithGoFakeS3(ctx context.Context, tree *gen.Tree[*gen.GeneratedObject], _ *gen.CredentialsGenerator) (*TestDependencies, error) {
+	localTestEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
+		CGoFakeS3Instance: env.AsGoFakeS3(),
+		CRedisInstance:    env.AsRedis(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create test environment: %w", err)
+	}
+
+	fakeAccessConfig, err := localTestEnv.GetGoFakeS3AccessConfig(CGoFakeS3Instance)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get gofakes3 env config: %w", err)
+	}
+
+	syncUserCredentials := s3.CredentialsV4{
+		AccessKeyID:     fakeAccessConfig.AccessToken,
+		SecretAccessKey: fakeAccessConfig.SecretToken,
+	}
+
+	userClient, err := minio.New(fakeAccessConfig.Host, &minio.Options{
+		Creds:  mcredentials.NewStaticV4(syncUserCredentials.AccessKeyID, syncUserCredentials.SecretAccessKey, ""),
+		Secure: false,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create user client: %w", err)
+	}
+
+	storageAddress := s3.StorageAddress{
+		Address:  fmt.Sprintf("http://%s", fakeAccessConfig.Host),
+		Provider: s3.ProviderOther,
+	}
+	s3Storages := map[string]s3.Storage{
+		CStorage1Key: {
+			StorageAddress: storageAddress,
+			Credentials: map[string]s3.CredentialsV4{
+				CSyncUserKey: syncUserCredentials,
+			},
+		},
+		CStorage2Key: {
+			StorageAddress: storageAddress,
+			Credentials: map[string]s3.CredentialsV4{
+				CSyncUserKey: syncUserCredentials,
+			},
+		},
+	}
+
+	redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get redis config: %w", err)
+	}
+
+	redisAddress := fmt.Sprintf("%s:%d", redisAccessConfig.Host.Local, redisAccessConfig.Port.Forwarded)
+	redisConfig := &config.Redis{
+		Addresses: []string{redisAddress},
+		Password:  redisAccessConfig.Password,
+	}
+
+	objstoreConfig := app.WorkerS3Config(CStorage1Key, s3Storages)
+
+	metricsSvc := &FakeMetricsSvc{}
+	s3ClientSet, err := s3client.NewClient(ctx, metricsSvc, storageAddress, syncUserCredentials, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("unable to create s3 client set: %w", err)
+	}
+
+	return &TestDependencies{
+		ObjStoreConfig: &objstoreConfig,
+		ObjStoreClient: objstore.WrapS3common(s3ClientSet),
+		Filler:         gen.NewS3Filler(tree, userClient, gen.WithUnsignedPayload()),
 		RedisConfig:    redisConfig,
 	}, nil
 }
@@ -220,14 +295,21 @@ func setupEnvWithCeph(ctx context.Context, tree *gen.Tree[*gen.GeneratedObject],
 			},
 		},
 	}
-	_, err = cephAdminClient.CreateUser(ctx, cephUser)
+	createdCephUser, err := cephAdminClient.CreateUser(ctx, cephUser)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create user: %w", err)
 	}
 
+	if len(createdCephUser.Keys) == 0 {
+		return nil, fmt.Errorf("user %s has no keys", usernamePassword.Username)
+	}
+
+	createdCephUserAccessKey := createdCephUser.Keys[0].AccessKey
+	createdCephUserSecretKey := createdCephUser.Keys[0].SecretKey
+
 	minioS3Endpoint := fmt.Sprintf("%s:%d", cephAccessConfig.Host.Local, cephAccessConfig.Port.Forwarded)
 	minioUserClient, err := minio.New(minioS3Endpoint, &minio.Options{
-		Creds:  mcredentials.NewStaticV4(ec2Creds.Access, ec2Creds.Secret, ""),
+		Creds:  mcredentials.NewStaticV4(createdCephUserAccessKey, createdCephUserSecretKey, ""),
 		Secure: false,
 	})
 	if err != nil {
@@ -240,8 +322,8 @@ func setupEnvWithCeph(ctx context.Context, tree *gen.Tree[*gen.GeneratedObject],
 		Provider: s3.ProviderCeph,
 	}
 	syncUserCredentials := s3.CredentialsV4{
-		AccessKeyID:     ec2Creds.Access,
-		SecretAccessKey: ec2Creds.Secret,
+		AccessKeyID:     createdCephUserAccessKey,
+		SecretAccessKey: createdCephUserSecretKey,
 	}
 	s3Storages := map[string]s3.Storage{
 		CStorage1Key: {
@@ -280,7 +362,7 @@ func setupEnvWithCeph(ctx context.Context, tree *gen.Tree[*gen.GeneratedObject],
 
 	return &TestDependencies{
 		ObjStoreConfig: &objstoreConfig,
-		ObjStoreClient: objstore.WrapS3common(s3ClientSet, s3.ProviderCeph),
+		ObjStoreClient: objstore.WrapS3common(s3ClientSet),
 		Filler:         filler,
 		RedisConfig:    redisConfig,
 	}, nil
@@ -312,6 +394,7 @@ func setupEnvWithSwift(ctx context.Context, tree *gen.Tree[*gen.GeneratedObject]
 		Password:         keystoneAccessConfig.Password,
 		DomainName:       keystoneAccessConfig.DefaultDomain.Name,
 		TenantName:       keystoneAccessConfig.TenantName,
+		AllowReauth:      true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to get admin client: %w", err)
@@ -480,13 +563,13 @@ var _ = BeforeSuite(func() {
 var _ = Describe("Diff scenarious", Ordered, func() {
 	testStorageBackends := []string{
 		CMinioTestStorageBackend,
-		// tests with followingg backends are taking significant amount of time
-		// e.g. 30 minustes for swift
+		// CGoFakeS3TestStorageBackend,
 		// CCephTestStorageBackend,
 		// CSwiftTestStorageBackend,
 	}
 
 	for _, testStorageBackend := range testStorageBackends {
+		var emptyObjectPutOptions []objstore.PutObjectOption
 		var ctx context.Context
 		var cancelFunc context.CancelFunc
 		var diffClient pb.DiffClient
@@ -502,6 +585,12 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			switch testStorageBackend {
 			case CMinioTestStorageBackend:
 				testDependencies, err = setupEnvWithMinio(ctx, testTree, testCredGen)
+			case CGoFakeS3TestStorageBackend:
+				// gofakes3 reqires explicit content length definition,
+				// which is omitted by S3 client if 0.
+				// Unsigned put helps to overcome the issue
+				emptyObjectPutOptions = append(emptyObjectPutOptions, objstore.WithUnsignedPayload())
+				testDependencies, err = setupEnvWithGoFakeS3(ctx, testTree, testCredGen)
 			case CCephTestStorageBackend:
 				testDependencies, err = setupEnvWithCeph(ctx, testTree, testCredGen)
 			case CSwiftTestStorageBackend:
@@ -534,8 +623,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 
 			go func() {
 				defer GinkgoRecover()
-				err = worker.Start(ctx, app, workerConf)
-				Expect(err).NotTo(HaveOccurred())
+				// AfterAll stops this worker by cancelling ctx, and Start then reports the
+				// server closing. Asserting on that would fail whichever spec happens to
+				// be running when the goroutine unwinds.
+				startErr := worker.Start(ctx, app, workerConf)
+				if ctx.Err() != nil {
+					return
+				}
+				Expect(startErr).NotTo(HaveOccurred())
 			}()
 
 			grpcConn, err := grpc.NewClient(grpcAddr,
@@ -980,7 +1075,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 
 				emptyDirPath := jointPath + "emptydirectory/"
 
-				err := storeClient.PutObject(ctx, bucket1Name, emptyDirPath, bytes.NewReader([]byte{}), 0)
+				err := storeClient.PutObject(ctx, bucket1Name, emptyDirPath, bytes.NewReader([]byte{}), 0, emptyObjectPutOptions...)
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
@@ -1194,6 +1289,14 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			var bucket2Name string
 			var locations []*pb.MigrateLocation
 
+			// gofakes3 reports success for a version-scoped delete and keeps the object.
+			// Removing the destination version is the first step of every versioned fix.
+			requiresVersionDelete := func() {
+				if testStorageBackend == CGoFakeS3TestStorageBackend {
+					Skip("gofakes3 ignores deletion of a single object version")
+				}
+			}
+
 			BeforeEach(func() {
 				bucket1Name = testCredGen.GenerateBucketName()
 				err := storeClient.CreateBucket(ctx, bucket1Name)
@@ -1376,6 +1479,8 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			It("Should succeed, check only last version", func() {
+				requiresVersionDelete()
+
 				leaf := testTreePicker.RandomLeafValue()
 				leafPath := leaf.GetFullPath()
 				versionCount := leaf.GetVersionCount()
@@ -1444,6 +1549,8 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			It("Should fail, no object", func() {
+				requiresVersionDelete()
+
 				leaf := testTreePicker.RandomLeafValue()
 				leafPath := leaf.GetFullPath()
 
@@ -1558,6 +1665,8 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			It("Should fail, no directory", func() {
+				requiresVersionDelete()
+
 				jointSubtree := testTreePicker.RandomJointSubtree()
 				subtreeObjects := slices.Collect(jointSubtree.WidthFirstValueIterator().Must())
 				objectNamesToRemove := make([]string, 0, len(subtreeObjects))
@@ -1685,7 +1794,7 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 
 				emptyDirPath := jointPath + "emptydirectory/"
 
-				err := storeClient.PutObject(ctx, bucket1Name, emptyDirPath, bytes.NewReader([]byte{}), 0)
+				err := storeClient.PutObject(ctx, bucket1Name, emptyDirPath, bytes.NewReader([]byte{}), 0, emptyObjectPutOptions...)
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
@@ -1789,6 +1898,8 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			It("Should fail, wrong etag", func() {
+				requiresVersionDelete()
+
 				joint := testTreePicker.RandomJointValue()
 				jointPath := joint.GetFullPath()
 
@@ -1904,6 +2015,8 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 			})
 
 			It("Should fail, wrong version count", func() {
+				requiresVersionDelete()
+
 				leaf := testTreePicker.RandomLeafValue()
 				leafPath := leaf.GetFullPath()
 				versionCount := leaf.GetVersionCount()

@@ -21,24 +21,20 @@ import (
 	"io"
 	"iter"
 	"slices"
-	"strings"
 
 	"github.com/minio/minio-go/v7"
 
-	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
 )
 
-func WrapS3common(client s3client.Client, provider s3.Provider) Common {
+func WrapS3common(client s3client.Client) Common {
 	return &s3CommonClient{
-		client:   client,
-		provider: provider,
+		client: client,
 	}
 }
 
 type s3CommonClient struct {
-	client   s3client.Client
-	provider s3.Provider
+	client s3client.Client
 }
 
 func (s *s3CommonClient) BucketExists(ctx context.Context, bucket string) (bool, error) {
@@ -100,7 +96,6 @@ func (s *s3CommonClient) ListObjects(ctx context.Context, bucket string, opts ..
 
 	minioOpts := commonOpts.toMinioListOptions()
 	minioOpts.Recursive = true
-	minioOpts.Prefix = s.normalizeInputName(minioOpts.Prefix)
 
 	objects := s.client.S3().ListObjects(ctx, bucket, minioOpts)
 	return func(yield func(CommonObjectInfo, error) bool) {
@@ -122,7 +117,7 @@ func (s *s3CommonClient) ListObjects(ctx context.Context, bucket string, opts ..
 				return
 			}
 			info := CommonObjectInfo{
-				Key:          s.normalizeOutputName(object.Key),
+				Key:          object.Key,
 				VersionID:    object.VersionID,
 				LastModified: object.LastModified,
 				Etag:         object.ETag,
@@ -151,8 +146,13 @@ func (s *s3CommonClient) GetObject(ctx context.Context, bucket string, name stri
 	return object, nil
 }
 
-func (s *s3CommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64) error {
-	if _, err := s.client.S3().PutObject(ctx, bucket, name, reader, int64(len), minio.PutObjectOptions{}); err != nil {
+func (s *s3CommonClient) PutObject(ctx context.Context, bucket string, name string, reader io.Reader, len uint64, opts ...PutObjectOption) error {
+	putOpts := &commonPutOptions{}
+	for _, opt := range opts {
+		opt(putOpts)
+	}
+
+	if _, err := s.client.S3().PutObject(ctx, bucket, name, reader, int64(len), putOpts.toMinioPutOptions()); err != nil {
 		return fmt.Errorf("unable to upload object: %w", err)
 	}
 	return nil
@@ -260,38 +260,4 @@ func (s *s3CommonClient) ObjectInfo(ctx context.Context, bucket string, name str
 		Etag:         stat.ETag,
 		Size:         uint64(stat.Size),
 	}, nil
-}
-
-// https://github.com/minio/minio/issues/17356
-// While working with lists, minio will output object keys as a/b/c, i.e, without leading slash.
-// It will also consider a/b as a valid value for prefix search parameter.
-// Prefix value /a/b will be considered invalid, search will return no results.
-// At the same time, other implementations, e.g. Ceph, will act the other way.
-// Meaning object keys will be listed as /a/b/c, with leading slash.
-// List operation with prefix /a/b will give results, with prefix a/b won't.
-// Therefore, in order to allow interoperability between providers, we should brind prefix parameter
-// and object keys in list to the expected format.
-func (s *s3CommonClient) normalizeInputName(name string) string {
-	if name == "" {
-		return name
-	}
-	isMinio := s.provider == s3.ProviderMinIO
-	hasLeadingSlash := strings.HasPrefix(name, "/")
-	if isMinio && hasLeadingSlash {
-		return strings.TrimPrefix(name, "/")
-	}
-	if !isMinio && !hasLeadingSlash {
-		return "/" + name
-	}
-	return name
-}
-
-func (s *s3CommonClient) normalizeOutputName(name string) string {
-	if name == "" {
-		return name
-	}
-	if !strings.HasPrefix(name, "/") {
-		return "/" + name
-	}
-	return name
 }
