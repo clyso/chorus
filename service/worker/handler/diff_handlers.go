@@ -23,6 +23,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
@@ -803,6 +804,7 @@ func (r *DiffSvc) EnsureObjectsDeleted(ctx context.Context, id entity.DiffFixID,
 		return fmt.Errorf("unable to get objects to remove: %w", err)
 	}
 
+	zerolog.Ctx(ctx).Info().Int("count", len(objectsToRemove)).Msg("EnsureObjectsDeleted: checking objects to remove")
 	client, err := r.clients.AsCommon(ctx, location.Storage, user)
 	if err != nil {
 		return fmt.Errorf("unable to obtain client: %w", err)
