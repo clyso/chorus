@@ -110,7 +110,20 @@ jobs:
               fi
               rm ./$bin_name
           done
-
+      - name: Generate token for chorus (release repo)
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GORELEASER_APP_ID }}
+          private-key: ${{ secrets.GORELEASER_APP_PRIVATE_KEY }}
+      - name: Generate token for homebrew-tap
+        id: app-token-tap
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GORELEASER_APP_ID }}
+          private-key: ${{ secrets.GORELEASER_APP_PRIVATE_KEY }}
+          owner: clyso
+          repositories: homebrew-tap
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -119,5 +132,5 @@ jobs:
           version: v1.26.1
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BREW_RELEASE_TOKEN: ${{ secrets.BREW_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          BREW_RELEASE_TOKEN: ${{ steps.app-token-tap.outputs.token }}
