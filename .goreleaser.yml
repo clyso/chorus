@@ -53,3 +53,5 @@ release:
     name: chorus
   extra_files:
     - glob: ./standalone/*
+changelog:
+  use: github-native
