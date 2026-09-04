@@ -68,6 +68,12 @@ func (m *middleware) Wrap(next http.Handler) http.Handler {
 			util.WriteError(r.Context(), w, err)
 			return
 		}
+		if !isRequestSignatureV4(r) && isRequestPresignedSignatureV4(r) {
+			// the presigned query-string auth params were validated:
+			// strip them so that the request forwarded to the backend
+			// carries only the Authorization header computed by the proxy.
+			removePresignParams(r)
+		}
 		ctx := log.WithUser(r.Context(), user)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -103,10 +109,13 @@ func (m *middleware) getCred(accessKey string) (credMeta, error) {
 }
 
 func (m *middleware) isReqAuthenticated(r *http.Request) (string, error) {
-	if isRequestSignatureV4(r) {
+	switch {
+	case isRequestSignatureV4(r):
 		sha256sum := getContentSha256Cksum(r)
 		return m.doesSignatureV4Match(sha256sum, r)
-	} else if m.allowV2 && isRequestSignatureV2(r) {
+	case isRequestPresignedSignatureV4(r):
+		return m.doesPresignedSignatureV4Match(r)
+	case m.allowV2 && isRequestSignatureV2(r):
 		return m.doesSignatureV2Match(r)
 	}
 	return "", mclient.ErrorResponse{
