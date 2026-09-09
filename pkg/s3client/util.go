@@ -281,6 +281,15 @@ func processHeaders(origin http.Header) (toSign http.Header, notToSign http.Head
 			continue
 		}
 
+		if strings.EqualFold(name, s3.AmzContentSha256) {
+			// the proxy re-signs the forwarded request: the payload hash must be
+			// part of the new signature whether the client signed it or not,
+			// otherwise it is re-added unsigned below and the storage rejects
+			// the signature.
+			toSign[name] = vals
+			continue
+		}
+
 		if len(origSigned) == 0 {
 			// sign all if there no signedHeaders in origin
 			toSign[name] = vals

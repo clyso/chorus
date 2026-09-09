@@ -33,7 +33,7 @@ When using Helm, specify Swift storage separately in `proxy.config.storage` and 
 
 ### Auth
 
-For S3, Proxy supports S3 signature v4 (v2 can be enabled). See `auth` section in [config.yaml](./config.yaml):
+For S3, Proxy supports S3 signature v4, presigned (query string) v4 URLs, and v2 (v2 can be enabled). See `auth` section in [config.yaml](./config.yaml):
 - `auth.useStorage` - use credentials from a configured storage
 - `auth.custom` - use custom credentials for proxy endpoint
 
