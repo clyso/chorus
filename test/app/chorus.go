@@ -86,6 +86,7 @@ func SetupChorus(t testing.TB, workerConf *worker.Config, proxyConf *proxy.Confi
 		proxyConf.Redis.Address = redisAddr
 		proxyConf.Port, e.ProxyAddr = getRandomPort()
 		e.ProxyPort = proxyConf.Port
+		proxyConf.Address = e.ProxyAddr
 		if err := proxyConf.Validate(); err != nil {
 			t.Error("invalid proxy config", err)
 		}
