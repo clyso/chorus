@@ -19,6 +19,7 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +58,58 @@ func presignTestRequest(t *testing.T, location string, expires int64) *http.Requ
 	return signer.PreSignV4(*req, presignTestAccessKey, presignTestSecretKey, "", location, expires)
 }
 
+// presignWithQueryPayloadHash signs req as a presigned request whose payload
+// hash is carried by the X-Amz-Content-Sha256 query parameter. minio-go's
+// signer only ever takes the hash from the header, so the fixture is built
+// with the helpers the verification itself uses.
+func presignWithQueryPayloadHash(t *testing.T, req *http.Request, hashedPayload string) *http.Request {
+	t.Helper()
+
+	now := time.Now().UTC()
+	scope := strings.Join([]string{now.Format("20060102"), "us-east-1", "s3", "aws4_request"}, "/")
+
+	query := req.URL.Query()
+	query.Set(s3.AmzAlgorithm, "AWS4-HMAC-SHA256")
+	query.Set(s3.AmzCredential, presignTestAccessKey+"/"+scope)
+	query.Set(s3.AmzDate, now.Format("20060102T150405Z"))
+	query.Set(s3.AmzExpires, "3600")
+	query.Set(s3.AmzSignedHeaders, "host")
+	req.URL.RawQuery = query.Encode()
+
+	signedHeaders := http.Header{}
+	signedHeaders.Set("Host", req.Host)
+	canonicalRequest := getCanonicalV4Request(signedHeaders, hashedPayload, req.URL.RawQuery, req.URL.Path, req.Method)
+	signingKey := getV4SigningKey(presignTestSecretKey, now, "us-east-1")
+	signature := getV4Signature(signingKey, getV4StringToSign(canonicalRequest, now, scope))
+
+	query.Set(s3.AmzSignature, signature)
+	req.URL.RawQuery = query.Encode()
+	return req
+}
+
+// signWithoutPayloadHash signs req with the Authorization header while
+// omitting X-Amz-Content-Sha256, hashing the payload as sha256("") - the value
+// the verification assumes for such a request. minio-go's signer instead signs
+// UNSIGNED-PAYLOAD in that case, so the fixture is hand-built.
+func signWithoutPayloadHash(t *testing.T, req *http.Request) *http.Request {
+	t.Helper()
+
+	now := time.Now().UTC()
+	scope := strings.Join([]string{now.Format("20060102"), "us-east-1", "s3", "aws4_request"}, "/")
+	req.Header.Set(s3.AmzDate, now.Format("20060102T150405Z"))
+
+	signedHeaders := http.Header{}
+	signedHeaders.Set("Host", req.Host)
+	signedHeaders.Set(s3.AmzDate, req.Header.Get(s3.AmzDate))
+	canonicalRequest := getCanonicalV4Request(signedHeaders, emptySHA256, req.URL.Query().Encode(), req.URL.Path, req.Method)
+	signingKey := getV4SigningKey(presignTestSecretKey, now, "us-east-1")
+	signature := getV4Signature(signingKey, getV4StringToSign(canonicalRequest, now, scope))
+
+	req.Header.Set(s3.Authorization, "AWS4-HMAC-SHA256 Credential="+presignTestAccessKey+"/"+scope+
+		",SignedHeaders=host;x-amz-date,Signature="+signature)
+	return req
+}
+
 func TestDoesPresignedSignatureV4Match(t *testing.T) {
 	t.Parallel()
 
@@ -65,7 +118,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req := presignTestRequest(t, "us-east-1", 3600)
 		m := presignTestMiddleware()
 
-		got, err := m.doesPresignedSignatureV4Match(req)
+		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
 		require.Equal(t, presignTestUser, got)
 	})
@@ -77,7 +130,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req := presignTestRequest(t, "default", 3600)
 		m := presignTestMiddleware()
 
-		got, err := m.doesPresignedSignatureV4Match(req)
+		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
 		require.Equal(t, presignTestUser, got)
 	})
@@ -89,7 +142,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req = signer.PreSignV4(*req, presignTestAccessKey, presignTestSecretKey, "", "us-east-1", 3600)
 		m := presignTestMiddleware()
 
-		got, err := m.doesPresignedSignatureV4Match(req)
+		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
 		require.Equal(t, presignTestUser, got)
 	})
@@ -101,7 +154,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req = signer.PreSignV4(*req, presignTestAccessKey, "wrong-secret-key", "", "us-east-1", 3600)
 		m := presignTestMiddleware()
 
-		_, err := m.doesPresignedSignatureV4Match(req)
+		_, _, err := m.doesPresignedSignatureV4Match(req)
 		var s3Err mclient.ErrorResponse
 		require.ErrorAs(t, err, &s3Err)
 		require.Equal(t, "SignatureDoesNotMatch", s3Err.Code)
@@ -114,7 +167,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req = signer.PreSignV4(*req, "unknown-access-key", presignTestSecretKey, "", "us-east-1", 3600)
 		m := presignTestMiddleware()
 
-		_, err := m.doesPresignedSignatureV4Match(req)
+		_, _, err := m.doesPresignedSignatureV4Match(req)
 		var s3Err mclient.ErrorResponse
 		require.ErrorAs(t, err, &s3Err)
 		require.Equal(t, "InvalidAccessKeyId", s3Err.Code)
@@ -130,7 +183,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req.URL.RawQuery = query.Encode()
 		m := presignTestMiddleware()
 
-		_, err := m.doesPresignedSignatureV4Match(req)
+		_, _, err := m.doesPresignedSignatureV4Match(req)
 		var s3Err mclient.ErrorResponse
 		require.ErrorAs(t, err, &s3Err)
 		require.Equal(t, "AccessDenied", s3Err.Code)
@@ -145,7 +198,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req.URL.RawQuery = query.Encode()
 		m := presignTestMiddleware()
 
-		_, err := m.doesPresignedSignatureV4Match(req)
+		_, _, err := m.doesPresignedSignatureV4Match(req)
 		var s3Err mclient.ErrorResponse
 		require.ErrorAs(t, err, &s3Err)
 		require.Equal(t, "AccessDenied", s3Err.Code)
@@ -157,7 +210,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 		req := presignTestRequest(t, "us-east-1", 700000) // > 7 days
 		m := presignTestMiddleware()
 
-		_, err := m.doesPresignedSignatureV4Match(req)
+		_, _, err := m.doesPresignedSignatureV4Match(req)
 		var s3Err mclient.ErrorResponse
 		require.ErrorAs(t, err, &s3Err)
 		require.Equal(t, "AuthorizationQueryParametersError", s3Err.Code)
@@ -172,9 +225,10 @@ func TestIsReqAuthenticatedPresigned(t *testing.T) {
 		req := presignTestRequest(t, "us-east-1", 3600)
 		m := presignTestMiddleware()
 
-		got, err := m.isReqAuthenticated(req)
+		got, hashedPayload, err := m.isReqAuthenticated(req)
 		require.NoError(t, err)
 		require.Equal(t, presignTestUser, got)
+		require.Equal(t, unsignedPayload, hashedPayload)
 	})
 
 	t.Run("request without any credentials is still rejected", func(t *testing.T) {
@@ -183,7 +237,7 @@ func TestIsReqAuthenticatedPresigned(t *testing.T) {
 		req.Host = "s3.example.com:9669"
 		m := presignTestMiddleware()
 
-		_, err := m.isReqAuthenticated(req)
+		_, _, err := m.isReqAuthenticated(req)
 		var s3Err mclient.ErrorResponse
 		require.ErrorAs(t, err, &s3Err)
 		require.Equal(t, "CredentialsNotSupported", s3Err.Code)
@@ -215,4 +269,82 @@ func TestWrapStripsPresignParams(t *testing.T) {
 	}
 	// non-auth query params must be preserved for the backend.
 	require.Equal(t, "attachment", query.Get("response-content-disposition"))
+}
+
+func TestWrapSetsVerifiedPayloadHash(t *testing.T) {
+	t.Parallel()
+
+	const payloadHash = "b1a4cf30d3f2b0b1b0dbbfd8bdd44b0d9dd8a6dbb45d69f7ec9ee3d5f6ea1b16"
+
+	tests := []struct {
+		name    string
+		request func(*testing.T) *http.Request
+		want    string
+	}{
+		{
+			name: "presigned without payload checksum",
+			request: func(t *testing.T) *http.Request {
+				return presignTestRequest(t, "us-east-1", 3600)
+			},
+			want: unsignedPayload,
+		},
+		{
+			name: "presigned with payload checksum in query",
+			request: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodPut, "/bucket-test/object.png?"+s3.AmzContentSha256+"="+payloadHash, nil)
+				req.Host = "s3.example.com:9669"
+				return presignWithQueryPayloadHash(t, req, payloadHash)
+			},
+			want: payloadHash,
+		},
+		{
+			name: "presigned with payload checksum in header",
+			request: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodPut, "/bucket-test/object.png", nil)
+				req.Host = "s3.example.com:9669"
+				req.Header.Set(s3.AmzContentSha256, payloadHash)
+				return signer.PreSignV4(*req, presignTestAccessKey, presignTestSecretKey, "", "us-east-1", 3600)
+			},
+			want: payloadHash,
+		},
+		{
+			// the storage must verify the payload against the hash the proxy
+			// verified, not against UNSIGNED-PAYLOAD.
+			name: "header signature without payload hash",
+			request: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/bucket-test/object.png", nil)
+				req.Host = "s3.example.com:9669"
+				return signWithoutPayloadHash(t, req)
+			},
+			want: emptySHA256,
+		},
+		{
+			name: "header signature with payload hash",
+			request: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodPut, "/bucket-test/object.png", nil)
+				req.Host = "s3.example.com:9669"
+				req.Header.Set(s3.AmzContentSha256, payloadHash)
+				return signer.SignV4(*req, presignTestAccessKey, presignTestSecretKey, "", "us-east-1")
+			},
+			want: payloadHash,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := require.New(t)
+
+			var forwarded *http.Request
+			next := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+				forwarded = req
+			})
+			rec := httptest.NewRecorder()
+			presignTestMiddleware().Wrap(next).ServeHTTP(rec, tc.request(t))
+
+			r.NotNil(forwarded, "request should have been forwarded to the next handler")
+			r.Equal(tc.want, forwarded.Header.Get(s3.AmzContentSha256))
+			r.NotContains(forwarded.URL.Query(), s3.AmzContentSha256)
+		})
+	}
 }

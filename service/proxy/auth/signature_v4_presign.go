@@ -47,24 +47,24 @@ func isRequestPresignedSignatureV4(r *http.Request) bool {
 }
 
 // doesPresignedSignatureV4Match verifies the signature of a presigned
-// (query-string authenticated) AWS Signature Version '4' request and
-// returns the authenticated user.
-func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, error) {
+// (query-string authenticated) AWS Signature Version '4' request and returns
+// the authenticated user together with the payload hash it verified against.
+func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, string, error) {
 	query := r.URL.Query()
 
 	psv, err := s3.ParsePreSignV4(query)
 	if err != nil {
-		return "", err
+		return "", unsignedPayload, err
 	}
 
 	credInfo, err := m.getCred(psv.Credential.AccessKey)
 	if err != nil {
-		return "", err
+		return "", unsignedPayload, err
 	}
 	cred := credInfo.cred
 
 	if psv.Expires < presignedMinExpires || psv.Expires > presignedMaxExpires {
-		return "", mclient.ErrorResponse{
+		return "", unsignedPayload, mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "AuthorizationQueryParametersError",
 			Message:    "X-Amz-Expires must be from 1 second to 604800 seconds (7 days).",
@@ -75,7 +75,7 @@ func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, err
 	}
 	now := time.Now().UTC()
 	if psv.Date.After(now.Add(presignedMaxClockSkew)) {
-		return "", mclient.ErrorResponse{
+		return "", unsignedPayload, mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "AccessDenied",
 			Message:    "Request is not valid yet",
@@ -85,7 +85,7 @@ func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, err
 		}
 	}
 	if now.Sub(psv.Date) > psv.Expires {
-		return "", mclient.ErrorResponse{
+		return "", unsignedPayload, mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "AccessDenied",
 			Message:    "Request has expired",
@@ -97,13 +97,17 @@ func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, err
 
 	extractedSignedHeaders, err := s3.ExtractSignedHeaders(psv.SignedHeaders, r)
 	if err != nil {
-		return "", err
+		return "", unsignedPayload, err
 	}
 
-	// The payload of a presigned request is not signed: the recommended
-	// value UNSIGNED-PAYLOAD is used unless the client explicitly signed
-	// a payload checksum through the X-Amz-Content-Sha256 query parameter.
+	// The payload of a presigned request is not signed: the recommended value
+	// UNSIGNED-PAYLOAD is used unless the client signed a payload checksum,
+	// through the X-Amz-Content-Sha256 query parameter or, as MinIO also
+	// accepts, through the header of the same name.
 	hashedPayload := query.Get(s3.AmzContentSha256)
+	if hashedPayload == "" {
+		hashedPayload = r.Header.Get(s3.AmzContentSha256)
+	}
 	if hashedPayload == "" {
 		hashedPayload = unsignedPayload
 	}
@@ -118,7 +122,7 @@ func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, err
 	newSignature := getV4Signature(signingKey, stringToSign)
 
 	if !compareSignatureV4(newSignature, psv.Signature) {
-		return "", mclient.ErrorResponse{
+		return "", unsignedPayload, mclient.ErrorResponse{
 			XMLName:    xml.Name{},
 			Code:       "SignatureDoesNotMatch",
 			Message:    "The request signature that the server calculated does not match the signature that you provided. Check your AWS secret access key and signing method. For more information, see REST Authentication and SOAP Authentication.",
@@ -128,7 +132,7 @@ func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (string, err
 		}
 	}
 
-	return credInfo.user, nil
+	return credInfo.user, hashedPayload, nil
 }
 
 // removePresignParams strips the AWS Signature Version '4' query-string
