@@ -177,13 +177,44 @@ func parseSignedHeader(signedHdrElement string) ([]string, error) {
 	return signedHeaders, nil
 }
 
+// requiresSignature tells whether SigV4 requires a header present in the
+// request to be covered by the signature.
+func requiresSignature(header string) bool {
+	return header == "content-type" || strings.HasPrefix(header, "x-amz-")
+}
+
+// validateSignedHeaders checks that the client signed every header SigV4
+// requires to be part of CanonicalHeaders: host, content-type when the request
+// carries it, and every x-amz-* header.
+//
+// Accepting a request that leaves such a header unsigned allows anyone able to
+// alter the request in flight to add or change it without invalidating the
+// signature - the privilege escalation Ceph RGW closed in v19.2.6/v20.2.4 with
+// the fix for CVE-2026-54330.
+// See https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
+func validateSignedHeaders(signedHeaders []string, reqHeaders http.Header) error {
+	if !slices.Contains(signedHeaders, "host") {
+		return fmt.Errorf("%w: signed headers does not contain host", dom.ErrAuth)
+	}
+	for header := range reqHeaders {
+		lower := strings.ToLower(header)
+		if !requiresSignature(lower) {
+			continue
+		}
+		if !slices.Contains(signedHeaders, lower) {
+			return fmt.Errorf("%w: header %q is present but not signed", dom.ErrAuth, lower)
+		}
+	}
+	return nil
+}
+
 // ExtractSignedHeaders extract signed headers from Authorization header
 func ExtractSignedHeaders(signedHeaders []string, r *http.Request) (http.Header, error) {
 	reqHeaders := r.Header
 	reqQueries := r.Form
 
-	if !slices.Contains(signedHeaders, "host") {
-		return nil, fmt.Errorf("%w: signed headers does not contain host", dom.ErrAuth)
+	if err := validateSignedHeaders(signedHeaders, reqHeaders); err != nil {
+		return nil, err
 	}
 	extractedSignedHeaders := make(http.Header)
 	for _, header := range signedHeaders {
