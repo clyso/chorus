@@ -255,6 +255,15 @@ var ignoreInSignature = map[string]struct{}{
 	"x-real-ip":          {},
 }
 
+// mustBeSigned tells whether a header has to be included in the signature of
+// the forwarded request regardless of what the client signed.
+//
+// See https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
+func mustBeSigned(name string) bool {
+	lower := strings.ToLower(name)
+	return lower == "content-type" || strings.HasPrefix(lower, "x-amz-")
+}
+
 // processHeaders decides which original headers should be copied to forwarded request.
 func processHeaders(origin http.Header) (toSign http.Header, notToSign http.Header) {
 	// get a set of headers from origin signature if it was V4
@@ -281,10 +290,10 @@ func processHeaders(origin http.Header) (toSign http.Header, notToSign http.Head
 			continue
 		}
 
-		if strings.EqualFold(name, s3.AmzContentSha256) {
-			// the proxy re-signs the forwarded request: the payload hash must be
-			// part of the new signature whether the client signed it or not,
-			// otherwise it is re-added unsigned below and the storage rejects
+		if mustBeSigned(name) {
+			// the proxy re-signs the forwarded request: these headers must be
+			// part of the new signature whether the client signed them or not,
+			// otherwise they are re-added unsigned below and the storage rejects
 			// the signature.
 			toSign[name] = vals
 			continue

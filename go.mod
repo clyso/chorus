@@ -4,7 +4,7 @@ go 1.26.6
 
 replace (
 	github.com/hibiken/asynq => github.com/clyso/asynq v0.0.0-20251202163730-20cb0d89aa76
-	github.com/minio/minio-go/v7 => github.com/aiivashchenko/minio-go/v7 v7.0.0-20260819230006-46dd34476ab1
+	github.com/minio/minio-go/v7 => github.com/aiivashchenko/minio-go/v7 v7.0.0-20260910131941-154d9dfa4858
 )
 
 require (
