@@ -58,7 +58,7 @@ func newAWSClient(conf s3.StorageAddress, cred s3.CredentialsV4, storageName, us
 		WithS3ForcePathStyle(true).
 		WithDisableSSL(!conf.IsSecure).
 		WithEndpoint(endpoint).
-		WithRegion("us-east-1").
+		WithRegion(signingRegion(conf)).
 		WithS3UsEast1RegionalEndpoint(endpoints.RegionalS3UsEast1Endpoint)
 
 	ses, err := session.NewSessionWithOptions(session.Options{
@@ -75,6 +75,17 @@ func newAWSClient(conf s3.StorageAddress, cred s3.CredentialsV4, storageName, us
 		storageName: storageName,
 		userName:    userName,
 	}, nil
+}
+
+// signingRegion is the SigV4 region of requests to the storage. Some S3 providers
+// validate the credential scope and reject any region but their own
+// (AuthorizationHeaderMalformed), so the configured default region is used.
+// Empty keeps the previous us-east-1.
+func signingRegion(conf s3.StorageAddress) string {
+	if conf.DefaultRegion != "" {
+		return conf.DefaultRegion
+	}
+	return "us-east-1"
 }
 
 type AWS struct {

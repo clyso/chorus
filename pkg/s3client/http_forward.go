@@ -96,7 +96,7 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 
 	copyReqSpan.End()
 	_, signReqSpan := otel.Tracer("").Start(ctx, fmt.Sprintf("clientDo.%s.SignReq", xctx.GetMethod(req.Context()).String()))
-	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", "us-east-1") // todo: get location if needed ("us-east-1")
+	newReq, err = signV4(*newReq, c.cred.AccessKeyID, c.cred.SecretAccessKey, "", signingRegion(c.conf))
 	signReqSpan.End()
 	if err != nil {
 		return nil, false, err
