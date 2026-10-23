@@ -68,6 +68,9 @@ func NewClient(ctx context.Context, metricsSvc metrics.Service, storageConf s3.S
 	mc, err := mclient.New(host, &mclient.Options{
 		Creds:  credentials.NewStaticV4(c.cred.AccessKeyID, c.cred.SecretAccessKey, ""),
 		Secure: storageConf.IsSecure,
+		// Without a region minio looks it up with GetBucketLocation signed with us-east-1,
+		// which providers validating the credential scope reject. Empty keeps the lookup.
+		Region: storageConf.DefaultRegion,
 	})
 	if err != nil {
 		return nil, err
@@ -105,7 +108,8 @@ func NewClient(ctx context.Context, metricsSvc metrics.Service, storageConf s3.S
 }
 
 func isOnline(ctx context.Context, c *client) error {
-	_, err := c.mc.GetBucketLocation(ctx, "probe-health-test")
+	// HEAD request: with a configured region GetBucketLocation answers without contacting the storage
+	_, err := c.mc.BucketExists(ctx, "probe-health-test")
 	if err == nil {
 		return nil
 	} else if !mclient.IsNetworkOrHostDown(err, false) {
