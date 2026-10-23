@@ -18,7 +18,6 @@ package router
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -73,12 +72,9 @@ func (r *s3Router) adjustObjReadRoute(ctx context.Context, prevStorage string) (
 	}
 	// since switch is in progress, we need to check if the object version is higher in other storage
 
-	// zero-downtime switch allowed only for a single replication:
-	replications := xctx.GetReplications(ctx)
-	if len(replications) != 1 {
-		return "", fmt.Errorf("%w: in-progress zero-downtime switch can have only one replication", dom.ErrInternal)
-	}
-	replID := replications[0]
+	// the switched replication comes from the switch itself: its policy is removed when
+	// the switch starts, so the replication list in ctx is empty during the switch
+	replID := inProgressZeroDowntime.ReplicationID()
 	version, err := r.getVersion(ctx, replID)
 	if err != nil {
 		return "", err
