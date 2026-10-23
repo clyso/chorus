@@ -215,7 +215,7 @@ storage:
       {{- /* Copy all fields except storageURL which is proxy-only */}}
       {{- range $key, $value := $storage }}
       {{- if ne $key "storageURL" }}
-      {{ $key }}: {{ $value | toYaml | nindent 6 | trim }}
+      {{ $key }}:{{ if or (kindIs "map" $value) (kindIs "slice" $value) }}{{ $value | toYaml | nindent 8 }}{{ else }} {{ $value | toYaml | nindent 8 | trim }}{{ end }}
       {{- end }}
       {{- end }}
     {{- end }}
@@ -245,12 +245,12 @@ storage:
       {{- /* For Swift: use storageURL, skip authURL and Keystone fields */}}
       {{- if $isSwift }}
         {{- if not (or (eq $key "authURL") (eq $key "storageEndpointName") (eq $key "storageEndpointType") (eq $key "region")) }}
-      {{ $key }}: {{ $value | toYaml | nindent 6 | trim }}
+      {{ $key }}:{{ if or (kindIs "map" $value) (kindIs "slice" $value) }}{{ $value | toYaml | nindent 8 }}{{ else }} {{ $value | toYaml | nindent 8 | trim }}{{ end }}
         {{- end }}
       {{- else }}
         {{- /* For S3: copy all fields except storageURL */}}
         {{- if ne $key "storageURL" }}
-      {{ $key }}: {{ $value | toYaml | nindent 6 | trim }}
+      {{ $key }}:{{ if or (kindIs "map" $value) (kindIs "slice" $value) }}{{ $value | toYaml | nindent 8 }}{{ else }} {{ $value | toYaml | nindent 8 | trim }}{{ end }}
         {{- end }}
       {{- end }}
       {{- end }}
