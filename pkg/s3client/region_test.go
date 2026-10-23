@@ -17,11 +17,17 @@
 package s3client
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+
+	mclient "github.com/minio/minio-go/v7"
 
 	"github.com/clyso/chorus/pkg/metrics"
 	"github.com/clyso/chorus/pkg/s3"
@@ -51,5 +57,51 @@ func TestAWSClientUsesDefaultRegion(t *testing.T) {
 	}
 	if auth := req.HTTPRequest.Header.Get("Authorization"); !strings.Contains(auth, "/ru-central-1/s3/aws4_request") {
 		t.Errorf("signature scope does not use the default region: %s", auth)
+	}
+}
+
+func TestMinioClientUsesDefaultRegion(t *testing.T) {
+	var mu sync.Mutex
+	var reqs []*http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reqs = append(reqs, r)
+		mu.Unlock()
+		if r.URL.Path == "/probe-health-test" || r.URL.Path == "/probe-health-test/" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("ETag", `"d41d8cd98f00b204e9800998ecf8427e"`)
+		w.Header().Set("Last-Modified", "Mon, 02 Jan 2006 15:04:05 GMT")
+		w.Header().Set("Content-Length", "0")
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(context.Background(), metrics.NewS3Service(false),
+		s3.StorageAddress{Address: strings.TrimPrefix(srv.URL, "http://"), DefaultRegion: "ru-central-1"},
+		s3.CredentialsV4{AccessKeyID: "tenant:key", SecretAccessKey: "secret"}, "storage", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.S3().StatObject(context.Background(), "bucket", "key", mclient.StatObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	probed := false
+	for _, r := range reqs {
+		if _, ok := r.URL.Query()["location"]; ok {
+			t.Errorf("unexpected GetBucketLocation request: %s", r.URL)
+		}
+		if auth := r.Header.Get("Authorization"); !strings.Contains(auth, "/ru-central-1/s3/aws4_request") {
+			t.Errorf("%s %s signed without the default region: %s", r.Method, r.URL.Path, auth)
+		}
+		if strings.HasPrefix(r.URL.Path, "/probe-health-test") {
+			probed = true
+		}
+	}
+	if !probed {
+		t.Error("online check did not reach the storage")
 	}
 }
