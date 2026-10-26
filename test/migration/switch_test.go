@@ -19,6 +19,7 @@ package migration
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"testing"
@@ -26,6 +27,7 @@ import (
 
 	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
 	mclient "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -329,6 +331,169 @@ func TestApi_ZeroDowntimeSwitch(t *testing.T) {
 	r.True(proto.Equal(replID, switchInfo.ReplicationId))
 	r.True(switchInfo.ZeroDowntime)
 	r.NotEmpty(switchInfo.History)
+}
+
+// Regression test for https://github.com/clyso/chorus/issues/267:
+func TestApi_ZeroDowntimeSwitch_ReadDuringSwitch(t *testing.T) {
+	const backlogSize = 200
+	e := app.SetupEmbedded(t, workerConf, proxyConf)
+	tstCtx := t.Context()
+	bucket := "switch-read-bucket"
+	r := require.New(t)
+
+	// minio-go retries 5xx responses with backoff, so a read failing during the switch
+	// could be retried until the switch is done and the failure would be masked.
+	// Use a dedicated proxy client with retries disabled instead of e.ProxyClient.
+	proxyCreds, err := e.ProxyClient.GetCreds()
+	r.NoError(err)
+	noRetryProxyClient, err := mclient.New(e.ProxyClient.EndpointURL().Host, &mclient.Options{
+		Creds:      credentials.NewStaticV4(proxyCreds.AccessKeyID, proxyCreds.SecretAccessKey, ""),
+		Secure:     false,
+		MaxRetries: 1, // single attempt, no retries
+		Region:     "us-east-1",
+	})
+	r.NoError(err)
+
+	// fill main bucket with init data
+	r.NoError(e.MainClient.MakeBucket(tstCtx, bucket, mclient.MakeBucketOptions{}))
+	syncedObj := getTestObj("synced", bucket)
+	_, err = e.MainClient.PutObject(tstCtx, syncedObj.bucket, syncedObj.name, bytes.NewReader(syncedObj.data), int64(len(syncedObj.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream"})
+	r.NoError(err)
+
+	replID := &pb.ReplicationID{
+		User:        user,
+		FromStorage: "main",
+		ToStorage:   "f1",
+		FromBucket:  &bucket,
+		ToBucket:    &bucket,
+	}
+	_, err = e.PolicyClient.AddReplication(tstCtx, &pb.AddReplicationRequest{Id: replID})
+	r.NoError(err)
+	r.Eventually(func() bool {
+		repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return repl.IsInitDone
+	}, e.WaitLong, e.RetryLong)
+	r.Eventually(func() bool {
+		_, err := e.F1Client.StatObject(tstCtx, bucket, syncedObj.name, mclient.StatObjectOptions{})
+		return err == nil
+	}, e.WaitLong, e.RetryLong)
+
+	// Keep the switch IN_PROGRESS: it completes only after the event backlog is drained, so the queue is paused again right after the switch starts.
+	// If the backlog assertion below fails, the worker drained the events in the short window between Resume and Pause.
+	_, err = e.PolicyClient.PauseReplication(tstCtx, replID)
+	r.NoError(err)
+	backlog := make([]testObj, backlogSize)
+	for i := range backlog {
+		backlog[i] = getTestObj(fmt.Sprintf("backlog/%d", i), bucket)
+		_, err = e.ProxyClient.PutObject(tstCtx, bucket, backlog[i].name, bytes.NewReader(backlog[i].data), int64(len(backlog[i].data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+		r.NoError(err)
+	}
+	repl, err := e.PolicyClient.GetReplication(tstCtx, replID)
+	r.NoError(err)
+	r.True(repl.IsPaused)
+	r.GreaterOrEqual(repl.Events-repl.EventsDone, int64(backlogSize))
+
+	_, err = e.PolicyClient.ResumeReplication(tstCtx, replID)
+	r.NoError(err)
+	_, err = e.PolicyClient.SwitchWithZeroDowntime(tstCtx, &pb.SwitchZeroDowntimeRequest{
+		ReplicationId: replID,
+		MultipartTtl:  durationpb.New(time.Minute),
+	})
+	r.NoError(err)
+	_, err = e.PolicyClient.PauseReplication(tstCtx, replID)
+	r.NoError(err)
+
+	switchInfo, err := e.PolicyClient.GetSwitchStatus(tstCtx, replID)
+	r.NoError(err)
+	r.EqualValues(pb.ReplicationSwitch_IN_PROGRESS, switchInfo.LastStatus)
+	repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
+	r.NoError(err)
+	r.True(repl.IsPaused)
+	r.Positive(repl.Events-repl.EventsDone, "event backlog was drained before the queue was paused: switch can complete before reads")
+	t.Log("unprocessed events during switch", repl.Events-repl.EventsDone)
+
+	// object written before the switch with its event still in the paused queue.
+	// Take the last one: the queue is FIFO, so it is the least likely to be processed in the resume window.
+	notReplicatedObj := backlog[backlogSize-1]
+	_, err = e.MainClient.StatObject(tstCtx, bucket, notReplicatedObj.name, mclient.StatObjectOptions{})
+	r.NoError(err, "backlog object must be in the old storage")
+	_, err = e.F1Client.StatObject(tstCtx, bucket, notReplicatedObj.name, mclient.StatObjectOptions{})
+	r.Error(err, "backlog object must not be replicated to the new storage yet")
+
+	// write during the switch: it goes to the new storage
+	newObj := getTestObj("new", bucket)
+	_, err = e.ProxyClient.PutObject(tstCtx, newObj.bucket, newObj.name, bytes.NewReader(newObj.data), int64(len(newObj.data)), mclient.PutObjectOptions{ContentType: "binary/octet-stream", DisableContentSha256: true})
+	r.NoError(err)
+	_, err = e.F1Client.StatObject(tstCtx, bucket, newObj.name, mclient.StatObjectOptions{})
+	r.NoError(err, "object written during the switch must be in the new storage")
+	_, err = e.MainClient.StatObject(tstCtx, bucket, newObj.name, mclient.StatObjectOptions{})
+	r.Error(err, "object written during the switch must not be in the old storage")
+
+	// read through proxy during the switch
+	tests := []struct {
+		name string
+		obj  testObj
+	}{
+		{name: "replicated before switch", obj: syncedObj},
+		{name: "not yet replicated: served from old storage", obj: notReplicatedObj},
+		{name: "written during switch: served from new storage", obj: newObj},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			info, err := noRetryProxyClient.StatObject(tstCtx, bucket, tt.obj.name, mclient.StatObjectOptions{})
+			r.NoError(err)
+			r.EqualValues(len(tt.obj.data), info.Size)
+
+			objData, err := noRetryProxyClient.GetObject(tstCtx, bucket, tt.obj.name, mclient.GetObjectOptions{})
+			r.NoError(err)
+			objBytes, err := io.ReadAll(objData)
+			r.NoError(err)
+			r.True(bytes.Equal(tt.obj.data, objBytes))
+		})
+	}
+	// list works during the switch. Object writes do not increment the bucket version,
+	// so list is routed to the new storage and does not show not yet replicated objects.
+	// This is current behaviour, not a requirement, so it is not asserted.
+	listed, err := listObjects(noRetryProxyClient, bucket, "")
+	r.NoError(err)
+	r.Contains(listed, syncedObj.name)
+	r.Contains(listed, newObj.name)
+
+	// switch is still in progress: all reads above were done during the switch
+	switchInfo, err = e.PolicyClient.GetSwitchStatus(tstCtx, replID)
+	r.NoError(err)
+	r.EqualValues(pb.ReplicationSwitch_IN_PROGRESS, switchInfo.LastStatus)
+
+	// drain backlog and let the switch finish
+	_, err = e.PolicyClient.ResumeReplication(tstCtx, replID)
+	r.NoError(err)
+	r.Eventually(func() bool {
+		switchInfo, err = e.PolicyClient.GetSwitchStatus(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return switchInfo.LastStatus == pb.ReplicationSwitch_DONE
+	}, e.WaitLong*2, e.RetryLong)
+	r.Eventually(func() bool {
+		repl, err = e.PolicyClient.GetReplication(tstCtx, replID)
+		if err != nil {
+			return false
+		}
+		return repl.Events == repl.EventsDone
+	}, e.WaitLong, e.RetryLong)
+
+	// objects read during the switch are in the new storage
+	for _, tt := range tests {
+		objData, err := e.F1Client.GetObject(tstCtx, bucket, tt.obj.name, mclient.GetObjectOptions{})
+		r.NoError(err, tt.obj.name)
+		objBytes, err := io.ReadAll(objData)
+		r.NoError(err, tt.obj.name)
+		r.True(bytes.Equal(tt.obj.data, objBytes), tt.obj.name)
+	}
 }
 
 func TestApi_switch_multipart(t *testing.T) {
