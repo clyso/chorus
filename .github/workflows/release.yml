@@ -80,7 +80,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v4
         with:
-          go-version: "1.26.6"
+          go-version: "1.26.10"
       - name: Install zip
         uses: montudor/action-zip@v1
       - name: Build standalone binaries
