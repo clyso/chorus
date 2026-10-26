@@ -28,12 +28,13 @@ func HttpMiddleware(conf *Config) func(next http.Handler) http.Handler {
 			return next
 		}
 
+		origins := conf.Whitelist
 		if conf.AllowAll {
-			conf.Whitelist = []string{"*"}
+			origins = []string{"*"}
 		}
 
 		return cors.New(cors.Options{
-			AllowedOrigins: conf.Whitelist,
+			AllowedOrigins: origins,
 			AllowedMethods: []string{
 				http.MethodHead,
 				http.MethodGet,

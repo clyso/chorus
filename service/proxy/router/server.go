@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
@@ -37,6 +38,8 @@ type Config struct {
 	TraceMiddleware   func(next http.Handler) http.Handler
 	MetricsMiddleware func(next http.Handler) http.Handler
 	PolicyMiddleware  func(next http.Handler) http.Handler
+	// CorsMiddleware must be set only when CORS is enabled: it also makes the proxy drop backend CORS headers.
+	CorsMiddleware func(next http.Handler) http.Handler
 }
 
 type StorageProxy struct {
@@ -77,28 +80,28 @@ func New(config Config) (http.Handler, error) {
 	}
 	handlers := make(map[dom.StorageType]http.Handler, len(config.Storages))
 	for storType, storProxy := range config.Storages {
-		// 8. main request handler. Forward request to storage backend and emit replication tasks
-		handler := serve(storProxy.Router, storProxy.Replicator)
+		// 9. main request handler. Forward request to storage backend and emit replication tasks
+		handler := serve(storProxy.Router, storProxy.Replicator, config.CorsMiddleware != nil)
 		if config.TraceMiddleware != nil {
-			// 7. tracing
+			// 8. tracing
 			handler = config.TraceMiddleware(handler)
 		}
 		if config.MetricsMiddleware != nil {
-			// 6. metrics collection
+			// 7. metrics collection
 			handler = config.MetricsMiddleware(handler)
 		}
-		// 5. set routing & replication policies to context
+		// 6. set routing & replication policies to context
 		handler = config.PolicyMiddleware(handler)
-		// 4. parse storage-specific request method/user/bucket/object and set to context
+		// 5. parse storage-specific request method/user/bucket/object and set to context
 		handler = storProxy.ReqParseMiddleware(handler)
 		if storProxy.AuthMiddleware != nil {
-			// 3. storage-specific auth check
+			// 4. storage-specific auth check
 			handler = storProxy.AuthMiddleware(handler)
 		}
 		handlers[storType] = handler
 	}
 	var result http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 2. detect storage type from request
+		// 3. detect storage type from request
 		storType := objstore.StorageTypeFromRequest(r)
 		ctx := log.WithStorType(r.Context(), storType)
 		handler, ok := handlers[storType]
@@ -108,6 +111,10 @@ func New(config Config) (http.Handler, error) {
 		}
 		handler.ServeHTTP(w, r.WithContext(ctx))
 	})
+	if config.CorsMiddleware != nil {
+		// 2. CORS: answer preflight requests before auth and set CORS headers for actual requests
+		result = config.CorsMiddleware(result)
+	}
 
 	// 1. init request scoped logger
 	result = config.LogMiddleware(result)
@@ -115,7 +122,7 @@ func New(config Config) (http.Handler, error) {
 
 }
 
-func serve(router Router, replSvc replication.Service) http.Handler {
+func serve(router Router, replSvc replication.Service, proxyCors bool) http.Handler {
 	// Use a custom handler function instead of ServeMux to avoid automatic redirects
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, span := otel.Tracer("").Start(r.Context(), "Route")
@@ -151,6 +158,19 @@ func serve(router Router, replSvc replication.Service) http.Handler {
 		}
 		// Forward response to original client
 		for k, v := range resp.Header {
+			if proxyCors {
+				// keep CORS headers set by proxy CORS middleware
+				if strings.HasPrefix(k, "Access-Control-") {
+					continue
+				}
+				if k == "Vary" {
+					// keep Vary set by proxy CORS middleware
+					for _, val := range v {
+						w.Header().Add(k, val)
+					}
+					continue
+				}
+			}
 			w.Header().Set(k, v[0])
 		}
 		w.WriteHeader(resp.StatusCode)

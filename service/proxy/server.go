@@ -45,6 +45,7 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 	"github.com/clyso/chorus/service/proxy/auth"
+	"github.com/clyso/chorus/service/proxy/cors"
 	"github.com/clyso/chorus/service/proxy/router"
 )
 
@@ -116,6 +117,9 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 	if conf.Trace.Enabled {
 		proxyConfig.TraceMiddleware = trace.HttpMiddleware(tp)
+	}
+	if conf.Cors.Enabled {
+		proxyConfig.CorsMiddleware = cors.HttpMiddleware(conf.Cors)
 	}
 	if s3Conf := conf.Storage.S3Storages(); len(s3Conf) != 0 {
 		metricsSvc := metrics.NewS3Service(conf.Metrics.Enabled)
