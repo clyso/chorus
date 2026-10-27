@@ -120,8 +120,8 @@ Worker:
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `worker_processed_tasks_total` | counter | `queue`, `task_type` | Tasks processed (both successful and failed) |
-| `worker_failed_tasks_total` | counter | `queue`, `task_type` | Tasks whose processing returned an error |
+| `worker_processed_tasks_total` | counter | `queue`, `task_type` | Tasks processed (both successful and failed); tasks postponed by a rate limit or a busy object lock are not counted |
+| `worker_failed_tasks_total` | counter | `queue`, `task_type` | Tasks whose processing returned an error, except tasks postponed by a rate limit or a busy object lock |
 | `worker_in_progress_tasks` | gauge | `queue`, `task_type` | Tasks currently being processed |
 | `worker_task_duration_seconds` | histogram | `queue`, `task_type` | Task processing time (exponential buckets, 0.1s–600s) |
 | `copy_in_progress_obj_bytes` | gauge | `flow`, `user`, `bucket` | Total size of objects currently being copied |

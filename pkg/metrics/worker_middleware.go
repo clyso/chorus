@@ -70,9 +70,12 @@ func WorkerMiddleware() asynq.MiddlewareFunc {
 			timer.ObserveDuration()
 			inProgressGauge.WithLabelValues(queue, t.Type()).Dec()
 			// A rate limit or a busy object lock postpones the task (dom.ErrRateLimitExceeded,
-			// logged at debug level by the worker error handler) — it is not a failure.
+			// logged at debug level by the worker error handler): it is neither processed nor failed yet.
 			var rlErr *dom.ErrRateLimitExceeded
-			if err != nil && !errors.As(err, &rlErr) {
+			if errors.As(err, &rlErr) {
+				return err
+			}
+			if err != nil {
 				failedCounter.WithLabelValues(queue, t.Type()).Inc()
 			}
 			processedCounter.WithLabelValues(queue, t.Type()).Inc()

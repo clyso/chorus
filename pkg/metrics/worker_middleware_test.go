@@ -36,10 +36,11 @@ func TestWorkerMiddleware_FailedTasks(t *testing.T) {
 	r.Error(run(errors.New("copy failed")))
 	r.EqualValues(1, failed())
 
-	// postponed by a rate limit or a busy lock: not a failure
+	r.EqualValues(2, processed())
+
+	// postponed by a rate limit or a busy lock: neither processed nor failed, it will be retried
 	postponed := fmt.Errorf("%w: lock not obtained", &dom.ErrRateLimitExceeded{RetryIn: time.Second})
 	r.ErrorIs(run(postponed), postponed)
 	r.EqualValues(1, failed())
-
-	r.EqualValues(3, processed())
+	r.EqualValues(2, processed())
 }
