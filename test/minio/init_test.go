@@ -35,7 +35,11 @@ import (
 const (
 	minioKey    = "minio"
 	followerKey = "minio-follower"
-	user        = "testuser"
+	// regionKey is a MinIO configured with storageRegion: it rejects requests
+	// signed for any other region.
+	regionKey     = "minio-region"
+	storageRegion = "test-region-1"
+	user          = "testuser"
 )
 
 var (
@@ -43,8 +47,13 @@ var (
 	proxyConf  *proxy.Config
 
 	storageCreds s3.CredentialsV4
+	regionCreds  s3.CredentialsV4
 
-	minioEndpoint string
+	minioEndpoint  string
+	regionEndpoint string
+
+	// storages are the MinIO storages of workerConf and proxyConf.
+	storages map[string]s3.Storage
 
 	// minioClient and followerClient talk to the MinIO containers directly,
 	// bypassing the proxy.
@@ -62,6 +71,7 @@ func setup(m *testing.M) int {
 	testEnv, err := env.NewTestEnvironment(ctx, map[string]env.ComponentCreationConfig{
 		minioKey:    env.AsMinio(env.WithDisabledSTDOutLog(), env.WithDisabledSTDErrLog()),
 		followerKey: env.AsMinio(env.WithDisabledSTDOutLog(), env.WithDisabledSTDErrLog()),
+		regionKey:   env.AsMinio(env.WithRegion(storageRegion), env.WithDisabledSTDOutLog(), env.WithDisabledSTDErrLog()),
 	})
 	if err != nil {
 		panic(fmt.Sprintf("unable to create test environment: %v", err))
@@ -97,7 +107,17 @@ func setup(m *testing.M) int {
 		panic(fmt.Sprintf("unable to create follower minio client: %v", err))
 	}
 
-	storages := map[string]s3.Storage{
+	regionAccess, err := testEnv.GetMinioAccessConfig(regionKey)
+	if err != nil {
+		panic(fmt.Sprintf("unable to get region minio config: %v", err))
+	}
+	regionEndpoint = fmt.Sprintf("%s:%d", regionAccess.Host.Local, regionAccess.S3Port.Forwarded)
+	regionCreds = s3.CredentialsV4{
+		AccessKeyID:     regionAccess.User,
+		SecretAccessKey: regionAccess.Password,
+	}
+
+	storages = map[string]s3.Storage{
 		minioKey: {
 			StorageAddress: s3.StorageAddress{
 				Address:  "http://" + minioEndpoint,
