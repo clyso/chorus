@@ -201,6 +201,20 @@ func WithHostAccessPorts(ports ...int) ComponentOption {
 	return &hostAccessPorts{ports: ports}
 }
 
+type region struct {
+	name string
+}
+
+func (r *region) apply(cfg *ComponentCreationConfig) {
+	cfg.Region = r.name
+}
+
+// WithRegion sets the region of a MinIO container. MinIO then rejects
+// requests signed for any other region.
+func WithRegion(name string) ComponentOption {
+	return &region{name: name}
+}
+
 type ContainerLogConsumer struct {
 	disabledLogs  map[string]struct{}
 	componentName string
@@ -236,6 +250,7 @@ type ContainerPort struct {
 
 type ComponentCreationConfig struct {
 	InstantiateFunc func(context.Context, *TestEnvironment, string, *ComponentCreationConfig) error
+	Region          string
 	Dependencies    []string
 	DisabledLogs    []string
 	HostAccessPorts []int
@@ -1108,14 +1123,18 @@ func startMinioInstance(ctx context.Context, env *TestEnvironment, componentName
 	s3NATPort := s3NATPortString
 	managementNATPortString := fmt.Sprintf(CNATPortTemplate, CMinioManagementPort)
 	managementNATPort := managementNATPortString
+	minioEnv := map[string]string{
+		"MINIO_ROOT_USER":     CMinioUsername,
+		"MINIO_ROOT_PASSWORD": CMinioPassword,
+	}
+	if componentConfig.Region != "" {
+		minioEnv["MINIO_SITE_REGION"] = componentConfig.Region
+	}
 	req := testcontainers.ContainerRequest{
 		Image:      CMinioImage,
 		WaitingFor: wait.ForHTTP("/minio/health/live").WithPort(s3NATPort),
 		Cmd:        []string{"server", "/data", "--address", fmt.Sprintf(":%d", CMinioS3Port), "--console-address", fmt.Sprintf(":%d", CMinioManagementPort)},
-		Env: map[string]string{
-			"MINIO_ROOT_USER":     CMinioUsername,
-			"MINIO_ROOT_PASSWORD": CMinioPassword,
-		},
+		Env:        minioEnv,
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
 		},
