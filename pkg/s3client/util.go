@@ -253,6 +253,10 @@ var ignoreInSignature = map[string]struct{}{
 	"x-forwarded-server": {},
 	"connection":         {},
 	"x-real-ip":          {},
+	// set by the client (GitLab Workhorse sends its correlation ID) and replaced on the way by
+	// some storages (Cloud.ru): signed, it breaks the signature of requests without a SigV4
+	// Authorization header (presigned URLs, SigV2), whose headers are all signed
+	"x-request-id": {},
 }
 
 // mustBeSigned tells whether a header has to be included in the signature of

@@ -81,6 +81,16 @@ func TestProcessHeaders(t *testing.T) {
 			wantDropped: []string{"Authorization", "X-Amz-Date"},
 		},
 		{
+			// a presigned GET from GitLab Workhorse: the storage may replace X-Request-Id on the way
+			name: "request id is never signed",
+			origin: http.Header{
+				"X-Request-Id": {"01M5YWAH7ES3G5MJ81QPPM7WCG"},
+				"User-Agent":   {"GitLab-Workhorse"},
+			},
+			wantToSign:    []string{"User-Agent"},
+			wantNotToSign: []string{"X-Request-Id"},
+		},
+		{
 			name: "everything is signed when the client signature is missing",
 			origin: http.Header{
 				"Content-Type": {"application/octet-stream"},
