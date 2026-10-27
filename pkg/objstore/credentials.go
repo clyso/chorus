@@ -43,7 +43,10 @@ const (
 	redisHashKey       = "chorus:dynamic_creds"
 	redisHFieldVersion = "version"
 	redisHFieldSalt    = "salt"
-	minPasswordLength  = 12
+
+	// Argon2 parallelism is part of the derived key, so it must be the same on all hosts.
+	kdfParallelism    = 4
+	minPasswordLength = 12
 )
 
 type CredsService interface {
@@ -103,11 +106,11 @@ func NewCredsSvc(ctx context.Context, conf *Config, rc redis.UniversalClient) (*
 	}
 	if !conf.DynamicCredentials.DisableEncryption {
 		// derive encryption key
-		salt, err := getOrCreateSalt(ctx, rc)
+		salt, parallelism, err := getOrCreateSalt(ctx, rc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create salt: %w", err)
 		}
-		instance.key = deriveKey(conf.DynamicCredentials.MasterPassword, salt)
+		instance.key = deriveKey(conf.DynamicCredentials.MasterPassword, salt, parallelism)
 	}
 	if conf.DynamicCredentials.DisableEncryption {
 		zerolog.Ctx(ctx).Warn().Msg("dynamic credentials encryption is disabled, credentials will be stored in Redis in plaintext")
@@ -146,13 +149,14 @@ Redis HASH structure:
 - Key: "chorus:dynamic_creds"
 - Fields:
   - "version": int64 - version of the credentials, incremented on each update
-  - "salt": string - base64 encoded salt for encryption key derivation
+  - "salt": string - "<Argon2 parallelism>:<base64 encoded salt>" for encryption key derivation.
+    Deployments created before parallelism was stored have only "<base64 encoded salt>": key is derived with host CPU count.
   - "<storType>:<storage>:<user>": credentials encoded string value
   - value: if encryption is enabled: JSON serialized credentials -> encrypted with AES-GCM -> base64 encoded
   - value: if encryption is disabled: JSON serialized credentials
 
 Credentials encryption:
-- AES-GCM with 256-bit key derived from master password using Argon2id KDF with per-instance salt stored in Redis.
+- AES-GCM with 256-bit key derived from master password using Argon2id KDF with per-instance salt and parallelism stored in Redis.
 
 Local cache:
 - Maps of storage:user to credentials for S3 and Swift, updated on sync if version changes in Redis.
@@ -495,41 +499,68 @@ func (s *credsSvc) SetSwiftCredentials(ctx context.Context, storage string, user
 	return s.storeCred(ctx, dom.Swift, storage, user, cred)
 }
 
-func getOrCreateSalt(ctx context.Context, rc redis.UniversalClient) ([]byte, error) {
+// getOrCreateSalt returns salt and Argon2 parallelism for encryption key derivation.
+func getOrCreateSalt(ctx context.Context, rc redis.UniversalClient) ([]byte, uint8, error) {
 	// generate crypto random 16byte salt:
 	salt := make([]byte, 16)
 	n, err := rand.Read(salt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate salt: %w", err)
+		return nil, 0, fmt.Errorf("failed to generate salt: %w", err)
 	}
 	if n != 16 {
-		return nil, fmt.Errorf("failed to generate salt: insufficient bytes read")
+		return nil, 0, fmt.Errorf("failed to generate salt: insufficient bytes read")
 	}
-	// encode to base64:
-	saltB64 := base64.StdEncoding.EncodeToString(salt)
+	// encode to base64 and prefix with parallelism, so they are stored atomically:
+	saltStr := strconv.Itoa(kdfParallelism) + ":" + base64.StdEncoding.EncodeToString(salt)
 	// try to set in redis if not exists:
-	set, err := rc.HSetNX(ctx, redisHashKey, redisHFieldSalt, saltB64).Result()
+	set, err := rc.HSetNX(ctx, redisHashKey, redisHFieldSalt, saltStr).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to set salt in redis: %w", err)
+		return nil, 0, fmt.Errorf("failed to set salt in redis: %w", err)
 	}
 	if set {
 		// we set the salt, return generated one
-		return salt, nil
+		return salt, kdfParallelism, nil
 	}
 	// salt already exists, get it
-	saltStr, err := rc.HGet(ctx, redisHashKey, redisHFieldSalt).Result()
+	saltStr, err = rc.HGet(ctx, redisHashKey, redisHFieldSalt).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get salt from redis: %w", err)
+		return nil, 0, fmt.Errorf("failed to get salt from redis: %w", err)
+	}
+	// base64 has no ':', so salt without prefix was created before parallelism was stored
+	parallelismStr, saltB64, found := strings.Cut(saltStr, ":")
+	var parallelism uint8
+	if found {
+		p, err := strconv.ParseUint(parallelismStr, 10, 8)
+		if err != nil || p == 0 {
+			return nil, 0, fmt.Errorf("%w: invalid kdf parallelism %q in redis salt", dom.ErrInternal, parallelismStr)
+		}
+		parallelism = uint8(p)
+	} else {
+		saltB64 = saltStr
+		parallelism = legacyKDFParallelism(runtime.NumCPU())
+		zerolog.Ctx(ctx).Warn().Uint8("kdf_parallelism", parallelism).
+			Msg("dynamic credentials encryption key is derived with host CPU count: hosts with different CPU count cannot decrypt each other's credentials")
 	}
 	// decode from base64
-	salt, err = base64.StdEncoding.DecodeString(saltStr)
+	salt, err = base64.StdEncoding.DecodeString(saltB64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode salt from base64: %w", err)
+		return nil, 0, fmt.Errorf("failed to decode salt from base64: %w", err)
 	}
-	return salt, nil
+	return salt, parallelism, nil
 }
 
-func deriveKey(masterPassword string, salt []byte) []byte {
+// legacyKDFParallelism returns Argon2 parallelism used before it was stored in Redis.
+// Key depends on host CPU count, so hosts with different CPU count derive different keys.
+// CPU count is truncated to uint8 to derive the same key as before. Truncation to 0 used to
+// panic in Argon2, so no credentials were encrypted with it and fixed parallelism is used instead.
+func legacyKDFParallelism(numCPU int) uint8 {
+	if p := uint8(numCPU); p != 0 {
+		return p
+	}
+	return kdfParallelism
+}
+
+func deriveKey(masterPassword string, salt []byte, parallelism uint8) []byte {
 	const (
 		// Argon2id parameters
 		memory     = 64 * 1024 // 64 MB
@@ -537,10 +568,7 @@ func deriveKey(masterPassword string, salt []byte) []byte {
 		keyLength  = 32 // 32 bytes = 256 bits
 	)
 	pwd := []byte(masterPassword)
-	cpuNum := runtime.NumCPU()
-	key := argon2.IDKey(pwd, salt, iterations, memory, uint8(cpuNum), keyLength)
-	return key
-
+	return argon2.IDKey(pwd, salt, iterations, memory, parallelism, keyLength)
 }
 
 func credsCacheKey(storage, user string) string {
