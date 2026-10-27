@@ -46,22 +46,22 @@ var _ RoutingSvc = (*policySvc)(nil)
 
 func (r *policySvc) SetBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID, toStorage string) error {
 	//check if there are no active user-level replications for the user
-	userRepls, err := r.userReplicationPolicyStore.Get(ctx, id.User)
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+	userReplExists, err := r.hasUserReplication(ctx, id.User)
+	if err != nil {
 		return fmt.Errorf("unable to get user-level replications for user %s: %w", id.User, err)
 	}
-	if len(userRepls) > 0 {
+	if userReplExists {
 		return fmt.Errorf("%w: cannot set bucket-level routing for user %s and bucket %s because user-level replications exist", dom.ErrInvalidArg, id.User, id.Bucket)
 	}
 	// check if there are no active bucket-level replications
-	bucketRepls, err := r.bucketReplicationPolicyStore.Get(ctx, entity.BucketReplicationPolicyID{
+	bucketReplExists, err := r.hasBucketReplication(ctx, entity.BucketReplicationPolicyID{
 		User:       id.User,
 		FromBucket: id.Bucket,
 	})
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+	if err != nil {
 		return fmt.Errorf("unable to get bucket-level replications for user %s and bucket %s: %w", id.User, id.Bucket, err)
 	}
-	if len(bucketRepls) > 0 {
+	if bucketReplExists {
 		return fmt.Errorf("%w: cannot set bucket-level routing for user %s and bucket %s because active bucket-level replications exist", dom.ErrInvalidArg, id.User, id.Bucket)
 	}
 	// add the routing
@@ -70,11 +70,11 @@ func (r *policySvc) SetBucketRouting(ctx context.Context, id entity.BucketRoutin
 
 func (r *policySvc) SetUserRouting(ctx context.Context, user string, toStorage string) error {
 	//check if there are no active user-level replications
-	userRepls, err := r.userReplicationPolicyStore.Get(ctx, user)
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+	userReplExists, err := r.hasUserReplication(ctx, user)
+	if err != nil {
 		return fmt.Errorf("unable to get user-level replications for user %s: %w", user, err)
 	}
-	if len(userRepls) > 0 {
+	if userReplExists {
 		return fmt.Errorf("%w: cannot set user-level routing for user %s because active user-level replications exist", dom.ErrInvalidArg, user)
 	}
 	// add the routing
@@ -83,14 +83,14 @@ func (r *policySvc) SetUserRouting(ctx context.Context, user string, toStorage s
 
 func (r *policySvc) DeleteBucketRouting(ctx context.Context, id entity.BucketRoutingPolicyID) error {
 	// check if there are no dependent bucket-level replications and it is safe to delete
-	bucketRepl, err := r.bucketReplicationPolicyStore.Get(ctx, entity.BucketReplicationPolicyID{
+	bucketReplExists, err := r.hasBucketReplication(ctx, entity.BucketReplicationPolicyID{
 		User:       id.User,
 		FromBucket: id.Bucket,
 	})
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+	if err != nil {
 		return fmt.Errorf("unable to get bucket-level replications for user %s and bucket %s: %w", id.User, id.Bucket, err)
 	}
-	if len(bucketRepl) > 0 {
+	if bucketReplExists {
 		return fmt.Errorf("%w: cannot delete bucket-level routing for user %s and bucket %s because dependent bucket-level replications exist", dom.ErrInvalidArg, id.User, id.Bucket)
 	}
 	return r.bucketRoutingStore.DeleteRouteOp(ctx, id).Get()
@@ -98,11 +98,11 @@ func (r *policySvc) DeleteBucketRouting(ctx context.Context, id entity.BucketRou
 
 func (r *policySvc) DeleteUserRouting(ctx context.Context, user string) error {
 	// check if there are no active user-level replications and it is safe to delete
-	userRepls, err := r.userReplicationPolicyStore.Get(ctx, user)
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+	userReplExists, err := r.hasUserReplication(ctx, user)
+	if err != nil {
 		return fmt.Errorf("unable to get user-level replications for user %s: %w", user, err)
 	}
-	if len(userRepls) > 0 {
+	if userReplExists {
 		return fmt.Errorf("%w: cannot delete user-level routing for user %s because dependent user-level replications exist", dom.ErrInvalidArg, user)
 	}
 	return r.userRoutingStore.DeleteRouteOp(ctx, user).Get()

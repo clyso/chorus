@@ -28,11 +28,13 @@ import (
 func Test_policySvc_SetBucketRouting(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	type before struct {
-		mainStorage string
-		userRepl    *entity.UserReplicationPolicy
-		bucketRepl  *entity.BucketReplicationPolicy
-		id          *entity.BucketRoutingPolicyID
-		toStorage   string
+		mainStorage                     string
+		userRepl                        *entity.UserReplicationPolicy
+		bucketRepl                      *entity.BucketReplicationPolicy
+		userReplHasZeroDowntimeSwitch   bool
+		bucketReplHasZeroDowntimeSwitch bool
+		id                              *entity.BucketRoutingPolicyID
+		toStorage                       string
 	}
 	tests := []struct {
 		name      string
@@ -81,6 +83,38 @@ func Test_policySvc_SetBucketRouting(t *testing.T) {
 			wantErr:   dom.ErrInvalidArg,
 		},
 		{
+			name: "fail when user-level replication is in zero-downtime switch",
+			before: before{
+				mainStorage: "main",
+				userRepl: &entity.UserReplicationPolicy{
+					User:        "user1",
+					FromStorage: "main",
+					ToStorage:   "storageB",
+				},
+				userReplHasZeroDowntimeSwitch: true,
+			},
+			id:        entity.BucketRoutingPolicyID{User: "user1", Bucket: "bucket1"},
+			toStorage: "storageA",
+			wantErr:   dom.ErrInvalidArg,
+		},
+		{
+			name: "fail when bucket-level replication is in zero-downtime switch",
+			before: before{
+				mainStorage: "main",
+				bucketRepl: &entity.BucketReplicationPolicy{
+					User:        "user1",
+					FromStorage: "main",
+					FromBucket:  "bucket1",
+					ToStorage:   "storageC",
+					ToBucket:    "bucket1",
+				},
+				bucketReplHasZeroDowntimeSwitch: true,
+			},
+			id:        entity.BucketRoutingPolicyID{User: "user1", Bucket: "bucket1"},
+			toStorage: "storageA",
+			wantErr:   dom.ErrInvalidArg,
+		},
+		{
 			name: "update routing",
 			before: before{
 				mainStorage: "main",
@@ -116,6 +150,12 @@ func Test_policySvc_SetBucketRouting(t *testing.T) {
 				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
+			if tt.before.userReplHasZeroDowntimeSwitch {
+				startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromUserReplication(*tt.before.userRepl))
+			}
+			if tt.before.bucketReplHasZeroDowntimeSwitch {
+				startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromBucketReplication(*tt.before.bucketRepl))
+			}
 			if tt.before.id != nil {
 				err := svc.SetBucketRouting(ctx, *tt.before.id, tt.before.toStorage)
 				r.NoError(err)
@@ -141,11 +181,12 @@ func Test_policySvc_SetBucketRouting(t *testing.T) {
 func Test_policySvc_DeleteBucketRouting(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	type before struct {
-		mainStorage         string
-		userRepl            *entity.UserReplicationPolicy
-		bucketRepl          *entity.BucketReplicationPolicy
-		bucketRoute         *entity.BucketRoutingPolicyID
-		buckeRouteToStorage string
+		mainStorage                     string
+		userRepl                        *entity.UserReplicationPolicy
+		bucketRepl                      *entity.BucketReplicationPolicy
+		bucketReplHasZeroDowntimeSwitch bool
+		bucketRoute                     *entity.BucketRoutingPolicyID
+		buckeRouteToStorage             string
 	}
 	tests := []struct {
 		name    string
@@ -182,6 +223,22 @@ func Test_policySvc_DeleteBucketRouting(t *testing.T) {
 			wantErr: dom.ErrInvalidArg,
 		},
 		{
+			name: "fail when bucket-level replication is in zero-downtime switch",
+			before: before{
+				mainStorage: "main",
+				bucketRepl: &entity.BucketReplicationPolicy{
+					User:        "user1",
+					FromStorage: "main",
+					FromBucket:  "bucket1",
+					ToStorage:   "storageC",
+					ToBucket:    "bucket1",
+				},
+				bucketReplHasZeroDowntimeSwitch: true,
+			},
+			id:      entity.BucketRoutingPolicyID{User: "user1", Bucket: "bucket1"},
+			wantErr: dom.ErrInvalidArg,
+		},
+		{
 			name: "delete idempotent",
 			before: before{
 				mainStorage: "main",
@@ -211,6 +268,9 @@ func Test_policySvc_DeleteBucketRouting(t *testing.T) {
 				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
+			if tt.before.bucketReplHasZeroDowntimeSwitch {
+				startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromBucketReplication(*tt.before.bucketRepl))
+			}
 			if tt.before.bucketRoute != nil {
 				err := svc.SetBucketRouting(ctx, *tt.before.bucketRoute, tt.before.buckeRouteToStorage)
 				r.NoError(err)
@@ -234,11 +294,12 @@ func Test_policySvc_DeleteBucketRouting(t *testing.T) {
 func Test_policySvc_SetUserRouting(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	type before struct {
-		mainStorage string
-		userRepl    *entity.UserReplicationPolicy
-		bucketRepl  *entity.BucketReplicationPolicy
-		userRoute   *string
-		toStorage   string
+		mainStorage                   string
+		userRepl                      *entity.UserReplicationPolicy
+		bucketRepl                    *entity.BucketReplicationPolicy
+		userReplHasZeroDowntimeSwitch bool
+		userRoute                     *string
+		toStorage                     string
 	}
 	tests := []struct {
 		name      string
@@ -287,6 +348,21 @@ func Test_policySvc_SetUserRouting(t *testing.T) {
 			wantErr:   nil,
 		},
 		{
+			name: "fail when user-level replication is in zero-downtime switch",
+			before: before{
+				mainStorage: "main",
+				userRepl: &entity.UserReplicationPolicy{
+					User:        "user1",
+					FromStorage: "main",
+					ToStorage:   "storageB",
+				},
+				userReplHasZeroDowntimeSwitch: true,
+			},
+			user:      "user1",
+			toStorage: "storageA",
+			wantErr:   dom.ErrInvalidArg,
+		},
+		{
 			name: "update routing",
 			before: before{
 				mainStorage: "main",
@@ -319,6 +395,9 @@ func Test_policySvc_SetUserRouting(t *testing.T) {
 				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
+			if tt.before.userReplHasZeroDowntimeSwitch {
+				startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromUserReplication(*tt.before.userRepl))
+			}
 			if tt.before.userRoute != nil {
 				err := svc.SetUserRouting(ctx, *tt.before.userRoute, tt.before.toStorage)
 				r.NoError(err)
@@ -345,11 +424,12 @@ func Test_policySvc_SetUserRouting(t *testing.T) {
 func Test_policySvc_DeleteUserRouting(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	type before struct {
-		mainStorage string
-		userRepl    *entity.UserReplicationPolicy
-		bucketRepl  *entity.BucketReplicationPolicy
-		userRoute   *string
-		routeTo     string
+		mainStorage                   string
+		userRepl                      *entity.UserReplicationPolicy
+		bucketRepl                    *entity.BucketReplicationPolicy
+		userReplHasZeroDowntimeSwitch bool
+		userRoute                     *string
+		routeTo                       string
 	}
 	tests := []struct {
 		name    string
@@ -398,6 +478,20 @@ func Test_policySvc_DeleteUserRouting(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name: "fail when user-level replication is in zero-downtime switch",
+			before: before{
+				mainStorage: "main",
+				userRepl: &entity.UserReplicationPolicy{
+					User:        "user1",
+					FromStorage: "main",
+					ToStorage:   "storageB",
+				},
+				userReplHasZeroDowntimeSwitch: true,
+			},
+			user:    "user1",
+			wantErr: dom.ErrInvalidArg,
+		},
+		{
 			name: "delete idempotent",
 			before: before{
 				mainStorage: "main",
@@ -426,6 +520,9 @@ func Test_policySvc_DeleteUserRouting(t *testing.T) {
 			if tt.before.bucketRepl != nil {
 				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
+			}
+			if tt.before.userReplHasZeroDowntimeSwitch {
+				startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromUserReplication(*tt.before.userRepl))
 			}
 			if tt.before.userRoute != nil {
 				err := svc.SetUserRouting(ctx, *tt.before.userRoute, tt.before.routeTo)

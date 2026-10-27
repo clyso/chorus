@@ -337,6 +337,10 @@ func (r *BucketReplicationSwitchStore) IsZeroDowntimeActiveOp(ctx context.Contex
 	return r.activeZeroDTIndex.IsMemberOp(ctx, id.User, id.FromBucket)
 }
 
+func (r *BucketReplicationSwitchStore) IsZeroDowntimeActiveForUserOp(ctx context.Context, user string) OperationResult[bool] {
+	return r.activeZeroDTIndex.NotEmptyOp(ctx, user)
+}
+
 func (r *BucketReplicationSwitchStore) DeleteOp(ctx context.Context, id entity.BucketReplicationPolicyID) OperationStatus {
 	res := map[string]OperationStatus{}
 	res["delete zero downtime index"] = r.activeZeroDTIndex.RemoveOp(ctx, id.User, id.FromBucket).Status()

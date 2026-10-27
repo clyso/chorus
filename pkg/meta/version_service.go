@@ -44,17 +44,16 @@ func (d Destination) Validate() error {
 	return nil
 }
 
-func (d Destination) IsFrom(replID entity.UniversalReplicationID) bool {
+func (d Destination) IsFrom(replID entity.UniversalReplicationID) (bool, error) {
 	fromBucket, toBucket := replID.FromToBuckets(d.Bucket)
 
 	if d.Storage == replID.FromStorage() && fromBucket == d.Bucket {
-		return true
+		return true, nil
 	}
 	if d.Storage == replID.ToStorage() && toBucket == d.Bucket {
-		return false
+		return false, nil
 	}
-	// should not happen: destinations must match replication ID
-	panic(fmt.Sprintf("destination storage/bucket %s/%s does not match replication ID %s", d.Storage, d.Bucket, replID.AsString()))
+	return false, fmt.Errorf("%w: destination storage/bucket %s/%s does not match replication ID %s", dom.ErrInternal, d.Storage, d.Bucket, replID.AsString())
 }
 
 type Version struct {
@@ -318,7 +317,11 @@ func (s *versionSvc) incrementDest(ctx context.Context, replID entity.UniversalR
 	if err := dest.Validate(); err != nil {
 		return 0, err
 	}
-	if dest.IsFrom(replID) {
+	isFrom, err := dest.IsFrom(replID)
+	if err != nil {
+		return 0, err
+	}
+	if isFrom {
 		return s.incVersion(ctx, keys.hashKey, keys.fromField, keys.toField)
 	}
 	// swap fields for 'to' destination
@@ -368,7 +371,11 @@ func (s *versionSvc) setDestIfGreater(ctx context.Context, replID entity.Univers
 	if err := dest.Validate(); err != nil {
 		return err
 	}
-	if dest.IsFrom(replID) {
+	isFrom, err := dest.IsFrom(replID)
+	if err != nil {
+		return err
+	}
+	if isFrom {
 		return s.setIfGreater(ctx, keys.hashKey, keys.fromField, keys.toField, version)
 	}
 	// swap fields for 'to' destination

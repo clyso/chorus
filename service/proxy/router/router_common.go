@@ -85,7 +85,11 @@ func (r *s3Router) adjustObjReadRoute(ctx context.Context, prevStorage string) (
 	}
 	currentDest := meta.Destination{Storage: prevStorage, Bucket: xctx.GetBucket(ctx)}
 	currVer, otherVer := version.From, version.To
-	if !currentDest.IsFrom(replID) {
+	isFrom, err := currentDest.IsFrom(replID)
+	if err != nil {
+		return "", err
+	}
+	if !isFrom {
 		//swap
 		currVer, otherVer = version.To, version.From
 	}

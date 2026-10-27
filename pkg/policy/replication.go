@@ -202,12 +202,22 @@ func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.
 		return fmt.Errorf("%w: unable to create user %s replication from %s because it is different from routing %s", dom.ErrInvalidArg, policy.User, policy.FromStorage, routeTo)
 	}
 	// check if there are existing bucket replications for this user
-	bucketPolicyExists, err := r.bucketReplicationPolicyStore.ExistsForUser(ctx, policy.User)
+	bucketPolicyExists, err := r.hasBucketReplicationForUser(ctx, policy.User)
 	if err != nil {
 		return fmt.Errorf("unable to check existing bucket replications: %w", err)
 	}
 	if bucketPolicyExists {
 		return fmt.Errorf("%w: unable to create user replication when there are existing bucket replications", dom.ErrInvalidArg)
+	}
+	// bucket routing overrides user routing: writes to bucket routed elsewhere would bypass replication
+	bucketRoutings, err := r.bucketRoutingStore.ListRoutesOp(ctx, policy.User).Get()
+	if err != nil {
+		return fmt.Errorf("unable to get bucket routings for user replication: %w", err)
+	}
+	for bucket, routeTo := range bucketRoutings {
+		if routeTo != policy.FromStorage {
+			return fmt.Errorf("%w: unable to create user %s replication from %s because bucket %s is routed to %s", dom.ErrInvalidArg, policy.User, policy.FromStorage, bucket, routeTo)
+		}
 	}
 
 	// check if replication switch already exists for this user
@@ -307,11 +317,11 @@ func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entit
 		return fmt.Errorf("%w: unable to create bucket %s replication from %s because it is different from routing %s", dom.ErrInvalidArg, policy.User, policy.FromStorage, routeTo)
 	}
 	// check if there are existing user replications for this user
-	userReplications, err := r.userReplicationPolicyStore.Get(ctx, policy.User)
-	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+	userReplicationExists, err := r.hasUserReplication(ctx, policy.User)
+	if err != nil {
 		return fmt.Errorf("unable to check existing user replications: %w", err)
 	}
-	if len(userReplications) != 0 {
+	if userReplicationExists {
 		return fmt.Errorf("%w: unable to create bucket replication when there are existing user replications", dom.ErrInvalidArg)
 	}
 
@@ -474,6 +484,38 @@ func (r *policySvc) ListUserReplicationsInfo(ctx context.Context) (map[entity.Us
 
 func (r *policySvc) IsUserReplicationExists(ctx context.Context, user string) (bool, error) {
 	return r.userReplicationStatusStore.Exists(ctx, user)
+}
+
+// Zero-downtime switch removes replication policy when it starts,
+// but the replication is active until the switch is done.
+func (r *policySvc) hasUserReplication(ctx context.Context, user string) (bool, error) {
+	policies, err := r.userReplicationPolicyStore.Get(ctx, user)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return false, err
+	}
+	if len(policies) != 0 {
+		return true, nil
+	}
+	return r.userReplicationSwitchStore.IsZeroDowntimeActiveOp(ctx, user).Get()
+}
+
+func (r *policySvc) hasBucketReplication(ctx context.Context, id entity.BucketReplicationPolicyID) (bool, error) {
+	policies, err := r.bucketReplicationPolicyStore.Get(ctx, id)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return false, err
+	}
+	if len(policies) != 0 {
+		return true, nil
+	}
+	return r.bucketReplicationSwitchStore.IsZeroDowntimeActiveOp(ctx, id).Get()
+}
+
+func (r *policySvc) hasBucketReplicationForUser(ctx context.Context, user string) (bool, error) {
+	exists, err := r.bucketReplicationPolicyStore.ExistsForUser(ctx, user)
+	if err != nil || exists {
+		return exists, err
+	}
+	return r.bucketReplicationSwitchStore.IsZeroDowntimeActiveForUserOp(ctx, user).Get()
 }
 
 func (r *policySvc) archieveReplicationStatusInTx(ctx context.Context, tx store.Executor[redis.Pipeliner], policy entity.UniversalReplicationID) {

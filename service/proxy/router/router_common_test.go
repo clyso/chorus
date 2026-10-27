@@ -55,4 +55,10 @@ func TestAdjustObjReadRouteDuringZeroDowntimeSwitch(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+
+	t.Run("routed storage is not part of switched replication", func(t *testing.T) {
+		r := &s3Router{versionSvc: objVersionStub{ver: meta.Version{From: 2, To: 1}}}
+		_, err := r.adjustObjReadRoute(ctx, "other")
+		require.ErrorIs(t, err, dom.ErrInternal)
+	})
 }
