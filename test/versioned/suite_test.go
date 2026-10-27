@@ -193,6 +193,7 @@ var _ = Describe("Minio versioned migration", func() {
 		filler := gen.NewS3Filler(testTree, minioSrcUserClient)
 		err = filler.FillBucket(ctx, CMinioSrcBucket)
 		Expect(err).NotTo(HaveOccurred())
+		fillHistories(ctx, minioSrcUserClient, CMinioSrcBucket)
 
 		redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
 		Expect(err).NotTo(HaveOccurred())
@@ -339,6 +340,7 @@ var _ = Describe("Minio versioned migration", func() {
 			}
 			return resp.Replications[0].IsInitDone
 		}, 60*time.Second, time.Second).Should(BeTrue())
+		expectSameHistories(ctx, testMinioSrcUserClient, CMinioSrcBucket, testMinioDestUserClient, CMinioDestBucket)
 
 		for treeObject := range testTree.DepthFirstValueIterator().Must() {
 			if treeObject.GetVersionCount() == 0 || treeObject.GetVersionCount() == 1 && treeObject.GetContentReader().Len() == 0 {
@@ -764,6 +766,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 		filler := gen.NewS3Filler(testTree, minioSrcUserClient)
 		err = filler.FillBucket(ctx, CCephSrcBucket)
 		Expect(err).NotTo(HaveOccurred())
+		fillHistories(ctx, minioSrcUserClient, CCephSrcBucket)
 
 		redisAccessConfig, err := localTestEnv.GetRedisAccessConfig(CRedisInstance)
 		Expect(err).NotTo(HaveOccurred())
@@ -920,6 +923,7 @@ var _ = Describe("Ceph system user versioned migration", func() {
 			}
 			return resp.Replications[0].IsInitDone
 		}, 60*time.Second, time.Second).Should(BeTrue())
+		expectSameHistories(ctx, testMinioSrcUserClient, CCephSrcBucket, testMinioDestUserClient, CCephDestBucket)
 
 		for treeObject := range testTree.DepthFirstValueIterator().Must() {
 			if treeObject.GetVersionCount() == 0 || treeObject.GetVersionCount() == 1 && treeObject.GetContentReader().Len() == 0 {

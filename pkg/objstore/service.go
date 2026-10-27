@@ -47,11 +47,12 @@ type NameAndVersion struct {
 }
 
 type CommonObjectInfo struct {
-	LastModified time.Time
-	Key          string
-	VersionID    string
-	Etag         string
-	Size         uint64
+	LastModified   time.Time
+	Key            string
+	VersionID      string
+	Etag           string
+	Size           uint64
+	IsDeleteMarker bool
 }
 
 type commonListOptions struct {
@@ -100,6 +101,21 @@ func WithAfter(after string) func(o *commonListOptions) {
 func WithLimit(limit uint32) func(o *commonListOptions) {
 	return func(o *commonListOptions) {
 		o.limit = limit
+	}
+}
+
+// ObjectVersions lists versions of the object with exactly the given name,
+// skipping objects whose names only start with it.
+func ObjectVersions(ctx context.Context, client Common, bucket string, name string) iter.Seq2[CommonObjectInfo, error] {
+	return func(yield func(CommonObjectInfo, error) bool) {
+		for object, err := range client.ListObjects(ctx, bucket, WithPrefix(name), WithVersions()) {
+			if err == nil && object.Key != name {
+				continue
+			}
+			if !yield(object, err) {
+				return
+			}
+		}
 	}
 }
 
