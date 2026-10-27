@@ -113,7 +113,12 @@ func isOnline(ctx context.Context, c *client) error {
 	if err == nil || mclient.IsNetworkOrHostDown(err, false) {
 		return err
 	}
-	switch mclient.ToErrorResponse(err).Code {
+	errResp := mclient.ToErrorResponse(err)
+	if errResp.StatusCode == http.StatusBadGateway {
+		// gateway in front of the storage cannot reach it
+		return err
+	}
+	switch errResp.Code {
 	case "", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AuthorizationHeaderMalformed":
 		// not an S3 error response, or the storage rejected the credentials
 		return err
