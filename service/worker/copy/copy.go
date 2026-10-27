@@ -357,6 +357,9 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	defer fromObject.Close()
 	stat, err := fromObject.Stat()
 	if err != nil {
+		if sourceDeleted(ctx, fromClient, from) {
+			return dom.ErrNotFound
+		}
 		return fmt.Errorf("unable to stat from object: %w", err)
 	}
 	if stat.Size == 0 {
@@ -369,6 +372,9 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, stat.Size, putObjectOpts)
 	if err != nil {
+		if sourceDeleted(ctx, fromClient, from) {
+			return dom.ErrNotFound
+		}
 		return fmt.Errorf("unable to upload object: %w", err)
 	}
 	if info.VersionID != "" {
@@ -382,6 +388,17 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 
 	return nil
+}
+
+// sourceDeleted reports whether the source object no longer exists. Short-lived objects
+// (e.g. registry uploads) can be deleted after the stat in CopyObject while their
+// content is read: the copy then fails with NoSuchKey and must be skipped, not retried.
+func sourceDeleted(ctx context.Context, client s3client.Client, from File) bool {
+	_, err := client.S3().StatObject(ctx, from.Bucket, from.Name, minio.GetObjectOptions{
+		VersionID: from.Version,
+	})
+	var errorResp minio.ErrorResponse
+	return errors.As(err, &errorResp) && (errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound)
 }
 
 func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to File) error {
