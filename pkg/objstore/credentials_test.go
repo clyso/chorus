@@ -1,11 +1,15 @@
 package objstore
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/argon2"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
@@ -777,4 +781,127 @@ func Test_credsSvc_ValidateReplicationID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_getOrCreateSalt(t *testing.T) {
+	c := testutil.SetupRedis(t)
+
+	t.Run("new deployment stores fixed parallelism", func(t *testing.T) {
+		r := require.New(t)
+		ctx := t.Context()
+		r.NoError(c.FlushAll(ctx).Err())
+
+		salt, parallelism, err := getOrCreateSalt(ctx, c)
+		r.NoError(err)
+		r.Len(salt, 16)
+		r.EqualValues(kdfParallelism, parallelism)
+		stored, err := c.HGet(ctx, redisHashKey, redisHFieldSalt).Result()
+		r.NoError(err)
+		r.Equal(strconv.Itoa(kdfParallelism)+":"+base64.StdEncoding.EncodeToString(salt), stored)
+
+		// subsequent calls return stored values
+		salt2, parallelism2, err := getOrCreateSalt(ctx, c)
+		r.NoError(err)
+		r.Equal(salt, salt2)
+		r.Equal(parallelism, parallelism2)
+	})
+
+	t.Run("legacy deployment without stored parallelism", func(t *testing.T) {
+		r := require.New(t)
+		ctx := t.Context()
+		r.NoError(c.FlushAll(ctx).Err())
+		legacySalt := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))
+		r.NoError(c.HSet(ctx, redisHashKey, redisHFieldSalt, legacySalt).Err())
+
+		salt, parallelism, err := getOrCreateSalt(ctx, c)
+		r.NoError(err)
+		r.Equal([]byte("0123456789abcdef"), salt)
+		r.Equal(legacyKDFParallelism(runtime.NumCPU()), parallelism)
+		// stored salt must not be changed for existing deployment
+		stored, err := c.HGet(ctx, redisHashKey, redisHFieldSalt).Result()
+		r.NoError(err)
+		r.Equal(legacySalt, stored)
+	})
+
+	for _, invalid := range []string{"0", "256", "-1", "abc", ""} {
+		t.Run("invalid stored parallelism "+invalid, func(t *testing.T) {
+			r := require.New(t)
+			ctx := t.Context()
+			r.NoError(c.FlushAll(ctx).Err())
+			r.NoError(c.HSet(ctx, redisHashKey, redisHFieldSalt,
+				invalid+":"+base64.StdEncoding.EncodeToString([]byte("0123456789abcdef"))).Err())
+
+			_, _, err := getOrCreateSalt(ctx, c)
+			r.Error(err)
+		})
+	}
+}
+
+func Test_deriveKey(t *testing.T) {
+	r := require.New(t)
+	salt := []byte("0123456789abcdef")
+	key := deriveKey("master-password", salt, kdfParallelism)
+	r.Len(key, 32)
+	r.Equal(key, deriveKey("master-password", salt, kdfParallelism))
+	r.NotEqual(key, deriveKey("other-password", salt, kdfParallelism))
+	// parallelism is part of the derived key
+	r.NotEqual(key, deriveKey("master-password", salt, kdfParallelism+1))
+}
+
+func Test_legacyKDFParallelism(t *testing.T) {
+	tests := []struct {
+		numCPU int
+		want   uint8
+	}{
+		{numCPU: 1, want: 1},
+		{numCPU: 8, want: 8},
+		{numCPU: 255, want: 255},
+		// truncation to 0 used to panic: fixed parallelism is used
+		{numCPU: 256, want: kdfParallelism},
+		{numCPU: 512, want: kdfParallelism},
+		// must be truncated, not capped, to derive the same key as before
+		{numCPU: 300, want: 44},
+	}
+	for _, tt := range tests {
+		t.Run(strconv.Itoa(tt.numCPU), func(t *testing.T) {
+			r := require.New(t)
+			r.Equal(tt.want, legacyKDFParallelism(tt.numCPU))
+		})
+	}
+}
+
+func Test_credsSvc_LegacyKey(t *testing.T) {
+	r := require.New(t)
+	ctx := t.Context()
+	c := testutil.SetupRedis(t)
+	const pwd = "superseretlongpassword"
+	creds := s3.CredentialsV4{AccessKeyID: "legacy_access_key", SecretAccessKey: "legacy_secret_key"}
+	conf := &Config{
+		Main: "s3storage",
+		Storages: map[string]Storage{
+			"s3storage": {CommonConfig: CommonConfig{Type: dom.S3}, S3: &validS3},
+		},
+		DynamicCredentials: DynamicCredentialsConfig{
+			Enabled:        true,
+			MasterPassword: pwd,
+			PollInterval:   time.Second,
+		},
+	}
+
+	// emulate deployment created before parallelism was stored:
+	// salt only, credentials encrypted with key derived by the old code.
+	salt := []byte("0123456789abcdef")
+	r.NoError(c.HSet(ctx, redisHashKey, redisHFieldSalt, base64.StdEncoding.EncodeToString(salt)).Err())
+	oldKey := argon2.IDKey([]byte(pwd), salt, 3, 64*1024, uint8(runtime.NumCPU()), 32)
+	legacySvc := &credsSvc{config: conf, key: oldKey}
+	value, err := legacySvc.encrypt(creds)
+	r.NoError(err)
+	r.NoError(c.HSet(ctx, redisHashKey, credsToRedisField(dom.S3, "s3storage", "legacy_user"), value).Err())
+	r.NoError(c.HIncrBy(ctx, redisHashKey, redisHFieldVersion, 1).Err())
+
+	svc, err := NewCredsSvc(ctx, conf, c)
+	r.NoError(err)
+	got, err := svc.GetS3Credentials("s3storage", "legacy_user")
+	r.NoError(err)
+	r.Equal(creds, got)
 }
