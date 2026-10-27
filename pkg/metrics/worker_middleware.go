@@ -18,10 +18,13 @@ package metrics
 
 import (
 	"context"
+	"errors"
 
 	"github.com/hibiken/asynq"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/clyso/chorus/pkg/dom"
 )
 
 var (
@@ -66,7 +69,10 @@ func WorkerMiddleware() asynq.MiddlewareFunc {
 			err := next.ProcessTask(ctx, t)
 			timer.ObserveDuration()
 			inProgressGauge.WithLabelValues(queue, t.Type()).Dec()
-			if err != nil {
+			// A rate limit or a busy object lock postpones the task (dom.ErrRateLimitExceeded,
+			// logged at debug level by the worker error handler) — it is not a failure.
+			var rlErr *dom.ErrRateLimitExceeded
+			if err != nil && !errors.As(err, &rlErr) {
 				failedCounter.WithLabelValues(queue, t.Type()).Inc()
 			}
 			processedCounter.WithLabelValues(queue, t.Type()).Inc()
