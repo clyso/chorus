@@ -1474,6 +1474,13 @@ func Test_policySvc_UpdateDowntimeSwitchStatus(t *testing.T) {
 
 }
 
+func startZeroDowntimeSwitch(t *testing.T, svc *policySvc, queuesMock *tasks.QueueServiceMock, replID entity.UniversalReplicationID) {
+	t.Helper()
+	queuesMock.InitReplicationDone(replID)
+	err := svc.AddZeroDowntimeReplicationSwitch(t.Context(), replID, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute})
+	require.NoError(t, err)
+}
+
 func setupDowntimeSwitchState(t *testing.T, svc *policySvc, queuesMock *tasks.QueueServiceMock, replID entity.UniversalReplicationID, opts *entity.ReplicationSwitchDowntimeOpts, status entity.ReplicationSwitchStatus) {
 	t.Helper()
 	ctx := context.TODO()

@@ -15,12 +15,15 @@ import (
 func Test_AddUserReplicationPolicy(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	type before struct {
-		mainStorage         string
-		routingBlock        *entity.UniversalReplicationID
-		userRepl            *entity.UserReplicationPolicy
-		userReplHasSwitch   bool
-		bucketRepl          *entity.BucketReplicationPolicy
-		bucketReplHasSwitch bool
+		mainStorage                     string
+		routingBlock                    *entity.UniversalReplicationID
+		userRepl                        *entity.UserReplicationPolicy
+		userReplHasSwitch               bool
+		bucketRepl                      *entity.BucketReplicationPolicy
+		bucketReplHasSwitch             bool
+		bucketReplHasZeroDowntimeSwitch bool
+		bucketRoute                     *entity.BucketRoutingPolicyID
+		bucketRouteToStorage            string
 	}
 	tests := []struct {
 		name    string
@@ -119,6 +122,68 @@ func Test_AddUserReplicationPolicy(t *testing.T) {
 				ToStorage:   "follower",
 			},
 			wantErr: dom.ErrInvalidArg,
+		},
+		{
+			name: "err: bucket replication in zero-downtime switch for user",
+			before: before{
+				mainStorage: "main",
+				bucketRepl: &entity.BucketReplicationPolicy{
+					User:        "user",
+					FromStorage: "main",
+					ToStorage:   "follower",
+					FromBucket:  "any",
+					ToBucket:    "any",
+				},
+				bucketReplHasZeroDowntimeSwitch: true,
+			},
+			policy: entity.UserReplicationPolicy{
+				User:        "user",
+				FromStorage: "main",
+				ToStorage:   "follower2",
+			},
+			wantErr: dom.ErrInvalidArg,
+		},
+		{
+			name: "err: user bucket routed to other storage",
+			before: before{
+				mainStorage:          "main",
+				bucketRoute:          &entity.BucketRoutingPolicyID{User: "user", Bucket: "any"},
+				bucketRouteToStorage: "follower2",
+			},
+			policy: entity.UserReplicationPolicy{
+				User:        "user",
+				FromStorage: "main",
+				ToStorage:   "follower",
+			},
+			wantErr: dom.ErrInvalidArg,
+		},
+		{
+			name: "ok: user bucket routed to source storage",
+			before: before{
+				mainStorage:          "main",
+				bucketRoute:          &entity.BucketRoutingPolicyID{User: "user", Bucket: "any"},
+				bucketRouteToStorage: "main",
+			},
+			policy: entity.UserReplicationPolicy{
+				User:        "user",
+				FromStorage: "main",
+				ToStorage:   "follower",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "ok: bucket routed to other storage for different user",
+			before: before{
+				mainStorage:          "main",
+				bucketRoute:          &entity.BucketRoutingPolicyID{User: "user-2", Bucket: "any"},
+				bucketRouteToStorage: "follower2",
+			},
+			policy: entity.UserReplicationPolicy{
+				User:        "user",
+				FromStorage: "main",
+				ToStorage:   "follower",
+			},
+			wantErr: nil,
 		},
 		{
 			name: "ok: bucket replication exists for different user",
@@ -241,6 +306,14 @@ func Test_AddUserReplicationPolicy(t *testing.T) {
 					err = svc.SetDowntimeReplicationSwitch(ctx, bid, nil)
 					r.NoError(err)
 				}
+				if tt.before.bucketReplHasZeroDowntimeSwitch {
+					startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromBucketReplication(*tt.before.bucketRepl))
+				}
+			}
+
+			if tt.before.bucketRoute != nil {
+				err := svc.SetBucketRouting(ctx, *tt.before.bucketRoute, tt.before.bucketRouteToStorage)
+				r.NoError(err)
 			}
 
 			err := svc.AddUserReplicationPolicy(ctx, tt.policy, entity.ReplicationOptions{})
@@ -268,12 +341,13 @@ func Test_AddUserReplicationPolicy(t *testing.T) {
 func Test_AddBucketReplicationPolicy(t *testing.T) {
 	c := testutil.SetupRedis(t)
 	type before struct {
-		mainStorage         string
-		routingBlock        *entity.UniversalReplicationID
-		userRepl            *entity.UserReplicationPolicy
-		userReplHasSwitch   bool
-		bucketRepl          *entity.BucketReplicationPolicy
-		bucketReplHasSwitch bool
+		mainStorage                   string
+		routingBlock                  *entity.UniversalReplicationID
+		userRepl                      *entity.UserReplicationPolicy
+		userReplHasSwitch             bool
+		bucketRepl                    *entity.BucketReplicationPolicy
+		bucketReplHasSwitch           bool
+		userReplHasZeroDowntimeSwitch bool
 	}
 	tests := []struct {
 		name    string
@@ -382,6 +456,26 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 				User:        "user",
 				FromStorage: "main",
 				ToStorage:   "follower",
+				FromBucket:  "bucket",
+				ToBucket:    "bucket",
+			},
+			wantErr: dom.ErrInvalidArg,
+		},
+		{
+			name: "err: user replication in zero-downtime switch",
+			before: before{
+				mainStorage: "main",
+				userRepl: &entity.UserReplicationPolicy{
+					User:        "user",
+					FromStorage: "main",
+					ToStorage:   "follower",
+				},
+				userReplHasZeroDowntimeSwitch: true,
+			},
+			policy: entity.BucketReplicationPolicy{
+				User:        "user",
+				FromStorage: "follower",
+				ToStorage:   "follower2",
 				FromBucket:  "bucket",
 				ToBucket:    "bucket",
 			},
@@ -586,6 +680,9 @@ func Test_AddBucketReplicationPolicy(t *testing.T) {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
 					err = svc.SetDowntimeReplicationSwitch(ctx, uid, nil)
 					r.NoError(err)
+				}
+				if tt.before.userReplHasZeroDowntimeSwitch {
+					startZeroDowntimeSwitch(t, svc, &qs, entity.UniversalFromUserReplication(*tt.before.userRepl))
 				}
 			}
 			if tt.before.bucketRepl != nil {

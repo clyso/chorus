@@ -700,3 +700,33 @@ func Test_Version(t *testing.T) {
 	r.Equal(Version{}, ver, "bucket ACL version is zero after final replication cleanup")
 
 }
+
+func Test_Version_DestinationMismatch(t *testing.T) {
+	r := require.New(t)
+	c := testutil.SetupRedis(t)
+	s := NewVersionService(c)
+	ctx := t.Context()
+
+	replID := entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
+		User:        "user1",
+		FromStorage: "stor1",
+		FromBucket:  "bucket",
+		ToStorage:   "stor2",
+		ToBucket:    "bucket",
+	})
+	obj := dom.Object{Bucket: "bucket", Name: "obj1"}
+	dest := Destination{Storage: "stor3", Bucket: "bucket"}
+
+	_, err := dest.IsFrom(replID)
+	r.ErrorIs(err, dom.ErrInternal)
+
+	_, err = s.IncrementObj(ctx, replID, obj, dest)
+	r.ErrorIs(err, dom.ErrInternal)
+
+	err = s.UpdateIfGreater(ctx, replID, obj, dest, 1)
+	r.ErrorIs(err, dom.ErrInternal)
+
+	ver, err := s.GetObj(ctx, replID, obj)
+	r.NoError(err)
+	r.Equal(Version{}, ver)
+}
