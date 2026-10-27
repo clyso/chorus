@@ -28,7 +28,6 @@ import (
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/s3"
 	"github.com/clyso/chorus/pkg/s3client"
-	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/service/worker/copy"
@@ -71,7 +70,6 @@ type svc struct {
 	clients                 objstore.Clients
 	versionSvc              meta.VersionService
 	listStateStore          *store.MigrationObjectListStateStore
-	uploadSvc               *storage.UploadSvc
 	copySvc                 copy.CopySvc
 	queueSvc                tasks.QueueService
 	limit                   ratelimit.RPM
@@ -83,7 +81,7 @@ type svc struct {
 }
 
 func New(conf *Config, credsSvc objstore.CredsService, clients objstore.Clients, versionSvc meta.VersionService,
-	copySvc copy.CopySvc, queueSvc tasks.QueueService, uploadSvc *storage.UploadSvc,
+	copySvc copy.CopySvc, queueSvc tasks.QueueService,
 	limit ratelimit.RPM, listStateStore *store.MigrationObjectListStateStore,
 	objectLocker *store.ObjectLocker, bucketLocker *store.BucketLocker,
 	replicationstatusLocker *store.ReplicationStatusLocker, versionedSvc *VersionedMigrationSvc) *svc {
@@ -93,7 +91,6 @@ func New(conf *Config, credsSvc objstore.CredsService, clients objstore.Clients,
 		clients:                 clients,
 		versionSvc:              versionSvc,
 		listStateStore:          listStateStore,
-		uploadSvc:               uploadSvc,
 		copySvc:                 copySvc,
 		queueSvc:                queueSvc,
 		limit:                   limit,

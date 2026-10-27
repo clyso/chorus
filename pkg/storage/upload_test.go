@@ -39,9 +39,6 @@ func Test_svc_StoreUploadID(t *testing.T) {
 	uploads := []string{"id1", "id2"}
 
 	for _, user := range users {
-		exists, err := storage.UploadsExistForUser(ctx, user)
-		r.NoError(err)
-		r.False(exists)
 		for _, bucket := range buckets {
 			exists, err := storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(user, bucket))
 			r.NoError(err)
@@ -64,9 +61,6 @@ func Test_svc_StoreUploadID(t *testing.T) {
 	}
 
 	for _, user := range users {
-		exists, err := storage.UploadsExistForUser(ctx, user)
-		r.NoError(err)
-		r.True(exists)
 		for _, bucket := range buckets {
 			exists, err := storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(user, bucket))
 			r.NoError(err)
@@ -105,10 +99,7 @@ func Test_StoreUploadID(t *testing.T) {
 	upload := "id1"
 
 	// not exists
-	exists, err := storage.UploadsExistForUser(ctx, user)
-	r.NoError(err)
-	r.False(exists)
-	exists, err = storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(user, bucket1))
+	exists, err := storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(user, bucket1))
 	r.NoError(err)
 	r.False(exists)
 	exists, err = storage.UploadExists(ctx, entity.NewUserUploadObjectID(user, bucket1), entity.NewUserUploadObject(obj, upload))
@@ -119,9 +110,6 @@ func Test_StoreUploadID(t *testing.T) {
 	err = storage.StoreUpload(ctx, entity.NewUserUploadObjectID(user, bucket1), entity.NewUserUploadObject(obj, upload), time.Minute)
 	r.NoError(err)
 	// exists for user and bucket1
-	exists, err = storage.UploadsExistForUser(ctx, user)
-	r.NoError(err)
-	r.True(exists)
 	exists, err = storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(user, bucket1))
 	r.NoError(err)
 	r.True(exists)
@@ -134,7 +122,7 @@ func Test_StoreUploadID(t *testing.T) {
 	r.NoError(err)
 	r.False(exists)
 	// not exists for other user
-	exists, err = storage.UploadsExistForUser(ctx, "u2")
+	exists, err = storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID("u2", bucket1))
 	r.NoError(err)
 	r.False(exists)
 
@@ -143,9 +131,6 @@ func Test_StoreUploadID(t *testing.T) {
 	r.NoError(err)
 
 	// not exists
-	exists, err = storage.UploadsExistForUser(ctx, user)
-	r.NoError(err)
-	r.False(exists)
 	exists, err = storage.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(user, bucket1))
 	r.NoError(err)
 	r.False(exists)

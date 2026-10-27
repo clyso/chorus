@@ -692,6 +692,116 @@ func TestApi_switch_multipart(t *testing.T) {
 	}
 }
 
+// TestApi_ZeroDowntimeSwitch_WaitsForPreSwitchMultipart checks that zero-downtime
+// switch does not complete while a multipart upload started on the old storage
+// before the switch is still open (bounded by multipart_ttl).
+func TestApi_ZeroDowntimeSwitch_WaitsForPreSwitchMultipart(t *testing.T) {
+	tests := []struct {
+		name        string
+		bucketLevel bool
+	}{
+		{name: "bucket-level", bucketLevel: true},
+		{name: "user-level", bucketLevel: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			e := app.SetupEmbedded(t, workerConf, proxyConf)
+			ctx := t.Context()
+			bucket := "switch-pre-mpu-" + tt.name
+
+			r.NoError(e.MainClient.MakeBucket(ctx, bucket, mclient.MakeBucketOptions{}))
+			replID := &pb.ReplicationID{
+				User:        user,
+				FromStorage: "main",
+				ToStorage:   "f1",
+			}
+			if tt.bucketLevel {
+				replID.FromBucket = &bucket
+				replID.ToBucket = &bucket
+			}
+			_, err := e.PolicyClient.AddReplication(ctx, &pb.AddReplicationRequest{Id: replID})
+			r.NoError(err)
+			r.Eventually(func() bool {
+				repl, err := e.PolicyClient.GetReplication(ctx, replID)
+				return err == nil && repl.IsInitDone
+			}, e.WaitLong, e.RetryLong)
+
+			// start multipart upload through proxy before switch: it lives on old storage
+			obj := getTestObj("mpu-obj", bucket)
+			half := len(obj.data) / 2
+			upload, err := e.ProxyAwsClient.CreateMultipartUpload(&aws_s3.CreateMultipartUploadInput{
+				Bucket:      sPtr(bucket),
+				ContentType: sPtr("binary/octet-stream"),
+				Key:         sPtr(obj.name),
+			})
+			r.NoError(err)
+			part1, err := e.ProxyAwsClient.UploadPart(&aws_s3.UploadPartInput{
+				Body:          bytes.NewReader(obj.data[:half]),
+				Bucket:        sPtr(bucket),
+				ContentLength: iPtr(int64(half)),
+				Key:           sPtr(obj.name),
+				PartNumber:    iPtr(1),
+				UploadId:      upload.UploadId,
+			})
+			r.NoError(err)
+
+			// start switch with multipart TTL much longer than test duration
+			_, err = e.PolicyClient.SwitchWithZeroDowntime(ctx, &pb.SwitchZeroDowntimeRequest{
+				ReplicationId: replID,
+				MultipartTtl:  durationpb.New(time.Hour),
+			})
+			r.NoError(err)
+
+			// switch must wait for multipart upload started before switch.
+			// e.WaitShort spans many worker SwitchRetryInterval periods.
+			r.Never(func() bool {
+				switchInfo, err := e.PolicyClient.GetSwitchStatus(ctx, replID)
+				return err == nil && switchInfo.LastStatus == pb.ReplicationSwitch_DONE
+			}, e.WaitShort, e.RetryLong, "switch completed while multipart upload started before switch is still open on old storage")
+
+			// finish upload through proxy after switch was started
+			part2, err := e.ProxyAwsClient.UploadPart(&aws_s3.UploadPartInput{
+				Body:          bytes.NewReader(obj.data[half:]),
+				Bucket:        sPtr(bucket),
+				ContentLength: iPtr(int64(len(obj.data) - half)),
+				Key:           sPtr(obj.name),
+				PartNumber:    iPtr(2),
+				UploadId:      upload.UploadId,
+			})
+			r.NoError(err)
+			_, err = e.ProxyAwsClient.CompleteMultipartUpload(&aws_s3.CompleteMultipartUploadInput{
+				Bucket: sPtr(bucket),
+				Key:    sPtr(obj.name),
+				MultipartUpload: &aws_s3.CompletedMultipartUpload{Parts: []*aws_s3.CompletedPart{
+					{PartNumber: iPtr(1), ETag: part1.ETag},
+					{PartNumber: iPtr(2), ETag: part2.ETag},
+				}},
+				UploadId: upload.UploadId,
+			})
+			r.NoError(err)
+
+			// switch is done after upload completion
+			r.Eventually(func() bool {
+				switchInfo, err := e.PolicyClient.GetSwitchStatus(ctx, replID)
+				return err == nil && switchInfo.LastStatus == pb.ReplicationSwitch_DONE
+			}, e.WaitLong, e.RetryLong)
+
+			// object is available through proxy and in new storage
+			for _, client := range []*mclient.Client{e.ProxyClient, e.F1Client} {
+				r.Eventually(func() bool {
+					objData, err := client.GetObject(ctx, bucket, obj.name, mclient.GetObjectOptions{})
+					if err != nil {
+						return false
+					}
+					objBytes, err := io.ReadAll(objData)
+					return err == nil && bytes.Equal(obj.data, objBytes)
+				}, e.WaitLong, e.RetryLong, client.EndpointURL().String())
+			}
+		})
+	}
+}
+
 func TestApi_scheduled_switch(t *testing.T) {
 	e := app.SetupEmbedded(t, workerConf, proxyConf)
 	tstCtx := t.Context()

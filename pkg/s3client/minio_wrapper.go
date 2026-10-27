@@ -82,6 +82,14 @@ func (s *S3) ListObjects(ctx context.Context, bucketName string, opts mclient.Li
 	return s.Client.ListObjects(ctx, bucketName, opts)
 }
 
+func (s *S3) ListIncompleteUploads(ctx context.Context, bucketName, objectPrefix string, recursive bool) <-chan mclient.ObjectMultipartInfo {
+	ctx, span := otel.Tracer("").Start(ctx, s3.ListMultipartUploads.String())
+	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
+	defer span.End()
+	s.metricsSvc.Count(xctx.GetFlow(ctx), s.name, s3.ListMultipartUploads.String())
+	return s.Client.ListIncompleteUploads(ctx, bucketName, objectPrefix, recursive)
+}
+
 func (s *S3) ListBuckets(ctx context.Context) ([]mclient.BucketInfo, error) {
 	ctx, span := otel.Tracer("").Start(ctx, s3.ListBuckets.String())
 	span.SetAttributes(attribute.String("storage", s.name), attribute.String("user", s.user))
