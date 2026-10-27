@@ -108,17 +108,18 @@ func NewClient(ctx context.Context, metricsSvc metrics.Service, storageConf s3.S
 }
 
 func isOnline(ctx context.Context, c *client) error {
-	// HEAD request: with a configured region GetBucketLocation answers without contacting the storage
-	_, err := c.mc.BucketExists(ctx, "probe-health-test")
-	if err == nil {
-		return nil
-	} else if !mclient.IsNetworkOrHostDown(err, false) {
-		switch mclient.ToErrorResponse(err).Code {
-		case "NoSuchBucket", "AccessDenied", "":
-			return nil
-		}
+	// Not GetBucketLocation: with a configured region minio-go answers it without a request.
+	_, err := c.mc.GetBucketVersioning(ctx, "probe-health-test")
+	if err == nil || mclient.IsNetworkOrHostDown(err, false) {
+		return err
 	}
-	return err
+	switch mclient.ToErrorResponse(err).Code {
+	case "", "InvalidAccessKeyId", "SignatureDoesNotMatch", "AuthorizationHeaderMalformed":
+		// not an S3 error response, or the storage rejected the credentials
+		return err
+	}
+	// any other S3 error response (NoSuchBucket, AccessDenied, NotImplemented, ...) means the storage is up
+	return nil
 }
 
 func (c *client) SNS() *sns.Client {
