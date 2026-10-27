@@ -21,7 +21,6 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/validate"
@@ -63,17 +62,6 @@ func (r *UploadSvc) UploadExists(ctx context.Context, id entity.UserUploadObject
 	contains, err := r.store.IsMember(ctx, id, object)
 	if err != nil {
 		return false, fmt.Errorf("unable to check if upload exists: %w", err)
-	}
-	return contains, nil
-}
-
-func (r *UploadSvc) UploadsExistForUser(ctx context.Context, user string) (bool, error) {
-	if user == "" {
-		return false, fmt.Errorf("%w: user is required to set uploadID", dom.ErrInvalidArg)
-	}
-	contains, err := r.store.HasIDs(ctx, user)
-	if err != nil {
-		return false, fmt.Errorf("unable to check if user uploads exist: %w", err)
 	}
 	return contains, nil
 }

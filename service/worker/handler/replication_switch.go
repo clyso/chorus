@@ -24,12 +24,14 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	mclient "github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/objstore"
 	"github.com/clyso/chorus/pkg/policy"
-	"github.com/clyso/chorus/pkg/storage"
+	"github.com/clyso/chorus/pkg/s3client"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 )
@@ -41,17 +43,17 @@ var (
 
 type switchSvc struct {
 	policySvc               policy.Service
-	uploadSvc               *storage.UploadSvc
+	clients                 objstore.Clients
 	replicationstatusLocker *store.ReplicationStatusLocker
 	conf                    *Config
 }
 
-func NewSwitchSvc(conf *Config, policySvc policy.Service, uploadSvc *storage.UploadSvc,
+func NewSwitchSvc(conf *Config, policySvc policy.Service, clients objstore.Clients,
 	replicationstatusLocker *store.ReplicationStatusLocker) *switchSvc {
 	return &switchSvc{
 		conf:                    conf,
 		policySvc:               policySvc,
-		uploadSvc:               uploadSvc,
+		clients:                 clients,
 		replicationstatusLocker: replicationstatusLocker,
 	}
 }
@@ -359,20 +361,76 @@ func (s *switchSvc) handleZeroDowntimeReplicationSwitch(ctx context.Context, p t
 		// events queue is not drained yet - retry later
 		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
 	}
-	var existsMultipartUploads bool
-	if bucketID, ok := replicationID.AsBucketID(); ok {
-		existsMultipartUploads, err = s.uploadSvc.UploadsExistForUserBucket(ctx, entity.NewUserUploadObjectID(bucketID.FromStorage, bucketID.FromBucket))
-	} else if userID, ok := replicationID.AsUserID(); ok {
-		existsMultipartUploads, err = s.uploadSvc.UploadsExistForUser(ctx, userID.User)
+	startedAt, ok := switchPolicy.GetLastStartAt()
+	if !ok {
+		// should never happen
+		return fmt.Errorf("zero downtime switch started at is not set")
 	}
-	if err != nil {
-		return err
-	}
-	if existsMultipartUploads {
-		// there are pending multipart uploads - retry later
-		return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+	if time.Since(startedAt) < switchPolicy.MultipartTTL {
+		// multipart requests for uploads not created during the switch are routed to the old storage.
+		// Uploads started more than TTL before the switch are considered abandoned.
+		upload, err := s.findOldStorageUpload(ctx, replicationID, startedAt.Add(-switchPolicy.MultipartTTL))
+		if err != nil {
+			return err
+		}
+		if upload != "" {
+			zerolog.Ctx(ctx).Info().Str("upload", upload).Msg("zero downtime switch is waiting for multipart upload on old storage")
+			return &dom.ErrRateLimitExceeded{RetryIn: s.conf.SwitchRetryInterval}
+		}
 	}
 	// all good - finish zero downtime replication switch:
 
 	return s.policySvc.CompleteZeroDowntimeReplicationSwitch(ctx, replicationID)
+}
+
+// findOldStorageUpload returns the first multipart upload initiated after given time on the replication source storage.
+func (s *switchSvc) findOldStorageUpload(ctx context.Context, id entity.UniversalReplicationID, after time.Time) (string, error) {
+	client, err := s.clients.AsS3(ctx, id.FromStorage(), id.User())
+	if err != nil {
+		return "", fmt.Errorf("unable to get %q s3 client: %w", id.FromStorage(), err)
+	}
+	var buckets []string
+	if bucketID, ok := id.AsBucketID(); ok {
+		buckets = []string{bucketID.FromBucket}
+	} else {
+		list, err := client.S3().ListBuckets(ctx)
+		if err != nil {
+			return "", fmt.Errorf("unable to list buckets: %w", err)
+		}
+		for _, bucket := range list {
+			buckets = append(buckets, bucket.Name)
+		}
+	}
+	for _, bucket := range buckets {
+		upload, err := findBucketUpload(ctx, client, bucket, after)
+		if err != nil || upload != "" {
+			return upload, err
+		}
+	}
+	return "", nil
+}
+
+func findBucketUpload(ctx context.Context, client s3client.Client, bucket string, after time.Time) (string, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	uploads := client.S3().ListIncompleteUploads(ctx, bucket, "", true)
+	defer func() {
+		cancel()
+		// drain channel to let listing goroutine exit on early return
+		for range uploads {
+		}
+	}()
+	for upload := range uploads {
+		if upload.Err != nil {
+			switch mclient.ToErrorResponse(upload.Err).Code {
+			// NoSuchUpload is not an S3 ListMultipartUploads error, but gofakes3 returns it for a bucket without uploads
+			case mclient.NoSuchBucket, mclient.NoSuchUpload:
+				return "", nil
+			}
+			return "", fmt.Errorf("unable to list multipart uploads for bucket %q: %w", bucket, upload.Err)
+		}
+		if upload.Initiated.After(after) {
+			return bucket + "/" + upload.Key + ":" + upload.UploadID, nil
+		}
+	}
+	return "", nil
 }

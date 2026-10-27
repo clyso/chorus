@@ -1,12 +1,25 @@
 package handler
 
 import (
+	"context"
+	"fmt"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	aws_s3 "github.com/aws/aws-sdk-go/service/s3"
+	"github.com/johannesboyne/gofakes3"
+	"github.com/johannesboyne/gofakes3/backend/s3mem"
 	"github.com/stretchr/testify/require"
 
+	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/entity"
+	"github.com/clyso/chorus/pkg/metrics"
+	"github.com/clyso/chorus/pkg/objstore"
+	"github.com/clyso/chorus/pkg/policy"
+	"github.com/clyso/chorus/pkg/s3"
+	"github.com/clyso/chorus/pkg/s3client"
+	"github.com/clyso/chorus/pkg/tasks"
 )
 
 func Test_SwitchWithDowntimeStateMachine(t *testing.T) {
@@ -450,4 +463,114 @@ func stringPtr(s string) *string {
 
 func uint32Ptr(i uint32) *uint32 {
 	return &i
+}
+
+type zeroDowntimePolicyStub struct {
+	policy.Service
+	status    entity.ReplicationStatusExtended
+	completed bool
+}
+
+func (p *zeroDowntimePolicyStub) GetReplicationPolicyInfoExtended(context.Context, entity.UniversalReplicationID) (entity.ReplicationStatusExtended, error) {
+	return p.status, nil
+}
+
+func (p *zeroDowntimePolicyStub) CompleteZeroDowntimeReplicationSwitch(context.Context, entity.UniversalReplicationID) error {
+	p.completed = true
+	return nil
+}
+
+type s3ClientsStub struct {
+	objstore.Clients
+	client s3client.Client
+}
+
+func (c s3ClientsStub) AsS3(_ context.Context, storage, user string) (s3client.Client, error) {
+	if storage != "from" || user != "user" {
+		return nil, fmt.Errorf("unexpected client %s/%s", storage, user)
+	}
+	return c.client, nil
+}
+
+func Test_ZeroDowntimeSwitchWaitsForPreSwitchUploads(t *testing.T) {
+	const bucket = "bucket"
+	now := time.Now()
+	// fake storage clock: all uploads are initiated at this time
+	uploadAt := now.Add(-2 * time.Hour)
+
+	replications := map[string]entity.UniversalReplicationID{
+		"user": entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+			User:        "user",
+			FromStorage: "from",
+			ToStorage:   "to",
+		}),
+		"bucket": entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
+			User:        "user",
+			FromBucket:  bucket,
+			FromStorage: "from",
+			ToStorage:   "to",
+			ToBucket:    bucket,
+		}),
+	}
+	tests := []struct {
+		name         string
+		startedAt    time.Time
+		ttl          time.Duration
+		noBucket     bool
+		createUpload bool
+		wantComplete bool
+	}{
+		{name: "no uploads", startedAt: now.Add(-30 * time.Minute), ttl: time.Hour, wantComplete: true},
+		{name: "no bucket on old storage", startedAt: now.Add(-30 * time.Minute), ttl: time.Hour, noBucket: true, wantComplete: true},
+		{name: "pre-switch upload within ttl", startedAt: now.Add(-90 * time.Minute), ttl: 2 * time.Hour, createUpload: true, wantComplete: false},
+		{name: "pre-switch upload ttl exceeded", startedAt: now.Add(-90 * time.Minute), ttl: time.Hour, createUpload: true, wantComplete: true},
+		{name: "abandoned upload started ttl before switch", startedAt: now.Add(-30 * time.Minute), ttl: time.Hour, createUpload: true, wantComplete: true},
+		{name: "upload started on old storage after switch", startedAt: now.Add(-3 * time.Hour), ttl: 24 * time.Hour, createUpload: true, wantComplete: false},
+	}
+	for replType, id := range replications {
+		for _, tt := range tests {
+			t.Run(replType+" "+tt.name, func(t *testing.T) {
+				r := require.New(t)
+				ctx := t.Context()
+
+				backend := s3mem.New()
+				fake := gofakes3.New(backend, gofakes3.WithTimeSource(gofakes3.FixedTimeSource(uploadAt)), gofakes3.WithTimeSkewLimit(0))
+				ts := httptest.NewServer(fake.Server())
+				t.Cleanup(ts.Close)
+				client, err := s3client.NewClient(ctx, metrics.NewS3Service(false), s3.StorageAddress{Address: ts.URL, HttpTimeout: time.Minute},
+					s3.CredentialsV4{AccessKeyID: "key", SecretAccessKey: "secret"}, "from", "user")
+				r.NoError(err)
+				if !tt.noBucket {
+					r.NoError(backend.CreateBucket(bucket))
+				}
+				if tt.createUpload {
+					_, err = client.AWS().CreateMultipartUploadWithContext(ctx, &aws_s3.CreateMultipartUploadInput{
+						Bucket: stringPtr(bucket),
+						Key:    stringPtr("obj"),
+					})
+					r.NoError(err)
+				}
+
+				policyStub := &zeroDowntimePolicyStub{status: entity.ReplicationStatusExtended{
+					ReplicationStatus: &entity.ReplicationStatus{IsArchived: true},
+					Switch: &entity.ReplicationSwitchInfo{
+						ReplicationSwitchZeroDowntimeOpts: entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: tt.ttl},
+						LastStartedAt:                     &tt.startedAt,
+						LastStatus:                        entity.StatusInProgress,
+					},
+				}}
+				worker := NewSwitchSvc(&Config{SwitchRetryInterval: time.Second}, policyStub, s3ClientsStub{client: client}, nil)
+
+				err = worker.handleZeroDowntimeReplicationSwitch(ctx, tasks.ZeroDowntimeReplicationSwitchPayload{ID: id})
+				if tt.wantComplete {
+					r.NoError(err)
+					r.True(policyStub.completed)
+					return
+				}
+				var rlErr *dom.ErrRateLimitExceeded
+				r.ErrorAs(err, &rlErr)
+				r.False(policyStub.completed)
+			})
+		}
+	}
 }

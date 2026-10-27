@@ -41,7 +41,6 @@ import (
 	"github.com/clyso/chorus/pkg/ratelimit"
 	"github.com/clyso/chorus/pkg/replication"
 	"github.com/clyso/chorus/pkg/rpc"
-	"github.com/clyso/chorus/pkg/storage"
 	"github.com/clyso/chorus/pkg/store"
 	"github.com/clyso/chorus/pkg/tasks"
 	"github.com/clyso/chorus/pkg/trace"
@@ -84,7 +83,6 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	logger.Info().Msg("app redis connected")
 
 	versionSvc := meta.NewVersionService(appRedis)
-	uploadSvc := storage.NewUploadSvc(appRedis)
 	objectListStateStore := store.NewMigrationObjectListStateStore(appRedis)
 	bucketListStateStore := store.NewMigrationBucketListStateStore(appRedis)
 
@@ -132,7 +130,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	checkSvc := handler.NewDiffSvc(confRedis, clientRegistry, queueSvc)
 	checkCtrl := handler.NewDiffCtrl(checkSvc, queueSvc)
 
-	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, uploadSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
+	workerSvc := handler.New(conf.Worker, credsSvc, clientRegistry, versionSvc, copySvc, queueSvc, limiter, objectListStateStore, objectLocker, bucketLocker, replicationStatusLocker, versionedMigrationSvc)
 
 	stdLogger := log.NewStdLogger()
 	redis.SetLogger(stdLogger)
@@ -184,7 +182,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 		mux.Use(metrics.WorkerMiddleware())
 	}
 	// common workers
-	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, uploadSvc, replicationStatusLocker)
+	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, clientRegistry, replicationStatusLocker)
 	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, switchWorker.HandleZeroDowntimeReplicationSwitch)
 	mux.HandleFunc(tasks.TypeApiSwitchWithDowntime, switchWorker.HandleSwitchWithDowntime)
 	logger.Info().Msg("registered common workers")

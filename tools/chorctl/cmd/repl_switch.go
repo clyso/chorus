@@ -125,7 +125,7 @@ func switchZeroDowntimeCmdInit() {
 	switchZeroDowntimeCmd.Flags().StringVarP(&switchZeroDowntimeCmdFrom, "from", "f", "", "From storage of existing replication")
 	switchZeroDowntimeCmd.Flags().StringVarP(&switchZeroDowntimeCmdTo, "to", "t", "", "To storage of existing replication")
 	switchZeroDowntimeCmd.Flags().StringVarP(&switchZeroDowntimeCmdUser, "user", "u", "", "User of existing replication")
-	switchZeroDowntimeCmd.Flags().DurationVar(&switchZeroDowntimeCmdMultipartTTL, "multipart-ttl", time.Hour, "Amount of time to wait for not finished multipart uploads during switch")
+	switchZeroDowntimeCmd.Flags().DurationVar(&switchZeroDowntimeCmdMultipartTTL, "multipart-ttl", time.Hour, "Max time to wait for multipart uploads started before the switch to finish")
 	if err := switchZeroDowntimeCmd.MarkFlagRequired("from"); err != nil {
 		logrus.WithError(err).Fatal()
 	}
