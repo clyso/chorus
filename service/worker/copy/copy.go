@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -122,7 +123,7 @@ func (r *S3CopySvc) GetVersionInfo(ctx context.Context, user string, to File) ([
 	if err != nil {
 		return nil, fmt.Errorf("unable to get %s storage client: %w", to.Storage, err)
 	}
-	objects := storageClient.ListObjects(ctx, to.Bucket, objstore.WithPrefix(to.Name), objstore.WithVersions())
+	objects := objstore.ObjectVersions(ctx, storageClient, to.Bucket, to.Name)
 
 	result := []entity.ObjectVersionInfo{}
 	for object, err := range objects {
@@ -171,7 +172,11 @@ func (r *S3CopySvc) GetLastMigratedVersionInfo(ctx context.Context, user string,
 			})
 
 			objects := slices.Collect(objectIter)
-			if len(objects) == 0 {
+			if len(objects) != 0 && objects[0].Err != nil {
+				return entity.ObjectVersionInfo{}, fmt.Errorf("unable to list to object versions: %w", objects[0].Err)
+			}
+			// the prefix also matches objects with longer names listed after the object versions
+			if len(objects) == 0 || objects[0].Key != to.Name {
 				return entity.ObjectVersionInfo{}, dom.ErrNotFound
 			}
 
@@ -222,13 +227,14 @@ func (r *S3CopySvc) ClearDestination(ctx context.Context, user string, to File, 
 		return nil
 	}
 
-	objectIter := toClient.ListObjects(ctx, to.Bucket, objstore.WithPrefix(to.Name), objstore.WithVersions())
+	objectIter := objstore.ObjectVersions(ctx, toClient, to.Bucket, to.Name)
 
 	listErrs := []error{}
 	namesAndVersions := []objstore.NameAndVersion{}
 	for object, err := range objectIter {
 		if err != nil {
 			listErrs = append(listErrs, fmt.Errorf("unable to list version: %w", err))
+			continue
 		}
 		namesAndVersions = append(namesAndVersions, objstore.NameAndVersion{
 			Name:    object.Key,
@@ -260,15 +266,23 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		VersionID: from.Version,
 	})
 	if err != nil {
-		var errorResp minio.ErrorResponse
-		ok := errors.As(err, &errorResp)
-		if !ok {
-			return fmt.Errorf("unable to get from object stat: %w", err)
-		}
-		if errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound {
+		switch {
+		case from.Version != "" && fromObjectStat.IsDeleteMarker:
+			// delete marker version is replicated below
+		case from.Version != "" && isNotFound(err):
+			// Ceph RGW answers a delete marker version with 404 and without the delete marker header:
+			// tell it apart from a missing version by the object versions list.
+			isDeleteMarker, listErr := r.isDeleteMarkerVersion(ctx, user, from)
+			if listErr != nil {
+				return fmt.Errorf("unable to list from object versions: %w", listErr)
+			}
+			if !isDeleteMarker {
+				return dom.ErrNotFound
+			}
+			fromObjectStat.IsDeleteMarker = true
+		case isNotFound(err):
 			return dom.ErrNotFound
-		}
-		if !fromObjectStat.IsDeleteMarker {
+		case !fromObjectStat.IsDeleteMarker:
 			return fmt.Errorf("unable to get from object stat: %w", err)
 		}
 	}
@@ -278,16 +292,10 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		VersionID: to.Version,
 	})
 	if err != nil {
-		var errorResp minio.ErrorResponse
-		ok := errors.As(err, &errorResp)
-		if !ok {
-			return fmt.Errorf("unable to get from object stat: %w", err)
-		}
-		if errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound {
-			toObjectPresent = false
-		} else {
+		if !isNotFound(err) {
 			return fmt.Errorf("unable to get to object stat: %w", err)
 		}
+		toObjectPresent = false
 	}
 
 	if toObjectPresent && fromObjectStat.ETag == toObjectStat.ETag && fromObjectStat.Size == toObjectStat.Size {
@@ -355,8 +363,13 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		return fmt.Errorf("unable to get from object: %w", err)
 	}
 	defer fromObject.Close()
+	// The source object can be deleted after the initial stat, before its content is requested.
+	// Requests to the source returning not found mean the object is gone: return dom.ErrNotFound as for the initial stat.
 	stat, err := fromObject.Stat()
 	if err != nil {
+		if isNotFound(err) {
+			return dom.ErrNotFound
+		}
 		return fmt.Errorf("unable to stat from object: %w", err)
 	}
 	if stat.Size == 0 {
@@ -367,8 +380,12 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		// workaround for big objects in e2e tests TODO: investigate
 		putObjectOpts.DisableContentSha256 = true
 	}
-	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, fromObject, stat.Size, putObjectOpts)
+	source := &sourceReader{obj: fromObject}
+	info, err := toClient.S3().PutObject(ctx, to.Bucket, to.Name, source, stat.Size, putObjectOpts)
 	if err != nil {
+		if isNotFound(source.err) {
+			return dom.ErrNotFound
+		}
 		return fmt.Errorf("unable to upload object: %w", err)
 	}
 	if info.VersionID != "" {
@@ -382,6 +399,61 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 
 	return nil
+}
+
+// sourceReader reads the source object for PutObject and keeps the error of reading it,
+// so a failed source read is told apart from a failed destination write.
+// It does not expose minio.Object.ReadAt, so PutObject keeps reading the source sequentially, as for *minio.Object.
+type sourceReader struct {
+	obj *minio.Object
+	err error
+}
+
+func (r *sourceReader) Read(p []byte) (int, error) {
+	n, err := r.obj.Read(p)
+	r.setErr(err)
+	return n, err
+}
+
+// Seek allows PutObject to retry the upload.
+func (r *sourceReader) Seek(offset int64, whence int) (int64, error) {
+	n, err := r.obj.Seek(offset, whence)
+	r.setErr(err)
+	return n, err
+}
+
+func (r *sourceReader) setErr(err error) {
+	if err != nil && !errors.Is(err, io.EOF) {
+		r.err = err
+	}
+}
+
+// isDeleteMarkerVersion reports whether the file version is listed as a delete marker in the object versions list.
+func (r *S3CopySvc) isDeleteMarkerVersion(ctx context.Context, user string, file File) (bool, error) {
+	client, err := r.clientRegistry.AsCommon(ctx, file.Storage, user)
+	if err != nil {
+		return false, fmt.Errorf("unable to get %s storage client: %w", file.Storage, err)
+	}
+	// the listing is read to the end: stopping it early leaks the minio-go listing goroutine
+	isDeleteMarker := false
+	for object, err := range objstore.ObjectVersions(ctx, client, file.Bucket, file.Name) {
+		if errors.Is(err, objstore.ErrBucketDoesntExist) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if object.VersionID == file.Version {
+			isDeleteMarker = object.IsDeleteMarker
+		}
+	}
+	return isDeleteMarker, nil
+}
+
+// isNotFound reports whether err is an S3 not found error response (NoSuchKey, NoSuchVersion, NoSuchBucket, etc.).
+func isNotFound(err error) bool {
+	var errorResp minio.ErrorResponse
+	return errors.As(err, &errorResp) && (errorResp.Code == minio.NoSuchKey || errorResp.StatusCode == http.StatusNotFound)
 }
 
 func (r *S3CopySvc) CopyACLs(ctx context.Context, user string, from File, to File) error {

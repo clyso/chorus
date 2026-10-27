@@ -203,6 +203,10 @@ func (r *VersionedMigrationSvc) MigrateVersions(ctx context.Context, replication
 			if err = lock.Do(ctx, time.Second*2, func() error {
 				return r.copySvc.CopyObject(ctx, replicationID.User, fromFile, toFile)
 			}); err != nil {
+				if errors.Is(err, dom.ErrNotFound) {
+					zerolog.Ctx(ctx).Warn().Str(log.ObjectVer, info.Version).Msg("versioned migration: skip object version copy: version missing in source")
+					continue
+				}
 				return fmt.Errorf("unable to copy object: %w", err)
 			}
 		}
