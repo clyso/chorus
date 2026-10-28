@@ -66,7 +66,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		User:        testAcc,
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-	}))
+	}), 0)
 	err = svc.ContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// defer cleanup dest container in ceph
@@ -83,7 +83,7 @@ func Test_handleSwiftObjectContent(t *testing.T) {
 		Etag:         objInfo.ETag,
 		LastModified: objInfo.LastModified.Format(time.RFC3339),
 	}
-	taskObj.SetReplicationID(task.ID)
+	taskObj.SetReplicationID(task.ID, task.Generation)
 	err = svc.ObjectUpdate(tstCtx, taskObj)
 	r.NoError(err, "handleObjectUpdate should not return an error for new object")
 	// compare ceph obj content

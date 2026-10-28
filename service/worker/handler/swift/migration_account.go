@@ -79,7 +79,7 @@ func (s *svc) HandleSwiftAccountMigration(ctx context.Context, t *asynq.Task) (e
 			task := tasks.SwiftContainerMigrationPayload{
 				Bucket: container,
 			}
-			task.SetReplicationID(p.ID)
+			task.SetReplicationID(p.ID, p.Generation)
 			err = s.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return false, err

@@ -63,7 +63,7 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 	containerUpdTask := tasks.SwiftContainerUpdatePayload{
 		Bucket: p.Bucket,
 	}
-	containerUpdTask.SetReplicationID(p.ID)
+	containerUpdTask.SetReplicationID(p.ID, p.Generation)
 	err = s.ContainerUpdate(ctx, containerUpdTask)
 	if err != nil {
 		return fmt.Errorf("handle container update: %w", err)
@@ -97,7 +97,7 @@ func (s *svc) HandleSwiftContainerMigration(ctx context.Context, t *asynq.Task) 
 				ObjSize:         object.Bytes,
 				ObjLastModified: object.LastModified.Format(time.RFC3339),
 			}
-			objTask.SetReplicationID(p.ID)
+			objTask.SetReplicationID(p.ID, p.Generation)
 			err = s.queueSvc.EnqueueTask(ctx, objTask)
 			if err != nil {
 				return false, fmt.Errorf("migration bucket list obj: unable to enqueue copy obj task: %w", err)

@@ -33,15 +33,18 @@ type ReplicationSvc interface {
 	PauseReplication(ctx context.Context, id entity.UniversalReplicationID) error
 	ResumeReplication(ctx context.Context, id entity.UniversalReplicationID) error
 	GetReplicationPolicyInfoExtended(ctx context.Context, id entity.UniversalReplicationID) (entity.ReplicationStatusExtended, error)
+	GetReplicationGeneration(ctx context.Context, id entity.UniversalReplicationID) (int64, error)
 
 	// user replication policies
-	AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) error
+	ValidateUserReplicationCreation(ctx context.Context, policy entity.UserReplicationPolicy) error
+	AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) (int64, error)
 	DeleteUserReplication(ctx context.Context, policy entity.UserReplicationPolicy) error
 	ListUserReplicationsInfo(ctx context.Context) (map[entity.UserReplicationPolicy]entity.ReplicationStatusExtended, error)
 	IsUserReplicationExists(ctx context.Context, user string) (bool, error)
 
 	// bucket replication policies
-	AddBucketReplicationPolicy(ctx context.Context, id entity.BucketReplicationPolicy, opts entity.ReplicationOptions) error
+	ValidateBucketReplicationCreation(ctx context.Context, policy entity.BucketReplicationPolicy) error
+	AddBucketReplicationPolicy(ctx context.Context, id entity.BucketReplicationPolicy, opts entity.ReplicationOptions) (int64, error)
 	ListBucketReplicationsInfo(ctx context.Context, user string) (map[entity.BucketReplicationPolicy]entity.ReplicationStatusExtended, error)
 	DeleteBucketReplication(ctx context.Context, id entity.BucketReplicationPolicy) error
 }
@@ -107,6 +110,10 @@ func (r *policySvc) GetReplicationPolicyInfoExtended(ctx context.Context, id ent
 
 	return r.fillExtendedReplicationStatus(ctx, id, &status, switchInfoPtr)
 
+}
+
+func (r *policySvc) GetReplicationGeneration(ctx context.Context, id entity.UniversalReplicationID) (int64, error) {
+	return r.replicationGenerationStore.Get(ctx, id)
 }
 
 func (r *policySvc) getReplicationStatusInTx(ctx context.Context, tx store.Executor[redis.Pipeliner], policy entity.UniversalReplicationID) store.OperationResult[entity.ReplicationStatus] {
@@ -177,7 +184,7 @@ func (r *policySvc) buildQueueStats(ctx context.Context, queue string) (bool, en
 	}, nil
 }
 
-func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) error {
+func (r *policySvc) ValidateUserReplicationCreation(ctx context.Context, policy entity.UserReplicationPolicy) error {
 	if err := policy.Validate(); err != nil {
 		return fmt.Errorf("unable to validate user replication policy: %w", err)
 	}
@@ -231,7 +238,14 @@ func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.
 	default:
 		return fmt.Errorf("unable to check existing user replication switch: %w", err)
 	}
-	// all good, create policy
+	return nil
+}
+
+func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.UserReplicationPolicy, opts entity.ReplicationOptions) (int64, error) {
+	if err := r.ValidateUserReplicationCreation(ctx, policy); err != nil {
+		return 0, err
+	}
+	uid := entity.UniversalFromUserReplication(policy)
 	tx := r.userReplicationPolicyStore.TxExecutor()
 	// 1. set explicit user-level routing
 	_ = r.userRoutingStore.WithExecutor(tx).SetOp(ctx, policy.User, policy.FromStorage)
@@ -239,11 +253,13 @@ func (r *policySvc) AddUserReplicationPolicy(ctx context.Context, policy entity.
 	_ = r.userReplicationPolicyStore.WithExecutor(tx).AddOp(ctx, policy)
 	// 3. add replication status
 	_ = r.userReplicationStatusStore.WithExecutor(tx).AddOp(ctx, policy, entity.StatusFromOptions(opts))
+	// 4. start new replication generation
+	generation := r.replicationGenerationStore.WithExecutor(tx).IncrementOp(ctx, uid)
 
 	if err := tx.Exec(ctx); err != nil {
-		return fmt.Errorf("unable to execute transaction: %w", err)
+		return 0, fmt.Errorf("unable to execute transaction: %w", err)
 	}
-	return nil
+	return generation.Get()
 }
 
 func (r *policySvc) DeleteUserReplication(ctx context.Context, policy entity.UserReplicationPolicy) error {
@@ -262,7 +278,14 @@ func (r *policySvc) DeleteUserReplication(ctx context.Context, policy entity.Use
 		return fmt.Errorf("unable to check existing user replication switch: %w", err)
 	}
 	// check if policy exists
+	uid := entity.UniversalFromUserReplication(policy)
 	_, err = r.userReplicationStatusStore.GetOp(ctx, policy).Get()
+	if errors.Is(err, dom.ErrNotFound) {
+		if err := tasks.StopAndPurgeReplicationQueues(ctx, r.queueSvc, uid); err != nil {
+			return fmt.Errorf("unable to remove queues of deleted replication: %w", err)
+		}
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to get existing replication status: %w", err)
 	}
@@ -276,23 +299,19 @@ func (r *policySvc) DeleteUserReplication(ctx context.Context, policy entity.Use
 	// we do NOT delete user-level routing.
 	// user may be deleting replication after successful switch.
 	// or in case if routing was set manually.
+	// 3. start new replication generation to drop already created tasks
+	_ = r.replicationGenerationStore.WithExecutor(tx).IncrementOp(ctx, uid)
 
 	if err := tx.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to execute transaction: %w", err)
 	}
-	// delete queues
-	queues := tasks.AllReplicationQueues(entity.UniversalFromUserReplication(policy))
-	for _, queue := range queues {
-		err := r.queueSvc.Delete(ctx, queue, true)
-		if err != nil && !errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msgf("unable to delete queue %s", queue)
-			continue
-		}
+	if err := tasks.StopAndPurgeReplicationQueues(ctx, r.queueSvc, uid); err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("unable to remove queues of deleted replication, retry delete to remove them")
 	}
 	return nil
 }
 
-func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entity.BucketReplicationPolicy, opts entity.ReplicationOptions) error {
+func (r *policySvc) ValidateBucketReplicationCreation(ctx context.Context, policy entity.BucketReplicationPolicy) error {
 	if err := policy.Validate(); err != nil {
 		return fmt.Errorf("unable to validate bucket replication policy: %w", err)
 	}
@@ -345,8 +364,14 @@ func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entit
 	if inUse {
 		return fmt.Errorf("%w: cannot use bucket %s as destination because it is already used in another replication", dom.ErrInvalidArg, policy.ToBucket)
 	}
+	return nil
+}
 
-	// all good, create policy
+func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entity.BucketReplicationPolicy, opts entity.ReplicationOptions) (int64, error) {
+	if err := r.ValidateBucketReplicationCreation(ctx, policy); err != nil {
+		return 0, err
+	}
+	uid := entity.UniversalFromBucketReplication(policy)
 	tx := r.bucketReplicationPolicyStore.TxExecutor()
 	// 1. set explicit bucket-level routing
 	_ = r.bucketRoutingStore.WithExecutor(tx).SetOp(ctx, policy.RoutingID(), policy.FromStorage)
@@ -358,11 +383,13 @@ func (r *policySvc) AddBucketReplicationPolicy(ctx context.Context, policy entit
 	if policy.ToBucket != policy.FromBucket {
 		_ = r.bucketRoutingStore.WithExecutor(tx).BlockOp(ctx, entity.NewBucketRoutingPolicyID(policy.User, policy.ToBucket))
 	}
+	// 5. start new replication generation
+	generation := r.replicationGenerationStore.WithExecutor(tx).IncrementOp(ctx, uid)
 
 	if err := tx.Exec(ctx); err != nil {
-		return fmt.Errorf("unable to execute transaction: %w", err)
+		return 0, fmt.Errorf("unable to execute transaction: %w", err)
 	}
-	return nil
+	return generation.Get()
 }
 
 func (r *policySvc) DeleteBucketReplication(ctx context.Context, policy entity.BucketReplicationPolicy) error {
@@ -381,7 +408,14 @@ func (r *policySvc) DeleteBucketReplication(ctx context.Context, policy entity.B
 		return fmt.Errorf("unable to check existing bucket replication switch: %w", err)
 	}
 	// check if policy exists
+	uid := entity.UniversalFromBucketReplication(policy)
 	_, err = r.bucketReplicationStatusStore.GetOp(ctx, policy).Get()
+	if errors.Is(err, dom.ErrNotFound) {
+		if err := tasks.StopAndPurgeReplicationQueues(ctx, r.queueSvc, uid); err != nil {
+			return fmt.Errorf("unable to remove queues of deleted replication: %w", err)
+		}
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to get existing replication status: %w", err)
 	}
@@ -396,18 +430,14 @@ func (r *policySvc) DeleteBucketReplication(ctx context.Context, policy entity.B
 	if policy.ToBucket != policy.FromBucket {
 		_ = r.bucketRoutingStore.WithExecutor(tx).UnblockOp(ctx, entity.NewBucketRoutingPolicyID(policy.User, policy.ToBucket))
 	}
+	// 4. start new replication generation to drop already created tasks
+	_ = r.replicationGenerationStore.WithExecutor(tx).IncrementOp(ctx, uid)
 
 	if err := tx.Exec(ctx); err != nil {
 		return fmt.Errorf("unable to execute transaction: %w", err)
 	}
-	// delete queues
-	queues := tasks.AllReplicationQueues(entity.UniversalFromBucketReplication(policy))
-	for _, queue := range queues {
-		err := r.queueSvc.Delete(ctx, queue, true)
-		if err != nil && !errors.Is(err, dom.ErrNotFound) {
-			zerolog.Ctx(ctx).Err(err).Msgf("unable to delete queue %s", queue)
-			continue
-		}
+	if err := tasks.StopAndPurgeReplicationQueues(ctx, r.queueSvc, uid); err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("unable to remove queues of deleted replication, retry delete to remove them")
 	}
 	return nil
 }

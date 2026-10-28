@@ -126,7 +126,7 @@ func (s *s3Svc) Replicate(ctx context.Context, routedTo string, task tasks.Repli
 		}
 		// 3. fan out tasks for each destination
 		if !skipTasks {
-			task.SetReplicationID(replID)
+			task.SetReplicationID(replID, xctx.GetReplicationGeneration(ctx, replID))
 			err := s.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return fmt.Errorf("unable to fan out replication task to %+v: %w", replID, err)

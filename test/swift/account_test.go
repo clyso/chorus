@@ -82,7 +82,7 @@ func Test_handleAccountUpdate(t *testing.T) {
 		User:        testAcc,
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-	}))
+	}), 0)
 	err = svc.AccountUpdate(tstCtx, task)
 	r.NoError(err, "handleAccountUpdate should not return an error")
 

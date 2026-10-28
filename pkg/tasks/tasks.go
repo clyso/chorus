@@ -98,23 +98,25 @@ type TaskPayload interface {
 }
 
 type ReplicationTask interface {
-	SetReplicationID(id entity.UniversalReplicationID)
+	SetReplicationID(id entity.UniversalReplicationID, generation int64)
 	GetReplicationID() entity.UniversalReplicationID
 	SetInheritableQueue(queue string)
 	GetInheritableQueue() string
 }
 
 type replicationID struct {
-	ID    entity.UniversalReplicationID
-	Queue string
+	ID         entity.UniversalReplicationID
+	Queue      string
+	Generation int64
 }
 
 func (r *replicationID) GetReplicationID() entity.UniversalReplicationID {
 	return r.ID
 }
 
-func (r *replicationID) SetReplicationID(id entity.UniversalReplicationID) {
+func (r *replicationID) SetReplicationID(id entity.UniversalReplicationID, generation int64) {
 	r.ID = id
+	r.Generation = generation
 }
 
 func (r *replicationID) SetInheritableQueue(queue string) {
@@ -136,35 +138,35 @@ type SwitchWithDowntimePayload struct {
 }
 
 type BucketSyncTagsPayload struct {
-	replicationID
 	Bucket string
+	replicationID
 }
 
 type ObjSyncTagsPayload struct {
-	replicationID
 	Object dom.Object
+	replicationID
 }
 
 type BucketSyncACLPayload struct {
-	replicationID
 	Bucket string
+	replicationID
 }
 
 type ObjSyncACLPayload struct {
-	replicationID
 	Object dom.Object
+	replicationID
 }
 
 type BucketCreatePayload struct {
-	replicationID
 	Bucket   string
 	Location string
 	//Storage  string
+	replicationID
 }
 
 type ObjectSyncPayload struct {
-	replicationID
 	Object dom.Object
+	replicationID
 
 	//FromVersion int64
 	ObjSize int64
@@ -172,9 +174,9 @@ type ObjectSyncPayload struct {
 }
 
 type BucketDeletePayload struct {
-	replicationID
 	Bucket string
 	//Storage string
+	replicationID
 }
 
 type ObjInfo struct {
@@ -183,15 +185,15 @@ type ObjInfo struct {
 }
 
 type ListObjectVersionsPayload struct {
-	replicationID
 	Bucket string
 	Prefix string
+	replicationID
 }
 
 type MigrateVersionedObjectPayload struct {
-	replicationID
 	Bucket string
 	Prefix string
+	replicationID
 }
 
 type MigrateS3UserPayload struct {
@@ -199,9 +201,9 @@ type MigrateS3UserPayload struct {
 }
 
 type MigrateBucketListObjectsPayload struct {
+	Bucket string
+	Prefix string
 	replicationID
-	Bucket    string
-	Prefix    string
 	Versioned bool
 }
 
@@ -278,8 +280,8 @@ type DiffFixEnsureObjectsRemovedPayload struct {
 }
 
 type DiffFixSwiftCopyPayload struct {
-	SwiftObjectMigrationPayload
 	Locations []MigrateLocation
+	SwiftObjectMigrationPayload
 }
 
 type DiffFixS3CopyPayload struct {
@@ -293,55 +295,50 @@ type DiffFixS3ListVersionsPayload struct {
 }
 
 type SwiftAccountUpdatePayload struct {
-	replicationID
-
 	// Date of the server response. Not Account modification date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
 	// because Openstack Swift does not return Last-Modified for Account Updates
 	Date string
+	replicationID
 }
 
 type SwiftContainerUpdatePayload struct {
-	replicationID
-
 	Bucket string
 	// Date of the server response. Not Container modification date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
 	// because Openstack Swift does not return Last-Modified for Container Updates
 	Date string
+	replicationID
 }
 
 type SwiftObjectMetaUpdatePayload struct {
-	replicationID
-
 	Bucket string
 	Object string
 	// Date of the server response. Not Object modification date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
 	// because Openstack Swift does not return Last-Modified for Object Meta Updates
 	Date string
+	replicationID
 }
 
 type SwiftObjectUpdatePayload struct {
-	replicationID
-
 	Bucket       string
 	Object       string
 	VersionID    string
 	Etag         string
 	LastModified string
+	replicationID
 }
 
 type SwiftObjectDeletePayload struct {
-	replicationID
-
 	Bucket    string
 	Object    string
 	VersionID string
 	// Date of the server response. Not Object deletion date, so it cannot be
 	// compared with Last-modified directly, but can be used as a reference
 	// because Openstack Swift does not return Last-Modified for Object delete
-	Date            string
+	Date string
+	replicationID
 	DeleteMultipart bool
 }
 
@@ -350,18 +347,16 @@ type SwiftAccountMigrationPayload struct {
 }
 
 type SwiftContainerMigrationPayload struct {
-	replicationID
-
 	Bucket string
+	replicationID
 }
 
 type SwiftObjectMigrationPayload struct {
-	replicationID
-
 	Bucket          string
 	ObjName         string
 	ObjVersion      string
 	ObjEtag         string
 	ObjLastModified string
-	ObjSize         int64
+	replicationID
+	ObjSize int64
 }

@@ -143,11 +143,11 @@ func Test_policySvc_SetBucketRouting(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
+				_, err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
+				_, err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.userReplHasZeroDowntimeSwitch {
@@ -261,11 +261,11 @@ func Test_policySvc_DeleteBucketRouting(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
+				_, err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
+				_, err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.bucketReplHasZeroDowntimeSwitch {
@@ -388,11 +388,11 @@ func Test_policySvc_SetUserRouting(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
+				_, err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
+				_, err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.userReplHasZeroDowntimeSwitch {
@@ -514,11 +514,11 @@ func Test_policySvc_DeleteUserRouting(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
+				_, err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
+				_, err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 			}
 			if tt.before.userReplHasZeroDowntimeSwitch {

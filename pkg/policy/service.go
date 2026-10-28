@@ -41,6 +41,7 @@ func NewService(client redis.UniversalClient, queueSVC tasks.QueueService, mainS
 		bucketReplicationSwitchStore: store.NewBucketReplicationSwitchStore(client),
 		bucketReplicationStatusStore: store.NewBucketReplicationStatusStore(client),
 		userReplicationStatusStore:   store.NewUserReplicationStatusStore(client),
+		replicationGenerationStore:   store.NewReplicationGenerationStore(client),
 		queueSvc:                     queueSVC,
 	}
 }
@@ -54,6 +55,7 @@ type policySvc struct {
 	userReplicationPolicyStore   *store.UserReplicationPolicyStore
 	bucketReplicationStatusStore *store.BucketReplicationStatusStore
 	userReplicationStatusStore   *store.UserReplicationStatusStore
+	replicationGenerationStore   *store.ReplicationGenerationStore
 
 	userReplicationSwitchStore   *store.UserReplicationSwitchStore
 	bucketReplicationSwitchStore *store.BucketReplicationSwitchStore

@@ -69,7 +69,7 @@ func Test_handleContainerUpdate(t *testing.T) {
 		User:        testAcc,
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-	}))
+	}), 0)
 	err = svc.ContainerUpdate(tstCtx, task)
 	r.NoError(err, "handleContainerUpdate should not return an error")
 	// check swift container

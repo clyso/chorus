@@ -77,21 +77,22 @@ func (r *Lock) Do(ctx context.Context, refresh time.Duration, work func() error)
 	}()
 	timer := time.NewTimer(refresh)
 	defer timer.Stop()
+	// keep the lock until work returns, even if ctx is canceled
+	refreshCtx := ctx
 	i := 0
 	for {
 		select {
-		case <-ctx.Done():
-			return fmt.Errorf("%w: refresh context canceled: %w", context.Canceled, ctx.Err())
+		case <-refreshCtx.Done():
+			refreshCtx = context.WithoutCancel(ctx)
 		case <-timer.C:
 			i++
-			err = r.Refresh(ctx, refreshInterval)
+			err = r.Refresh(refreshCtx, refreshInterval)
 			if err != nil {
 				zerolog.Ctx(ctx).Err(err).
 					Str("refresh_period", refresh.String()).
 					Str("refresh_overlap", r.overlap.String()).
 					Int("refresh_iteration", i).
 					Msg("unable to refresh lock")
-				continue
 			}
 			timer.Reset(refresh)
 		case err = <-errCh:

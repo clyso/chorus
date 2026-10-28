@@ -75,7 +75,7 @@ func Test_handleObjectDelete(t *testing.T) {
 		User:        testAcc,
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-	}))
+	}), 0)
 	err = svc.ObjectDelete(tstCtx, task)
 	r.NoError(err, "task ignored when source object not deleted")
 	// object still exists in swift
@@ -177,7 +177,7 @@ func Test_handleObjectDeleteMultipart(t *testing.T) {
 		User:        testAcc,
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-	}))
+	}), 0)
 	err = svc.ObjectDelete(tstCtx, task)
 	r.NoError(err, "failed to sync object delete with multipart delete")
 	// check that SLO manifest was deleted, but parts still exist
