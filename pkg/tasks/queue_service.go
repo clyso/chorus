@@ -24,6 +24,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"github.com/clyso/chorus/pkg/dom"
+	"github.com/clyso/chorus/pkg/entity"
 )
 
 type QueueService interface {
@@ -32,6 +33,11 @@ type QueueService interface {
 	Resume(ctx context.Context, queueName string) error
 	Pause(ctx context.Context, queueName string) error
 	Delete(ctx context.Context, queueName string, force bool) error
+	// Stop pauses queues, cancels active tasks and waits until asynq reports none active.
+	// Handlers of canceled tasks may still be finishing. Queues stay paused.
+	Stop(ctx context.Context, queues ...string) error
+	// Purge requires stopped queues: asynq refuses to delete a queue with active tasks.
+	Purge(ctx context.Context, queues ...string) error
 	Stats(ctx context.Context, queueName string) (*QueueStats, error)
 	EnqueueTask(ctx context.Context, task any) error
 }
@@ -104,6 +110,94 @@ func (q *queueService) Delete(ctx context.Context, queueName string, force bool)
 		return fmt.Errorf("unable to delete non-empty queue %s: %w", queueName, dom.ErrInvalidArg)
 	}
 	return err
+}
+
+const (
+	// a task held by a dead worker stays active until its asynq lease expires, so waiting longer is pointless
+	stopTimeout      = 10 * time.Second
+	stopPollInterval = 50 * time.Millisecond
+)
+
+func (q *queueService) Stop(ctx context.Context, queues ...string) error {
+	// pause sets the flag even for missing queues, so later enqueued tasks are not processed
+	for _, queue := range queues {
+		if err := q.Pause(ctx, queue); err != nil {
+			return fmt.Errorf("unable to pause queue %s: %w", queue, err)
+		}
+	}
+	deadline := time.Now().Add(stopTimeout)
+	for {
+		// a task dequeued concurrently with pause may become active after the previous listing
+		active, err := q.cancelActive(queues)
+		if err != nil {
+			return err
+		}
+		if active == 0 {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%w: %d tasks are still active after %s, queues are paused, retry later", dom.ErrInternal, active, stopTimeout)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(stopPollInterval):
+		}
+	}
+}
+
+func (q *queueService) cancelActive(queues []string) (int, error) {
+	const pageSize = 1000
+	active := 0
+	for _, queue := range queues {
+		for page := 1; ; page++ {
+			list, err := q.inspector.ListActiveTasks(queue, asynq.PageSize(pageSize), asynq.Page(page))
+			if errors.Is(err, asynq.ErrQueueNotFound) {
+				break
+			}
+			if err != nil {
+				return 0, fmt.Errorf("unable to list active tasks of queue %s: %w", queue, err)
+			}
+			for _, task := range list {
+				if err := q.inspector.CancelProcessing(task.ID); err != nil {
+					return 0, fmt.Errorf("unable to cancel task %s of queue %s: %w", task.ID, queue, err)
+				}
+			}
+			active += len(list)
+			if len(list) < pageSize {
+				break
+			}
+		}
+	}
+	return active, nil
+}
+
+func (q *queueService) Purge(ctx context.Context, queues ...string) error {
+	for _, queue := range queues {
+		err := q.Delete(ctx, queue, true)
+		if errors.Is(err, dom.ErrNotFound) {
+			// missing queue may still have the paused flag
+			if err := q.Resume(ctx, queue); err != nil {
+				return fmt.Errorf("unable to remove paused flag of queue %s: %w", queue, err)
+			}
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("unable to delete queue %s: %w", queue, err)
+		}
+	}
+	return nil
+}
+
+func StopAndPurgeReplicationQueues(ctx context.Context, svc QueueService, id entity.UniversalReplicationID) error {
+	queues := AllReplicationQueues(id)
+	if err := svc.Stop(ctx, queues...); err != nil {
+		return fmt.Errorf("unable to stop replication queues: %w", err)
+	}
+	if err := svc.Purge(ctx, queues...); err != nil {
+		return fmt.Errorf("unable to purge replication queues: %w", err)
+	}
+	return nil
 }
 
 func (q *queueService) UnprocessedCount(ctx context.Context, ignoreNotFound bool, queues ...string) (int, error) {

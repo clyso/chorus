@@ -63,7 +63,7 @@ func (s *svc) HandleSwiftObjectMigration(ctx context.Context, t *asynq.Task) (er
 			Etag:         p.ObjEtag,
 			LastModified: p.ObjLastModified,
 		}
-		task.SetReplicationID(p.ID)
+		task.SetReplicationID(p.ID, p.Generation)
 		return s.ObjectUpdate(ctx, task)
 	})
 }

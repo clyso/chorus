@@ -365,7 +365,7 @@ func Test_getActiveZeroDowntimeSwitch(t *testing.T) {
 			ToStorage:   "follower",
 		}
 		uid := entity.UniversalFromUserReplication(policy)
-		err := svc.AddUserReplicationPolicy(ctx, policy, entity.ReplicationOptions{})
+		_, err := svc.AddUserReplicationPolicy(ctx, policy, entity.ReplicationOptions{})
 		r.NoError(err)
 		// create zero downtime switch
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, uid, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute})
@@ -405,7 +405,7 @@ func Test_getActiveZeroDowntimeSwitch(t *testing.T) {
 			ToBucket:    "bucket2",
 		}
 		uid := entity.UniversalFromBucketReplication(policy)
-		err := svc.AddBucketReplicationPolicy(ctx, policy, entity.ReplicationOptions{})
+		_, err := svc.AddBucketReplicationPolicy(ctx, policy, entity.ReplicationOptions{})
 		r.NoError(err)
 		// create zero downtime switch
 		err = svc.AddZeroDowntimeReplicationSwitch(ctx, uid, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute})
@@ -428,7 +428,7 @@ func Test_BuildProxyContext(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		c := testutil.SetupRedis(t)
 		r := require.New(t)
-		svc := NewService(c, nil, "main")
+		svc := NewService(c, &tasks.QueueServiceMock{}, "main")
 		ctx := t.Context()
 
 		proxyCtx, err := svc.BuildProxyContext(ctx, "user", "bucket")
@@ -462,7 +462,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromStorage: "main",
 			ToStorage:   "follower",
 		}
-		err := svc.AddUserReplicationPolicy(ctx, userPolicy, entity.ReplicationOptions{})
+		_, err := svc.AddUserReplicationPolicy(ctx, userPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		// other user returns no policies
@@ -583,7 +583,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			ToStorage:   "follower",
 		}
 
-		err = svc.AddUserReplicationPolicy(ctx, otherUserPolicy, entity.ReplicationOptions{})
+		_, err = svc.AddUserReplicationPolicy(ctx, otherUserPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err = svc.BuildProxyContext(ctx, "other-user", "bucket")
@@ -650,7 +650,7 @@ func Test_BuildProxyContext(t *testing.T) {
 	t.Run("multiple user replications", func(t *testing.T) {
 		c := testutil.SetupRedis(t)
 		r := require.New(t)
-		svc := NewService(c, nil, "main")
+		svc := NewService(c, &tasks.QueueServiceMock{}, "main")
 		ctx := t.Context()
 
 		//setup: add user replication
@@ -659,7 +659,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromStorage: "main",
 			ToStorage:   "follower",
 		}
-		err := svc.AddUserReplicationPolicy(ctx, userPolicy1, entity.ReplicationOptions{})
+		_, err := svc.AddUserReplicationPolicy(ctx, userPolicy1, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err := svc.BuildProxyContext(ctx, "user", "bucket")
@@ -687,7 +687,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromStorage: "main",
 			ToStorage:   "follower2",
 		}
-		err = svc.AddUserReplicationPolicy(ctx, userPolicy2, entity.ReplicationOptions{})
+		_, err = svc.AddUserReplicationPolicy(ctx, userPolicy2, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err = svc.BuildProxyContext(ctx, "user", "bucket")
@@ -728,7 +728,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			FromBucket:  "bucket",
 			ToBucket:    "bucket",
 		}
-		err := svc.AddBucketReplicationPolicy(ctx, bucketPolicy, entity.ReplicationOptions{})
+		_, err := svc.AddBucketReplicationPolicy(ctx, bucketPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		// other user returns no policies
@@ -893,7 +893,7 @@ func Test_BuildProxyContext(t *testing.T) {
 			ToBucket:    "other-bucket",
 		}
 
-		err = svc.AddBucketReplicationPolicy(ctx, otherBucketPolicy, entity.ReplicationOptions{})
+		_, err = svc.AddBucketReplicationPolicy(ctx, otherBucketPolicy, entity.ReplicationOptions{})
 		r.NoError(err)
 
 		proxyCtx, err = svc.BuildProxyContext(ctx, "user", "other-bucket")
@@ -975,5 +975,102 @@ func validateCtx(t *testing.T, ctx context.Context, expected validateCtxParams) 
 		for i := range expected.expectedRepls {
 			r.Equal(expected.expectedRepls[i].AsString(), gotReplications[i].AsString(), "replication ID should match")
 		}
+	}
+}
+
+func Test_ContextReplicationGenerations(t *testing.T) {
+	userPolicy := entity.UserReplicationPolicy{User: "user", FromStorage: "main", ToStorage: "follower"}
+	bucketPolicy := entity.BucketReplicationPolicy{User: "user", FromStorage: "main", ToStorage: "follower", FromBucket: "bucket", ToBucket: "bucket"}
+	tests := []struct {
+		add                   func(svc *policySvc) error
+		delete                func(svc *policySvc) error
+		name                  string
+		id                    entity.UniversalReplicationID
+		visibleWithoutBucket  bool
+		visibleInOtherBuckets bool
+	}{
+		{
+			name: "user replication",
+			id:   entity.UniversalFromUserReplication(userPolicy),
+			add: func(svc *policySvc) error {
+				_, err := svc.AddUserReplicationPolicy(t.Context(), userPolicy, entity.ReplicationOptions{})
+				return err
+			},
+			delete: func(svc *policySvc) error {
+				return svc.DeleteUserReplication(t.Context(), userPolicy)
+			},
+			visibleWithoutBucket:  true,
+			visibleInOtherBuckets: true,
+		},
+		{
+			name: "bucket replication",
+			id:   entity.UniversalFromBucketReplication(bucketPolicy),
+			add: func(svc *policySvc) error {
+				_, err := svc.AddBucketReplicationPolicy(t.Context(), bucketPolicy, entity.ReplicationOptions{})
+				return err
+			},
+			delete: func(svc *policySvc) error {
+				return svc.DeleteBucketReplication(t.Context(), bucketPolicy)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+			c := testutil.SetupRedis(t)
+			qs := &tasks.QueueServiceMock{}
+			tasks.Reset(qs)
+			svc := NewService(c, qs, "main")
+			ctx := t.Context()
+
+			r.NoError(tt.add(svc))
+			r.NoError(tt.delete(svc))
+			r.NoError(tt.add(svc))
+			generation, err := svc.GetReplicationGeneration(ctx, tt.id)
+			r.NoError(err)
+			r.EqualValues(3, generation)
+			want := map[entity.UniversalReplicationID]int64{tt.id: generation}
+			wantIn := func(visible bool) map[entity.UniversalReplicationID]int64 {
+				if visible {
+					return want
+				}
+				return nil
+			}
+
+			agentCtx, err := svc.BuildAgentContext(ctx, "user", "bucket")
+			r.NoError(err)
+			r.Equal(want, xctx.GetReplicationGenerations(agentCtx))
+			agentCtx, err = svc.BuildAgentContext(ctx, "user", "other-bucket")
+			r.NoError(err)
+			r.Equal(wantIn(tt.visibleInOtherBuckets), xctx.GetReplicationGenerations(agentCtx))
+			agentCtx, err = svc.BuildAgentContext(ctx, "other-user", "bucket")
+			r.NoError(err)
+			r.Nil(xctx.GetReplicationGenerations(agentCtx))
+
+			proxyCtx, err := svc.BuildProxyContext(ctx, "user", "bucket")
+			r.NoError(err)
+			r.Equal(want, xctx.GetReplicationGenerations(proxyCtx))
+			proxyCtx, err = svc.BuildProxyContext(ctx, "user", "other-bucket")
+			r.NoError(err)
+			r.Equal(wantIn(tt.visibleInOtherBuckets), xctx.GetReplicationGenerations(proxyCtx))
+			proxyCtx, err = svc.BuildProxyNoBucketContext(ctx, "user")
+			r.NoError(err)
+			r.Equal(wantIn(tt.visibleWithoutBucket), xctx.GetReplicationGenerations(proxyCtx))
+
+			// proxy still creates tasks for multipart uploads started before the switch
+			qs.InitReplicationDone(tt.id)
+			r.NoError(svc.AddZeroDowntimeReplicationSwitch(ctx, tt.id, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute}))
+			proxyCtx, err = svc.BuildProxyContext(ctx, "user", "bucket")
+			r.NoError(err)
+			r.Empty(xctx.GetReplications(proxyCtx))
+			r.NotNil(xctx.GetInProgressZeroDowntime(proxyCtx))
+			r.Equal(want, xctx.GetReplicationGenerations(proxyCtx))
+			proxyCtx, err = svc.BuildProxyNoBucketContext(ctx, "user")
+			r.NoError(err)
+			r.Equal(wantIn(tt.visibleWithoutBucket), xctx.GetReplicationGenerations(proxyCtx))
+			agentCtx, err = svc.BuildAgentContext(ctx, "user", "bucket")
+			r.NoError(err)
+			r.Nil(xctx.GetReplicationGenerations(agentCtx), "agent creates tasks only for replication policies")
+		})
 	}
 }

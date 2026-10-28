@@ -149,6 +149,9 @@ func StartNew(from context.Context) (context.Context, context.CancelFunc) {
 	if reps := xctx.GetReplications(from); len(reps) != 0 {
 		ctx = xctx.SetReplications(ctx, reps)
 	}
+	if gens := xctx.GetReplicationGenerations(from); len(gens) != 0 {
+		ctx = xctx.SetReplicationGenerations(ctx, gens)
+	}
 	if switchInfo := xctx.GetInProgressZeroDowntime(from); switchInfo != nil {
 		ctx = xctx.SetInProgressZeroDowntime(ctx, *switchInfo)
 	}

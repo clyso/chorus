@@ -131,7 +131,13 @@ func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID e
 	opts := entity.ReplicationOptions{
 		EventSource: pbToEventSource(eventSource),
 	}
-	err = h.policySvc.AddUserReplicationPolicy(ctx, replicationID, opts)
+	if err := h.policySvc.ValidateUserReplicationCreation(ctx, replicationID); err != nil {
+		return err
+	}
+	if err := h.removeLeftoversOfDeletedReplication(ctx, entity.UniversalFromUserReplication(replicationID)); err != nil {
+		return err
+	}
+	generation, err := h.policySvc.AddUserReplicationPolicy(ctx, replicationID, opts)
 	if err != nil {
 		return err
 	}
@@ -159,7 +165,7 @@ func (h *policyHandlers) addUserReplication(ctx context.Context, replicationID e
 	}
 	// enqueue
 	uid := entity.UniversalFromUserReplication(replicationID)
-	task.SetReplicationID(uid)
+	task.SetReplicationID(uid, generation)
 	return h.queueSvc.EnqueueTask(ctx, task)
 }
 
@@ -210,8 +216,14 @@ func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID
 		return fmt.Errorf("%w: bucket %s not exists in source storage %s", dom.ErrInvalidArg, replicationID.FromBucket, replicationID.FromStorage)
 	}
 
+	if err := h.policySvc.ValidateBucketReplicationCreation(ctx, replicationID); err != nil {
+		return err
+	}
+	if err := h.removeLeftoversOfDeletedReplication(ctx, entity.UniversalFromBucketReplication(replicationID)); err != nil {
+		return err
+	}
 	// create policy:
-	err = h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, opts)
+	generation, err := h.policySvc.AddBucketReplicationPolicy(ctx, replicationID, opts)
 	if err != nil {
 		return fmt.Errorf("%w: unable to add bucket replication policy", err)
 	}
@@ -234,7 +246,7 @@ func (h *policyHandlers) addBucketReplication(ctx context.Context, replicationID
 	default:
 		return fmt.Errorf("%w: unsupported storage type %s for bucket replication", dom.ErrInvalidArg, storageType)
 	}
-	task.SetReplicationID(entity.UniversalFromBucketReplication(replicationID))
+	task.SetReplicationID(entity.UniversalFromBucketReplication(replicationID), generation)
 	return h.queueSvc.EnqueueTask(ctx, task)
 }
 
@@ -298,51 +310,73 @@ func (h *policyHandlers) DeleteReplication(ctx context.Context, req *pb.Replicat
 	if err != nil {
 		return nil, err
 	}
-	existing, err := h.policySvc.GetReplicationPolicyInfoExtended(ctx, uid)
-	if err != nil {
-		return nil, err
-	}
-	isAgent := existing.AgentURL != ""
-	err = h.inReplicationLock(ctx, uid, func() error {
-		if userRepl, ok := uid.AsUserID(); ok {
-			// delete user replication
-			err = h.policySvc.DeleteUserReplication(ctx, userRepl)
-			if err != nil {
-				return err
-			}
-		} else if bucketRepl, ok := uid.AsBucketID(); ok {
-			// create bucket replication
-			err = h.policySvc.DeleteBucketReplication(ctx, bucketRepl)
-			if err != nil {
-				return fmt.Errorf("%w: unable to delete replication policy", err)
-			}
-			if isAgent {
-				err = h.notificationSvc.DeleteBucketNotification(ctx, bucketRepl.FromStorage, bucketRepl.User, bucketRepl.FromBucket)
-				if err != nil {
-					zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
-				}
-			}
-		} else {
-			return fmt.Errorf("%w: invalid replication ID", dom.ErrInvalidArg)
-		}
-		err = h.versionSvc.Cleanup(ctx, uid)
-		if err != nil {
-			return fmt.Errorf("%w: unable to delete version metadata", err)
-		}
-		err = h.objectListStateStore.DeleteForReplication(ctx, uid)
-		if err != nil {
-			return fmt.Errorf("%w: unable to delete list obj metadata", err)
-		}
-		err = h.bucketListStateStore.DeleteForReplication(ctx, uid)
-		if err != nil {
-			return fmt.Errorf("%w: unable to delete list bucket metadata", err)
-		}
-		return nil
+	// lock order: user, then replication
+	err = h.inUserLock(ctx, req.User, func() error {
+		return h.inReplicationLock(ctx, uid, func() error {
+			return h.deleteReplication(ctx, uid)
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (h *policyHandlers) deleteReplication(ctx context.Context, uid entity.UniversalReplicationID) error {
+	existing, err := h.policySvc.GetReplicationPolicyInfoExtended(ctx, uid)
+	if err != nil && !errors.Is(err, dom.ErrNotFound) {
+		return err
+	}
+	// missing replication may have leftover queues, so policy delete still runs; metadata is kept because user replication cleanup also matches bucket replications
+	exists := err == nil
+	if userRepl, ok := uid.AsUserID(); ok {
+		if err := h.policySvc.DeleteUserReplication(ctx, userRepl); err != nil {
+			return err
+		}
+	} else if bucketRepl, ok := uid.AsBucketID(); ok {
+		if err := h.policySvc.DeleteBucketReplication(ctx, bucketRepl); err != nil {
+			return fmt.Errorf("%w: unable to delete replication policy", err)
+		}
+		if exists && existing.AgentURL != "" {
+			err := h.notificationSvc.DeleteBucketNotification(ctx, bucketRepl.FromStorage, bucketRepl.User, bucketRepl.FromBucket)
+			if err != nil {
+				zerolog.Ctx(ctx).Err(err).Msg("unable to delete agent bucket notification")
+			}
+		}
+	} else {
+		return fmt.Errorf("%w: invalid replication ID", dom.ErrInvalidArg)
+	}
+	if !exists {
+		return nil
+	}
+	return h.deleteReplicationMetadata(ctx, uid)
+}
+
+// removeLeftoversOfDeletedReplication must be called only after creation is validated:
+// metadata cleanup of a user replication also matches its bucket replications.
+// Queues are stopped first so canceled tasks cannot start new metadata writes (go-redis rejects commands on canceled ctx).
+// A write already sent can still land.
+func (h *policyHandlers) removeLeftoversOfDeletedReplication(ctx context.Context, uid entity.UniversalReplicationID) error {
+	if err := tasks.StopAndPurgeReplicationQueues(ctx, h.queueSvc, uid); err != nil {
+		return fmt.Errorf("unable to remove queues of deleted replication: %w", err)
+	}
+	if err := h.deleteReplicationMetadata(ctx, uid); err != nil {
+		return fmt.Errorf("unable to clean up leftovers of deleted replication: %w", err)
+	}
+	return nil
+}
+
+func (h *policyHandlers) deleteReplicationMetadata(ctx context.Context, uid entity.UniversalReplicationID) error {
+	if err := h.versionSvc.Cleanup(ctx, uid); err != nil {
+		return fmt.Errorf("%w: unable to delete version metadata", err)
+	}
+	if err := h.objectListStateStore.DeleteForReplication(ctx, uid); err != nil {
+		return fmt.Errorf("%w: unable to delete list obj metadata", err)
+	}
+	if err := h.bucketListStateStore.DeleteForReplication(ctx, uid); err != nil {
+		return fmt.Errorf("%w: unable to delete list bucket metadata", err)
+	}
+	return nil
 }
 
 func (h *policyHandlers) DeleteSwitch(ctx context.Context, req *pb.ReplicationID) (*emptypb.Empty, error) {
@@ -538,7 +572,9 @@ func (h *policyHandlers) PauseReplication(ctx context.Context, req *pb.Replicati
 	if err != nil {
 		return nil, err
 	}
-	err = h.policySvc.PauseReplication(ctx, uid)
+	err = h.inUserLock(ctx, req.User, func() error {
+		return h.policySvc.PauseReplication(ctx, uid)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -550,7 +586,9 @@ func (h *policyHandlers) ResumeReplication(ctx context.Context, req *pb.Replicat
 	if err != nil {
 		return nil, err
 	}
-	err = h.policySvc.ResumeReplication(ctx, uid)
+	err = h.inUserLock(ctx, req.User, func() error {
+		return h.policySvc.ResumeReplication(ctx, uid)
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -685,7 +685,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
+				_, err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -699,7 +699,7 @@ func Test_policySvc_SetDowntimeReplicationSwitch(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{AgentURL: tt.before.bucketReplAgent})
+				_, err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{AgentURL: tt.before.bucketReplAgent})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -1133,7 +1133,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 			ctx := t.Context()
 
 			if tt.before.userRepl != nil {
-				err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
+				_, err := svc.AddUserReplicationPolicy(ctx, *tt.before.userRepl, entity.ReplicationOptions{})
 				r.NoError(err)
 				if tt.before.userReplHasSwitch {
 					uid := entity.UniversalFromUserReplication(*tt.before.userRepl)
@@ -1150,7 +1150,7 @@ func Test_policySvc_AddZeroDowntimeSwitch(t *testing.T) {
 				}
 			}
 			if tt.before.bucketRepl != nil {
-				err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{AgentURL: tt.before.bucketReplAgent})
+				_, err := svc.AddBucketReplicationPolicy(ctx, *tt.before.bucketRepl, entity.ReplicationOptions{AgentURL: tt.before.bucketReplAgent})
 				r.NoError(err)
 				if tt.before.bucketReplHasSwitch {
 					bid := entity.UniversalFromBucketReplication(*tt.before.bucketRepl)
@@ -1488,9 +1488,11 @@ func setupDowntimeSwitchState(t *testing.T, svc *policySvc, queuesMock *tasks.Qu
 
 	// create routing and replication
 	if bucketID, ok := replID.AsBucketID(); ok {
-		r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{}))
+		_, err := svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{})
+		r.NoError(err)
 	} else if userID, ok := replID.AsUserID(); ok {
-		r.NoError(svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{}))
+		_, err := svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{})
+		r.NoError(err)
 	} else {
 		t.Fatal("invalid replication ID type")
 	}
@@ -1644,9 +1646,11 @@ func Test_ZeroDowntimeSwitch_E2E(t *testing.T) {
 
 			// create routing and replication
 			if bucketID, ok := replID.AsBucketID(); ok {
-				r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{}))
+				_, err := svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{})
+				r.NoError(err)
 			} else if userID, ok := replID.AsUserID(); ok {
-				r.NoError(svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{}))
+				_, err := svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{})
+				r.NoError(err)
 			} else {
 				t.Fatal("invalid replication ID type")
 			}
@@ -1753,9 +1757,11 @@ func Test_ZeroDowntimeSwitch_E2E(t *testing.T) {
 
 			// recreate replication and switch again
 			if bucketID, ok := replID.AsBucketID(); ok {
-				r.NoError(svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{}))
+				_, err := svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{})
+				r.NoError(err)
 			} else if userID, ok := replID.AsUserID(); ok {
-				r.NoError(svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{}))
+				_, err := svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{})
+				r.NoError(err)
 			} else {
 				t.Fatal("invalid replication ID type")
 			}
@@ -2188,6 +2194,82 @@ func Test_DowntimeSwitch_E2E(t *testing.T) {
 			replicationPolicyExists(t, svc, replID, true)
 			routeTo, err = svc.getRoutingForReplication(ctx, replID)
 			r.NoError(err)
+		})
+	}
+}
+
+// Switch must not change generation: queued tasks of the replication must keep running.
+func Test_SwitchKeepsReplicationGeneration(t *testing.T) {
+	c := testutil.SetupRedis(t)
+	queuesMock := &tasks.QueueServiceMock{}
+	replications := map[string]entity.UniversalReplicationID{
+		"user": entity.UniversalFromUserReplication(entity.UserReplicationPolicy{
+			User:        "user",
+			FromStorage: "main",
+			ToStorage:   "follower",
+		}),
+		"bucket": entity.UniversalFromBucketReplication(entity.BucketReplicationPolicy{
+			User:        "user",
+			FromStorage: "main",
+			FromBucket:  "bucket",
+			ToStorage:   "follower",
+			ToBucket:    "bucket",
+		}),
+	}
+	for replType, replID := range replications {
+		t.Run(replType+" zero downtime", func(t *testing.T) {
+			if err := c.FlushAll(t.Context()).Err(); err != nil {
+				t.Fatal(err)
+			}
+			tasks.Reset(queuesMock)
+			r := require.New(t)
+			svc := NewService(c, queuesMock, "main")
+			ctx := t.Context()
+
+			if bucketID, ok := replID.AsBucketID(); ok {
+				_, err := svc.AddBucketReplicationPolicy(ctx, bucketID, entity.ReplicationOptions{})
+				r.NoError(err)
+			} else if userID, ok := replID.AsUserID(); ok {
+				_, err := svc.AddUserReplicationPolicy(ctx, userID, entity.ReplicationOptions{})
+				r.NoError(err)
+			}
+			generation, err := svc.GetReplicationGeneration(ctx, replID)
+			r.NoError(err)
+			queuesMock.InitReplicationDone(replID)
+			queuesMock.EventReplicationInProgress(replID)
+
+			r.NoError(svc.AddZeroDowntimeReplicationSwitch(ctx, replID, &entity.ReplicationSwitchZeroDowntimeOpts{MultipartTTL: time.Minute}))
+			replicationPolicyExists(t, svc, replID, false)
+			got, err := svc.GetReplicationGeneration(ctx, replID)
+			r.NoError(err)
+			r.Equal(generation, got, "switch start keeps generation")
+			r.Equal(1, queuesMock.Queues[tasks.EventMigrationQueue(replID)], "switch start keeps queued tasks")
+
+			r.NoError(svc.CompleteZeroDowntimeReplicationSwitch(ctx, replID))
+			got, err = svc.GetReplicationGeneration(ctx, replID)
+			r.NoError(err)
+			r.Equal(generation, got, "switch completion keeps generation")
+		})
+		t.Run(replType+" downtime", func(t *testing.T) {
+			if err := c.FlushAll(t.Context()).Err(); err != nil {
+				t.Fatal(err)
+			}
+			tasks.Reset(queuesMock)
+			r := require.New(t)
+			svc := NewService(c, queuesMock, "main")
+			ctx := t.Context()
+
+			opts := &entity.ReplicationSwitchDowntimeOpts{
+				Cron:                stringPtr("0 0 * * *"),
+				ContinueReplication: true,
+			}
+			setupDowntimeSwitchState(t, svc, queuesMock, replID, opts, entity.StatusDone)
+			got, err := svc.GetReplicationGeneration(ctx, replID)
+			r.NoError(err)
+			r.EqualValues(1, got, "switch keeps generation of added replication")
+			got, err = svc.GetReplicationGeneration(ctx, replID.Swap())
+			r.NoError(err)
+			r.Zero(got, "switch does not change generation of backward replication")
 		})
 	}
 }

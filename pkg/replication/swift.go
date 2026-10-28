@@ -61,7 +61,7 @@ func (s *swiftSVC) Replicate(ctx context.Context, routedTo string, task tasks.Re
 
 	// 3. fan out tasks for each destination
 	for _, replID := range replications {
-		task.SetReplicationID(replID)
+		task.SetReplicationID(replID, xctx.GetReplicationGeneration(ctx, replID))
 		err := s.queueSvc.EnqueueTask(ctx, task)
 		if err != nil {
 			return fmt.Errorf("unable to fan out replication task to %+v: %w", replID, err)

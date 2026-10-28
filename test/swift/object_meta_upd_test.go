@@ -60,7 +60,7 @@ func Test_handleObjectMetaUpdate(t *testing.T) {
 		User:        testAcc,
 		FromStorage: swiftTestKey,
 		ToStorage:   cephTestKey,
-	}))
+	}), 0)
 	// handler retuns error if object does not exist
 	err = svc.ObjectMetaUpdate(tstCtx, task)
 	r.NoError(err, "handleObjectMetaUpdate should return an error if object does not exist in ceph")

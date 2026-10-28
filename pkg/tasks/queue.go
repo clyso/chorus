@@ -19,6 +19,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/clyso/chorus/pkg/entity"
 )
@@ -56,15 +58,22 @@ var Priority = map[string]int{
 	"*":                                          1, // fallback for legacy queues
 }
 
+var replicationQueuePrefixes = []Queue{QueueMigrateListObjectsPrefix, QueueMigrateCopyObjectPrefix, QueueEventsPrefix}
+
 func replicationQueueName(queuePrefix Queue, id entity.UniversalReplicationID) string {
-	switch queuePrefix {
-	case QueueMigrateCopyObjectPrefix,
-		QueueMigrateListObjectsPrefix,
-		QueueEventsPrefix:
-		return fmt.Sprintf("%s:%s", queuePrefix, id.AsString())
-	default:
+	if !slices.Contains(replicationQueuePrefixes, queuePrefix) {
 		panic(fmt.Sprintf("%s is not a replication queue prefix", queuePrefix))
 	}
+	return fmt.Sprintf("%s:%s", queuePrefix, id.AsString())
+}
+
+func isReplicationQueue(queue string) bool {
+	for _, prefix := range replicationQueuePrefixes {
+		if strings.HasPrefix(queue, string(prefix)+":") {
+			return true
+		}
+	}
+	return false
 }
 
 func InitMigrationListQueue(id entity.UniversalReplicationID) string {

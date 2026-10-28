@@ -79,7 +79,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 				Bucket: p.Bucket,
 				Prefix: object.Key,
 			}
-			task.SetReplicationID(replicationID)
+			task.SetReplicationID(replicationID, p.Generation)
 			err = s.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return fmt.Errorf("unable to create list object versions task: %w", err)
@@ -95,7 +95,7 @@ func (s *svc) HandleMigrationBucketListObj(ctx context.Context, t *asynq.Task) e
 					ContentType: object.ContentType,
 				},
 			}
-			task.SetReplicationID(replicationID)
+			task.SetReplicationID(replicationID, p.Generation)
 			err = s.queueSvc.EnqueueTask(ctx, task)
 			if err != nil {
 				return fmt.Errorf("migration bucket list obj: unable to create copy obj task: %w", err)

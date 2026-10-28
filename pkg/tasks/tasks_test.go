@@ -39,7 +39,7 @@ func Test_ReplicationGetterSetter(t *testing.T) {
 		FromBucket:  "fb",
 		ToStorage:   "ts",
 		ToBucket:    "tb",
-	}))
+	}), 0)
 	r.NotEmpty(expect.ID.AsString())
 	r.False(expect.ID.IsEmpty())
 	r.EqualValues("u", expect.ID.User())

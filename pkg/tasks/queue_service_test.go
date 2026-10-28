@@ -327,9 +327,58 @@ func Test_queueService_Enqueue(t *testing.T) {
 		FromBucket:  "fb",
 		ToStorage:   "ts",
 		ToBucket:    "tb",
-	}))
+	}), 0)
 	err = qs.EnqueueTask(ctx, payload)
 	r.NoError(err, "expected no error when replication ID is set")
 	err = qs.EnqueueTask(ctx, &payload)
 	r.NoError(err, "expected no error when replication ID is set")
+}
+
+func Test_queueService_StopPurge(t *testing.T) {
+	ctx := t.Context()
+	c := testutil.SetupRedis(t)
+	inspector := asynq.NewInspectorFromRedisClient(c)
+	defer inspector.Close()
+	client := asynq.NewClientFromRedisClient(c)
+	defer client.Close()
+	qs := NewQueueService(client, inspector)
+
+	r := require.New(t)
+	queueName, missingQueue := "test-queue-stop", "test-queue-stop-missing"
+
+	_, err := client.EnqueueContext(ctx, asynq.NewTask("test-task", nil), asynq.Queue(queueName))
+	r.NoError(err)
+	_, err = client.EnqueueContext(ctx, asynq.NewTask("test-task", nil), asynq.Queue(queueName))
+	r.NoError(err)
+
+	started := make(chan struct{}, 2)
+	canceled := make(chan struct{}, 2)
+	stop := registerHandler(t, ctx, c, queueName, func(ctx context.Context, t *asynq.Task) error {
+		started <- struct{}{}
+		<-ctx.Done()
+		canceled <- struct{}{}
+		return ctx.Err()
+	})
+	defer stop()
+	<-started
+
+	r.NoError(qs.Stop(ctx, queueName, missingQueue))
+	r.Eventually(func() bool { return len(canceled) == 1 }, time.Second, 10*time.Millisecond, "active task is canceled")
+	info, err := inspector.GetQueueInfo(queueName)
+	r.NoError(err)
+	r.Zero(info.Active, "no active tasks after stop")
+	r.True(info.Paused, "stopped queue stays paused")
+	r.Equal(2, info.Size, "stop keeps tasks in queue")
+	r.Never(func() bool { return len(started) != 0 }, 200*time.Millisecond, 20*time.Millisecond, "stopped queue does not start tasks")
+
+	r.NoError(qs.Purge(ctx, queueName, missingQueue))
+	queues, err := inspector.Queues()
+	r.NoError(err)
+	r.NotContains(queues, queueName, "purge removes queue")
+
+	_, err = client.EnqueueContext(ctx, asynq.NewTask("test-task", nil), asynq.Queue(missingQueue))
+	r.NoError(err)
+	paused, err := qs.IsPaused(ctx, missingQueue)
+	r.NoError(err)
+	r.False(paused, "queue created after purge is not paused")
 }

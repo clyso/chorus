@@ -57,7 +57,7 @@ func (s *svc) HandleMigrationS3User(ctx context.Context, t *asynq.Task) error {
 		task := tasks.BucketCreatePayload{
 			Bucket: bucket.Name,
 		}
-		task.SetReplicationID(p.ID)
+		task.SetReplicationID(p.ID, p.Generation)
 		err = s.queueSvc.EnqueueTask(ctx, task)
 		if err != nil {
 			return err

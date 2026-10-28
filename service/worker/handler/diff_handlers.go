@@ -183,6 +183,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 	universalReplID := entity.UniversalFromBucketReplication(bucketReplID)
 	diffFixID := entity.NewDiffFixID(diffID, toLocation.Storage)
 
+	// diff fix queue is not generation-checked, so generation is 0
 	payloadMaker := func(object string, isDir bool) (any, error) {
 		switch payload.StorageType {
 		case dom.Swift:
@@ -196,7 +197,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 					ObjName: object,
 				},
 			}
-			task.SetReplicationID(universalReplID)
+			task.SetReplicationID(universalReplID, 0)
 			return task, nil
 		case dom.S3:
 			if payload.Versioned && !isDir {
@@ -207,7 +208,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 						Prefix: object,
 					},
 				}
-				task.SetReplicationID(universalReplID)
+				task.SetReplicationID(universalReplID, 0)
 				return task, nil
 			}
 			task := tasks.DiffFixS3CopyPayload{
@@ -219,7 +220,7 @@ func (r *DiffCtrl) HandleDiffEnsureObjectsRemoved(ctx context.Context, t *asynq.
 					},
 				},
 			}
-			task.SetReplicationID(universalReplID)
+			task.SetReplicationID(universalReplID, 0)
 			return task, nil
 		default:
 			return nil, fmt.Errorf("unknown storage type %s: %w", payload.StorageType, asynq.SkipRetry)
@@ -391,14 +392,12 @@ func (r *DiffSvc) DeleteDiff(ctx context.Context, id entity.DiffID) error {
 		return fmt.Errorf("unable to make tokens out of diff id: %w", err)
 	}
 
-	diffQueue := tasks.DiffQueue(id)
-	if err := r.queueSvc.Delete(ctx, diffQueue, true); err != nil && !errors.Is(err, dom.ErrNotFound) {
-		return fmt.Errorf("unable to delete %s queue: %w", diffQueue, err)
+	queues := []string{tasks.DiffQueue(id), tasks.DiffFixQueue(id)}
+	if err := r.queueSvc.Stop(ctx, queues...); err != nil {
+		return fmt.Errorf("unable to stop diff queues: %w", err)
 	}
-
-	fixQueue := tasks.DiffFixQueue(id)
-	if err := r.queueSvc.Delete(ctx, fixQueue, true); err != nil && !errors.Is(err, dom.ErrNotFound) {
-		return fmt.Errorf("unable to delete %s queue: %w", fixQueue, err)
+	if err := r.queueSvc.Purge(ctx, queues...); err != nil {
+		return fmt.Errorf("unable to purge diff queues: %w", err)
 	}
 
 	exec := r.idStore.GroupExecutor()

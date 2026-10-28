@@ -181,6 +181,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	if conf.Metrics.Enabled {
 		mux.Use(metrics.WorkerMiddleware())
 	}
+	mux.Use(tasks.DropStaleReplicationTasks(policySvc.GetReplicationGeneration))
 	// common workers
 	switchWorker := handler.NewSwitchSvc(conf.Worker, policySvc, clientRegistry, replicationStatusLocker)
 	mux.HandleFunc(tasks.TypeApiZeroDowntimeSwitch, switchWorker.HandleZeroDowntimeReplicationSwitch)

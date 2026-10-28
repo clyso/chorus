@@ -38,6 +38,7 @@ type traceKey struct{}
 type userKey struct{}
 type routingPolicyKey struct{}
 type replicationsKey struct{}
+type replicationGenerationsKey struct{}
 type inProgressZeroDowntimeKey struct{}
 
 type Flow string
@@ -205,6 +206,19 @@ func GetReplications(ctx context.Context) []entity.UniversalReplicationID {
 
 func SetReplications(ctx context.Context, r []entity.UniversalReplicationID) context.Context {
 	return context.WithValue(ctx, replicationsKey{}, r)
+}
+
+func GetReplicationGeneration(ctx context.Context, id entity.UniversalReplicationID) int64 {
+	return GetReplicationGenerations(ctx)[id]
+}
+
+func GetReplicationGenerations(ctx context.Context) map[entity.UniversalReplicationID]int64 {
+	gens, _ := ctx.Value(replicationGenerationsKey{}).(map[entity.UniversalReplicationID]int64)
+	return gens
+}
+
+func SetReplicationGenerations(ctx context.Context, gens map[entity.UniversalReplicationID]int64) context.Context {
+	return context.WithValue(ctx, replicationGenerationsKey{}, gens)
 }
 
 func GetInProgressZeroDowntime(ctx context.Context) *entity.ReplicationSwitchInfo {

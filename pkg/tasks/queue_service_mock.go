@@ -113,6 +113,24 @@ func (q *QueueServiceMock) Delete(ctx context.Context, queueName string, force b
 	return nil
 }
 
+func (q *QueueServiceMock) Stop(ctx context.Context, queues ...string) error {
+	if q.Paused == nil {
+		q.Paused = map[string]bool{}
+	}
+	for _, queue := range queues {
+		q.Paused[queue] = true
+	}
+	return nil
+}
+
+func (q *QueueServiceMock) Purge(ctx context.Context, queues ...string) error {
+	for _, queue := range queues {
+		delete(q.Queues, queue)
+		delete(q.Paused, queue)
+	}
+	return nil
+}
+
 func (q *QueueServiceMock) IsPaused(ctx context.Context, queueName string) (bool, error) {
 	_, err := q.UnprocessedCount(ctx, false, queueName)
 	if err != nil {
