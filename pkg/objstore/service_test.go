@@ -9,9 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// listStub lists objects as a storage does for the listing prefix.
 type listStub struct {
-	Common
+	CommonBase
 	listed []CommonObjectInfo
 	err    error
 	prefix string
@@ -49,7 +48,7 @@ func TestObjectVersions(t *testing.T) {
 
 	var versions []string
 	var listErr error
-	for object, err := range ObjectVersions(t.Context(), stub, "bucket", "a") {
+	for object, err := range (commonClient{stub}).ObjectVersions(t.Context(), "bucket", "a") {
 		if err != nil {
 			listErr = err
 			continue

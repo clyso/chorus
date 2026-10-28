@@ -351,7 +351,7 @@ func (r *DiffSvc) ProduceObjectTasks(ctx context.Context, diffID entity.DiffID, 
 }
 
 func (r *DiffSvc) AccountObjectVersions(ctx context.Context, diffID entity.DiffID,
-	user string, location entity.DiffLocation, prefix string, ignoreEtags bool, ignoreSizes bool) error {
+	user string, location entity.DiffLocation, object string, ignoreEtags bool, ignoreSizes bool) error {
 	locationCount := len(diffID.Locations)
 
 	client, err := r.clients.AsCommon(ctx, location.Storage, user)
@@ -360,7 +360,7 @@ func (r *DiffSvc) AccountObjectVersions(ctx context.Context, diffID entity.DiffI
 	}
 
 	versionIdx := uint64(0)
-	objects := objstore.ObjectVersions(ctx, client, location.Bucket, prefix)
+	objects := client.ObjectVersions(ctx, location.Bucket, object)
 	for object, err := range objects {
 		if err != nil {
 			return fmt.Errorf("unable to list object versions: %w", err)
@@ -773,7 +773,7 @@ func (r *DiffSvc) RemoveDiffObjects(ctx context.Context, id entity.DiffFixID, lo
 	listErrs := []error{}
 	namesAndVersions := []objstore.NameAndVersion{}
 	for _, objectName := range objectNames {
-		versionIter := objstore.ObjectVersions(ctx, client, location.Bucket, objectName)
+		versionIter := client.ObjectVersions(ctx, location.Bucket, objectName)
 
 		for versionInfo, err := range versionIter {
 			if err != nil {

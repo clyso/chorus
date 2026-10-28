@@ -28,10 +28,13 @@ import (
 	"github.com/gophercloud/gophercloud/v2/pagination"
 )
 
+// https://docs.openstack.org/swift/latest/middleware.html#module-swift.common.middleware.versioned_writes.object_versioning
+const swiftDeleteMarkerContentType = "application/x-deleted;swift_versions_deleted=1"
+
 func WrapSwiftCommon(client *gophercloud.ServiceClient) Common {
-	return &swiftCommonClient{
+	return commonClient{&swiftCommonClient{
 		client: client,
-	}
+	}}
 }
 
 type swiftCommonClient struct {
@@ -143,11 +146,12 @@ func (s *swiftCommonClient) ListObjects(ctx context.Context, bucket string, opts
 
 			for _, object := range objectList {
 				objectInfo := CommonObjectInfo{
-					LastModified: object.LastModified,
-					Key:          object.Name,
-					VersionID:    object.VersionID,
-					Etag:         object.Hash,
-					Size:         uint64(object.Bytes),
+					LastModified:   object.LastModified,
+					Key:            object.Name,
+					VersionID:      object.VersionID,
+					Etag:           object.Hash,
+					Size:           uint64(object.Bytes),
+					IsDeleteMarker: object.ContentType == swiftDeleteMarkerContentType,
 				}
 				if !yield(objectInfo, nil) {
 					return false, nil

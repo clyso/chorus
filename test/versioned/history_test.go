@@ -25,8 +25,8 @@ import (
 
 const historyPrefix = "history/"
 
-// histories of objects to migrate in addition to the generated ones: p - put a version, d - delete creating a delete marker.
-// Names of objects starting with the name of another object must not mix up their versions.
+// p - put a version, d - delete creating a delete marker.
+// Object names are prefixes of each other on purpose.
 var histories = map[string]string{
 	historyPrefix + "a":              "ppp",
 	historyPrefix + "a-b":            "ppp",
@@ -48,7 +48,6 @@ func fillHistories(ctx context.Context, client *minio.Client, bucket string) {
 	}
 }
 
-// expectSameHistories expects the destination objects to have the same versions as the source ones.
 // Delete marker version ids are not compared, as migration does not preserve them.
 func expectSameHistories(ctx context.Context, src *minio.Client, srcBucket string, dest *minio.Client, destBucket string) {
 	srcVersions := listHistories(ctx, src, srcBucket)
@@ -59,7 +58,6 @@ func expectSameHistories(ctx context.Context, src *minio.Client, srcBucket strin
 	Expect(listHistories(ctx, dest, destBucket)).To(Equal(srcVersions))
 }
 
-// listHistories returns versions of objects from histories by object name, newest first.
 func listHistories(ctx context.Context, client *minio.Client, bucket string) map[string][]string {
 	versions := map[string][]string{}
 	for object := range client.ListObjects(ctx, bucket, minio.ListObjectsOptions{Prefix: historyPrefix, WithVersions: true, Recursive: true}) {
