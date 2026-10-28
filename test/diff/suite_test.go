@@ -2153,6 +2153,49 @@ var _ = Describe("Diff scenarious", Ordered, func() {
 				Expect(getCheckResponse.Check.IgnoreSizes).To(BeFalse())
 				Expect(getCheckResponse.Check.Versioned).To(BeTrue())
 			})
+
+			It("Should fail, object name is the start of another object name", func() {
+				objectPath := "name-prefix/a"
+				for _, name := range []string{objectPath, objectPath + "-b"} {
+					for _, bucket := range []string{bucket1Name, bucket2Name} {
+						for i := range 2 {
+							// bucket2 misses the latest version of the object
+							if bucket == bucket2Name && name == objectPath && i == 1 {
+								continue
+							}
+							content := []byte(fmt.Sprintf("%s %d", name, i))
+							err := storeClient.PutObject(ctx, bucket, name, bytes.NewReader(content), uint64(len(content)))
+							Expect(err).NotTo(HaveOccurred())
+						}
+					}
+				}
+
+				_, err := diffClient.Start(ctx, &pb.StartDiffCheckRequest{
+					Locations: locations,
+					User:      CSyncUserKey,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				var getCheckResponse *pb.GetDiffCheckReportResponse
+				Eventually(func(g Gomega) {
+					getCheckResponse, err = diffClient.GetReport(ctx, &pb.DiffCheckRequest{Locations: locations})
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(getCheckResponse).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check).NotTo(BeNil())
+					g.Expect(getCheckResponse.Check.Ready).To(BeTrue())
+				}, 1*time.Minute, time.Millisecond*100).Should(Succeed())
+				Expect(getCheckResponse.Check.Consistent).To(BeFalse())
+
+				checkEntries, err := diffClient.GetReportEntries(ctx, &pb.GetDiffCheckReportEntriesRequest{
+					Locations: locations,
+					PageSize:  1000,
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(checkEntries.Entries).NotTo(BeEmpty())
+				for _, entry := range checkEntries.Entries {
+					Expect(entry.Object).To(Equal(objectPath))
+				}
+			})
 		})
 	}
 })

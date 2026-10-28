@@ -104,21 +104,6 @@ func WithLimit(limit uint32) func(o *commonListOptions) {
 	}
 }
 
-// ObjectVersions lists versions of the object with exactly the given name,
-// skipping objects whose names only start with it.
-func ObjectVersions(ctx context.Context, client Common, bucket string, name string) iter.Seq2[CommonObjectInfo, error] {
-	return func(yield func(CommonObjectInfo, error) bool) {
-		for object, err := range client.ListObjects(ctx, bucket, WithPrefix(name), WithVersions()) {
-			if err == nil && object.Key != name {
-				continue
-			}
-			if !yield(object, err) {
-				return
-			}
-		}
-	}
-}
-
 type commonObjectOptions struct {
 	versionID string
 }
@@ -159,6 +144,12 @@ type commonGetter interface {
 
 // Common - common object storage client interface
 type Common interface {
+	CommonBase
+	// ObjectVersions skips objects whose names only start with the given name.
+	ObjectVersions(ctx context.Context, bucket string, name string) iter.Seq2[CommonObjectInfo, error]
+}
+
+type CommonBase interface {
 	BucketExists(ctx context.Context, bucket string) (bool, error)
 	IsBucketVersioned(ctx context.Context, bucket string) (bool, error)
 	ListBuckets(ctx context.Context) ([]string, error)
@@ -174,6 +165,23 @@ type Common interface {
 	RemoveObjectsSingleErr(ctx context.Context, bucket string, names []string) error
 	RemoveVersionedObjects(ctx context.Context, bucket string, objects []NameAndVersion) []error
 	ListObjects(ctx context.Context, bucket string, opts ...func(o *commonListOptions)) iter.Seq2[CommonObjectInfo, error]
+}
+
+type commonClient struct {
+	CommonBase
+}
+
+func (c commonClient) ObjectVersions(ctx context.Context, bucket string, name string) iter.Seq2[CommonObjectInfo, error] {
+	return func(yield func(CommonObjectInfo, error) bool) {
+		for object, err := range c.ListObjects(ctx, bucket, WithPrefix(name), WithVersions()) {
+			if err == nil && object.Key != name {
+				continue
+			}
+			if !yield(object, err) {
+				return
+			}
+		}
+	}
 }
 
 // TODO:

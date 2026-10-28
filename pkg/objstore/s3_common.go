@@ -28,9 +28,9 @@ import (
 )
 
 func WrapS3common(client s3client.Client) Common {
-	return &s3CommonClient{
+	return commonClient{&s3CommonClient{
 		client: client,
-	}
+	}}
 }
 
 type s3CommonClient struct {
