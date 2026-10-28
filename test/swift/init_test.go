@@ -3,8 +3,10 @@ package swift
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/clyso/chorus/pkg/dom"
 	"github.com/clyso/chorus/pkg/metrics"
@@ -20,6 +22,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/roles"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/services"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/users"
+	"github.com/gophercloud/gophercloud/v2/openstack/objectstorage/v1/accounts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -220,10 +223,37 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	for _, storage := range []string{swiftTestKey, cephTestKey} {
+		if err := waitAccountReady(tstCtx, storage, testAcc, 200*time.Millisecond, 60*time.Second); err != nil {
+			panic(err)
+		}
+	}
 	exitCode := m.Run()
 	tstEnv.Terminate(tstCtx)
 	// exit
 	os.Exit(exitCode)
+}
+
+// waitAccountReady polls account HEAD because the container healthcheck can pass while the proxy still answers 503.
+func waitAccountReady(ctx context.Context, storage, account string, interval, timeout time.Duration) error {
+	client, err := clients.AsSwift(ctx, storage, account)
+	if err != nil {
+		return fmt.Errorf("unable to get %s client: %w", storage, err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		lastErr := accounts.Get(ctx, client, accounts.GetOpts{}).Err
+		// gophercloud expects 204, but swift answers account HEAD with 200.
+		if lastErr == nil || gophercloud.ResponseCodeIs(lastErr, http.StatusOK) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%s account %s not ready after %s: %w", storage, account, timeout, lastErr)
+		case <-time.After(interval):
+		}
+	}
 }
 
 func registerSwiftEndpoitnt(t testing.TB, name, host string, port int) {
