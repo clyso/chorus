@@ -124,7 +124,7 @@ const (
 	CSeaweedFSSecretToken  = "seaweedfssecretkey"
 	CSeaweedFSS3ConfigPath = "/etc/seaweedfs/s3.json"
 
-	CCephImage                 = "ghcr.io/arttor/ceph-test:v19"
+	CCephImage                 = "ghcr.io/clyso/ceph-test:v19"
 	CCephDemoUID               = "cephuid"
 	CCephSystemUserUID         = "superuser"
 	CCephSystemUserDisplayName = "superuser"
