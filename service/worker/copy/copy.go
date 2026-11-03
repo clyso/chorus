@@ -330,6 +330,16 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 
 	if features.Tagging(ctx) {
 		putObjectOpts.UserTags = fromObjectStat.UserTags
+		// AWS S3 and MinIO answer HeadObject with x-amz-tagging-count only, never with
+		// the X-Amz-Tagging header minio-go needs to fill UserTags, so the stat has
+		// no tags even when the object is tagged. Fetch them explicitly in that case.
+		if len(putObjectOpts.UserTags) == 0 && fromObjectStat.UserTagCount > 0 {
+			objTags, err := fromClient.S3().GetObjectTagging(ctx, from.Bucket, from.Name, minio.GetObjectTaggingOptions{VersionID: from.Version})
+			if err != nil {
+				return fmt.Errorf("unable to get from object tags: %w", err)
+			}
+			putObjectOpts.UserTags = objTags.ToMap()
+		}
 	}
 
 	if to.Version != "" {
