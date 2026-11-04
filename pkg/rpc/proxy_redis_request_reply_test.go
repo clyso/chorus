@@ -37,7 +37,14 @@ func TestProxyClient_GetCredentials(t *testing.T) {
 	t.Cleanup(func() {
 		wg.Wait()
 	})
-	time.Sleep(50 * time.Millisecond)
+
+	// Wait until the proxy's request subscription is active. A fixed sleep can
+	// still race with slow test environments and Redis startup.
+	r.Eventually(func() bool {
+		subscribers, err := c.PubSubNumSub(ctx, proxyCreds).Result()
+		return err == nil && subscribers[proxyCreds] == 1
+	}, time.Second, 10*time.Millisecond)
+
 	tst := ProxyClient{c}
 	res, err := tst.GetCredentials(ctx)
 	r.NoError(err)

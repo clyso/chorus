@@ -61,31 +61,23 @@ func NewProxyClient(client redis.UniversalClient) Proxy {
 }
 
 func (c *ProxyClient) GetCredentials(ctx context.Context) (*pb.GetProxyCredentialsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	replyChanName := xid.New().String()
 	ps := c.client.Subscribe(ctx, replyChanName)
 	defer func() {
 		_ = ps.Close()
 		_ = ps.Unsubscribe(context.Background(), replyChanName)
 	}()
-	resCh := make(chan any, 1)
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	go func() {
-		defer close(resCh)
-		select {
-		case <-ctx.Done():
-			resCh <- ctx.Err()
-			return
-		case msg := <-ps.Channel():
-			var res pb.GetProxyCredentialsResponse
-			err := proto.Unmarshal([]byte(msg.Payload), &res)
-			if err != nil {
-				resCh <- err
-				return
-			}
-			resCh <- &res
-		}
-	}()
+
+	// Subscribe is asynchronous. Wait for Redis to confirm the reply-channel
+	// subscription before publishing the request, or the response can be lost.
+	if _, err := ps.Receive(ctx); err != nil {
+		return nil, fmt.Errorf("subscribe to proxy credentials reply channel: %w", err)
+	}
+
+	messages := ps.Channel()
 	received, err := c.client.Publish(ctx, proxyCreds, replyChanName).Result()
 	if err != nil {
 		return nil, err
@@ -93,20 +85,19 @@ func (c *ProxyClient) GetCredentials(ctx context.Context) (*pb.GetProxyCredentia
 	if received == 0 {
 		return nil, fmt.Errorf("%w: proxy is not listening", dom.ErrNotImplemented)
 	}
-	var res any
+
 	select {
-	case res = <-resCh:
+	case msg, ok := <-messages:
+		if !ok || msg == nil {
+			return nil, fmt.Errorf("%w: proxy credentials reply channel closed", dom.ErrInternal)
+		}
+		var res pb.GetProxyCredentialsResponse
+		if err := proto.Unmarshal([]byte(msg.Payload), &res); err != nil {
+			return nil, err
+		}
+		return &res, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	}
-
-	switch resp := res.(type) {
-	case error:
-		return nil, resp
-	case *pb.GetProxyCredentialsResponse:
-		return resp, nil
-	default:
-		return nil, fmt.Errorf("%w: unknown response type %T", dom.ErrInternal, resp)
 	}
 }
 
@@ -116,13 +107,22 @@ func ProxyServe(ctx context.Context, client redis.UniversalClient, proxy Proxy) 
 		_ = ps.Close()
 		_ = ps.Unsubscribe(context.Background(), proxyCreds)
 	}()
+
+	// Do not start consuming requests until Redis confirms this subscription.
+	if _, err := ps.Receive(ctx); err != nil {
+		return fmt.Errorf("subscribe to proxy credentials requests: %w", err)
+	}
+
 	messages := ps.Channel()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case msg := <-messages:
-			if msg.Payload == "" {
+		case msg, ok := <-messages:
+			if !ok {
+				return nil
+			}
+			if msg == nil || msg.Payload == "" {
 				zerolog.Ctx(ctx).Warn().Msg("request reply proxy server: empty payload for proxy creds pubSub received")
 				continue
 			}
