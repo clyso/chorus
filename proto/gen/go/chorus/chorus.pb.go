@@ -11,7 +11,7 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/known/durationpb"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -67,7 +67,7 @@ func (x Storage_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Storage_Type.Descriptor instead.
 func (Storage_Type) EnumDescriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{2, 0}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{7, 0}
 }
 
 type GetAppVersionResponse struct {
@@ -174,6 +174,314 @@ func (x *GetStoragesResponse) GetStorages() []*Storage {
 	return nil
 }
 
+type ListBrowserBucketsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
+	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBrowserBucketsRequest) Reset() {
+	*x = ListBrowserBucketsRequest{}
+	mi := &file_chorus_chorus_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBrowserBucketsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBrowserBucketsRequest) ProtoMessage() {}
+
+func (x *ListBrowserBucketsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBrowserBucketsRequest.ProtoReflect.Descriptor instead.
+func (*ListBrowserBucketsRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListBrowserBucketsRequest) GetStorage() string {
+	if x != nil {
+		return x.Storage
+	}
+	return ""
+}
+
+func (x *ListBrowserBucketsRequest) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+type ListBrowserBucketsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Buckets       []string               `protobuf:"bytes,1,rep,name=buckets,proto3" json:"buckets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBrowserBucketsResponse) Reset() {
+	*x = ListBrowserBucketsResponse{}
+	mi := &file_chorus_chorus_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBrowserBucketsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBrowserBucketsResponse) ProtoMessage() {}
+
+func (x *ListBrowserBucketsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBrowserBucketsResponse.ProtoReflect.Descriptor instead.
+func (*ListBrowserBucketsResponse) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListBrowserBucketsResponse) GetBuckets() []string {
+	if x != nil {
+		return x.Buckets
+	}
+	return nil
+}
+
+type ListBrowserObjectsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Storage       string                 `protobuf:"bytes,1,opt,name=storage,proto3" json:"storage,omitempty"`
+	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	Bucket        string                 `protobuf:"bytes,3,opt,name=bucket,proto3" json:"bucket,omitempty"`
+	Prefix        string                 `protobuf:"bytes,4,opt,name=prefix,proto3" json:"prefix,omitempty"`
+	After         string                 `protobuf:"bytes,5,opt,name=after,proto3" json:"after,omitempty"`
+	Limit         uint32                 `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBrowserObjectsRequest) Reset() {
+	*x = ListBrowserObjectsRequest{}
+	mi := &file_chorus_chorus_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBrowserObjectsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBrowserObjectsRequest) ProtoMessage() {}
+
+func (x *ListBrowserObjectsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBrowserObjectsRequest.ProtoReflect.Descriptor instead.
+func (*ListBrowserObjectsRequest) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListBrowserObjectsRequest) GetStorage() string {
+	if x != nil {
+		return x.Storage
+	}
+	return ""
+}
+
+func (x *ListBrowserObjectsRequest) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *ListBrowserObjectsRequest) GetBucket() string {
+	if x != nil {
+		return x.Bucket
+	}
+	return ""
+}
+
+func (x *ListBrowserObjectsRequest) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *ListBrowserObjectsRequest) GetAfter() string {
+	if x != nil {
+		return x.After
+	}
+	return ""
+}
+
+func (x *ListBrowserObjectsRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type BrowserObject struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Key                string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Size               uint64                 `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
+	LastModified       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=last_modified,json=lastModified,proto3" json:"last_modified,omitempty"`
+	SourceLastModified string                 `protobuf:"bytes,4,opt,name=source_last_modified,json=sourceLastModified,proto3" json:"source_last_modified,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *BrowserObject) Reset() {
+	*x = BrowserObject{}
+	mi := &file_chorus_chorus_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BrowserObject) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BrowserObject) ProtoMessage() {}
+
+func (x *BrowserObject) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BrowserObject.ProtoReflect.Descriptor instead.
+func (*BrowserObject) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BrowserObject) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *BrowserObject) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *BrowserObject) GetLastModified() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastModified
+	}
+	return nil
+}
+
+func (x *BrowserObject) GetSourceLastModified() string {
+	if x != nil {
+		return x.SourceLastModified
+	}
+	return ""
+}
+
+type ListBrowserObjectsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Objects       []*BrowserObject       `protobuf:"bytes,1,rep,name=objects,proto3" json:"objects,omitempty"`
+	NextAfter     string                 `protobuf:"bytes,2,opt,name=next_after,json=nextAfter,proto3" json:"next_after,omitempty"`
+	HasMore       bool                   `protobuf:"varint,3,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBrowserObjectsResponse) Reset() {
+	*x = ListBrowserObjectsResponse{}
+	mi := &file_chorus_chorus_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBrowserObjectsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBrowserObjectsResponse) ProtoMessage() {}
+
+func (x *ListBrowserObjectsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chorus_chorus_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBrowserObjectsResponse.ProtoReflect.Descriptor instead.
+func (*ListBrowserObjectsResponse) Descriptor() ([]byte, []int) {
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListBrowserObjectsResponse) GetObjects() []*BrowserObject {
+	if x != nil {
+		return x.Objects
+	}
+	return nil
+}
+
+func (x *ListBrowserObjectsResponse) GetNextAfter() string {
+	if x != nil {
+		return x.NextAfter
+	}
+	return ""
+}
+
+func (x *ListBrowserObjectsResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
 type Storage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// some human-readable alias for storage config
@@ -190,7 +498,7 @@ type Storage struct {
 
 func (x *Storage) Reset() {
 	*x = Storage{}
-	mi := &file_chorus_chorus_proto_msgTypes[2]
+	mi := &file_chorus_chorus_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -202,7 +510,7 @@ func (x *Storage) String() string {
 func (*Storage) ProtoMessage() {}
 
 func (x *Storage) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[2]
+	mi := &file_chorus_chorus_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -215,7 +523,7 @@ func (x *Storage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Storage.ProtoReflect.Descriptor instead.
 func (*Storage) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{2}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Storage) GetName() string {
@@ -264,7 +572,7 @@ type Credential struct {
 
 func (x *Credential) Reset() {
 	*x = Credential{}
-	mi := &file_chorus_chorus_proto_msgTypes[3]
+	mi := &file_chorus_chorus_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -276,7 +584,7 @@ func (x *Credential) String() string {
 func (*Credential) ProtoMessage() {}
 
 func (x *Credential) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[3]
+	mi := &file_chorus_chorus_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -289,7 +597,7 @@ func (x *Credential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Credential.ProtoReflect.Descriptor instead.
 func (*Credential) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{3}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Credential) GetAlias() string {
@@ -323,7 +631,7 @@ type GetProxyCredentialsResponse struct {
 
 func (x *GetProxyCredentialsResponse) Reset() {
 	*x = GetProxyCredentialsResponse{}
-	mi := &file_chorus_chorus_proto_msgTypes[4]
+	mi := &file_chorus_chorus_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -335,7 +643,7 @@ func (x *GetProxyCredentialsResponse) String() string {
 func (*GetProxyCredentialsResponse) ProtoMessage() {}
 
 func (x *GetProxyCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[4]
+	mi := &file_chorus_chorus_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -348,7 +656,7 @@ func (x *GetProxyCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProxyCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*GetProxyCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{4}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetProxyCredentialsResponse) GetAddress() string {
@@ -377,7 +685,7 @@ type SetUserCredentialsRequest struct {
 
 func (x *SetUserCredentialsRequest) Reset() {
 	*x = SetUserCredentialsRequest{}
-	mi := &file_chorus_chorus_proto_msgTypes[5]
+	mi := &file_chorus_chorus_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +697,7 @@ func (x *SetUserCredentialsRequest) String() string {
 func (*SetUserCredentialsRequest) ProtoMessage() {}
 
 func (x *SetUserCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[5]
+	mi := &file_chorus_chorus_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +710,7 @@ func (x *SetUserCredentialsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*SetUserCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{5}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SetUserCredentialsRequest) GetStorage() string {
@@ -443,7 +751,7 @@ type S3Credential struct {
 
 func (x *S3Credential) Reset() {
 	*x = S3Credential{}
-	mi := &file_chorus_chorus_proto_msgTypes[6]
+	mi := &file_chorus_chorus_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +763,7 @@ func (x *S3Credential) String() string {
 func (*S3Credential) ProtoMessage() {}
 
 func (x *S3Credential) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[6]
+	mi := &file_chorus_chorus_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +776,7 @@ func (x *S3Credential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use S3Credential.ProtoReflect.Descriptor instead.
 func (*S3Credential) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{6}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *S3Credential) GetAccessKey() string {
@@ -497,7 +805,7 @@ type SwiftCredential struct {
 
 func (x *SwiftCredential) Reset() {
 	*x = SwiftCredential{}
-	mi := &file_chorus_chorus_proto_msgTypes[7]
+	mi := &file_chorus_chorus_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -509,7 +817,7 @@ func (x *SwiftCredential) String() string {
 func (*SwiftCredential) ProtoMessage() {}
 
 func (x *SwiftCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_chorus_chorus_proto_msgTypes[7]
+	mi := &file_chorus_chorus_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,7 +830,7 @@ func (x *SwiftCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwiftCredential.ProtoReflect.Descriptor instead.
 func (*SwiftCredential) Descriptor() ([]byte, []int) {
-	return file_chorus_chorus_proto_rawDescGZIP(), []int{7}
+	return file_chorus_chorus_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SwiftCredential) GetUsername() string {
@@ -563,7 +871,29 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x12\n" +
 	"\x04date\x18\x03 \x01(\tR\x04date\"B\n" +
 	"\x13GetStoragesResponse\x12+\n" +
-	"\bstorages\x18\x01 \x03(\v2\x0f.chorus.StorageR\bstorages\"\xd3\x01\n" +
+	"\bstorages\x18\x01 \x03(\v2\x0f.chorus.StorageR\bstorages\"I\n" +
+	"\x19ListBrowserBucketsRequest\x12\x18\n" +
+	"\astorage\x18\x01 \x01(\tR\astorage\x12\x12\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\"6\n" +
+	"\x1aListBrowserBucketsResponse\x12\x18\n" +
+	"\abuckets\x18\x01 \x03(\tR\abuckets\"\xa5\x01\n" +
+	"\x19ListBrowserObjectsRequest\x12\x18\n" +
+	"\astorage\x18\x01 \x01(\tR\astorage\x12\x12\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\x12\x16\n" +
+	"\x06bucket\x18\x03 \x01(\tR\x06bucket\x12\x16\n" +
+	"\x06prefix\x18\x04 \x01(\tR\x06prefix\x12\x14\n" +
+	"\x05after\x18\x05 \x01(\tR\x05after\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\rR\x05limit\"\xa8\x01\n" +
+	"\rBrowserObject\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
+	"\x04size\x18\x02 \x01(\x04R\x04size\x12?\n" +
+	"\rlast_modified\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\flastModified\x120\n" +
+	"\x14source_last_modified\x18\x04 \x01(\tR\x12sourceLastModified\"\x87\x01\n" +
+	"\x1aListBrowserObjectsResponse\x12/\n" +
+	"\aobjects\x18\x01 \x03(\v2\x15.chorus.BrowserObjectR\aobjects\x12\x1d\n" +
+	"\n" +
+	"next_after\x18\x02 \x01(\tR\tnextAfter\x12\x19\n" +
+	"\bhas_more\x18\x03 \x01(\bR\ahasMore\"\xd3\x01\n" +
 	"\aStorage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
 	"\ais_main\x18\x02 \x01(\bR\x06isMain\x12\x18\n" +
@@ -603,10 +933,12 @@ const file_chorus_chorus_proto_rawDesc = "" +
 	"\vdomain_name\x18\x03 \x01(\tR\n" +
 	"domainName\x12\x1f\n" +
 	"\vtenant_name\x18\x04 \x01(\tR\n" +
-	"tenantName2\xb9\x02\n" +
+	"tenantName2\xf3\x03\n" +
 	"\x06Chorus\x12F\n" +
 	"\rGetAppVersion\x12\x16.google.protobuf.Empty\x1a\x1d.chorus.GetAppVersionResponse\x12B\n" +
-	"\vGetStorages\x12\x16.google.protobuf.Empty\x1a\x1b.chorus.GetStoragesResponse\x12R\n" +
+	"\vGetStorages\x12\x16.google.protobuf.Empty\x1a\x1b.chorus.GetStoragesResponse\x12[\n" +
+	"\x12ListBrowserBuckets\x12!.chorus.ListBrowserBucketsRequest\x1a\".chorus.ListBrowserBucketsResponse\x12[\n" +
+	"\x12ListBrowserObjects\x12!.chorus.ListBrowserObjectsRequest\x1a\".chorus.ListBrowserObjectsResponse\x12R\n" +
 	"\x13GetProxyCredentials\x12\x16.google.protobuf.Empty\x1a#.chorus.GetProxyCredentialsResponse\x12O\n" +
 	"\x12SetUserCredentials\x12!.chorus.SetUserCredentialsRequest\x1a\x16.google.protobuf.EmptyB)Z'github.com/clyso/chorus/proto/chorus;pbb\x06proto3"
 
@@ -623,39 +955,51 @@ func file_chorus_chorus_proto_rawDescGZIP() []byte {
 }
 
 var file_chorus_chorus_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_chorus_chorus_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_chorus_chorus_proto_goTypes = []any{
 	(Storage_Type)(0),                   // 0: chorus.Storage.Type
 	(*GetAppVersionResponse)(nil),       // 1: chorus.GetAppVersionResponse
 	(*GetStoragesResponse)(nil),         // 2: chorus.GetStoragesResponse
-	(*Storage)(nil),                     // 3: chorus.Storage
-	(*Credential)(nil),                  // 4: chorus.Credential
-	(*GetProxyCredentialsResponse)(nil), // 5: chorus.GetProxyCredentialsResponse
-	(*SetUserCredentialsRequest)(nil),   // 6: chorus.SetUserCredentialsRequest
-	(*S3Credential)(nil),                // 7: chorus.S3Credential
-	(*SwiftCredential)(nil),             // 8: chorus.SwiftCredential
-	(*emptypb.Empty)(nil),               // 9: google.protobuf.Empty
+	(*ListBrowserBucketsRequest)(nil),   // 3: chorus.ListBrowserBucketsRequest
+	(*ListBrowserBucketsResponse)(nil),  // 4: chorus.ListBrowserBucketsResponse
+	(*ListBrowserObjectsRequest)(nil),   // 5: chorus.ListBrowserObjectsRequest
+	(*BrowserObject)(nil),               // 6: chorus.BrowserObject
+	(*ListBrowserObjectsResponse)(nil),  // 7: chorus.ListBrowserObjectsResponse
+	(*Storage)(nil),                     // 8: chorus.Storage
+	(*Credential)(nil),                  // 9: chorus.Credential
+	(*GetProxyCredentialsResponse)(nil), // 10: chorus.GetProxyCredentialsResponse
+	(*SetUserCredentialsRequest)(nil),   // 11: chorus.SetUserCredentialsRequest
+	(*S3Credential)(nil),                // 12: chorus.S3Credential
+	(*SwiftCredential)(nil),             // 13: chorus.SwiftCredential
+	(*timestamppb.Timestamp)(nil),       // 14: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),               // 15: google.protobuf.Empty
 }
 var file_chorus_chorus_proto_depIdxs = []int32{
-	3,  // 0: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
-	0,  // 1: chorus.Storage.provider:type_name -> chorus.Storage.Type
-	4,  // 2: chorus.Storage.credentials:type_name -> chorus.Credential
-	4,  // 3: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
-	7,  // 4: chorus.SetUserCredentialsRequest.s3_cred:type_name -> chorus.S3Credential
-	8,  // 5: chorus.SetUserCredentialsRequest.swift_cred:type_name -> chorus.SwiftCredential
-	9,  // 6: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
-	9,  // 7: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
-	9,  // 8: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
-	6,  // 9: chorus.Chorus.SetUserCredentials:input_type -> chorus.SetUserCredentialsRequest
-	1,  // 10: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
-	2,  // 11: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
-	5,  // 12: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
-	9,  // 13: chorus.Chorus.SetUserCredentials:output_type -> google.protobuf.Empty
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	8,  // 0: chorus.GetStoragesResponse.storages:type_name -> chorus.Storage
+	14, // 1: chorus.BrowserObject.last_modified:type_name -> google.protobuf.Timestamp
+	6,  // 2: chorus.ListBrowserObjectsResponse.objects:type_name -> chorus.BrowserObject
+	0,  // 3: chorus.Storage.provider:type_name -> chorus.Storage.Type
+	9,  // 4: chorus.Storage.credentials:type_name -> chorus.Credential
+	9,  // 5: chorus.GetProxyCredentialsResponse.credentials:type_name -> chorus.Credential
+	12, // 6: chorus.SetUserCredentialsRequest.s3_cred:type_name -> chorus.S3Credential
+	13, // 7: chorus.SetUserCredentialsRequest.swift_cred:type_name -> chorus.SwiftCredential
+	15, // 8: chorus.Chorus.GetAppVersion:input_type -> google.protobuf.Empty
+	15, // 9: chorus.Chorus.GetStorages:input_type -> google.protobuf.Empty
+	3,  // 10: chorus.Chorus.ListBrowserBuckets:input_type -> chorus.ListBrowserBucketsRequest
+	5,  // 11: chorus.Chorus.ListBrowserObjects:input_type -> chorus.ListBrowserObjectsRequest
+	15, // 12: chorus.Chorus.GetProxyCredentials:input_type -> google.protobuf.Empty
+	11, // 13: chorus.Chorus.SetUserCredentials:input_type -> chorus.SetUserCredentialsRequest
+	1,  // 14: chorus.Chorus.GetAppVersion:output_type -> chorus.GetAppVersionResponse
+	2,  // 15: chorus.Chorus.GetStorages:output_type -> chorus.GetStoragesResponse
+	4,  // 16: chorus.Chorus.ListBrowserBuckets:output_type -> chorus.ListBrowserBucketsResponse
+	7,  // 17: chorus.Chorus.ListBrowserObjects:output_type -> chorus.ListBrowserObjectsResponse
+	10, // 18: chorus.Chorus.GetProxyCredentials:output_type -> chorus.GetProxyCredentialsResponse
+	15, // 19: chorus.Chorus.SetUserCredentials:output_type -> google.protobuf.Empty
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_chorus_chorus_proto_init() }
@@ -663,14 +1007,14 @@ func file_chorus_chorus_proto_init() {
 	if File_chorus_chorus_proto != nil {
 		return
 	}
-	file_chorus_chorus_proto_msgTypes[5].OneofWrappers = []any{}
+	file_chorus_chorus_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chorus_chorus_proto_rawDesc), len(file_chorus_chorus_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

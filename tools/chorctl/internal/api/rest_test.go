@@ -37,18 +37,11 @@ import (
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
 
-// apiServices lists the gRPC services exposed by the chorus management REST
-// API and mapped in restRoutes. The Webhook service is excluded on purpose:
-// its routes use path parameters and are not called by chorctl.
 var apiServices = []string{"chorus.Chorus", "chorus.Policy", "chorus.Diff"}
 
-// newTestGateway starts an in-process HTTP server backed by the generated
-// grpc-gateway registration code — the same code the worker serves REST with.
-// It returns a Conn pointed at that server.
 func newTestGateway(t *testing.T, chorusSrv pb.ChorusServer) *Conn {
 	t.Helper()
 	r := require.New(t)
-	// Same marshaler options as the worker gateway, see pkg/api/grpc_http_gateway.go.
 	mux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
 			MarshalOptions:   protojson.MarshalOptions{EmitUnpopulated: true},
@@ -87,15 +80,6 @@ func newMessage(t *testing.T, md protoreflect.MessageDescriptor) proto.Message {
 	return mt.New().Interface()
 }
 
-// TestRestRoutes_MatchGeneratedGateway verifies that every entry in restRoutes
-// (HTTP verb + path) is routed by the generated grpc-gateway code to the
-// expected gRPC method. The gateway is backed by Unimplemented* stubs, so a
-// correctly routed request returns exactly
-// "codes.Unimplemented: method <Name> not implemented", while a stale verb or
-// path in restRoutes fails with the gateway routing error (NotFound).
-//
-// Together with the CI check that regenerates proto code and fails on
-// uncommitted changes, this pins restRoutes to proto/http.yaml.
 func TestRestRoutes_MatchGeneratedGateway(t *testing.T) {
 	conn := newTestGateway(t, pb.UnimplementedChorusServer{})
 	for fullMethod := range restRoutes {
@@ -113,9 +97,6 @@ func TestRestRoutes_MatchGeneratedGateway(t *testing.T) {
 	}
 }
 
-// TestRestRoutes_CoverAllAPIMethods verifies that every unary method of the
-// management API services has a restRoutes entry, so a new RPC cannot be
-// silently missing from the chorctl REST client.
 func TestRestRoutes_CoverAllAPIMethods(t *testing.T) {
 	r := require.New(t)
 	for _, svcName := range apiServices {
@@ -126,7 +107,6 @@ func TestRestRoutes_CoverAllAPIMethods(t *testing.T) {
 		for i := 0; i < svc.Methods().Len(); i++ {
 			m := svc.Methods().Get(i)
 			if m.IsStreamingServer() || m.IsStreamingClient() {
-				// Streaming methods have no REST mapping, see Conn.NewStream.
 				continue
 			}
 			fullMethod := fmt.Sprintf("/%s/%s", svcName, m.Name())
@@ -136,19 +116,61 @@ func TestRestRoutes_CoverAllAPIMethods(t *testing.T) {
 	}
 }
 
-// TestRestRoutes_GetRequestsAreEmpty verifies that GET routes take
-// google.protobuf.Empty: Conn.Invoke does not implement query parameter
-// encoding and drops the request message for GET (see Invoke).
-func TestRestRoutes_GetRequestsAreEmpty(t *testing.T) {
+type browserBucketsStub struct {
+	pb.UnimplementedChorusServer
+	request *pb.ListBrowserBucketsRequest
+}
+
+func (s *browserBucketsStub) ListBrowserBuckets(_ context.Context, req *pb.ListBrowserBucketsRequest) (*pb.ListBrowserBucketsResponse, error) {
+	s.request = req
+	return &pb.ListBrowserBucketsResponse{Buckets: []string{"bucket-a"}}, nil
+}
+
+func TestConn_InvokeGETEncodesRequestAsQuery(t *testing.T) {
+	r := require.New(t)
+	stub := &browserBucketsStub{}
+	conn := newTestGateway(t, stub)
+	var reply pb.ListBrowserBucketsResponse
+	err := conn.Invoke(t.Context(), pb.Chorus_ListBrowserBuckets_FullMethodName, &pb.ListBrowserBucketsRequest{
+		Storage: "main storage",
+		User:    "browser-user",
+	}, &reply)
+	r.NoError(err)
+	r.Equal("main storage", stub.request.GetStorage())
+	r.Equal("browser-user", stub.request.GetUser())
+	r.Equal([]string{"bucket-a"}, reply.GetBuckets())
+}
+
+func TestRestRoutes_GetRoutesEncodeRequestFields(t *testing.T) {
 	r := require.New(t)
 	for fullMethod, rt := range restRoutes {
 		if rt.method != http.MethodGet {
 			continue
 		}
 		md := methodDescriptor(t, fullMethod)
-		r.Equal(protoreflect.FullName("google.protobuf.Empty"), md.Input().FullName(),
-			"GET route %s has request fields which would be silently dropped; use a body method in proto/http.yaml or implement query params", fullMethod)
+		req := newMessage(t, md.Input())
+		_, err := encodeQuery(req)
+		r.NoError(err, "GET route %s request cannot be encoded as query params", fullMethod)
 	}
+}
+
+func TestRestRoutes_GetRequestsUseProtoJSONNames(t *testing.T) {
+	r := require.New(t)
+	query, err := encodeQuery(&pb.ListBrowserObjectsRequest{
+		Storage: "main",
+		User:    "user",
+		Bucket:  "bucket",
+		Prefix:  "a/b",
+		After:   "next",
+		Limit:   50,
+	})
+	r.NoError(err)
+	r.Equal("main", query.Get("storage"))
+	r.Equal("user", query.Get("user"))
+	r.Equal("bucket", query.Get("bucket"))
+	r.Equal("a/b", query.Get("prefix"))
+	r.Equal("next", query.Get("after"))
+	r.Equal("50", query.Get("limit"))
 }
 
 type stubChorusServer struct {
@@ -159,8 +181,6 @@ func (stubChorusServer) GetAppVersion(context.Context, *emptypb.Empty) (*pb.GetA
 	return &pb.GetAppVersionResponse{Version: "v1.2.3", Commit: "abc", Date: "2026-01-01"}, nil
 }
 
-// TestConn_InvokeRoundTrip verifies the success path end to end through the
-// generated gateway: request encoding, routing, and response decoding.
 func TestConn_InvokeRoundTrip(t *testing.T) {
 	r := require.New(t)
 	conn := newTestGateway(t, stubChorusServer{})

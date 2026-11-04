@@ -22,6 +22,8 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Chorus_GetAppVersion_FullMethodName       = "/chorus.Chorus/GetAppVersion"
 	Chorus_GetStorages_FullMethodName         = "/chorus.Chorus/GetStorages"
+	Chorus_ListBrowserBuckets_FullMethodName  = "/chorus.Chorus/ListBrowserBuckets"
+	Chorus_ListBrowserObjects_FullMethodName  = "/chorus.Chorus/ListBrowserObjects"
 	Chorus_GetProxyCredentials_FullMethodName = "/chorus.Chorus/GetProxyCredentials"
 	Chorus_SetUserCredentials_FullMethodName  = "/chorus.Chorus/SetUserCredentials"
 )
@@ -34,6 +36,10 @@ type ChorusClient interface {
 	GetAppVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAppVersionResponse, error)
 	// Lists configured storages with users
 	GetStorages(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStoragesResponse, error)
+	// Lists buckets for an object browser.
+	ListBrowserBuckets(ctx context.Context, in *ListBrowserBucketsRequest, opts ...grpc.CallOption) (*ListBrowserBucketsResponse, error)
+	// Lists a page of objects and their original migration timestamps.
+	ListBrowserObjects(ctx context.Context, in *ListBrowserObjectsRequest, opts ...grpc.CallOption) (*ListBrowserObjectsResponse, error)
 	// Returns connection details for proxy s3 endpoint
 	GetProxyCredentials(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProxyCredentialsResponse, error)
 	// Sets user credentials for a given storage.
@@ -68,6 +74,26 @@ func (c *chorusClient) GetStorages(ctx context.Context, in *emptypb.Empty, opts 
 	return out, nil
 }
 
+func (c *chorusClient) ListBrowserBuckets(ctx context.Context, in *ListBrowserBucketsRequest, opts ...grpc.CallOption) (*ListBrowserBucketsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBrowserBucketsResponse)
+	err := c.cc.Invoke(ctx, Chorus_ListBrowserBuckets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chorusClient) ListBrowserObjects(ctx context.Context, in *ListBrowserObjectsRequest, opts ...grpc.CallOption) (*ListBrowserObjectsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBrowserObjectsResponse)
+	err := c.cc.Invoke(ctx, Chorus_ListBrowserObjects_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chorusClient) GetProxyCredentials(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetProxyCredentialsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetProxyCredentialsResponse)
@@ -96,6 +122,10 @@ type ChorusServer interface {
 	GetAppVersion(context.Context, *emptypb.Empty) (*GetAppVersionResponse, error)
 	// Lists configured storages with users
 	GetStorages(context.Context, *emptypb.Empty) (*GetStoragesResponse, error)
+	// Lists buckets for an object browser.
+	ListBrowserBuckets(context.Context, *ListBrowserBucketsRequest) (*ListBrowserBucketsResponse, error)
+	// Lists a page of objects and their original migration timestamps.
+	ListBrowserObjects(context.Context, *ListBrowserObjectsRequest) (*ListBrowserObjectsResponse, error)
 	// Returns connection details for proxy s3 endpoint
 	GetProxyCredentials(context.Context, *emptypb.Empty) (*GetProxyCredentialsResponse, error)
 	// Sets user credentials for a given storage.
@@ -114,6 +144,12 @@ func (UnimplementedChorusServer) GetAppVersion(context.Context, *emptypb.Empty) 
 }
 func (UnimplementedChorusServer) GetStorages(context.Context, *emptypb.Empty) (*GetStoragesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStorages not implemented")
+}
+func (UnimplementedChorusServer) ListBrowserBuckets(context.Context, *ListBrowserBucketsRequest) (*ListBrowserBucketsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBrowserBuckets not implemented")
+}
+func (UnimplementedChorusServer) ListBrowserObjects(context.Context, *ListBrowserObjectsRequest) (*ListBrowserObjectsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBrowserObjects not implemented")
 }
 func (UnimplementedChorusServer) GetProxyCredentials(context.Context, *emptypb.Empty) (*GetProxyCredentialsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetProxyCredentials not implemented")
@@ -177,6 +213,42 @@ func _Chorus_GetStorages_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Chorus_ListBrowserBuckets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBrowserBucketsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).ListBrowserBuckets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_ListBrowserBuckets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).ListBrowserBuckets(ctx, req.(*ListBrowserBucketsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chorus_ListBrowserObjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBrowserObjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChorusServer).ListBrowserObjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Chorus_ListBrowserObjects_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChorusServer).ListBrowserObjects(ctx, req.(*ListBrowserObjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Chorus_GetProxyCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -227,6 +299,14 @@ var Chorus_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStorages",
 			Handler:    _Chorus_GetStorages_Handler,
+		},
+		{
+			MethodName: "ListBrowserBuckets",
+			Handler:    _Chorus_ListBrowserBuckets_Handler,
+		},
+		{
+			MethodName: "ListBrowserObjects",
+			Handler:    _Chorus_ListBrowserObjects_Handler,
 		},
 		{
 			MethodName: "GetProxyCredentials",

@@ -29,6 +29,7 @@ import ChorusSetCredentialPage from '@/pages/ChorusSetCredentialPage/ChorusSetCr
 import ChorusDiffReportsPage from '@/pages/ChorusDiffReportsPage/ChorusDiffReportsPage.vue';
 import ChorusAddDiffReportPage from '@/pages/ChorusAddDiffReportPage/ChorusAddDiffReportPage.vue';
 import ChorusDiffReportDetailPage from '@/pages/ChorusDiffReportDetailPage/ChorusDiffReportDetailPage.vue';
+import ChorusObjectBrowserPage from '@/pages/ChorusObjectBrowserPage/ChorusObjectBrowserPage.vue';
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -70,6 +71,11 @@ export const routes: RouteRecordRaw[] = [
         path: 'storages',
         name: RouteName.CHORUS_STORAGES,
         component: ChorusStoragesPage,
+      },
+      {
+        path: 'objects',
+        name: RouteName.CHORUS_OBJECT_BROWSER,
+        component: ChorusObjectBrowserPage,
       },
       {
         path: 'storages/:storageName',

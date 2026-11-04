@@ -19,7 +19,9 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -30,7 +32,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
@@ -58,6 +59,8 @@ var restRoutes = map[string]route{
 	// Chorus service:
 	pb.Chorus_GetAppVersion_FullMethodName:       {http.MethodGet, "/version"},
 	pb.Chorus_GetStorages_FullMethodName:         {http.MethodGet, "/storage"},
+	pb.Chorus_ListBrowserBuckets_FullMethodName:  {http.MethodGet, "/browser/buckets"},
+	pb.Chorus_ListBrowserObjects_FullMethodName:  {http.MethodGet, "/browser/objects"},
 	pb.Chorus_GetProxyCredentials_FullMethodName: {http.MethodGet, "/proxy"},
 	pb.Chorus_SetUserCredentials_FullMethodName:  {http.MethodPost, "/credentials"},
 	// Policy service - replication:
@@ -81,10 +84,8 @@ var restRoutes = map[string]route{
 	pb.Policy_TestProxy_FullMethodName:      {http.MethodPost, "/test-proxy"},
 }
 
-// Conn calls the chorus management API over HTTP/JSON via the grpc-gateway
-// REST endpoints. It implements grpc.ClientConnInterface so that the
-// generated gRPC client stubs (pb.NewChorusClient, pb.NewPolicyClient, ...)
-// can be used as-is.
+// Conn calls the chorus management API over HTTP/JSON via the grpc-gateway REST endpoints.
+// It implements grpc.ClientConnInterface so generated gRPC client stubs can be used as-is.
 type Conn struct {
 	httpClient *http.Client
 	baseURL    *url.URL
@@ -102,14 +103,14 @@ func (c *Conn) Invoke(ctx context.Context, method string, args, reply any, _ ...
 		return status.Errorf(codes.Internal, "request for %s is not a proto message", method)
 	}
 
+	endpoint := c.baseURL.JoinPath(rt.path)
 	var body io.Reader
 	if rt.method == http.MethodGet {
-		// All GET routes take google.protobuf.Empty. Fail loudly if a future
-		// GET route carries request fields: they would require query
-		// parameter encoding, which is not implemented.
-		if !isEmptyMessage(reqMsg) {
-			return status.Errorf(codes.Internal, "GET route for %s cannot carry request fields", method)
+		query, err := encodeQuery(reqMsg)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to encode query for %s: %v", method, err)
 		}
+		endpoint.RawQuery = query.Encode()
 	} else {
 		data, err := protojson.Marshal(reqMsg)
 		if err != nil {
@@ -118,7 +119,7 @@ func (c *Conn) Invoke(ctx context.Context, method string, args, reply any, _ ...
 		body = bytes.NewReader(data)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, rt.method, c.baseURL.JoinPath(rt.path).String(), body)
+	httpReq, err := http.NewRequestWithContext(ctx, rt.method, endpoint.String(), body)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to build request for %s: %v", method, err)
 	}
@@ -150,6 +151,39 @@ func (c *Conn) Invoke(ctx context.Context, method string, args, reply any, _ ...
 	return nil
 }
 
+// encodeQuery converts protobuf JSON fields to grpc-gateway GET query parameters.
+// Scalar fields use their JSON names; repeated scalar fields become repeated query keys.
+func encodeQuery(msg proto.Message) (url.Values, error) {
+	data, err := protojson.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+
+	query := make(url.Values, len(fields))
+	for name, raw := range fields {
+		var value any
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return nil, fmt.Errorf("decode field %q: %w", name, err)
+		}
+		if values, ok := value.([]any); ok {
+			for _, item := range values {
+				if item != nil {
+					query.Add(name, fmt.Sprint(item))
+				}
+			}
+			continue
+		}
+		if value != nil {
+			query.Set(name, fmt.Sprint(value))
+		}
+	}
+	return query, nil
+}
+
 func (c *Conn) NewStream(_ context.Context, _ *grpc.StreamDesc, method string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
 	return nil, status.Errorf(codes.Unimplemented, "streaming method %s is not supported by the REST client", method)
 }
@@ -159,18 +193,7 @@ func (c *Conn) Close() error {
 	return nil
 }
 
-// isEmptyMessage reports whether the message has no populated fields.
-func isEmptyMessage(m proto.Message) bool {
-	empty := true
-	m.ProtoReflect().Range(func(protoreflect.FieldDescriptor, protoreflect.Value) bool {
-		empty = false
-		return false
-	})
-	return empty
-}
-
-// transportErrCode maps HTTP client errors to gRPC codes preserving
-// context cancellation semantics.
+// transportErrCode maps HTTP client errors to gRPC codes preserving context cancellation semantics.
 func transportErrCode(err error) codes.Code {
 	switch {
 	case errors.Is(err, context.Canceled):
@@ -182,16 +205,10 @@ func transportErrCode(err error) codes.Code {
 	}
 }
 
-// errorFromResponse converts a grpc-gateway error response into a gRPC status
-// error. The gateway serializes errors as google.rpc.Status JSON
-// ({"code":..,"message":..,"details":[..]}), which allows PrintGrpcError to
-// present them the same way as before.
+// errorFromResponse converts a grpc-gateway error response into a gRPC status error.
 func errorFromResponse(httpStatus int, body []byte) error {
 	var st spb.Status
 	err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(body, &st)
-	// Trust the body only if the code is a valid gRPC error code. This filters
-	// out non grpc-gateway JSON responses, e.g. {"code":401,...} produced by an
-	// auth proxy in front of the API.
 	if err == nil && st.GetCode() > int32(codes.OK) && st.GetCode() <= int32(codes.Unauthenticated) {
 		return status.ErrorProto(&st)
 	}
@@ -202,8 +219,6 @@ func errorFromResponse(httpStatus int, body []byte) error {
 	return status.Errorf(codeFromHTTPStatus(httpStatus), "HTTP %d: %s", httpStatus, bytes.TrimSpace(body))
 }
 
-// codeFromHTTPStatus is a fallback for non grpc-gateway error responses,
-// e.g. produced by a load balancer in front of the API.
 func codeFromHTTPStatus(httpStatus int) codes.Code {
 	switch httpStatus {
 	case http.StatusBadRequest:

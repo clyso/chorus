@@ -264,7 +264,7 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 	}
 
 	if conf.Api.Enabled {
-		chorusHandler := api.ChorusHandlers(credsSvc, rpc.NewProxyClient(appRedis), &app)
+		chorusHandler := api.ChorusHandlers(credsSvc, clientRegistry, rpc.NewProxyClient(appRedis), &app)
 		diffHandler := api.DiffHandlers(credsSvc, checkSvc)
 		var webhookConf *api.WebhookConfig
 		if conf.Api.Webhook.Enabled {
