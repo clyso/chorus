@@ -49,6 +49,10 @@
       label: t(RouteName.CHORUS_STORAGES),
     },
     {
+      name: RouteName.CHORUS_OBJECT_BROWSER,
+      label: t(RouteName.CHORUS_OBJECT_BROWSER),
+    },
+    {
       name: RouteName.CHORUS_MONITORING,
       label: t(RouteName.CHORUS_MONITORING),
     },

@@ -31,6 +31,8 @@ import type {
   RoutingPolicyListRequest,
   RoutingPolicyListResponse,
   ChorusStorageListResponse,
+  ChorusBrowserBucketsResponse,
+  ChorusBrowserObjectsResponse,
   RoutingPolicyEditRequest,
   RoutingPolicyAddRequest,
   UserCredentialSetRequest,
@@ -53,6 +55,33 @@ export abstract class ChorusService {
   static async getStorages(): Promise<ChorusStorageListResponse> {
     const { data } = await apiClient.get<ChorusStorageListResponse>(
       ApiHelper.getChorusAPIUrl('/storage'),
+    );
+
+    return data;
+  }
+
+  static async getBrowserBuckets(
+    params: { storage: string; user: string },
+  ): Promise<ChorusBrowserBucketsResponse> {
+    const { data } = await apiClient.get<ChorusBrowserBucketsResponse>(
+      ApiHelper.getChorusAPIUrl('/browser/buckets'),
+      { params },
+    );
+
+    return data;
+  }
+
+  static async getBrowserObjects(params: {
+    storage: string;
+    user: string;
+    bucket: string;
+    prefix?: string;
+    after?: string;
+    limit?: number;
+  }): Promise<ChorusBrowserObjectsResponse> {
+    const { data } = await apiClient.get<ChorusBrowserObjectsResponse>(
+      ApiHelper.getChorusAPIUrl('/browser/objects'),
+      { params },
     );
 
     return data;

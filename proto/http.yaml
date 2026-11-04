@@ -29,6 +29,10 @@ http:
       get: /version
     - selector: chorus.Chorus.GetStorages
       get: /storage
+    - selector: chorus.Chorus.ListBrowserBuckets
+      get: /browser/buckets
+    - selector: chorus.Chorus.ListBrowserObjects
+      get: /browser/objects
     - selector: chorus.Chorus.GetProxyCredentials
       get: /proxy
     - selector: chorus.Chorus.SetUserCredentials

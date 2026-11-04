@@ -27,6 +27,105 @@
     "application/json"
   ],
   "paths": {
+    "/browser/buckets": {
+      "get": {
+        "summary": "Lists buckets for an object browser.",
+        "operationId": "Chorus_ListBrowserBuckets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListBrowserBucketsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googleRpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "storage",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
+    "/browser/objects": {
+      "get": {
+        "summary": "Lists a page of objects and their original migration timestamps.",
+        "operationId": "Chorus_ListBrowserObjects",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListBrowserObjectsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googleRpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "storage",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Chorus"
+        ]
+      }
+    },
     "/credentials": {
       "post": {
         "summary": "Sets user credentials for a given storage.",
@@ -1117,6 +1216,25 @@
         }
       }
     },
+    "chorusBrowserObject": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "lastModified": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceLastModified": {
+          "type": "string"
+        }
+      }
+    },
     "chorusBucketRouting": {
       "type": "object",
       "properties": {
@@ -1342,6 +1460,35 @@
             "type": "object",
             "$ref": "#/definitions/chorusStorage"
           }
+        }
+      }
+    },
+    "chorusListBrowserBucketsResponse": {
+      "type": "object",
+      "properties": {
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "chorusListBrowserObjectsResponse": {
+      "type": "object",
+      "properties": {
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusBrowserObject"
+          }
+        },
+        "nextAfter": {
+          "type": "string"
+        },
+        "hasMore": {
+          "type": "boolean"
         }
       }
     },

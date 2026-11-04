@@ -13,6 +13,12 @@ service Chorus {
   rpc GetAppVersion(google.protobuf.Empty) returns (GetAppVersionResponse);
   // Lists configured storages with users
   rpc GetStorages(google.protobuf.Empty) returns (GetStoragesResponse);
+    // Lists buckets for an object browser.
+    rpc ListBrowserBuckets(ListBrowserBucketsRequest)
+      returns (ListBrowserBucketsResponse);
+    // Lists a page of objects and their original migration timestamps.
+    rpc ListBrowserObjects(ListBrowserObjectsRequest)
+      returns (ListBrowserObjectsResponse);
   // Returns connection details for proxy s3 endpoint
   rpc GetProxyCredentials(google.protobuf.Empty)
       returns (GetProxyCredentialsResponse);
@@ -28,6 +34,35 @@ message GetAppVersionResponse {
 }
 
 message GetStoragesResponse { repeated Storage storages = 1; }
+
+message ListBrowserBucketsRequest {
+  string storage = 1;
+  string user = 2;
+}
+
+message ListBrowserBucketsResponse { repeated string buckets = 1; }
+
+message ListBrowserObjectsRequest {
+  string storage = 1;
+  string user = 2;
+  string bucket = 3;
+  string prefix = 4;
+  string after = 5;
+  uint32 limit = 6;
+}
+
+message BrowserObject {
+  string key = 1;
+  uint64 size = 2;
+  google.protobuf.Timestamp last_modified = 3;
+  string source_last_modified = 4;
+}
+
+message ListBrowserObjectsResponse {
+  repeated BrowserObject objects = 1;
+  string next_after = 2;
+  bool has_more = 3;
+}
 
 message Storage {
   enum Type {

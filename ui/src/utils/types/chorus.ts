@@ -85,6 +85,23 @@ export interface ChorusStorageListResponse {
   storages: ChorusStorage[];
 }
 
+export interface ChorusBrowserBucketsResponse {
+  buckets: string[];
+}
+
+export interface ChorusBrowserObject {
+  key: string;
+  size: string;
+  lastModified: string;
+  sourceLastModified: string;
+}
+
+export interface ChorusBrowserObjectsResponse {
+  objects: ChorusBrowserObject[];
+  nextAfter: string;
+  hasMore: boolean;
+}
+
 export interface ChorusStorage {
   name: string;
   isMain: boolean;
