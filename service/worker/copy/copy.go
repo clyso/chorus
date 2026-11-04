@@ -44,7 +44,8 @@ import (
 // TODO:
 // swift client metrics
 const (
-	CChorusSourceVersionIDMetaHeader = "x-amz-meta-chorus-source-version-id"
+	CChorusSourceVersionIDMetaHeader    = "x-amz-meta-chorus-source-version-id"
+	CChorusSourceLastModifiedMetaHeader = "x-amz-meta-chorus-source-last-modified"
 
 	CRGWVersionMigrationQueryParam = "rgwx-version-id"
 )
@@ -326,6 +327,12 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	putObjectOpts := minio.PutObjectOptions{
 		UserMetadata: fromObjectStat.UserMetadata,
 		ContentType:  fromObjectStat.ContentType,
+	}
+	if putObjectOpts.UserMetadata == nil {
+		putObjectOpts.UserMetadata = make(map[string]string)
+	}
+	if !fromObjectStat.LastModified.IsZero() {
+		putObjectOpts.UserMetadata[CChorusSourceLastModifiedMetaHeader] = fromObjectStat.LastModified.UTC().Format(time.RFC3339Nano)
 	}
 
 	if features.Tagging(ctx) {
