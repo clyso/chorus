@@ -32,7 +32,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	pb "github.com/clyso/chorus/proto/gen/go/chorus"
 )
@@ -58,24 +57,24 @@ var restRoutes = map[string]route{
 	pb.Diff_Fix_FullMethodName:              {http.MethodPost, "/diff/fix"},
 	pb.Diff_Restart_FullMethodName:          {http.MethodPut, "/diff/restart"},
 	// Chorus service:
-	pb.Chorus_GetAppVersion_FullMethodName:        {http.MethodGet, "/version"},
-	pb.Chorus_GetStorages_FullMethodName:           {http.MethodGet, "/storage"},
-	pb.Chorus_ListBrowserBuckets_FullMethodName:    {http.MethodGet, "/browser/buckets"},
-	pb.Chorus_ListBrowserObjects_FullMethodName:    {http.MethodGet, "/browser/objects"},
-	pb.Chorus_GetProxyCredentials_FullMethodName:   {http.MethodGet, "/proxy"},
-	pb.Chorus_SetUserCredentials_FullMethodName:    {http.MethodPost, "/credentials"},
+	pb.Chorus_GetAppVersion_FullMethodName:       {http.MethodGet, "/version"},
+	pb.Chorus_GetStorages_FullMethodName:         {http.MethodGet, "/storage"},
+	pb.Chorus_ListBrowserBuckets_FullMethodName:  {http.MethodGet, "/browser/buckets"},
+	pb.Chorus_ListBrowserObjects_FullMethodName:  {http.MethodGet, "/browser/objects"},
+	pb.Chorus_GetProxyCredentials_FullMethodName: {http.MethodGet, "/proxy"},
+	pb.Chorus_SetUserCredentials_FullMethodName:  {http.MethodPost, "/credentials"},
 	// Policy service - replication:
 	pb.Policy_AvailableBuckets_FullMethodName:       {http.MethodPost, "/replication/list-buckets"},
-	pb.Policy_AddReplication_FullMethodName:          {http.MethodPost, "/replication/add"},
-	pb.Policy_GetReplication_FullMethodName:          {http.MethodPost, "/replication/get"},
-	pb.Policy_ListReplications_FullMethodName:        {http.MethodPost, "/replication"},
-	pb.Policy_PauseReplication_FullMethodName:        {http.MethodPut, "/replication/pause"},
-	pb.Policy_ResumeReplication_FullMethodName:       {http.MethodPut, "/replication/resume"},
-	pb.Policy_DeleteReplication_FullMethodName:       {http.MethodPut, "/replication/delete"},
-	pb.Policy_SwitchWithZeroDowntime_FullMethodName:  {http.MethodPost, "/replication/switch/zero-downtime"},
-	pb.Policy_SwitchWithDowntime_FullMethodName:      {http.MethodPost, "/replication/switch"},
-	pb.Policy_DeleteSwitch_FullMethodName:            {http.MethodPost, "/replication/switch/delete"},
-	pb.Policy_GetSwitchStatus_FullMethodName:         {http.MethodPost, "/replication/switch/get"},
+	pb.Policy_AddReplication_FullMethodName:         {http.MethodPost, "/replication/add"},
+	pb.Policy_GetReplication_FullMethodName:         {http.MethodPost, "/replication/get"},
+	pb.Policy_ListReplications_FullMethodName:       {http.MethodPost, "/replication"},
+	pb.Policy_PauseReplication_FullMethodName:       {http.MethodPut, "/replication/pause"},
+	pb.Policy_ResumeReplication_FullMethodName:      {http.MethodPut, "/replication/resume"},
+	pb.Policy_DeleteReplication_FullMethodName:      {http.MethodPut, "/replication/delete"},
+	pb.Policy_SwitchWithZeroDowntime_FullMethodName: {http.MethodPost, "/replication/switch/zero-downtime"},
+	pb.Policy_SwitchWithDowntime_FullMethodName:     {http.MethodPost, "/replication/switch"},
+	pb.Policy_DeleteSwitch_FullMethodName:           {http.MethodPost, "/replication/switch/delete"},
+	pb.Policy_GetSwitchStatus_FullMethodName:        {http.MethodPost, "/replication/switch/get"},
 	// Policy service - routing:
 	pb.Policy_ListRoutings_FullMethodName:   {http.MethodPost, "/routing"},
 	pb.Policy_AddRouting_FullMethodName:     {http.MethodPost, "/routing/add"},
