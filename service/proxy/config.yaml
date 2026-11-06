@@ -6,6 +6,7 @@ cors:
   whitelist:
 auth:
   allowV2Signature: false
+  requireSignedContentType: true # false accepts an unsigned Content-Type (minio-go clients, presigned PUTs)
   useStorage: # use credentials from one of configured storages <one|two>
   custom: # OR use custom credentials for proxy s3 endpoint
 #    user1:

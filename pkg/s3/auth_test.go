@@ -11,6 +11,26 @@ import (
 	"github.com/clyso/chorus/pkg/dom"
 )
 
+func TestExtractSignedHeadersContentTypePolicy(t *testing.T) {
+	t.Parallel()
+
+	r := &http.Request{Header: http.Header{"Content-Type": {"application/octet-stream"}, "Host": {"h"}}}
+	signed := []string{"host"}
+
+	if _, err := ExtractSignedHeadersWithPolicy(signed, r, StrictSignedHeaders); err == nil {
+		t.Fatal("strict policy must reject an unsigned Content-Type")
+	}
+	relaxed := SignedHeadersPolicy{RequireContentType: false}
+	if _, err := ExtractSignedHeadersWithPolicy(signed, r, relaxed); err != nil {
+		t.Fatalf("relaxed policy must accept an unsigned Content-Type, got %v", err)
+	}
+	// x-amz-* headers stay mandatory under either policy
+	r.Header.Set("X-Amz-Meta-Foo", "bar")
+	if _, err := ExtractSignedHeadersWithPolicy(signed, r, relaxed); err == nil {
+		t.Fatal("relaxed policy must still reject an unsigned x-amz-* header")
+	}
+}
+
 func TestExtractSignedHeadersRejectsUnsignedHeaders(t *testing.T) {
 	t.Parallel()
 

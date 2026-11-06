@@ -21,7 +21,10 @@ import (
 )
 
 type Config struct {
-	AllowV2Signature bool                        `yaml:"allowV2Signature"`
-	UseStorage       string                      `yaml:"useStorage"`
-	Custom           map[string]s3.CredentialsV4 `yaml:"custom"`
+	AllowV2Signature bool `yaml:"allowV2Signature"`
+	// RequireSignedContentType rejects requests whose Content-Type is not signed.
+	// Set it to false for minio-go clients and presigned PUT uploads.
+	RequireSignedContentType bool                        `yaml:"requireSignedContentType"`
+	UseStorage               string                      `yaml:"useStorage"`
+	Custom                   map[string]s3.CredentialsV4 `yaml:"custom"`
 }
