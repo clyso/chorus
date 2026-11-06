@@ -135,7 +135,7 @@ func (s *svc) syncBucketTagging(ctx context.Context, fromClient, toClient s3clie
 		toBucketName = toBucket
 	}
 	var mcErr mclient.ErrorResponse
-	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
+	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSet") {
 		err = toClient.S3().RemoveBucketTagging(ctx, toBucketName)
 		if err != nil {
 			if mclient.IsNetworkOrHostDown(err, true) {
@@ -191,7 +191,7 @@ func (s *svc) syncObjectTagging(ctx context.Context, fromClient, toClient s3clie
 	fromTags, err := fromClient.S3().GetObjectTagging(ctx, fromBucket, object.Name, mclient.GetObjectTaggingOptions{VersionID: object.Version})
 
 	var mcErr mclient.ErrorResponse
-	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSetError") {
+	if errors.As(err, &mcErr) && strings.Contains(mcErr.Code, "NoSuchTagSet") {
 		err = toClient.S3().RemoveObjectTagging(ctx, toBucket, object.Name, mclient.RemoveObjectTaggingOptions{VersionID: object.Version})
 		if err != nil {
 			if mclient.IsNetworkOrHostDown(err, true) {
