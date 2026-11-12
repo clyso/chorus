@@ -26,7 +26,7 @@ storage:
   storages:
 #    one: # yaml key with some handy storage name
 #      address: <s3.chorus.com>
-#      credentials: # user -> alias -> credential
+#      credentials: # user -> alias -> credential. Flat "user: {accessKeyID, secretAccessKey}" is read as alias named after the user
 #        user1:
 #          alias1: # alias name for the credential, e.g. laptop or ci
 #            accessKeyID: <user1 alias1 v4 accessKey credential>

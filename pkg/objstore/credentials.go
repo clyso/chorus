@@ -193,7 +193,8 @@ Redis HASH structure:
   - value: if encryption is disabled: JSON serialized credentials
 
 Alias fields are S3-only and read only by proxy-mode instances; worker-mode
-instances skip them. Storage, user, and alias names must not contain ':' -
+instances skip them. Proxy-mode instances read per-user S3 fields as the alias
+named after the user, unless an explicit alias field with that name exists. Storage, user, and alias names must not contain ':' -
 enforced on the write path so the field format stays unambiguous.
 
 Credentials encryption:
@@ -513,8 +514,8 @@ func (s *credsSvc) sync(ctx context.Context) error {
 			// proxy alias entry - not used by the worker
 			continue
 		}
-		if s.proxy != nil && (alias == "" || storType != dom.S3) {
-			// proxy indexes only S3 alias entries; worker per-user entries are skipped
+		if s.proxy != nil && storType != dom.S3 {
+			// proxy authenticates only S3 credentials
 			continue
 		}
 		plaintext, err := s.decrypt([]byte(value))
@@ -545,6 +546,23 @@ func (s *credsSvc) sync(ctx context.Context) error {
 			swiftCreds[credsCacheKey(storage, user)] = cred
 		default:
 			return fmt.Errorf("%w: unknown storage type %s", dom.ErrInvalidArg, storType)
+		}
+	}
+
+	if s.proxy != nil {
+		// per-user entries (set without alias) act as the alias named after the user,
+		// same as flat static proxy credentials. Explicit alias entries win.
+		for key, cred := range s3Creds {
+			storage, user := cacheKeyToCreds(key)
+			if _, ok := s3AliasCreds[aliasCacheKey(storage, user, user)]; ok {
+				continue
+			}
+			s3AliasCreds[aliasCacheKey(storage, user, user)] = cred
+			s3AccessKeyIdx[s3accessKeyIdxKey(storage, cred.AccessKeyID)] = s3CredsByAccessKey{
+				user:        user,
+				alias:       user,
+				credentials: cred,
+			}
 		}
 	}
 

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/clyso/chorus/pkg/dom"
 )
 
@@ -144,8 +146,50 @@ func (s *StorageAddress) validate() error {
 // authenticates callers by alias access key and joins credentials across
 // storages by alias name when re-signing forwarded requests.
 type ProxyStorage struct {
-	Credentials    map[string]map[string]CredentialsV4 `yaml:"credentials"`
+	Credentials    ProxyCredentials `yaml:"credentials"`
 	StorageAddress `yaml:",inline" mapstructure:",squash"`
+}
+
+// ProxyCredentials maps user -> alias -> credential.
+// For backward compatibility a user may also be set to a single flat credential
+// (the pre-alias config format): it is read as the alias named after the user.
+type ProxyCredentials map[string]map[string]CredentialsV4
+
+func (c *ProxyCredentials) UnmarshalYAML(value *yaml.Node) error {
+	var raw map[string]yaml.Node
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+	res := make(ProxyCredentials, len(raw))
+	for user, node := range raw {
+		if isFlatCredential(&node) {
+			var cred CredentialsV4
+			if err := node.Decode(&cred); err != nil {
+				return err
+			}
+			res[user] = map[string]CredentialsV4{user: cred}
+			continue
+		}
+		var aliases map[string]CredentialsV4
+		if err := node.Decode(&aliases); err != nil {
+			return err
+		}
+		res[user] = aliases
+	}
+	*c = res
+	return nil
+}
+
+func isFlatCredential(node *yaml.Node) bool {
+	if node.Kind != yaml.MappingNode {
+		return false
+	}
+	for i := 0; i < len(node.Content); i += 2 {
+		if k := node.Content[i].Value; k == "accessKeyID" || k == "secretAccessKey" {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ProxyStorage) HasUser(user string) bool {

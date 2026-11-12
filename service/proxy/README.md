@@ -64,5 +64,13 @@ keyed by user only, and re-signs forwarded requests with the target storage's cr
 the same alias name. `auth.custom` uses the same nested form; each custom `(user, alias)`
 pair must exist in the main storage credentials.
 
+Typical use: a bucket migration is started for user `owner`, but other storage users with
+access to the bucket also write to it. Add their keys as aliases of `owner` on every storage,
+otherwise their writes are not mapped to the replication and are not replicated.
+
+The flat pre-alias form `user1: {accessKeyID: ..., secretAccessKey: ...}` is still accepted
+and is read as the alias named after the user (`user1 -> user1 -> credential`). Flat and
+nested users can be mixed.
+
 Aliases can also be added at runtime via the management API
 (`chorctl set-user --alias <name> ...`) - see [docs/dynamic-creds.md](../../docs/dynamic-creds.md).

@@ -79,7 +79,8 @@ credentials; combining it with Swift credentials is an error.
 
 Mode semantics:
 - The **worker** uses only per-user entries and ignores alias entries.
-- The **proxy** is alias-only: it indexes static nested config plus dynamic alias entries.
-  Dynamic per-user entries (set without `alias`) do not authenticate at the proxy.
+- The **proxy** indexes static config plus dynamic entries. A dynamic per-user entry (set
+  without `alias`) is read as the alias named after the user, same as a flat static
+  credential; an explicit alias entry with that name takes precedence.
 
 

@@ -138,6 +138,64 @@ storages:
 	r.ElementsMatch([]string{"user1", "user2"}, stor.UserList())
 }
 
+// Pre-alias flat config (user -> credential) must keep working: each flat
+// credential is read as the alias named after the user. Flat and nested users
+// can be mixed, e.g. to add extra identities to an existing tenant.
+func TestStorages_LegacyFlatYAMLUnmarshal(t *testing.T) {
+	r := require.New(t)
+	const confYAML = `storage:
+  main: s3
+  storages:
+    s3:
+      type: S3
+      provider: Ceph
+      address: s3.example.com
+      credentials:
+        admin:
+          accessKeyID: key1
+          secretAccessKey: secret1
+        tenant:
+          tenant:
+            accessKeyID: key2
+            secretAccessKey: secret2
+          second_user:
+            accessKeyID: key3
+            secretAccessKey: secret3
+auth:
+  useStorage: s3
+  custom:
+    admin:
+      accessKeyID: custom1
+      secretAccessKey: customSecret1`
+
+	var conf struct {
+		Storage Storages    `yaml:"storage"`
+		Auth    auth.Config `yaml:"auth"`
+	}
+	r.NoError(yaml.Unmarshal([]byte(confYAML), &conf))
+	r.NoError(conf.Storage.Validate())
+	r.NoError(ValidateAuth(conf.Storage, &conf.Auth))
+
+	stor := conf.Storage.Storages["s3"].S3
+	r.Equal(s3.ProxyCredentials{
+		"admin": {"admin": {AccessKeyID: "key1", SecretAccessKey: "secret1"}},
+		"tenant": {
+			"tenant":      {AccessKeyID: "key2", SecretAccessKey: "secret2"},
+			"second_user": {AccessKeyID: "key3", SecretAccessKey: "secret3"},
+		},
+	}, stor.Credentials)
+	r.Equal(s3.ProxyCredentials{
+		"admin": {"admin": {AccessKeyID: "custom1", SecretAccessKey: "customSecret1"}},
+	}, conf.Auth.Custom)
+
+	// round trip keeps the nested form
+	out, err := yaml.Marshal(stor)
+	r.NoError(err)
+	var back s3.ProxyStorage
+	r.NoError(yaml.Unmarshal(out, &back))
+	r.Equal(stor.Credentials, back.Credentials)
+}
+
 func TestProxyStorage_Validate(t *testing.T) {
 	validAddr := s3.StorageAddress{
 		Address:  "s3.example.com",

@@ -1078,7 +1078,7 @@ func Test_credsSvc_ProxyMode_Dynamic(t *testing.T) {
 		r.NotContains(svcW.ListUsers(s3Stor), "bob")
 	})
 
-	t.Run("worker entry ignored by proxy", func(t *testing.T) {
+	t.Run("per-user entry is alias named after user", func(t *testing.T) {
 		r := require.New(t)
 		userCred := s3.CredentialsV4{
 			AccessKeyID:     "carol_key",
@@ -1091,12 +1091,36 @@ func Test_credsSvc_ProxyMode_Dynamic(t *testing.T) {
 		r.NoError(err)
 		r.EqualValues(userCred, got)
 
-		// wait until proxy syncs past the write, then confirm it is ignored
-		time.Sleep(pollInterval * 3)
-		_, _, _, err = svcP.FindS3Credentials(s3Stor, userCred.AccessKeyID)
-		r.ErrorIs(err, dom.ErrNotFound)
-		r.Error(svcP.HasUser(s3Stor, "carol"))
-		r.NotContains(svcP.ListUsers(s3Stor), "carol")
+		// proxy authenticates it as alias "carol" of user "carol"
+		r.Eventually(func() bool {
+			_, _, _, err := svcP.FindS3Credentials(s3Stor, userCred.AccessKeyID)
+			return err == nil
+		}, pollInterval*5, pollInterval/2)
+		user, alias, cred, err := svcP.FindS3Credentials(s3Stor, userCred.AccessKeyID)
+		r.NoError(err)
+		r.Equal("carol", user)
+		r.Equal("carol", alias)
+		r.EqualValues(userCred, cred)
+		got, err = svcP.GetS3AliasCredentials(s3Stor, "carol", "carol")
+		r.NoError(err)
+		r.EqualValues(userCred, got)
+		r.NoError(svcP.HasUser(s3Stor, "carol"))
+		r.Contains(svcP.ListUsers(s3Stor), "carol")
+
+		// explicit alias with the same name wins over the per-user entry
+		aliasCred := s3.CredentialsV4{
+			AccessKeyID:     "carol_alias_key",
+			SecretAccessKey: "carol_alias_secret",
+		}
+		r.NoError(svcP.SetS3AliasCredentials(ctx, s3Stor, "carol", "carol", aliasCred))
+		r.Eventually(func() bool {
+			got, err := svcP.GetS3AliasCredentials(s3Stor, "carol", "carol")
+			return err == nil && got == aliasCred
+		}, pollInterval*5, pollInterval/2)
+		// worker still uses the per-user entry
+		got, err = svcW.GetS3Credentials(s3Stor, "carol")
+		r.NoError(err)
+		r.EqualValues(userCred, got)
 	})
 
 	t.Run("static config precedence over dynamic alias", func(t *testing.T) {
