@@ -72,8 +72,7 @@ func Test_e2e_proxy_second_user_bucket_migration(t *testing.T) {
 	put := func(c *mclient.Client, name string) {
 		t.Helper()
 		data := bytes.Repeat([]byte(name), 128)
-		// unsigned payload: the proxy cannot re-sign aws-chunked streaming uploads to MinIO
-		_, err := c.PutObject(ctx, bucket, name, bytes.NewReader(data), int64(len(data)), mclient.PutObjectOptions{DisableContentSha256: true})
+		_, err := c.PutObject(ctx, bucket, name, bytes.NewReader(data), int64(len(data)), mclient.PutObjectOptions{})
 		r.NoError(err)
 	}
 	for i := range 20 {

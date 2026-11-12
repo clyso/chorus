@@ -101,6 +101,13 @@ func (c *client) Do(req *http.Request) (resp *http.Response, isApiErr bool, err 
 	if err != nil {
 		return nil, false, err
 	}
+	sha := newReq.Header.Get(s3.AmzContentSha256)
+	if newReq.Body != http.NoBody && (sha == s3.StreamingPayload || sha == s3.StreamingPayloadTrailer) {
+		// chunk signatures are chained from the seed signature: re-sign them with the storage credentials
+		if newReq.Body, err = resignChunks(newReq, sha == s3.StreamingPayloadTrailer, c.cred.SecretAccessKey, signingRegion(c.conf)); err != nil {
+			return nil, false, err
+		}
+	}
 	for name, vals := range notToSign {
 		newReq.Header[name] = vals
 	}

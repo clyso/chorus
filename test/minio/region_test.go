@@ -104,7 +104,7 @@ func Test_e2e_storage_region(t *testing.T) {
 		bucket := bucketName("region-proxy")
 		obj, content := "obj.txt", "written through the proxy"
 		r.NoError(proxyClient.MakeBucket(ctx, bucket, mclient.MakeBucketOptions{}))
-		_, err = proxyClient.PutObject(ctx, bucket, obj, strings.NewReader(content), int64(len(content)), mclient.PutObjectOptions{DisableContentSha256: true})
+		_, err = proxyClient.PutObject(ctx, bucket, obj, strings.NewReader(content), int64(len(content)), mclient.PutObjectOptions{})
 		r.NoError(err)
 		r.Equal(content, string(readObject(t, proxyClient, bucket, obj)))
 		r.Equal(content, string(readObject(t, regionClient, bucket, obj)))

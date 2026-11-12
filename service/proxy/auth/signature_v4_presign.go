@@ -118,7 +118,7 @@ func (m *middleware) doesPresignedSignatureV4Match(r *http.Request) (credMeta, s
 
 	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, r.URL.Path, r.Method)
 	stringToSign := getV4StringToSign(canonicalRequest, psv.Date, psv.Credential.GetScope())
-	signingKey := getV4SigningKey(cred.SecretAccessKey, psv.Credential.Scope.Date, psv.Credential.Scope.Region)
+	signingKey := s3.SigningKeyV4(cred.SecretAccessKey, psv.Credential.Scope.Date, psv.Credential.Scope.Region)
 	newSignature := getV4Signature(signingKey, stringToSign)
 
 	if !compareSignatureV4(newSignature, psv.Signature) {

@@ -269,41 +269,11 @@ func Test_e2e_proxy_presigned_sigv4(t *testing.T) {
 		ctx := t.Context()
 
 		obj, content := "header-auth-obj.txt", "header auth content"
-		// DisableContentSha256 avoids a streaming upload, see
-		// streaming_signature_is_not_supported below.
-		_, err := proxyClient.PutObject(ctx, bucket, obj, strings.NewReader(content), int64(len(content)),
-			mclient.PutObjectOptions{DisableContentSha256: true})
+		_, err := proxyClient.PutObject(ctx, bucket, obj, strings.NewReader(content), int64(len(content)), mclient.PutObjectOptions{})
 		r.NoError(err)
 
 		r.Equal(content, string(readObject(t, proxyClient, bucket, obj)))
 	})
-}
-
-// Test_e2e_proxy_streaming_upload pins the streaming upload limitation
-// documented in service/proxy/README.md: minio-go signs a payload chunk chain
-// against the request signature, which the proxy invalidates by re-signing the
-// request. If this test starts failing, chunked uploads got supported and the
-// DisableContentSha256 workarounds in this suite can be dropped.
-func Test_e2e_proxy_streaming_signature_is_not_supported(t *testing.T) {
-	r := require.New(t)
-	e := app.SetupChorus(t, workerConf, proxyConf)
-	ctx := t.Context()
-
-	proxyClient, err := mclient.New(e.ProxyAddr, &mclient.Options{
-		Creds:  mcredentials.NewStaticV4(storageCreds.AccessKeyID, storageCreds.SecretAccessKey, ""),
-		Secure: false,
-	})
-	r.NoError(err)
-
-	bucket := bucketName("streaming-upload")
-	r.NoError(proxyClient.MakeBucket(ctx, bucket, mclient.MakeBucketOptions{}))
-
-	content := "streaming upload content"
-	_, err = proxyClient.PutObject(ctx, bucket, "obj.txt", strings.NewReader(content), int64(len(content)), mclient.PutObjectOptions{})
-	r.Error(err)
-	// MinIO reports the broken chunk chain as SignatureDoesNotMatch, Ceph RGW
-	// as XAmzContentSHA256Mismatch.
-	r.Contains([]string{"SignatureDoesNotMatch", "XAmzContentSHA256Mismatch"}, mclient.ToErrorResponse(err).Code)
 }
 
 // Test_e2e_proxy_sigv2 covers the V2 signature path, which - like a presigned

@@ -39,7 +39,6 @@ import (
 const (
 	signV4Algorithm = "AWS4-HMAC-SHA256"
 	iso8601Format   = "20060102T150405Z"
-	yyyymmdd        = "20060102"
 )
 
 func isRequestSignatureV4(r *http.Request) bool {
@@ -85,7 +84,7 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 	queryStr := req.URL.Query().Encode()
 	canonicalRequest := getCanonicalV4Request(extractedSignedHeaders, hashedPayload, queryStr, req.URL.Path, req.Method)
 	stringToSign := getV4StringToSign(canonicalRequest, t, signV4Values.Credential.GetScope())
-	signingKey := getV4SigningKey(cred.SecretAccessKey, signV4Values.Credential.Scope.Date,
+	signingKey := s3.SigningKeyV4(cred.SecretAccessKey, signV4Values.Credential.Scope.Date,
 		signV4Values.Credential.Scope.Region)
 	newSignature := getV4Signature(signingKey, stringToSign)
 
@@ -98,6 +97,16 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 			Key:        xctx.GetObject(r.Context()),
 			StatusCode: http.StatusForbidden,
 		}
+	}
+
+	if hashedPayload == s3.StreamingPayload || hashedPayload == s3.StreamingPayloadTrailer {
+		// the seed signature does not cover the body: check every chunk signature
+		r.Body = s3.ResignChunks(r.Body, hashedPayload == s3.StreamingPayloadTrailer, &s3.ChunkSigner{
+			Key:   signingKey,
+			Date:  t.Format(iso8601Format),
+			Scope: signV4Values.Credential.GetScope(),
+			Prev:  newSignature,
+		}, nil)
 	}
 
 	return credInfo, nil
@@ -159,14 +168,6 @@ func getV4StringToSign(canonicalRequest string, t time.Time, scope string) strin
 	canonicalRequestBytes := sha256.Sum256([]byte(canonicalRequest))
 	stringToSign += hex.EncodeToString(canonicalRequestBytes[:])
 	return stringToSign
-}
-
-func getV4SigningKey(secretKey string, t time.Time, region string) []byte {
-	date := sumHMAC([]byte("AWS4"+secretKey), []byte(t.Format(yyyymmdd)))
-	regionBytes := sumHMAC(date, []byte(region))
-	service := sumHMAC(regionBytes, []byte("s3"))
-	signingKey := sumHMAC(service, []byte("aws4_request"))
-	return signingKey
 }
 
 func getV4Signature(signingKey []byte, stringToSign string) string {
