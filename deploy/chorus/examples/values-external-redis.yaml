@@ -38,12 +38,27 @@ storage:
       provider: Ceph
       isSecure: true
 
+# Worker credentials
 credentials:
   storages:
     main:
       user1:
         accessKeyID: "AKIAIOSFODNN7EXAMPLE"
         secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Proxy credentials (user -> alias -> credential)
+proxyCredentials:
+  storages:
+    main:
+      user1:
+        default:
+          accessKeyID: "BKIAIOSFODNN7EXAMPLE"
+          secretAccessKey: "xJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+proxy:
+  config:
+    auth:
+      useStorage: main
 
 ---
 # Example with Redis Sentinel

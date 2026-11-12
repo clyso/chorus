@@ -62,6 +62,7 @@ func TestDoesSignatureV2MatchAcceptsSignedVirtualHostRequest(t *testing.T) {
 		accessKey = "test-access-key"
 		secretKey = "test-secret-key"
 		user      = "test-user"
+		alias     = "test-alias"
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/object/nested?acl", nil)
@@ -76,7 +77,8 @@ func TestDoesSignatureV2MatchAcceptsSignedVirtualHostRequest(t *testing.T) {
 					AccessKeyID:     accessKey,
 					SecretAccessKey: secretKey,
 				},
-				user: user,
+				user:  user,
+				alias: alias,
 			},
 		},
 		endpoint: "http://s3.example.com",
@@ -84,5 +86,6 @@ func TestDoesSignatureV2MatchAcceptsSignedVirtualHostRequest(t *testing.T) {
 
 	got, err := m.doesSignatureV2Match(req)
 	require.NoError(t, err)
-	require.Equal(t, user, got)
+	require.Equal(t, user, got.user)
+	require.Equal(t, alias, got.alias)
 }

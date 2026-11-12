@@ -7,24 +7,28 @@ proxy:
       one: # yaml key with some handy storage name
         type: S3
         address: ":9680" # will start fake s3 on port 9680
-        credentials:
+        credentials: # user -> alias -> credential
           user1:
-            accessKeyID: testKey1
-            secretAccessKey: testSecretKey1
+            default:
+              accessKeyID: testKey1
+              secretAccessKey: testSecretKey1
           user2:
-            accessKeyID: testKey2
-            secretAccessKey: testSecretKey2
+            default:
+              accessKeyID: testKey2
+              secretAccessKey: testSecretKey2
         provider: Other
       two: # yaml key with some handy storage name
         type: S3
         address: ":9681" # will start fake s3 on port 9681
-        credentials:
+        credentials: # user -> alias -> credential
           user1:
-            accessKeyID: testKey1
-            secretAccessKey: testSecretKey1
+            default:
+              accessKeyID: testKey1
+              secretAccessKey: testSecretKey1
           user2:
-            accessKeyID: testKey2
-            secretAccessKey: testSecretKey2
+            default:
+              accessKeyID: testKey2
+              secretAccessKey: testSecretKey2
         provider: Other
 features:
   tagging: false # sync object/bucket tags

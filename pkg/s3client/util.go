@@ -245,6 +245,21 @@ func signV4(req http.Request, accessKeyID, secretAccessKey, sessionToken, locati
 	return res, nil
 }
 
+// resignChunks re-signs the aws-chunked body of a request signed by signV4,
+// chaining the chunk signatures from its seed signature.
+func resignChunks(req *http.Request, withTrailer bool, secretAccessKey, region string) (io.ReadCloser, error) {
+	auth, err := s3.ParseSignV4(req.Header.Get(s3.Authorization))
+	if err != nil {
+		return nil, err
+	}
+	return s3.ResignChunks(req.Body, withTrailer, nil, &s3.ChunkSigner{
+		Key:   s3.SigningKeyV4(secretAccessKey, auth.Credential.Scope.Date, region),
+		Date:  req.Header.Get(s3.AmzDate),
+		Scope: auth.Credential.GetScope(),
+		Prev:  auth.Signature,
+	}), nil
+}
+
 var ignoreInSignature = map[string]struct{}{
 	"x-forwarded-for":    {},
 	"x-forwarded-host":   {},

@@ -45,6 +45,10 @@ message Storage {
 }
 
 message Credential {
+  // Display name of the credential:
+  // - in GetStoragesResponse: the user name
+  // - in GetProxyCredentialsResponse: "<user>:<alias>" of the proxy alias
+  //   credential
   string alias = 1;
   string access_key = 2;
   string secret_key = 3;
@@ -60,6 +64,10 @@ message SetUserCredentialsRequest {
   string user = 2;
   optional S3Credential s3_cred = 3;
   optional SwiftCredential swift_cred = 4;
+  // Optional proxy alias name for the credential. S3 only.
+  // When set, the credential is stored as a proxy alias credential
+  // used by the proxy to authenticate and re-sign forwarded requests.
+  optional string alias = 5;
 }
 
 message S3Credential {

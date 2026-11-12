@@ -31,12 +31,15 @@ import (
 	"github.com/clyso/chorus/pkg/util"
 )
 
-func Middleware(conf *Config, credsSvc objstore.CredsService, endpointAddress string) *middleware {
+func Middleware(conf *Config, credsSvc objstore.ProxyCredsLookup, endpointAddress string) *middleware {
 	custom := map[string]credMeta{}
-	for user, cred := range conf.Custom {
-		custom[cred.AccessKeyID] = credMeta{
-			cred: cred,
-			user: user,
+	for user, aliases := range conf.Custom {
+		for alias, cred := range aliases {
+			custom[cred.AccessKeyID] = credMeta{
+				cred:  cred,
+				user:  user,
+				alias: alias,
+			}
 		}
 	}
 	return &middleware{
@@ -49,21 +52,22 @@ func Middleware(conf *Config, credsSvc objstore.CredsService, endpointAddress st
 }
 
 type credMeta struct {
-	cred s3.CredentialsV4
-	user string
+	cred  s3.CredentialsV4
+	user  string
+	alias string
 }
 
 type middleware struct {
 	allowV2     bool
 	custom      map[string]credMeta
 	storageName string
-	credsSvc    objstore.CredsService
+	credsSvc    objstore.ProxyCredsLookup
 	endpoint    string
 }
 
 func (m *middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, payloadHash, err := m.isReqAuthenticated(r)
+		cred, payloadHash, err := m.isReqAuthenticated(r)
 		if err != nil {
 			util.WriteError(r.Context(), w, err)
 			return
@@ -79,7 +83,8 @@ func (m *middleware) Wrap(next http.Handler) http.Handler {
 			// carries only the Authorization header computed by the proxy.
 			removePresignParams(r)
 		}
-		ctx := log.WithUser(r.Context(), user)
+		ctx := log.WithUser(r.Context(), cred.user)
+		ctx = xctx.SetAlias(ctx, cred.alias)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -95,12 +100,13 @@ var authDeniedErr = mclient.ErrorResponse{
 func (m *middleware) getCred(accessKey string) (credMeta, error) {
 	if m.storageName != "" {
 		// check storage creds
-		user, cred, err := m.credsSvc.FindS3Credentials(m.storageName, accessKey)
+		user, alias, cred, err := m.credsSvc.FindS3Credentials(m.storageName, accessKey)
 		if err == nil {
 			// found:
 			return credMeta{
-				cred: cred,
-				user: user,
+				cred:  cred,
+				user:  user,
+				alias: alias,
 			}, nil
 		}
 		// fallback to custom creds
@@ -114,9 +120,9 @@ func (m *middleware) getCred(accessKey string) (credMeta, error) {
 }
 
 // isReqAuthenticated verifies the request signature and returns the
-// authenticated user together with the payload hash the signature was
+// authenticated credential together with the payload hash the signature was
 // verified against.
-func (m *middleware) isReqAuthenticated(r *http.Request) (string, string, error) {
+func (m *middleware) isReqAuthenticated(r *http.Request) (credMeta, string, error) {
 	switch {
 	case isRequestSignatureV4(r):
 		sha256sum := getContentSha256Cksum(r)
@@ -129,7 +135,7 @@ func (m *middleware) isReqAuthenticated(r *http.Request) (string, string, error)
 		user, err := m.doesSignatureV2Match(r)
 		return user, unsignedPayload, err
 	}
-	return "", unsignedPayload, mclient.ErrorResponse{
+	return credMeta{}, unsignedPayload, mclient.ErrorResponse{
 		XMLName:    xml.Name{},
 		Code:       "CredentialsNotSupported",
 		Message:    "This request does not support given credentials type.",

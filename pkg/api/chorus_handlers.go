@@ -83,15 +83,25 @@ func (h *chorusHandlers) SetUserCredentials(ctx context.Context, req *pb.SetUser
 		if req.S3Cred == nil {
 			return nil, fmt.Errorf("%w: s3 credentials are required for storage type S3", dom.ErrInvalidArg)
 		}
-		err := h.credsSvc.SetS3Credentials(ctx, req.Storage, req.User, s3.CredentialsV4{
+		cred := s3.CredentialsV4{
 			AccessKeyID:     req.S3Cred.AccessKey,
 			SecretAccessKey: req.S3Cred.SecretKey,
-		})
+		}
+		var err error
+		if req.GetAlias() != "" {
+			// proxy alias credential
+			err = h.credsSvc.SetS3AliasCredentials(ctx, req.Storage, req.User, req.GetAlias(), cred)
+		} else {
+			err = h.credsSvc.SetS3Credentials(ctx, req.Storage, req.User, cred)
+		}
 		if err != nil {
 			return nil, err
 		}
 		return &emptypb.Empty{}, nil
 	case dom.Swift:
+		if req.GetAlias() != "" {
+			return nil, fmt.Errorf("%w: alias credentials are supported only for S3 storages", dom.ErrInvalidArg)
+		}
 		if req.SwiftCred == nil {
 			return nil, fmt.Errorf("%w: swift credentials are required for storage type Swift", dom.ErrInvalidArg)
 		}

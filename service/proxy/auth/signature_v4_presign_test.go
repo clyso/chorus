@@ -79,7 +79,7 @@ func presignWithQueryPayloadHash(t *testing.T, req *http.Request, hashedPayload 
 	signedHeaders := http.Header{}
 	signedHeaders.Set("Host", req.Host)
 	canonicalRequest := getCanonicalV4Request(signedHeaders, hashedPayload, req.URL.RawQuery, req.URL.Path, req.Method)
-	signingKey := getV4SigningKey(presignTestSecretKey, now, "us-east-1")
+	signingKey := s3.SigningKeyV4(presignTestSecretKey, now, "us-east-1")
 	signature := getV4Signature(signingKey, getV4StringToSign(canonicalRequest, now, scope))
 
 	query.Set(s3.AmzSignature, signature)
@@ -102,7 +102,7 @@ func signWithoutPayloadHash(t *testing.T, req *http.Request) *http.Request {
 	signedHeaders.Set("Host", req.Host)
 	signedHeaders.Set(s3.AmzDate, req.Header.Get(s3.AmzDate))
 	canonicalRequest := getCanonicalV4Request(signedHeaders, emptySHA256, req.URL.Query().Encode(), req.URL.Path, req.Method)
-	signingKey := getV4SigningKey(presignTestSecretKey, now, "us-east-1")
+	signingKey := s3.SigningKeyV4(presignTestSecretKey, now, "us-east-1")
 	signature := getV4Signature(signingKey, getV4StringToSign(canonicalRequest, now, scope))
 
 	req.Header.Set(s3.Authorization, "AWS4-HMAC-SHA256 Credential="+presignTestAccessKey+"/"+scope+
@@ -120,7 +120,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 
 		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 	})
 
 	t.Run("non-default region in credential scope", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 
 		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 	})
 
 	t.Run("preserves non-auth query params", func(t *testing.T) {
@@ -144,7 +144,7 @@ func TestDoesPresignedSignatureV4Match(t *testing.T) {
 
 		got, _, err := m.doesPresignedSignatureV4Match(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 	})
 
 	t.Run("wrong secret key", func(t *testing.T) {
@@ -227,7 +227,7 @@ func TestIsReqAuthenticatedPresigned(t *testing.T) {
 
 		got, hashedPayload, err := m.isReqAuthenticated(req)
 		require.NoError(t, err)
-		require.Equal(t, presignTestUser, got)
+		require.Equal(t, presignTestUser, got.user)
 		require.Equal(t, unsignedPayload, hashedPayload)
 	})
 

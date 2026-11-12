@@ -22,7 +22,8 @@
 │   ├── s3cmd-follower.conf   # s3cmd credentials for follower storage
 │   ├── s3cmd-main.conf       # s3cmd credentials for main storage
 │   ├── s3cmd-proxy.conf      # s3cmd credentials for proxy storage
-│   ├── s3-credentials.yaml   # chorus common config with S3 credentials
+│   ├── s3-credentials.yaml   # chorus worker config with S3 credentials
+│   ├── proxy-s3-credentials.yaml # chorus proxy config with S3 alias credentials
 │   └── worker-conf.yaml      # example config for chorus-worker
 ```
 
@@ -113,7 +114,7 @@ Try to add more worker instances to speed up replication process and observe how
 ```
 The same can be done for `worker3`, `worker4`, etc. And for `proxy` service.
 
-Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) with your own s3 storages and start docker-compose without fake backends:
+Replace S3 credentials in [./s3-credentials.yaml](./s3-credentials.yaml) and [./proxy-s3-credentials.yaml](./proxy-s3-credentials.yaml) with your own s3 storages and start docker-compose without fake backends:
 ```shell
 docker-compose -f ./docker-compose/docker-compose.yml --profile proxy up
 ```
