@@ -68,6 +68,9 @@ http:
     - selector: chorus.Policy.GetSwitchStatus
       post: /replication/switch/get
       body: "*"
+    - selector: chorus.Policy.ListReplicationFailures
+      post: /replication/failures
+      body: "*"
       # Policy service - routing:
     - selector: chorus.Policy.ListRoutings
       post: /routing

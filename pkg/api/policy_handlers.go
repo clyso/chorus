@@ -18,6 +18,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -28,6 +29,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	xctx "github.com/clyso/chorus/pkg/ctx"
 	"github.com/clyso/chorus/pkg/dom"
@@ -403,6 +405,56 @@ func (h *policyHandlers) GetReplication(ctx context.Context, req *pb.Replication
 		return nil, err
 	}
 	return replicationToPb(uid, status), nil
+}
+
+func (h *policyHandlers) ListReplicationFailures(ctx context.Context, req *pb.ListReplicationFailuresRequest) (*pb.ListReplicationFailuresResponse, error) {
+	uid, err := pbToReplicationID(req.Id)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.ListReplicationFailuresResponse{}
+	for _, q := range []struct{ name, queue string }{
+		{"init", tasks.InitMigrationCopyQueue(uid)},
+		{"event", tasks.EventMigrationQueue(uid)},
+	} {
+		failed, err := h.queueSvc.ListFailed(ctx, q.queue, int(req.Limit))
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range failed {
+			res.Failures = append(res.Failures, failureToPb(q.name, f))
+		}
+	}
+	return res, nil
+}
+
+// failureToPb converts a failed task, pulling the object out of the payloads that carry one.
+func failureToPb(queue string, f tasks.FailedTask) *pb.ReplicationFailure {
+	out := &pb.ReplicationFailure{
+		Queue:        queue,
+		TaskType:     f.Type,
+		Retried:      int32(f.Retried),
+		MaxRetry:     int32(f.MaxRetry),
+		LastError:    f.LastErr,
+		LastFailedAt: timestamppb.New(f.LastFailedAt),
+		Archived:     f.Archived,
+	}
+	if !f.Archived && !f.NextProcessAt.IsZero() {
+		out.NextRetryAt = timestamppb.New(f.NextProcessAt)
+	}
+	switch f.Type {
+	case tasks.TypeMigrateObjCopy:
+		var p tasks.MigrateObjCopyPayload
+		if json.Unmarshal(f.Payload, &p) == nil {
+			out.Bucket, out.Object, out.VersionId = p.Bucket, p.Obj.Name, p.Obj.VersionID
+		}
+	case tasks.TypeObjectSync:
+		var p tasks.ObjectSyncPayload
+		if json.Unmarshal(f.Payload, &p) == nil {
+			out.Bucket, out.Object, out.VersionId = p.Object.Bucket, p.Object.Name, p.Object.Version
+		}
+	}
+	return out
 }
 
 func (h *policyHandlers) GetSwitchStatus(ctx context.Context, req *pb.ReplicationID) (*pb.ReplicationSwitch, error) {

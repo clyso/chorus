@@ -148,6 +148,11 @@ type QueueStats struct {
 	Unprocessed int
 	// Total number of successfully processed tasks.
 	Done int
+	// Tasks that failed at least once and wait for their next attempt.
+	Retrying int
+	// Tasks that will not be attempted again (retries exhausted or permanent error).
+	// They stay in Unprocessed, so a replication with archived tasks never reaches 100 %.
+	Archived int
 	// Age of the oldest pending task in the queue.
 	Latency time.Duration
 	// Approx bytes used by the queue and its tasks in Redis.

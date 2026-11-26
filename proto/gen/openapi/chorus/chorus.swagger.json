@@ -406,6 +406,39 @@
         ]
       }
     },
+    "/replication/failures": {
+      "post": {
+        "summary": "Lists the tasks of a replication that failed at least once: the objects\nstill being retried and those given up on, with the last error of each.",
+        "operationId": "Policy_ListReplicationFailures",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/chorusListReplicationFailuresResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googleRpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/chorusListReplicationFailuresRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
     "/replication/get": {
       "post": {
         "summary": "Returns replication info by ID.",
@@ -1357,6 +1390,31 @@
         }
       }
     },
+    "chorusListReplicationFailuresRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/chorusReplicationID"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Maximum number of entries per queue and state (default 100)."
+        }
+      }
+    },
+    "chorusListReplicationFailuresResponse": {
+      "type": "object",
+      "properties": {
+        "failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/chorusReplicationFailure"
+          }
+        }
+      }
+    },
     "chorusListReplicationsRequest": {
       "type": "object",
       "properties": {
@@ -1517,9 +1575,76 @@
         "webhookUrl": {
           "type": "string",
           "description": "Webhook endpoint URL for this replication (if event source uses webhook).\nRead-only, computed by the server."
+        },
+        "initObjRetrying": {
+          "type": "string",
+          "format": "int64",
+          "description": "Initial replication tasks that failed at least once and wait for a retry."
+        },
+        "initObjArchived": {
+          "type": "string",
+          "format": "int64",
+          "description": "Initial replication tasks that will not be retried (retries exhausted or\npermanent error). They keep the replication below 100 % until fixed or\ndeleted; see ListReplicationFailures for the objects and errors."
+        },
+        "eventsRetrying": {
+          "type": "string",
+          "format": "int64",
+          "description": "Same for event replication tasks."
+        },
+        "eventsArchived": {
+          "type": "string",
+          "format": "int64"
         }
       },
       "description": "Represents specification and status of user-level or bucket-level\nreplication."
+    },
+    "chorusReplicationFailure": {
+      "type": "object",
+      "properties": {
+        "queue": {
+          "type": "string",
+          "description": "\"init\" for the initial copy queue, \"event\" for the live replication queue."
+        },
+        "taskType": {
+          "type": "string",
+          "description": "asynq task type, e.g. migrate:object:copy or object:sync."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "Object the task works on, when the payload carries one."
+        },
+        "object": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "retried": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxRetry": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "lastError": {
+          "type": "string"
+        },
+        "lastFailedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nextRetryAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the next attempt is due; unset for archived tasks."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "true if the task will not be retried."
+        }
+      },
+      "description": "One replication task that failed at least once."
     },
     "chorusReplicationID": {
       "type": "object",

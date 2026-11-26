@@ -33,6 +33,10 @@ func (q *QueueServiceMock) EnqueueTask(ctx context.Context, task any) error {
 	return nil
 }
 
+func (q *QueueServiceMock) ListFailed(ctx context.Context, queueName string, limit int) ([]FailedTask, error) {
+	return nil, nil
+}
+
 // InitReplicationInProgress test helper to initialize queues for replication in progress
 func (q *QueueServiceMock) InitReplicationInProgress(id entity.UniversalReplicationID) {
 	queue := InitMigrationListQueue(id)
