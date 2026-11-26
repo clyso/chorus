@@ -332,6 +332,33 @@ func local_request_Policy_GetSwitchStatus_0(ctx context.Context, marshaler runti
 	return msg, metadata, err
 }
 
+func request_Policy_ListReplicationFailures_0(ctx context.Context, marshaler runtime.Marshaler, client PolicyClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListReplicationFailuresRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.ListReplicationFailures(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Policy_ListReplicationFailures_0(ctx context.Context, marshaler runtime.Marshaler, server PolicyServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListReplicationFailuresRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.ListReplicationFailures(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_Policy_ListRoutings_0(ctx context.Context, marshaler runtime.Marshaler, client PolicyClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq RoutingsRequest
@@ -720,6 +747,26 @@ func RegisterPolicyHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		}
 		forward_Policy_GetSwitchStatus_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Policy_ListReplicationFailures_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/chorus.Policy/ListReplicationFailures", runtime.WithHTTPPathPattern("/replication/failures"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Policy_ListReplicationFailures_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Policy_ListReplicationFailures_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_Policy_ListRoutings_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1067,6 +1114,23 @@ func RegisterPolicyHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		}
 		forward_Policy_GetSwitchStatus_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Policy_ListReplicationFailures_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/chorus.Policy/ListReplicationFailures", runtime.WithHTTPPathPattern("/replication/failures"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Policy_ListReplicationFailures_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Policy_ListReplicationFailures_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_Policy_ListRoutings_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1173,41 +1237,43 @@ func RegisterPolicyHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 }
 
 var (
-	pattern_Policy_AvailableBuckets_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "list-buckets"}, ""))
-	pattern_Policy_AddReplication_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "add"}, ""))
-	pattern_Policy_GetReplication_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "get"}, ""))
-	pattern_Policy_ListReplications_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"replication"}, ""))
-	pattern_Policy_PauseReplication_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "pause"}, ""))
-	pattern_Policy_ResumeReplication_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "resume"}, ""))
-	pattern_Policy_DeleteReplication_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "delete"}, ""))
-	pattern_Policy_SwitchWithZeroDowntime_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "switch", "zero-downtime"}, ""))
-	pattern_Policy_SwitchWithDowntime_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "switch"}, ""))
-	pattern_Policy_DeleteSwitch_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "switch", "delete"}, ""))
-	pattern_Policy_GetSwitchStatus_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "switch", "get"}, ""))
-	pattern_Policy_ListRoutings_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"routing"}, ""))
-	pattern_Policy_AddRouting_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "add"}, ""))
-	pattern_Policy_DeleteRouting_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "delete"}, ""))
-	pattern_Policy_BlockRouting_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "block"}, ""))
-	pattern_Policy_UnblockRouting_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "unblock"}, ""))
-	pattern_Policy_TestProxy_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"test-proxy"}, ""))
+	pattern_Policy_AvailableBuckets_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "list-buckets"}, ""))
+	pattern_Policy_AddReplication_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "add"}, ""))
+	pattern_Policy_GetReplication_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "get"}, ""))
+	pattern_Policy_ListReplications_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"replication"}, ""))
+	pattern_Policy_PauseReplication_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "pause"}, ""))
+	pattern_Policy_ResumeReplication_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "resume"}, ""))
+	pattern_Policy_DeleteReplication_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "delete"}, ""))
+	pattern_Policy_SwitchWithZeroDowntime_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "switch", "zero-downtime"}, ""))
+	pattern_Policy_SwitchWithDowntime_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "switch"}, ""))
+	pattern_Policy_DeleteSwitch_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "switch", "delete"}, ""))
+	pattern_Policy_GetSwitchStatus_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"replication", "switch", "get"}, ""))
+	pattern_Policy_ListReplicationFailures_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"replication", "failures"}, ""))
+	pattern_Policy_ListRoutings_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"routing"}, ""))
+	pattern_Policy_AddRouting_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "add"}, ""))
+	pattern_Policy_DeleteRouting_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "delete"}, ""))
+	pattern_Policy_BlockRouting_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "block"}, ""))
+	pattern_Policy_UnblockRouting_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"routing", "unblock"}, ""))
+	pattern_Policy_TestProxy_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"test-proxy"}, ""))
 )
 
 var (
-	forward_Policy_AvailableBuckets_0       = runtime.ForwardResponseMessage
-	forward_Policy_AddReplication_0         = runtime.ForwardResponseMessage
-	forward_Policy_GetReplication_0         = runtime.ForwardResponseMessage
-	forward_Policy_ListReplications_0       = runtime.ForwardResponseMessage
-	forward_Policy_PauseReplication_0       = runtime.ForwardResponseMessage
-	forward_Policy_ResumeReplication_0      = runtime.ForwardResponseMessage
-	forward_Policy_DeleteReplication_0      = runtime.ForwardResponseMessage
-	forward_Policy_SwitchWithZeroDowntime_0 = runtime.ForwardResponseMessage
-	forward_Policy_SwitchWithDowntime_0     = runtime.ForwardResponseMessage
-	forward_Policy_DeleteSwitch_0           = runtime.ForwardResponseMessage
-	forward_Policy_GetSwitchStatus_0        = runtime.ForwardResponseMessage
-	forward_Policy_ListRoutings_0           = runtime.ForwardResponseMessage
-	forward_Policy_AddRouting_0             = runtime.ForwardResponseMessage
-	forward_Policy_DeleteRouting_0          = runtime.ForwardResponseMessage
-	forward_Policy_BlockRouting_0           = runtime.ForwardResponseMessage
-	forward_Policy_UnblockRouting_0         = runtime.ForwardResponseMessage
-	forward_Policy_TestProxy_0              = runtime.ForwardResponseMessage
+	forward_Policy_AvailableBuckets_0        = runtime.ForwardResponseMessage
+	forward_Policy_AddReplication_0          = runtime.ForwardResponseMessage
+	forward_Policy_GetReplication_0          = runtime.ForwardResponseMessage
+	forward_Policy_ListReplications_0        = runtime.ForwardResponseMessage
+	forward_Policy_PauseReplication_0        = runtime.ForwardResponseMessage
+	forward_Policy_ResumeReplication_0       = runtime.ForwardResponseMessage
+	forward_Policy_DeleteReplication_0       = runtime.ForwardResponseMessage
+	forward_Policy_SwitchWithZeroDowntime_0  = runtime.ForwardResponseMessage
+	forward_Policy_SwitchWithDowntime_0      = runtime.ForwardResponseMessage
+	forward_Policy_DeleteSwitch_0            = runtime.ForwardResponseMessage
+	forward_Policy_GetSwitchStatus_0         = runtime.ForwardResponseMessage
+	forward_Policy_ListReplicationFailures_0 = runtime.ForwardResponseMessage
+	forward_Policy_ListRoutings_0            = runtime.ForwardResponseMessage
+	forward_Policy_AddRouting_0              = runtime.ForwardResponseMessage
+	forward_Policy_DeleteRouting_0           = runtime.ForwardResponseMessage
+	forward_Policy_BlockRouting_0            = runtime.ForwardResponseMessage
+	forward_Policy_UnblockRouting_0          = runtime.ForwardResponseMessage
+	forward_Policy_TestProxy_0               = runtime.ForwardResponseMessage
 )

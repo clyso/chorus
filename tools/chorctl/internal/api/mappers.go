@@ -46,7 +46,18 @@ func StorageRow(in *pb.Storage) string {
 }
 
 func ReplHeader() string {
-	return "NAME\tPROGRESS\tOBJECTS\tEVENTS\tLAG\tPAUSED\tAGE\tARCHIEVED\tHAS_SWITCH"
+	return "NAME\tPROGRESS\tOBJECTS\tEVENTS\tFAILED\tLAG\tPAUSED\tAGE\tARCHIEVED\tHAS_SWITCH"
+}
+
+// ReplFailed renders the FAILED column: tasks waiting for a retry / tasks given up on,
+// summed over the initial and the event queue, or "-" when there are none.
+func ReplFailed(in *pb.Replication) string {
+	retrying := in.InitObjRetrying + in.EventsRetrying
+	archived := in.InitObjArchived + in.EventsArchived
+	if retrying == 0 && archived == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%d/%d", retrying, archived)
 }
 
 func ReplRow(in *pb.Replication) string {
@@ -58,11 +69,12 @@ func ReplRow(in *pb.Replication) string {
 	if in.HasSwitch {
 		switchStatus = in.SwitchInfo.LastStatus.String()
 	}
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v\t%s",
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%v\t%s\t%v\t%s",
 		id,
 		ToPercentage(p),
 		objects,
 		events,
+		ReplFailed(in),
 		DurationToStr(in.EventLag.AsDuration()),
 		in.IsPaused,
 		DateToAge(in.CreatedAt),

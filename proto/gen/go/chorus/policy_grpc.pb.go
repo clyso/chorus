@@ -20,24 +20,25 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Policy_AvailableBuckets_FullMethodName       = "/chorus.Policy/AvailableBuckets"
-	Policy_AddReplication_FullMethodName         = "/chorus.Policy/AddReplication"
-	Policy_GetReplication_FullMethodName         = "/chorus.Policy/GetReplication"
-	Policy_ListReplications_FullMethodName       = "/chorus.Policy/ListReplications"
-	Policy_StreamReplication_FullMethodName      = "/chorus.Policy/StreamReplication"
-	Policy_PauseReplication_FullMethodName       = "/chorus.Policy/PauseReplication"
-	Policy_ResumeReplication_FullMethodName      = "/chorus.Policy/ResumeReplication"
-	Policy_DeleteReplication_FullMethodName      = "/chorus.Policy/DeleteReplication"
-	Policy_SwitchWithZeroDowntime_FullMethodName = "/chorus.Policy/SwitchWithZeroDowntime"
-	Policy_SwitchWithDowntime_FullMethodName     = "/chorus.Policy/SwitchWithDowntime"
-	Policy_DeleteSwitch_FullMethodName           = "/chorus.Policy/DeleteSwitch"
-	Policy_GetSwitchStatus_FullMethodName        = "/chorus.Policy/GetSwitchStatus"
-	Policy_ListRoutings_FullMethodName           = "/chorus.Policy/ListRoutings"
-	Policy_AddRouting_FullMethodName             = "/chorus.Policy/AddRouting"
-	Policy_DeleteRouting_FullMethodName          = "/chorus.Policy/DeleteRouting"
-	Policy_BlockRouting_FullMethodName           = "/chorus.Policy/BlockRouting"
-	Policy_UnblockRouting_FullMethodName         = "/chorus.Policy/UnblockRouting"
-	Policy_TestProxy_FullMethodName              = "/chorus.Policy/TestProxy"
+	Policy_AvailableBuckets_FullMethodName        = "/chorus.Policy/AvailableBuckets"
+	Policy_AddReplication_FullMethodName          = "/chorus.Policy/AddReplication"
+	Policy_GetReplication_FullMethodName          = "/chorus.Policy/GetReplication"
+	Policy_ListReplications_FullMethodName        = "/chorus.Policy/ListReplications"
+	Policy_StreamReplication_FullMethodName       = "/chorus.Policy/StreamReplication"
+	Policy_PauseReplication_FullMethodName        = "/chorus.Policy/PauseReplication"
+	Policy_ResumeReplication_FullMethodName       = "/chorus.Policy/ResumeReplication"
+	Policy_DeleteReplication_FullMethodName       = "/chorus.Policy/DeleteReplication"
+	Policy_SwitchWithZeroDowntime_FullMethodName  = "/chorus.Policy/SwitchWithZeroDowntime"
+	Policy_SwitchWithDowntime_FullMethodName      = "/chorus.Policy/SwitchWithDowntime"
+	Policy_DeleteSwitch_FullMethodName            = "/chorus.Policy/DeleteSwitch"
+	Policy_GetSwitchStatus_FullMethodName         = "/chorus.Policy/GetSwitchStatus"
+	Policy_ListReplicationFailures_FullMethodName = "/chorus.Policy/ListReplicationFailures"
+	Policy_ListRoutings_FullMethodName            = "/chorus.Policy/ListRoutings"
+	Policy_AddRouting_FullMethodName              = "/chorus.Policy/AddRouting"
+	Policy_DeleteRouting_FullMethodName           = "/chorus.Policy/DeleteRouting"
+	Policy_BlockRouting_FullMethodName            = "/chorus.Policy/BlockRouting"
+	Policy_UnblockRouting_FullMethodName          = "/chorus.Policy/UnblockRouting"
+	Policy_TestProxy_FullMethodName               = "/chorus.Policy/TestProxy"
 )
 
 // PolicyClient is the client API for Policy service.
@@ -113,6 +114,9 @@ type PolicyClient interface {
 	DeleteSwitch(ctx context.Context, in *ReplicationID, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Returns Switch status
 	GetSwitchStatus(ctx context.Context, in *ReplicationID, opts ...grpc.CallOption) (*ReplicationSwitch, error)
+	// Lists the tasks of a replication that failed at least once: the objects
+	// still being retried and those given up on, with the last error of each.
+	ListReplicationFailures(ctx context.Context, in *ListReplicationFailuresRequest, opts ...grpc.CallOption) (*ListReplicationFailuresResponse, error)
 	// Returns configured routing policies for chorus proxy.
 	ListRoutings(ctx context.Context, in *RoutingsRequest, opts ...grpc.CallOption) (*RoutingsResponse, error)
 	// Overrides routing destination for given user or user's bucket.
@@ -265,6 +269,16 @@ func (c *policyClient) GetSwitchStatus(ctx context.Context, in *ReplicationID, o
 	return out, nil
 }
 
+func (c *policyClient) ListReplicationFailures(ctx context.Context, in *ListReplicationFailuresRequest, opts ...grpc.CallOption) (*ListReplicationFailuresResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListReplicationFailuresResponse)
+	err := c.cc.Invoke(ctx, Policy_ListReplicationFailures_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *policyClient) ListRoutings(ctx context.Context, in *RoutingsRequest, opts ...grpc.CallOption) (*RoutingsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RoutingsResponse)
@@ -398,6 +412,9 @@ type PolicyServer interface {
 	DeleteSwitch(context.Context, *ReplicationID) (*emptypb.Empty, error)
 	// Returns Switch status
 	GetSwitchStatus(context.Context, *ReplicationID) (*ReplicationSwitch, error)
+	// Lists the tasks of a replication that failed at least once: the objects
+	// still being retried and those given up on, with the last error of each.
+	ListReplicationFailures(context.Context, *ListReplicationFailuresRequest) (*ListReplicationFailuresResponse, error)
 	// Returns configured routing policies for chorus proxy.
 	ListRoutings(context.Context, *RoutingsRequest) (*RoutingsResponse, error)
 	// Overrides routing destination for given user or user's bucket.
@@ -455,6 +472,9 @@ func (UnimplementedPolicyServer) DeleteSwitch(context.Context, *ReplicationID) (
 }
 func (UnimplementedPolicyServer) GetSwitchStatus(context.Context, *ReplicationID) (*ReplicationSwitch, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSwitchStatus not implemented")
+}
+func (UnimplementedPolicyServer) ListReplicationFailures(context.Context, *ListReplicationFailuresRequest) (*ListReplicationFailuresResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListReplicationFailures not implemented")
 }
 func (UnimplementedPolicyServer) ListRoutings(context.Context, *RoutingsRequest) (*RoutingsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRoutings not implemented")
@@ -703,6 +723,24 @@ func _Policy_GetSwitchStatus_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Policy_ListReplicationFailures_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListReplicationFailuresRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServer).ListReplicationFailures(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Policy_ListReplicationFailures_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServer).ListReplicationFailures(ctx, req.(*ListReplicationFailuresRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Policy_ListRoutings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RoutingsRequest)
 	if err := dec(in); err != nil {
@@ -861,6 +899,10 @@ var Policy_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSwitchStatus",
 			Handler:    _Policy_GetSwitchStatus_Handler,
+		},
+		{
+			MethodName: "ListReplicationFailures",
+			Handler:    _Policy_ListReplicationFailures_Handler,
 		},
 		{
 			MethodName: "ListRoutings",

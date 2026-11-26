@@ -179,6 +179,8 @@ func (r *policySvc) buildQueueStats(ctx context.Context, queue string) (bool, en
 		// the failed attempts. Their difference is the number of tasks that
 		// actually succeeded, which is what we report as Done.
 		Done:        stats.ProcessedTotal - stats.FailedTotal,
+		Retrying:    stats.Retrying,
+		Archived:    stats.Archived,
 		Latency:     stats.Latency,
 		MemoryUsage: stats.MemoryUsage,
 	}, nil

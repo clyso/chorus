@@ -90,6 +90,11 @@ service Policy {
   // Returns Switch status
   rpc GetSwitchStatus(ReplicationID) returns (ReplicationSwitch);
 
+  // Lists the tasks of a replication that failed at least once: the objects
+  // still being retried and those given up on, with the last error of each.
+  rpc ListReplicationFailures(ListReplicationFailuresRequest)
+      returns (ListReplicationFailuresResponse);
+
   // Returns configured routing policies for chorus proxy.
   rpc ListRoutings(RoutingsRequest) returns (RoutingsResponse);
 
@@ -272,6 +277,44 @@ message Replication {
   // Webhook endpoint URL for this replication (if event source uses webhook).
   // Read-only, computed by the server.
   string webhook_url = 16;
+
+  // Initial replication tasks that failed at least once and wait for a retry.
+  int64 init_obj_retrying = 17;
+  // Initial replication tasks that will not be retried (retries exhausted or
+  // permanent error). They keep the replication below 100 % until fixed or
+  // deleted; see ListReplicationFailures for the objects and errors.
+  int64 init_obj_archived = 18;
+  // Same for event replication tasks.
+  int64 events_retrying = 19;
+  int64 events_archived = 20;
+}
+
+message ListReplicationFailuresRequest {
+  ReplicationID id = 1;
+  // Maximum number of entries per queue and state (default 100).
+  int32 limit = 2;
+}
+
+message ListReplicationFailuresResponse { repeated ReplicationFailure failures = 1; }
+
+// One replication task that failed at least once.
+message ReplicationFailure {
+  // "init" for the initial copy queue, "event" for the live replication queue.
+  string queue = 1;
+  // asynq task type, e.g. migrate:object:copy or object:sync.
+  string task_type = 2;
+  // Object the task works on, when the payload carries one.
+  string bucket = 3;
+  string object = 4;
+  string version_id = 5;
+  int32 retried = 6;
+  int32 max_retry = 7;
+  string last_error = 8;
+  google.protobuf.Timestamp last_failed_at = 9;
+  // When the next attempt is due; unset for archived tasks.
+  google.protobuf.Timestamp next_retry_at = 10;
+  // true if the task will not be retried.
+  bool archived = 11;
 }
 
 // Request list of bucket available for replication for given user and from/to

@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -381,4 +382,64 @@ func Test_queueService_StopPurge(t *testing.T) {
 	paused, err := qs.IsPaused(ctx, missingQueue)
 	r.NoError(err)
 	r.False(paused, "queue created after purge is not paused")
+}
+
+func Test_queueService_ListFailed(t *testing.T) {
+	ctx := t.Context()
+	c := testutil.SetupRedis(t)
+	inspector := asynq.NewInspectorFromRedisClient(c)
+	defer inspector.Close()
+	client := asynq.NewClientFromRedisClient(c)
+	defer client.Close()
+	qs := NewQueueService(client, inspector)
+
+	r := require.New(t)
+	queueName := "test-queue-list-failed"
+
+	// non-existing queue has no failed tasks
+	failed, err := qs.ListFailed(ctx, queueName, 0)
+	r.NoError(err)
+	r.Empty(failed)
+
+	_, err = client.EnqueueContext(ctx, asynq.NewTask("retry-task", []byte("a")), asynq.Queue(queueName))
+	r.NoError(err)
+	_, err = client.EnqueueContext(ctx, asynq.NewTask("permanent-task", []byte("b")), asynq.Queue(queueName))
+	r.NoError(err)
+
+	stop := registerHandler(t, ctx, c, queueName, func(ctx context.Context, t *asynq.Task) error {
+		if t.Type() == "permanent-task" {
+			return fmt.Errorf("rejected: %w", asynq.SkipRetry)
+		}
+		return errors.New("try again")
+	})
+	r.Eventually(func() bool {
+		info, err := inspector.GetQueueInfo(queueName)
+		if err != nil {
+			return false
+		}
+		return info.Retry == 1 && info.Archived == 1
+	}, 5*time.Second, 100*time.Millisecond, "expected one retried and one archived task")
+	stop()
+
+	stats, err := qs.Stats(ctx, queueName)
+	r.NoError(err)
+	r.Equal(1, stats.Retrying)
+	r.Equal(1, stats.Archived)
+
+	failed, err = qs.ListFailed(ctx, queueName, 0)
+	r.NoError(err)
+	r.Len(failed, 2)
+
+	retrying, archived := failed[0], failed[1]
+	r.Equal("retry-task", retrying.Type)
+	r.False(retrying.Archived)
+	r.Equal([]byte("a"), retrying.Payload)
+	r.Equal("try again", retrying.LastErr)
+	r.Equal(1, retrying.Retried)
+	r.False(retrying.NextProcessAt.IsZero())
+
+	r.Equal("permanent-task", archived.Type)
+	r.True(archived.Archived)
+	r.Equal([]byte("b"), archived.Payload)
+	r.Contains(archived.LastErr, "rejected")
 }

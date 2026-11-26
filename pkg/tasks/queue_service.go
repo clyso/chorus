@@ -39,7 +39,24 @@ type QueueService interface {
 	// Purge requires stopped queues: asynq refuses to delete a queue with active tasks.
 	Purge(ctx context.Context, queues ...string) error
 	Stats(ctx context.Context, queueName string) (*QueueStats, error)
+	// ListFailed returns the tasks of the queue that failed at least once: those waiting
+	// for a retry and those archived after exhausting their retries. At most limit of each.
+	ListFailed(ctx context.Context, queueName string, limit int) ([]FailedTask, error)
 	EnqueueTask(ctx context.Context, task any) error
+}
+
+// FailedTask is a task that failed at least once, with what asynq knows about it.
+type FailedTask struct {
+	LastFailedAt  time.Time
+	NextProcessAt time.Time
+	ID            string
+	Type          string
+	LastErr       string
+	Payload       []byte
+	Retried       int
+	MaxRetry      int
+	// Archived tasks will not be retried.
+	Archived bool
 }
 
 type QueueStats struct {
@@ -55,6 +72,10 @@ type QueueStats struct {
 	ProcessedTotal int
 	// Total number of failed processing attempts (retries + archived tasks).
 	FailedTotal int
+	// Tasks that failed at least once and wait for their next attempt.
+	Retrying int
+	// Tasks that exhausted their retries (or were marked SkipRetry) and will not run again.
+	Archived int
 
 	// Paused indicates whether the queue is paused.
 	// If true, tasks in the queue will not be processed.
@@ -95,10 +116,45 @@ func (q *queueService) Stats(ctx context.Context, queueName string) (*QueueStats
 		Unprocessed:    info.Size,
 		ProcessedTotal: info.ProcessedTotal,
 		FailedTotal:    info.FailedTotal,
+		Retrying:       info.Retry,
+		Archived:       info.Archived,
 		Paused:         info.Paused,
 		MemoryUsage:    info.MemoryUsage,
 		Latency:        info.Latency,
 	}, nil
+}
+
+func (q *queueService) ListFailed(_ context.Context, queueName string, limit int) ([]FailedTask, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	var out []FailedTask
+	for _, state := range []struct {
+		list     func(string, ...asynq.ListOption) ([]*asynq.TaskInfo, error)
+		archived bool
+	}{{q.inspector.ListRetryTasks, false}, {q.inspector.ListArchivedTasks, true}} {
+		infos, err := state.list(queueName, asynq.PageSize(limit))
+		if errors.Is(err, asynq.ErrQueueNotFound) {
+			return out, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("list failed tasks of %s: %w", queueName, err)
+		}
+		for _, info := range infos {
+			out = append(out, FailedTask{
+				ID:            info.ID,
+				Type:          info.Type,
+				Payload:       info.Payload,
+				Retried:       info.Retried,
+				MaxRetry:      info.MaxRetry,
+				LastErr:       info.LastErr,
+				LastFailedAt:  info.LastFailedAt,
+				NextProcessAt: info.NextProcessAt,
+				Archived:      state.archived,
+			})
+		}
+	}
+	return out, nil
 }
 
 func (q *queueService) Delete(ctx context.Context, queueName string, force bool) error {
