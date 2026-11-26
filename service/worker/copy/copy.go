@@ -45,6 +45,9 @@ import (
 // swift client metrics
 const (
 	CChorusSourceVersionIDMetaHeader = "x-amz-meta-chorus-source-version-id"
+	// CChorusSourceETagMetaHeader keeps the source ETag on the copy
+	// when the sourceETag feature is on.
+	CChorusSourceETagMetaHeader = "x-amz-meta-chorus-source-etag"
 
 	CRGWVersionMigrationQueryParam = "rgwx-version-id"
 )
@@ -298,7 +301,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		toObjectPresent = false
 	}
 
-	if toObjectPresent && fromObjectStat.ETag == toObjectStat.ETag && fromObjectStat.Size == toObjectStat.Size {
+	if toObjectPresent && objectUpToDate(fromObjectStat, toObjectStat, features.SourceETag(ctx)) {
 		return nil
 	}
 
@@ -371,6 +374,12 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		}
 		return fmt.Errorf("unable to stat from object: %w", err)
 	}
+	if features.SourceETag(ctx) {
+		if putObjectOpts.UserMetadata == nil {
+			putObjectOpts.UserMetadata = map[string]string{}
+		}
+		putObjectOpts.UserMetadata[CChorusSourceETagMetaHeader] = stat.ETag
+	}
 	if stat.Size == 0 {
 		// workaround for e2e test test/object_test.go TestApi_Object_Folder
 		putObjectOpts.DisableContentSha256 = true
@@ -398,6 +407,19 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 	}
 
 	return nil
+}
+
+// objectUpToDate reports whether the destination copy matches the source object:
+// same size and same ETag. With bySourceETag, the source ETag recorded on the
+// copy also counts, for destinations that compute ETags differently.
+func objectUpToDate(from, to minio.ObjectInfo, bySourceETag bool) bool {
+	if from.Size != to.Size {
+		return false
+	}
+	if from.ETag == to.ETag {
+		return true
+	}
+	return bySourceETag && from.ETag != "" && to.Metadata.Get(CChorusSourceETagMetaHeader) == from.ETag
 }
 
 // sourceReader keeps the source read error to tell it apart from a destination write error.

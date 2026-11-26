@@ -20,4 +20,5 @@ features:
   lifecycle: false # sync bucket Lifecycle
   policy: false # sync bucket Policies
   preserveACLGrants: false # preserve object/bucket ACL Grants from source
+  sourceETag: false # keep the source ETag in object metadata and skip up-to-date copies by it; for destinations with different ETags
 
