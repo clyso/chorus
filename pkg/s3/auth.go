@@ -177,10 +177,22 @@ func parseSignedHeader(signedHdrElement string) ([]string, error) {
 	return signedHeaders, nil
 }
 
+// SignedHeadersPolicy tells which present headers must be covered by the signature.
+type SignedHeadersPolicy struct {
+	// RequireContentType rejects a request whose Content-Type is not signed.
+	// AWS S3 accepts such requests; minio-go and presigned PUT uploads send
+	// them. When off, the header can be altered in flight over plain HTTP.
+	// x-amz-* headers are always required.
+	RequireContentType bool
+}
+
+// StrictSignedHeaders is the policy that requires every header SigV4 lists.
+var StrictSignedHeaders = SignedHeadersPolicy{RequireContentType: true}
+
 // requiresSignature tells whether SigV4 requires a header present in the
 // request to be covered by the signature.
-func requiresSignature(header string) bool {
-	return header == "content-type" || strings.HasPrefix(header, "x-amz-")
+func (p SignedHeadersPolicy) requiresSignature(header string) bool {
+	return (p.RequireContentType && header == "content-type") || strings.HasPrefix(header, "x-amz-")
 }
 
 // validateSignedHeaders checks that the client signed every header SigV4
@@ -192,13 +204,13 @@ func requiresSignature(header string) bool {
 // signature - the privilege escalation Ceph RGW closed in v19.2.6/v20.2.4 with
 // the fix for CVE-2026-54330.
 // See https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
-func validateSignedHeaders(signedHeaders []string, reqHeaders http.Header) error {
+func validateSignedHeaders(signedHeaders []string, reqHeaders http.Header, policy SignedHeadersPolicy) error {
 	if !slices.Contains(signedHeaders, "host") {
 		return fmt.Errorf("%w: signed headers does not contain host", dom.ErrAuth)
 	}
 	for header := range reqHeaders {
 		lower := strings.ToLower(header)
-		if !requiresSignature(lower) {
+		if !policy.requiresSignature(lower) {
 			continue
 		}
 		if !slices.Contains(signedHeaders, lower) {
@@ -209,11 +221,18 @@ func validateSignedHeaders(signedHeaders []string, reqHeaders http.Header) error
 }
 
 // ExtractSignedHeaders extract signed headers from Authorization header
+// under StrictSignedHeaders.
 func ExtractSignedHeaders(signedHeaders []string, r *http.Request) (http.Header, error) {
+	return ExtractSignedHeadersWithPolicy(signedHeaders, r, StrictSignedHeaders)
+}
+
+// ExtractSignedHeadersWithPolicy extract signed headers from Authorization header
+// under the given policy.
+func ExtractSignedHeadersWithPolicy(signedHeaders []string, r *http.Request, policy SignedHeadersPolicy) (http.Header, error) {
 	reqHeaders := r.Header
 	reqQueries := r.Form
 
-	if err := validateSignedHeaders(signedHeaders, reqHeaders); err != nil {
+	if err := validateSignedHeaders(signedHeaders, reqHeaders, policy); err != nil {
 		return nil, err
 	}
 	extractedSignedHeaders := make(http.Header)

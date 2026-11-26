@@ -60,7 +60,7 @@ func (m *middleware) doesSignatureV4Match(hashedPayload string, r *http.Request)
 		return "", err
 	}
 
-	extractedSignedHeaders, err := s3.ExtractSignedHeaders(signV4Values.SignedHeaders, r)
+	extractedSignedHeaders, err := s3.ExtractSignedHeadersWithPolicy(signV4Values.SignedHeaders, r, m.headers)
 	if err != nil {
 		return "", err
 	}

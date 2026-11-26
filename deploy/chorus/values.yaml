@@ -242,6 +242,7 @@ proxy:
 
     auth:
       allowV2Signature: false
+      requireSignedContentType: true # false accepts an unsigned Content-Type (minio-go clients, presigned PUTs)
       useStorage: "" # Use credentials from this storage
       custom: {} # Or define custom credentials
         # user1:

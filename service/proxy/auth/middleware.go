@@ -41,6 +41,7 @@ func Middleware(conf *Config, credsSvc objstore.CredsService, endpointAddress st
 	}
 	return &middleware{
 		allowV2:     conf.AllowV2Signature,
+		headers:     s3.SignedHeadersPolicy{RequireContentType: conf.RequireSignedContentType},
 		custom:      custom,
 		storageName: conf.UseStorage,
 		credsSvc:    credsSvc,
@@ -55,6 +56,7 @@ type credMeta struct {
 
 type middleware struct {
 	allowV2     bool
+	headers     s3.SignedHeadersPolicy
 	custom      map[string]credMeta
 	storageName string
 	credsSvc    objstore.CredsService
