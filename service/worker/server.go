@@ -152,6 +152,10 @@ func Start(ctx context.Context, app dom.AppInfo, conf *Config) error {
 				taskID, _ := asynq.GetTaskID(ctx)
 				queue, _ := asynq.GetQueueName(ctx)
 				taskLogger := zerolog.Ctx(ctx).With().Str("task_type", task.Type()).Str("task_id", taskID).Str("task_queue", queue).Int("task_max_retry", maxRetry).Int("task_retried", retried).Logger()
+				if errors.Is(err, asynq.SkipRetry) {
+					taskLogger.Error().RawJSON("task_payload", task.Payload()).Err(err).Msg("process task failed with a permanent error. task archived")
+					return
+				}
 				if retried >= maxRetry {
 					taskLogger.Error().RawJSON("task_payload", task.Payload()).Err(err).Msg("process task failed. task will be dropped")
 					return
