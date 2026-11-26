@@ -99,6 +99,11 @@ func (s *svc) HandleMigrationObjCopy(ctx context.Context, t *asynq.Task) (err er
 			logger.Warn().Msg("migration obj copy: skip object sync: object missing in source")
 			return nil
 		}
+		if isPermanentS3Error(err) {
+			// a retry gets the same answer: archive the task now
+			logger.Error().Err(err).Msg("migration obj copy: storage rejected the object, giving up")
+			return fmt.Errorf("migration obj copy: unable to copy object: %w: %w", err, asynq.SkipRetry)
+		}
 		return fmt.Errorf("migration obj copy: unable to copy object: %w", err)
 	}
 
