@@ -327,6 +327,7 @@ func (r *S3CopySvc) CopyObject(ctx context.Context, user string, from File, to F
 		UserMetadata: fromObjectStat.UserMetadata,
 		ContentType:  fromObjectStat.ContentType,
 	}
+	applyStandardHeaders(&putObjectOpts, fromObjectStat)
 
 	if features.Tagging(ctx) {
 		putObjectOpts.UserTags = fromObjectStat.UserTags
@@ -564,4 +565,14 @@ func srcOwnerToDestOwner(owner, srcBucketOwner, dstBucketOwner *string) *string 
 		return owner
 	}
 	return dstBucketOwner
+}
+
+func applyStandardHeaders(opts *minio.PutObjectOptions, stat minio.ObjectInfo) {
+	opts.CacheControl = stat.Metadata.Get("Cache-Control")
+	opts.ContentEncoding = stat.Metadata.Get("Content-Encoding")
+	opts.ContentDisposition = stat.Metadata.Get("Content-Disposition")
+	opts.ContentLanguage = stat.Metadata.Get("Content-Language")
+	if !stat.Expires.IsZero() {
+		opts.Expires = stat.Expires
+	}
 }
